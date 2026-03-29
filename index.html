@@ -1310,11 +1310,22 @@
     localStorage.setItem('kaysworks-theme', isDark ? 'dark' : 'light');
   });
 
-  // Custom cursor
+  // Custom cursor — disabled on touch devices
   const ring = document.getElementById('cursorRing');
   const dot  = document.getElementById('cursorDot');
   const cursorEl = document.getElementById('cursor');
   let mx = 0, my = 0, rx = 0, ry = 0;
+
+  const isTouchDevice = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+  if (isTouchDevice()) {
+    // Hide custom cursor and restore native cursor on touch devices
+    cursorEl.style.display = 'none';
+    document.documentElement.style.setProperty('cursor', 'auto', 'important');
+    const styleOverride = document.createElement('style');
+    styleOverride.textContent = 'html, body, * { cursor: auto !important; }';
+    document.head.appendChild(styleOverride);
+  } else {
 
   function getLuminanceRGB(r, g, b) {
     return 0.299 * r + 0.587 * g + 0.114 * b;
@@ -1426,6 +1437,7 @@
       ring.style.width = '36px'; ring.style.height = '36px';
     });
   });
+  } // end non-touch cursor block
 
   // Nav scroll
   const nav = document.getElementById('mainNav');
