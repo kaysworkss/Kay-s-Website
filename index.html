@@ -1571,46 +1571,38 @@
   }
 
   function renderArtCard(idx) {
-    const card = artCards[idx];
-    const bg   = card.querySelector('.card-bg');
-    const computedBg = window.getComputedStyle(bg).background;
+    const card   = artCards[idx];
+    const bg     = card.querySelector('.card-bg');
+    const imgEl  = bg ? bg.querySelector('img') : null;
 
-    // Show gradient as a coloured preview panel inside the lightbox
-    lightboxImg.style.display = 'none';
-    let artPreview = document.getElementById('artLightboxPreview');
-    if (!artPreview) {
-      artPreview = document.createElement('div');
-      artPreview.id = 'artLightboxPreview';
-      artPreview.style.cssText = `
-        width: min(72vw, 680px);
-        height: min(72vh, 560px);
-        border-radius: 10px;
-        box-shadow: 0 30px 80px rgba(0,0,0,0.7);
-        transform: scale(0.92);
-        transition: transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94), background 0.3s;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 5rem;
-      `;
-      lightboxImg.parentNode.insertBefore(artPreview, lightboxImg);
+    // Hide the old colour-block preview if it exists
+    const artPreview = document.getElementById('artLightboxPreview');
+    if (artPreview) artPreview.style.display = 'none';
+
+    if (imgEl && imgEl.src) {
+      // Show the real image full-size inside the lightbox
+      lightboxImg.src     = imgEl.src;
+      lightboxImg.alt     = imgEl.alt || card.dataset.artTitle || 'Artwork';
+      lightboxImg.style.display = '';
+      // animate in
+      lightboxImg.style.transform = 'scale(0.92)';
+      requestAnimationFrame(() => {
+        lightboxImg.style.transform = 'scale(1)';
+      });
+    } else {
+      // Fallback: nothing to show
+      lightboxImg.style.display = 'none';
     }
-    artPreview.style.background = computedBg;
-    artPreview.style.display = 'flex';
-    // emoji if first card
-    artPreview.textContent = bg.textContent.trim();
-    // animate in
-    requestAnimationFrame(() => {
-      artPreview.style.transform = 'scale(1)';
-    });
 
     const title  = card.dataset.artTitle  || '';
     const medium = card.dataset.artMedium || '';
-    lightboxTitle.textContent  = title;
-    lightboxMedium.textContent = medium;
+    lightboxTitle.textContent   = title;
+    lightboxMedium.textContent  = medium;
     lightboxCounter.textContent = (idx + 1) + ' / ' + artCards.length;
     updateDots(idx);
-    lightboxDots.style.display = 'flex';
-    lightboxPrev.style.display = 'flex';
-    lightboxNext.style.display = 'flex';
+    lightboxDots.style.display  = 'flex';
+    lightboxPrev.style.display  = 'flex';
+    lightboxNext.style.display  = 'flex';
     document.getElementById('lightboxCaption').style.display = 'flex';
   }
 
@@ -1657,8 +1649,7 @@
     setTimeout(() => {
       if (!lightbox.classList.contains('open')) {
         lightboxImg.src = '';
-        const preview = document.getElementById('artLightboxPreview');
-        if (preview) { preview.style.transform = 'scale(0.92)'; preview.style.display = 'none'; }
+        lightboxImg.style.transform = 'scale(0.92)';
       }
     }, 350);
   }
