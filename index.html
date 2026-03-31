@@ -1092,10 +1092,48 @@
           <span class="wip-badge">Ilekun Itan (story door)</span>
         </div>
       </div>
-      <div class="release-countdown">
-        <p class="countdown-label">Precursor — 31st of March 2026</p>
-        <p class="countdown-date">Opening Mint</p>
+      <div class="release-countdown" id="mintCountdown">
+        <p class="countdown-label">Precursor — 31st of March 2026 · 8:00 PM GMT+1</p>
+        <p class="countdown-date" id="countdownDisplay">Opening Mint</p>
+        <p id="countdownTimer" style="font-family:'Cinzel',serif;font-size:1rem;letter-spacing:0.2em;color:var(--gold);margin-top:0.6rem;display:none;"></p>
+        <p id="mintLive" style="font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--gold);margin-top:0.5rem;display:none;">✦ Mint is Live ✦</p>
       </div>
+      <script>
+        (function() {
+          var mintTime = new Date('2026-03-31T20:00:00+01:00').getTime();
+          var timerEl = document.getElementById('countdownTimer');
+          var liveEl = document.getElementById('mintLive');
+          var displayEl = document.getElementById('countdownDisplay');
+
+          function pad(n) { return n < 10 ? '0' + n : n; }
+
+          function tick() {
+            var now = Date.now();
+            var diff = mintTime - now;
+
+            if (diff <= 0) {
+              displayEl.style.display = 'none';
+              timerEl.style.display = 'none';
+              liveEl.style.display = 'block';
+              return;
+            }
+
+            var h = Math.floor(diff / 3600000);
+            var m = Math.floor((diff % 3600000) / 60000);
+            var s = Math.floor((diff % 60000) / 1000);
+
+            if (h > 0) {
+              timerEl.textContent = pad(h) + 'h ' + pad(m) + 'm ' + pad(s) + 's';
+            } else {
+              timerEl.textContent = pad(m) + 'm ' + pad(s) + 's';
+            }
+            timerEl.style.display = 'block';
+            setTimeout(tick, 1000);
+          }
+
+          tick();
+        })();
+      </script>
     </div>
   </div>
 </section>
@@ -1320,7 +1358,7 @@
   <li><a href="https://instagram.com/kays_works" target="_blank" rel="noopener">Instagram</a></li>
   <li><a href="https://x.com/kayodeoyeniyi1" target="_blank" rel="noopener">Twitter</a></li>
   <li><a href="https://kaysworks.substack.com/?utm_campaign=profile_chips" target="_blank" rel="noopener">Newsletter</a></li>
-  <li><a href="mailto:oyeniyikayode4@gmail.com">Contact</a></li>
+  <li><a href="/cdn-cgi/l/email-protection#e58a9c808b8c9c8c8e849c8a8180d1a58288848c89cb868a88">Contact</a></li>
 </ul>
   <p class="footer-copy">© 2026 Kay's Works · All rights reserved</p>
 </footer>
@@ -1341,7 +1379,7 @@
   </div>
 </div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
   // Show mobile controls on small screens
   function checkMobile() {
     const isMobile = window.innerWidth <= 900;
@@ -1685,10 +1723,4 @@
   lightbox.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
   lightbox.addEventListener('touchend', e => {
     if (!artLightboxMode) return;
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(dx) > 50) goToArt(currentArtIndex + (dx < 0 ? 1 : -1));
-  });
-
-</script>
-</body>
-</html>
+    const
