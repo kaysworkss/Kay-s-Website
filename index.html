@@ -1091,11 +1091,11 @@
        alt="Featured artwork - Apoti Olowe carved wooden chest"/>
   <div style="position:absolute;bottom:0;left:0;right:0;
               background:linear-gradient(to top, rgba(30,20,16,0.75) 0%, transparent 100%);
-              padding:3rem 5rem;line-height:1.4;">
-    <p style="font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.4em;
-              text-transform:uppercase;color:#7a3018;margin-bottom:0.5rem;">Featured Work</p>
-    <p style="font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;
-              font-style:italic;color:#e8d5b0;">Apoti Olowe — Digital Sculpture</p>
+              padding:clamp(1.2rem, 4vw, 3rem) clamp(1.2rem, 4vw, 5rem);line-height:1.4;">
+    <p style="font-family:'Cinzel',serif;font-size:clamp(0.5rem, 1.2vw, 0.65rem);letter-spacing:0.4em;
+              text-transform:uppercase;color:#7a3018;margin-bottom:0.4rem;">Featured Work</p>
+    <p style="font-family:'Cormorant Garamond',serif;font-size:clamp(1rem, 3vw, 2rem);font-weight:300;
+              font-style:italic;color:#e8d5b0;margin:0;">Apoti Olowe — Digital Sculpture</p>
   </div>
 </section>
 
@@ -1849,8 +1849,10 @@
 
   // Swipe support for mobile
   let touchStartX = 0;
-  lightbox.addEventListener('touchstart', e => { touchStartX = e.touchlientX - touchStartX;
-    if (Math.abs(dx) > 50) goToArt(currentArtIndex + (dx < 0 ? 1 : -1));
+  lightbox.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+  lightbox.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50 && artLightboxMode) goToArt(currentArtIndex + (dx < 0 ? 1 : -1));
   });
 
 </script>
