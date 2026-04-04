@@ -475,28 +475,23 @@
   }
   .portfolio-grid {
     display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    grid-auto-rows: 200px;
+    grid-template-columns: repeat(4, 1fr);
     gap: 1rem;
   }
   .art-card {
     background: var(--parchment);
-    border: 1px solid rgba(196,132,90,0.15);
+    border: 1px solid rgba(196,132,90,0.25);
     display: flex; flex-direction: column; align-items: center;
-    justify-content: flex-end; padding: 1.2rem; border-radius: 8px;
+    justify-content: flex-end; padding: 0; border-radius: 8px;
     position: relative; overflow: hidden; cursor: none;
-    transition: transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94);
+    aspect-ratio: 1 / 1;
+    transition: transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94),
+                border-color 0.3s;
   }
-  .art-card:hover { transform: scale(1.02); z-index: 5; }
+  .art-card:hover { transform: scale(1.02); z-index: 5; border-color: rgba(196,132,90,0.55); }
   .art-card:hover .card-overlay { opacity: 1; }
-  .art-card:nth-child(1) { grid-column: span 4; grid-row: span 2; aspect-ratio: 1/1; }
-  .art-card:nth-child(2) { grid-column: span 4; grid-row: span 2; aspect-ratio: 1/1; }
-  .art-card:nth-child(3) { grid-column: span 4; grid-row: span 2; aspect-ratio: 1/1; }
-  .art-card:nth-child(4) { grid-column: span 4; grid-row: span 2; aspect-ratio: 1/1; }
-  .art-card:nth-child(5) { grid-column: span 4; grid-row: span 2; aspect-ratio: 1/1; }
-  .art-card:nth-child(6) { grid-column: span 4; grid-row: span 2; aspect-ratio: 1/1; }
-  .art-card:nth-child(7) { grid-column: span 4; grid-row: span 2; aspect-ratio: 1/1; }
-  .art-card:nth-child(8) { grid-column: span 4; grid-row: span 2; aspect-ratio: 1/1; }
+  /* First card spans 2 cols x 2 rows for a featured look */
+  .art-card:nth-child(1) { grid-column: span 2; grid-row: span 2; aspect-ratio: unset; }
 
   .card-bg {
     position: absolute; inset: 0;
@@ -964,6 +959,16 @@
     }
     body.dark .mobile-nav a { color: #e0c8a8; }
     .mobile-nav a:hover { color: var(--rust); }
+    .mobile-nav-close {
+      position: absolute; top: 1.8rem; right: 1.8rem;
+      background: none; border: none;
+      font-size: 1.5rem; color: var(--bark);
+      cursor: none; opacity: 0.6;
+      transition: opacity 0.2s, transform 0.2s;
+      line-height: 1;
+    }
+    body.dark .mobile-nav-close { color: #e0c8a8; }
+    .mobile-nav-close:hover { opacity: 1; transform: rotate(90deg); }
     .mobile-nav-toggle {
       margin-top: 1rem;
       font-family: 'Cinzel', serif; font-size: 0.65rem;
@@ -995,8 +1000,8 @@
     /* PORTFOLIO */
     .portfolio-header { flex-direction: column; align-items: flex-start; gap: 1.5rem; }
     .filter-tabs { flex-wrap: wrap; }
-    .portfolio-grid { grid-template-columns: 1fr 1fr; grid-auto-rows: 160px; }
-    .art-card { grid-column: span 1 !important; grid-row: span 1 !important; }
+    .portfolio-grid { grid-template-columns: 1fr 1fr; }
+    .art-card { grid-column: span 1 !important; grid-row: span 1 !important; aspect-ratio: 1 / 1; }
 
     /* COMMISSIONS */
     #commissions { grid-template-columns: 1fr; gap: 3rem; }
@@ -1050,6 +1055,7 @@
 
 <!-- Mobile nav drawer -->
 <div class="mobile-nav" id="mobileNav">
+  <button class="mobile-nav-close" id="mobileNavClose" aria-label="Close menu">✕</button>
   <a href="#series" class="mobile-link">New Series</a>
   <a href="#portfolio" class="mobile-link">Portfolio</a>
   <a href="#commissions" class="mobile-link">Commissions</a>
@@ -1139,16 +1145,16 @@
         <p class="precursor-title">Precursor</p>
         <div class="precursor-phases">
 
-          <!-- Presale phase -->
+          <!-- Whitelist Presale phase -->
           <div class="precursor-phase" id="phase-presale">
             <p class="phase-label">Whitelist Presale</p>
             <p class="phase-date">31st March 2026 · 8:00 PM GMT+1</p>
             <div class="phase-status" id="presale-status">
               <span class="status-live" id="presale-live" style="display:none;">✦ Mint is Live ✦</span>
-              <span class="status-ended" id="presale-ended" style="display:none;">✦ Mint is Live ✦</span>
+              <span class="status-ended" id="presale-ended" style="display:none;">Whitelist Presale Ended</span>
               <span class="status-countdown" id="presale-countdown"></span>
             </div>
-            <a href="https://www.transient.xyz/mint/entry-token-for-apoti-olowe" target="_blank" class="btn-mint phase-btn">Mint Entry Token (Whitelist)</a>
+            <a href="https://www.transient.xyz/mint/entry-token-for-apoti-olowe" target="_blank" class="btn-mint phase-btn">Mint Entry Token (Whitelist Presale)</a>
           </div>
 
           <div class="precursor-divider"></div>
@@ -1161,7 +1167,7 @@
               <span class="status-live" id="public-live" style="display:none;">✦ Mint is Live ✦</span>
               <span class="status-countdown" id="public-countdown"></span>
             </div>
-            <a href="https://opensea.io/item/ethereum/0x611cca3635b0f05b103031ee8d4f3261633292b4/1" target="_blank" class="btn-public-phase phase-btn">Mint Entry Token (Public Phase)</a>
+            <a href="https://opensea.io/collection/apoti-olowe-editions?status=listed" target="_blank" class="btn-public-phase phase-btn">Mint Entry Token (Public Phase)</a>
           </div>
 
         </div>
@@ -1174,9 +1180,9 @@
       <script>
         (function() {
           var presaleTime = new Date('2026-03-31T20:00:00+01:00').getTime();
-          var publicTime  = new Date('2026-04-04T10:00:00+01:00').getTime();
-          /* presale runs until public phase starts */
-          var presaleEnd  = publicTime;
+          var presaleEnd  = new Date('2026-04-07T20:00:00+01:00').getTime();
+          var publicTime  = new Date('2026-04-04T09:00:00+01:00').getTime();
+          var publicEnd   = new Date('2026-04-11T10:00:00+01:00').getTime();
 
           function pad(n) { return n < 10 ? '0' + n : String(n); }
 
@@ -1195,6 +1201,7 @@
 
             /* ── Presale ── */
             var diffP = presaleTime - now;
+            var diffPresaleEnd = presaleEnd - now;
             var presaleLive = document.getElementById('presale-live');
             var presaleEnded = document.getElementById('presale-ended');
             var presaleCd = document.getElementById('presale-countdown');
@@ -1203,10 +1210,11 @@
               presaleCd.style.display = 'inline';
               presaleLive.style.display = 'none';
               presaleEnded.style.display = 'none';
-            } else if (now < presaleEnd) {
-              presaleCd.style.display = 'none';
-              presaleEnded.style.display = 'none';
+            } else if (diffPresaleEnd > 0) {
+              presaleCd.textContent = 'Ends in ' + fmt(diffPresaleEnd);
+              presaleCd.style.display = 'inline';
               presaleLive.style.display = 'inline';
+              presaleEnded.style.display = 'none';
             } else {
               presaleCd.style.display = 'none';
               presaleLive.style.display = 'none';
@@ -1215,14 +1223,20 @@
 
             /* ── Public ── */
             var diffPub = publicTime - now;
+            var diffPubEnd = publicEnd - now;
             var publicLive = document.getElementById('public-live');
             var publicCd = document.getElementById('public-countdown');
             if (diffPub > 0) {
               publicCd.textContent = fmt(diffPub);
               publicCd.style.display = 'inline';
               publicLive.style.display = 'none';
+            } else if (diffPubEnd > 0) {
+              publicCd.textContent = 'Ends in ' + fmt(diffPubEnd);
+              publicCd.style.display = 'inline';
+              publicLive.style.display = 'inline';
             } else {
               publicCd.style.display = 'none';
+              publicLive.textContent = 'Public Mint Ended';
               publicLive.style.display = 'inline';
             }
 
@@ -1262,7 +1276,15 @@
     </div>
   </div>
   <div class="portfolio-grid reveal" style="transition-delay:0.15s">
-     <div class="art-card art-card-clickable" data-art-index="0" data-art-title="Anastasia" data-art-medium="Digital Painting · 2026">
+    <div class="art-card art-card-clickable" data-art-index="2" data-art-title="Skull" data-art-medium="Digital Painting · 2026">
+      <div class="card-bg"><img src="images/skull.png" alt="Artwork"></div>
+      <div class="card-overlay">
+        <p class="card-title-overlay">Skull</p>
+        <p class="card-medium">Digital Painting · 2026</p>
+      </div>
+      <div class="card-zoom-hint">⊕</div>
+    </div>
+    <div class="art-card art-card-clickable" data-art-index="0" data-art-title="Anastasia" data-art-medium="Digital Painting · 2026">
       <div class="card-bg"><img src="images/anastasiasq.png" alt="Artwork"></div>
       <div class="card-overlay">
         <p class="card-title-overlay">Anastasia</p>
@@ -1275,14 +1297,6 @@
         <p class="card-title-overlay">A Dose of Warmth</p>
         <p class="card-medium">Digital Painting · 2026</p>
       </div>
-    </div>
-     <div class="art-card art-card-clickable" data-art-index="2" data-art-title="Skull" data-art-medium="Digital Painting · 2026">
-      <div class="card-bg"><img src="images/skull.png" alt="Artwork"></div>
-      <div class="card-overlay">
-        <p class="card-title-overlay">Skull</p>
-        <p class="card-medium">Digital Painting · 2026</p>
-      </div>
-      <div class="card-zoom-hint">⊕</div>
     </div>
     <div class="art-card art-card-clickable" data-art-index="3" data-art-title="It is just water" data-art-medium="Digital Painting · 2025">
       <div class="card-bg"><img src="images/water.png" alt="Artwork"></div>
@@ -1509,6 +1523,10 @@
       hamburger.classList.remove('open');
       mobileNav.classList.remove('open');
     });
+  });
+  document.getElementById('mobileNavClose').addEventListener('click', () => {
+    hamburger.classList.remove('open');
+    mobileNav.classList.remove('open');
   });
 
   // Mobile theme toggle mirrors main toggle
