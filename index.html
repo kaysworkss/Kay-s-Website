@@ -933,18 +933,19 @@
   }
   .aor-label {
     font-family: 'Cinzel', serif;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.35em;
+    font-size: clamp(0.85rem, 1.2vw, 1rem);
+    font-weight: 700;
+    letter-spacing: 0.45em;
     text-transform: uppercase;
     color: var(--gold);
     margin-bottom: 0.6rem;
+    text-shadow: 0 0 18px rgba(201,168,76,0.35);
   }
   .aor-heading {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(0.95rem, 1.5vw, 1.2rem);
+    font-size: clamp(1.1rem, 2vw, 1.5rem);
     font-weight: 300;
-    color: rgba(232,213,176,0.8);
+    color: rgba(232,213,176,0.9);
     letter-spacing: 0.04em;
     margin-bottom: 2.5rem;
     font-style: italic;
@@ -978,11 +979,22 @@
   @keyframes aor-pulse-fin  { 0%,100%{box-shadow:0 0 0 0 rgba(91,191,154,0);}  50%{box-shadow:0 0 18px 4px rgba(91,191,154,.4);}  }
   @keyframes aor-pulse-post { 0%,100%{box-shadow:0 0 0 0 rgba(120,116,100,0);} 50%{box-shadow:0 0 14px 3px rgba(120,116,100,.25);} }
 
+  /* Pulsing card overlay for the active month */
+  @keyframes aor-card-pulse-pre  { 0%,100%{box-shadow:0 0 0 0 rgba(201,122,154,0), inset 0 0 0 1px rgba(201,122,154,0.12);} 50%{box-shadow:0 0 22px 6px rgba(201,122,154,.18), inset 0 0 0 1px rgba(201,122,154,0.3);} }
+  @keyframes aor-card-pulse-ch   { 0%,100%{box-shadow:0 0 0 0 rgba(157,150,212,0), inset 0 0 0 1px rgba(157,150,212,0.12);} 50%{box-shadow:0 0 22px 6px rgba(157,150,212,.18), inset 0 0 0 1px rgba(157,150,212,0.3);} }
+  @keyframes aor-card-pulse-fin  { 0%,100%{box-shadow:0 0 0 0 rgba(91,191,154,0),  inset 0 0 0 1px rgba(91,191,154,0.12);}  50%{box-shadow:0 0 22px 6px rgba(91,191,154,.2),  inset 0 0 0 1px rgba(91,191,154,0.3);}  }
+  @keyframes aor-card-pulse-post { 0%,100%{box-shadow:0 0 0 0 rgba(120,116,100,0), inset 0 0 0 1px rgba(120,116,100,0.1);} 50%{box-shadow:0 0 16px 4px rgba(120,116,100,.14), inset 0 0 0 1px rgba(120,116,100,0.22);} }
+
   .aor-row.aor-current .aor-card {
     background: rgba(255,255,255,0.055) !important;
     border-left-color: var(--gold) !important;
     border-color: rgba(255,255,255,0.12) !important;
   }
+  .aor-row.aor-current.pre  .aor-card { animation: aor-card-pulse-pre  3s ease-in-out infinite; }
+  .aor-row.aor-current.ch   .aor-card { animation: aor-card-pulse-ch   3s ease-in-out infinite; }
+  .aor-row.aor-current.fin  .aor-card { animation: aor-card-pulse-fin  3s ease-in-out infinite; }
+  .aor-row.aor-current.post .aor-card { animation: aor-card-pulse-post 3s ease-in-out infinite; }
+
   .aor-row.aor-current .aor-title {
     color: rgba(240,234,216,1) !important;
     font-size: clamp(1rem, 1.6vw, 1.2rem) !important;
@@ -1155,12 +1167,6 @@
     color: rgba(255,255,255,0.5);
   }
   .aor-leg-dot { width: 6px; height: 6px; border-radius: 50%; }
-  @media (max-width: 900px) {
-    .aor-track { left: 72px; }
-    .aor-date  { width: 60px; padding-right: 12px; }
-    .aor-title { font-size: 0.9rem; }
-  }
-
   /* ── RESPONSIVE ── */
   @media (max-width: 900px) {
 
@@ -1307,6 +1313,89 @@
     /* FOOTER */
     footer { flex-direction: column; gap: 1.2rem; text-align: center; padding: 2.5rem 1.5rem; }
     .footer-links { flex-wrap: wrap; justify-content: center; gap: 1rem; }
+
+    /* RELEASE SCHEDULE — Mobile overhaul */
+    .aor-wrap { margin-top: 40px; padding-top: 32px; }
+
+    /* Switch to a top-label layout: date label floats above card inline */
+    .aor-timeline { padding-left: 0; }
+    .aor-track { left: 10px; top: 18px; }
+    .aor-row {
+      flex-direction: column;
+      margin-bottom: 16px;
+      padding-left: 26px;
+      position: relative;
+    }
+
+    /* Dot sits at the left edge, vertically centred with the date label */
+    .aor-dot {
+      position: absolute;
+      left: 2px;
+      top: 4px;
+      margin-top: 0;
+    }
+
+    /* Date becomes a small inline label above the card */
+    .aor-date {
+      width: auto;
+      flex-shrink: 0;
+      text-align: left;
+      padding-right: 0;
+      padding-top: 0;
+      padding-bottom: 6px;
+      display: flex;
+      flex-direction: row;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .aor-date-m {
+      font-size: 0.82rem;
+      line-height: 1.2;
+      /* collapse br so month+year read inline */
+      display: inline;
+    }
+    .aor-date-m br { display: none; }
+    .aor-date-d {
+      font-size: 0.68rem;
+      margin-top: 0;
+      opacity: 0.7;
+    }
+
+    /* Card fills full width */
+    .aor-card {
+      margin-left: 0;
+      padding: 10px 12px 12px;
+    }
+
+    .aor-badge { font-size: 0.68rem; letter-spacing: 0.14em; padding: 2px 6px; }
+    .aor-title { font-size: 0.92rem !important; line-height: 1.3; margin-bottom: 4px; }
+    .aor-logline { font-size: 0.9rem; line-height: 1.5; }
+    .aor-sub    { font-size: 0.88rem; line-height: 1.5; }
+    .aor-note   { font-size: 0.68rem; }
+    .aor-tags   { gap: 4px; margin-top: 6px; }
+    .aor-tag    { font-size: 0.66rem; padding: 2px 6px; letter-spacing: 0.04em; }
+
+    /* "Now" badge — inline with title */
+    .aor-now-badge { font-size: 0.68rem; padding: 1px 5px; }
+
+    /* Legend — horizontal scroll on very narrow screens */
+    .aor-legend {
+      gap: 12px;
+      margin-top: 24px;
+      flex-wrap: wrap;
+    }
+    .aor-leg { font-size: 0.66rem; }
+
+    /* Header label + heading */
+    .aor-label  { font-size: 0.78rem; letter-spacing: 0.3em; }
+    .aor-heading { font-size: 1rem; }
+
+    /* Toggle button — full width on mobile */
+    #aorToggleBtn {
+      font-size: 0.65rem !important;
+      padding: 0.3rem 0.7rem !important;
+      letter-spacing: 0.15em !important;
+    }
   }
 </style>
 </head>
