@@ -2054,9 +2054,19 @@
     mobileNav.classList.remove('open');
   });
 
-  // Dark mode toggle — declared first so mobile toggle can reference it
+  // ── THEME SYSTEM ──
+  // Priority: manual override (stored in localStorage) → time of day → OS preference
+  // Day = 06:00–20:00 → light. Night = 20:00–06:00 → dark.
+  // A manual toggle stores a preference that expires at the next midnight,
+  // so the site resets to the time-based default each new day.
+
   const themeToggle = document.getElementById('themeToggle');
   const themeToggleMobile = document.getElementById('themeToggleMobile');
+
+  function isNightTime() {
+    const h = new Date().getHours(); // 0-23 local time
+    return h < 6 || h >= 20;
+  }
 
   function applyTheme(isDark) {
     document.body.classList.toggle('dark', isDark);
@@ -2065,25 +2075,38 @@
     themeToggleMobile.textContent = icon;
   }
 
-  // Use saved preference, or fall back to OS preference
-  const savedTheme = localStorage.getItem('kaysworks-theme');
-  if (savedTheme) {
-    applyTheme(savedTheme === 'dark');
+  // Load saved preference — only honour it if it was set today
+  const saved = JSON.parse(localStorage.getItem('kaysworks-theme') || 'null');
+  const today = new Date().toDateString();
+
+  if (saved && saved.date === today) {
+    // User manually toggled today — respect their choice
+    applyTheme(saved.dark);
   } else {
-    applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches);
+    // No override or it's a new day — use time of day
+    localStorage.removeItem('kaysworks-theme');
+    applyTheme(isNightTime());
   }
 
-  themeToggle.addEventListener('click', () => {
-    const isDark = document.body.classList.toggle('dark');
-    localStorage.setItem('kaysworks-theme', isDark ? 'dark' : 'light');
-    applyTheme(isDark);
-  });
+  // Re-check every minute so the theme switches automatically at 06:00 / 20:00
+  // Only auto-switches if the user hasn't set a manual override today
+  setInterval(() => {
+    const currentSaved = JSON.parse(localStorage.getItem('kaysworks-theme') || 'null');
+    const currentDay   = new Date().toDateString();
+    if (!currentSaved || currentSaved.date !== currentDay) {
+      applyTheme(isNightTime());
+    }
+  }, 60 * 1000);
 
-  themeToggleMobile.addEventListener('click', () => {
+  function handleToggle() {
     const isDark = document.body.classList.toggle('dark');
-    localStorage.setItem('kaysworks-theme', isDark ? 'dark' : 'light');
+    // Save with today's date so it expires at midnight
+    localStorage.setItem('kaysworks-theme', JSON.stringify({ dark: isDark, date: new Date().toDateString() }));
     applyTheme(isDark);
-  });
+  }
+
+  themeToggle.addEventListener('click', handleToggle);
+  themeToggleMobile.addEventListener('click', handleToggle);
 
   // Custom cursor — disabled on touch devices
   const ring = document.getElementById('cursorRing');
