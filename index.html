@@ -2122,25 +2122,45 @@
     return window.getComputedStyle(document.body).backgroundColor;
   }
 
-  // Canvas-based pixel sampler for images
+  // Canvas-based pixel sampler for images — averages a 7×7 patch for stability
   const imgCanvasCache = new Map();
+
+  // Bust the cache when an image (re)loads so stale canvases don't persist
+  document.querySelectorAll('.card-bg img').forEach(img => {
+    img.addEventListener('load', () => { imgCanvasCache.delete(img); });
+  });
+
   function sampleImagePixel(imgEl, x, y) {
     try {
       let canvas = imgCanvasCache.get(imgEl);
       if (!canvas) {
         canvas = document.createElement('canvas');
+        // Sample at a reduced resolution for speed (max 400px wide)
+        const scale = Math.min(1, 400 / imgEl.naturalWidth);
+        canvas.width  = Math.round(imgEl.naturalWidth  * scale);
+        canvas.height = Math.round(imgEl.naturalHeight * scale);
         const ctx = canvas.getContext('2d');
-        canvas.width = imgEl.naturalWidth;
-        canvas.height = imgEl.naturalHeight;
-        ctx.drawImage(imgEl, 0, 0);
+        ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
         imgCanvasCache.set(imgEl, canvas);
       }
       const rect = imgEl.getBoundingClientRect();
-      const px = Math.floor((x - rect.left) / rect.width * canvas.width);
-      const py = Math.floor((y - rect.top) / rect.height * canvas.height);
+      const scaleX = canvas.width  / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const px = Math.floor((x - rect.left) * scaleX);
+      const py = Math.floor((y - rect.top)  * scaleY);
       const ctx = canvas.getContext('2d');
-      const pixel = ctx.getImageData(Math.max(0,px), Math.max(0,py), 1, 1).data;
-      return getLuminanceRGB(pixel[0], pixel[1], pixel[2]);
+      const radius = 3; // sample a 7×7 patch
+      const sx = Math.max(0, px - radius);
+      const sy = Math.max(0, py - radius);
+      const sw = Math.min(canvas.width  - sx, radius * 2 + 1);
+      const sh = Math.min(canvas.height - sy, radius * 2 + 1);
+      const data = ctx.getImageData(sx, sy, sw, sh).data;
+      let total = 0, count = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        total += getLuminanceRGB(data[i], data[i+1], data[i+2]);
+        count++;
+      }
+      return count > 0 ? total / count : null;
     } catch(e) {
       return null;
     }
@@ -2150,6 +2170,23 @@
     const els = document.elementsFromPoint(x, y);
     for (const el of els) {
       if (el === cursorEl || el.closest('#cursor')) continue;
+
+      // ── Art wall cards: always pixel-sample the underlying image ──
+      // Overlays (.card-overlay, .card-zoom-hint) intercept the hit before
+      // the <img>, so we walk up to the card and sample its image directly.
+      const artCard = el.closest('.art-card-clickable');
+      if (artCard) {
+        const imgEl = artCard.querySelector('.card-bg img');
+        if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
+          const lum = sampleImagePixel(imgEl, x, y);
+          if (lum !== null) return lum < 128 ? 'dark' : 'light';
+        }
+        // Image not loaded yet — fall back to card bg colour
+        const bg = getEffectiveBg(artCard);
+        const lum = getLuminanceFromBg(bg);
+        if (lum !== null) return lum < 120 ? 'dark' : 'light';
+        continue;
+      }
 
       // Sample image pixel directly if cursor is over an image
       if (el.tagName === 'IMG' && el.complete) {
