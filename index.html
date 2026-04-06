@@ -2081,7 +2081,7 @@
   <div class="reveal" style="transition-delay:0.2s">
     <p class="section-label">Inquire</p>
     <h3 style="font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:300;color:var(--bark);margin-bottom:1.5rem">Tell me about your <em>vision</em></h3>
-    <form class="commission-form" action="https://formspree.io/f/xzdkeklb" method="POST">
+    <form class="commission-form" id="commissionForm" novalidate>
       <!-- Honeypot field — hidden from real users, catches bots -->
       <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off" />
       <div class="form-group">
@@ -2104,7 +2104,8 @@
         <label class="form-label" for="comm-message">Tell me about your vision</label>
         <textarea id="comm-message" name="message" class="form-textarea" placeholder="Describe what you have in mind — mood, subject, references, any details that matter to you..." required></textarea>
       </div>
-      <button type="submit" class="btn-primary" style="align-self:flex-start">Send Inquiry</button>
+      <div id="formStatus" role="alert" aria-live="polite" style="display:none;padding:0.85rem 1.1rem;border-radius:6px;font-family:'Crimson Pro',serif;font-size:1rem;line-height:1.5;"></div>
+      <button type="submit" id="commissionSubmit" class="btn-primary" style="align-self:flex-start">Send Inquiry</button>
     </form>
   </div>
 </section>
@@ -2537,6 +2538,86 @@
     const dx = e.changedTouches[0].clientX - touchStartX;
     if (Math.abs(dx) > 50 && artLightboxMode) goToArt(currentArtIndex + (dx < 0 ? 1 : -1));
   });
+
+  // Commission form — fetch-based with full HTTP 4xx error handling
+  (function () {
+    var form      = document.getElementById('commissionForm');
+    var submitBtn = document.getElementById('commissionSubmit');
+    var statusBox = document.getElementById('formStatus');
+    if (!form) return;
+
+    function showStatus(msg, type) {
+      var base = 'display:block;padding:0.85rem 1.1rem;border-radius:6px;font-family:\'Crimson Pro\',serif;font-size:1rem;line-height:1.5;margin-bottom:0.5rem;';
+      var colours = {
+        success: 'background:rgba(107,124,92,0.15);border:1px solid rgba(107,124,92,0.5);color:#3a5a2a;',
+        error:   'background:rgba(158,79,46,0.12);border:1px solid rgba(158,79,46,0.45);color:#7a2e10;',
+        warning: 'background:rgba(201,153,58,0.12);border:1px solid rgba(201,153,58,0.45);color:#7a5a10;'
+      };
+      statusBox.style.cssText = base + (colours[type] || colours.error);
+      statusBox.innerHTML = msg;
+      statusBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function hideStatus() {
+      statusBox.style.display = 'none';
+      statusBox.innerHTML = '';
+    }
+
+    function setLoading(on) {
+      submitBtn.disabled = on;
+      submitBtn.textContent = on ? 'Sending\u2026' : 'Send Inquiry';
+      submitBtn.style.opacity = on ? '0.65' : '';
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      hideStatus();
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      setLoading(true);
+      var data = new FormData(form);
+
+      fetch('https://formspree.io/f/xzdkeklb', {
+        method: 'POST',
+        body: data,
+        headers: { 'Accept': 'application/json' }
+      })
+      .then(function (response) {
+        if (response.ok) {
+          showStatus('\u2756 Your inquiry has been sent. I\u2019ll be in touch within a few days \u2014 thank you.', 'success');
+          form.reset();
+          return;
+        }
+        return response.json().catch(function () { return {}; }).then(function (body) {
+          var status = response.status;
+          var err    = body.error || '';
+          var errs   = body.errors;
+          if (status === 400) {
+            showStatus('\u26a0 Could not send: ' + (err || 'The form data was not accepted. Please check all fields and try again.'), 'error');
+          } else if (status === 403) {
+            showStatus('\u26a0 Your message could not be sent right now. Please reach out via email at the bottom of the page.', 'error');
+          } else if (status === 404) {
+            showStatus('\u26a0 The contact form is temporarily unavailable. Please try again later.', 'error');
+          } else if (status === 422) {
+            var detail = 'Please review your entries and try again.';
+            if (Array.isArray(errs) && errs.length) {
+              detail = errs.map(function (e) { return e.message || e.field; }).filter(Boolean).join(' \u00b7 ');
+            }
+            showStatus('\u26a0 Could not process your request: ' + detail, 'warning');
+          } else if (status === 429) {
+            showStatus('\u26a0 Too many submissions. Please wait a moment and try again.', 'warning');
+          } else {
+            showStatus('\u26a0 Something went wrong (error ' + status + '). Please try again or contact me directly.', 'error');
+          }
+        });
+      })
+      .catch(function () {
+        showStatus('\u26a0 Could not reach the server. Please check your connection and try again.', 'error');
+      })
+      .finally(function () {
+        setLoading(false);
+      });
+    });
+  })();
 
 </script>
 </body>
