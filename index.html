@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-     <link rel="icon" type="svg" href="images/kaysworkslogo.svg">
+  <link rel="icon" type="image/svg+xml" href="images/kaysworkslogo.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="images/favicon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="images/favicon-192x192.png">
 
 <meta charset="UTF-8" />
 <meta name="google-site-verification" content="e9TWfxuPMB5PAQcZ0Hpa72H111jODvMsedDkePP2UVM" />
@@ -2546,16 +2549,28 @@
     var statusBox = document.getElementById('formStatus');
     if (!form) return;
 
+    var fadeTimer = null;
+
     function showStatus(msg, type) {
-      var base = 'display:block;padding:0.85rem 1.1rem;border-radius:6px;font-family:\'Crimson Pro\',serif;font-size:1rem;line-height:1.5;margin-bottom:0.5rem;';
+      var base = 'display:block;padding:0.85rem 1.1rem;border-radius:6px;font-family:\'Crimson Pro\',serif;font-size:1rem;line-height:1.5;margin-bottom:0.5rem;transition:opacity 0.8s ease;';
       var colours = {
         success: 'background:rgba(107,124,92,0.15);border:1px solid rgba(107,124,92,0.5);color:#3a5a2a;',
         error:   'background:rgba(158,79,46,0.12);border:1px solid rgba(158,79,46,0.45);color:#7a2e10;',
         warning: 'background:rgba(201,153,58,0.12);border:1px solid rgba(201,153,58,0.45);color:#7a5a10;'
       };
       statusBox.style.cssText = base + (colours[type] || colours.error);
+      statusBox.style.opacity = '1';
       statusBox.innerHTML = msg;
       statusBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      // Auto-fade success messages after 5 s; leave errors visible
+      if (fadeTimer) clearTimeout(fadeTimer);
+      if (type === 'success') {
+        fadeTimer = setTimeout(function () {
+          statusBox.style.opacity = '0';
+          setTimeout(function () { hideStatus(); }, 800);
+        }, 5000);
+      }
     }
 
     function hideStatus() {
