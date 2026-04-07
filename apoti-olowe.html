@@ -538,24 +538,50 @@
   /* ── LIGHTBOX ── */
   .lb-panel { display: none; position: fixed; inset: 0; z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem; }
   .lb-panel.open { display: flex; }
-  .lb-bg { position: absolute; inset: 0; background: rgba(8,6,4,0.96); cursor: none; }
+  /* Restore cursor inside lightbox so nav buttons are usable */
+  .lb-panel, .lb-panel * { cursor: auto !important; }
+  .lb-bg { position: absolute; inset: 0; background: rgba(8,6,4,0.96); cursor: pointer !important; }
   body.light .lb-bg { background: rgba(240,232,218,0.97); }
-  .lb-content { position: relative; z-index: 10001; display: flex; align-items: center; gap: 1rem; max-width: 92vw; }
+  .lb-content { position: relative; z-index: 10001; display: flex; align-items: center; gap: 1.2rem; max-width: 92vw; }
   .lb-img-wrap { position: relative; max-height: 85vh; display: flex; flex-direction: column; align-items: center; }
-  .lb-img-wrap img { max-height: 78vh; max-width: 78vw; object-fit: contain; display: block; border-radius: 2px; }
+  .lb-img-wrap img { max-height: 78vh; max-width: 74vw; object-fit: contain; display: block; border-radius: 2px; }
   .lb-caption { margin-top: 0.75rem; text-align: center; }
   .lb-title { font-family: 'Cormorant Garamond', serif; font-size: 0.95rem; color: var(--text-soft); }
   .lb-sub { font-family: 'Cinzel', serif; font-size: 0.65rem; color: var(--text-muted); letter-spacing: 0.1em; margin-top: 2px; text-transform: uppercase; }
-  .lb-close-btn { position: absolute; top: -2rem; right: 0; background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: none; line-height: 1; transition: color 0.2s; }
+  .lb-close-btn {
+    position: absolute; top: -2.4rem; right: 0;
+    background: none; border: none; color: rgba(232,213,176,0.7);
+    font-size: 22px; cursor: pointer !important; line-height: 1;
+    transition: color 0.2s; padding: 4px;
+  }
   .lb-close-btn:hover { color: var(--gold); }
   .lb-nav {
-    background: none; border: 1px solid rgba(196,132,90,0.3);
-    color: var(--gold); font-size: 18px; width: 40px; height: 40px; border-radius: 4px;
-    cursor: none; flex-shrink: 0; transition: background 0.2s, border-color 0.2s;
+    background: rgba(30,20,12,0.55); border: 1px solid rgba(196,132,90,0.4);
+    color: var(--gold); font-size: 20px;
+    width: 48px; height: 48px; border-radius: 50%;
+    cursor: pointer !important; flex-shrink: 0;
+    transition: background 0.2s, border-color 0.2s, transform 0.15s;
     display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
   }
-  .lb-nav:hover { background: var(--surface-hover); border-color: var(--gold); }
-  .lb-counter { position: absolute; top: -2rem; left: 0; font-family: 'Cinzel', serif; font-size: 0.65rem; letter-spacing: 0.2em; color: var(--text-muted); text-transform: uppercase; }
+  .lb-nav:hover { background: rgba(196,132,90,0.22); border-color: var(--gold); transform: scale(1.08); }
+  .lb-nav:active { transform: scale(0.96); }
+  .lb-counter {
+    position: absolute; top: -2.4rem; left: 0;
+    font-family: 'Cinzel', serif; font-size: 0.65rem;
+    letter-spacing: 0.2em; color: rgba(232,213,176,0.55); text-transform: uppercase;
+  }
+  /* Keyboard hint */
+  .lb-hint {
+    position: absolute; bottom: -2.2rem; left: 50%; transform: translateX(-50%);
+    font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.22em;
+    text-transform: uppercase; color: rgba(232,213,176,0.3); white-space: nowrap;
+  }
+  @media (max-width: 600px) {
+    .lb-nav { width: 38px; height: 38px; font-size: 16px; }
+    .lb-img-wrap img { max-width: 80vw; max-height: 65vh; }
+    .lb-hint { display: none; }
+  }
 
   /* ── THREADS ── */
   .ao-threads-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(220px,100%),1fr)); gap: 1rem; }
@@ -1153,43 +1179,115 @@
 // ── GALLERY ──
 var IMGS = [
   {src:"images/preperation.png",        title:"Still Life — Vessels",         sub:"World building reference"},
-  {src:"images/monostudy.png", title:"Study in Monochrome",         sub:"Process sketch"},
-  {src:"images/apotiolowebox.jpg",            title:"Àpótí Ọlọ́wẹ̀ — The Chest", sub:"Digital sculpture"},
-  {src:"images/dopt.jpg",         title:"Door Panels",                  sub:"Narrative relief"},
-  {src:"images/doorsketch.png",       title:"Ilekun Itan Sketch",                sub:"Concept development for Ilekun Itan"},
-  {src:"images/Patterndesign.png",     title:"Brand Motif",                  sub:"Pattern design"},
-  {src:"images/serieslogo.png",        title:"Series Identity",              sub:"Logotype"},
-  {src:"images/tote bag front.png",       title:"Totebag design",                sub:"Tote bag sample mockup"},
-  {src:"images/tote bag front2.png",       title:"Totebag design",                sub:"Tote bag sample mockup"},
-  {src:"merch.jpg",       title:"Totebag design Motif",                sub:"Tote bag motif design"},
-  {src:"images/back.png",       title:"Totebag design",                sub:"Tote bag sample mockup"},
+  {src:"images/monostudy.png",           title:"Study in Monochrome",          sub:"Process sketch"},
+  {src:"images/apotiolowebox.jpg",       title:"Àpótí Ọlọ́wẹ̀ — The Chest",  sub:"Digital sculpture"},
+  {src:"images/dopt.jpg",               title:"Door Panels",                   sub:"Narrative relief"},
+  {src:"images/doorsketch.png",          title:"Ilekun Itan Sketch",            sub:"Concept development for Ilekun Itan"},
+  {src:"images/Patterndesign.png",       title:"Brand Motif",                  sub:"Pattern design"},
+  {src:"images/serieslogo.png",          title:"Series Identity",              sub:"Logotype"},
+  {src:"images/tote bag front.png",      title:"Totebag design",               sub:"Tote bag sample mockup"},
+  {src:"images/tote bag front2.png",     title:"Totebag design",               sub:"Tote bag sample mockup"},
+  {src:"images/merch.jpg",                      title:"Totebag design Motif",         sub:"Tote bag motif design"},
+  {src:"images/back.png",               title:"Totebag design",               sub:"Tote bag sample mockup"},
 ];
+
 var grid = document.getElementById('galGrid');
-var lbContainer = document.getElementById('lbContainer');
 var n = IMGS.length;
+var currentIdx = 0;
+
+// ── Build gallery grid ──
 IMGS.forEach(function(img, i) {
-  var prev=(i-1+n)%n, next=(i+1)%n;
-  var card=document.createElement('div');
-  card.className='gal-item';
-  card.onclick=function(){openLight(i);};
-  card.innerHTML='<div class="gal-img-wrap"><img src="'+img.src+'" alt="'+img.title+'" loading="lazy"/><div class="gal-overlay"><span class="gal-zoom">+</span></div></div><p class="gal-title">'+img.title+'</p><p class="gal-sub">'+img.sub+'</p>';
+  var card = document.createElement('div');
+  card.className = 'gal-item';
+  card.setAttribute('tabindex', '0');
+  card.setAttribute('role', 'button');
+  card.setAttribute('aria-label', 'View image: ' + img.title);
+  card.innerHTML = '<div class="gal-img-wrap"><img src="' + img.src + '" alt="' + img.title + '" loading="lazy"/><div class="gal-overlay"><span class="gal-zoom">+</span></div></div><p class="gal-title">' + img.title + '</p><p class="gal-sub">' + img.sub + '</p>';
+  card.addEventListener('click', function() { openLight(i); });
+  card.addEventListener('keydown', function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLight(i); } });
   grid.appendChild(card);
-  var lb=document.createElement('div');
-  lb.className='lb-panel'; lb.id='lb'+i;
-  lb.innerHTML='<div class="lb-bg" onclick="closeLight()"></div><div class="lb-content"><button class="lb-nav" onclick="event.stopPropagation();openLight('+prev+')">&#8592;</button><div class="lb-img-wrap"><span class="lb-counter">'+(i+1)+' / '+n+'</span><button class="lb-close-btn" onclick="closeLight()">&#215;</button><img src="'+img.src+'" alt="'+img.title+'"/><div class="lb-caption"><p class="lb-title">'+img.title+'</p><p class="lb-sub">'+img.sub+'</p></div></div><button class="lb-nav" onclick="event.stopPropagation();openLight('+next+')">&#8594;</button></div>';
-  lbContainer.appendChild(lb);
 });
+
+// ── Build single lightbox ──
+var lbContainer = document.getElementById('lbContainer');
+lbContainer.innerHTML = [
+  '<div class="lb-panel" id="lbPanel" role="dialog" aria-modal="true" aria-label="Image viewer">',
+  '  <div class="lb-bg" id="lbBg"></div>',
+  '  <div class="lb-content">',
+  '    <button class="lb-nav" id="lbPrev" aria-label="Previous image">&#8592;</button>',
+  '    <div class="lb-img-wrap">',
+  '      <span class="lb-counter" id="lbCounter"></span>',
+  '      <button class="lb-close-btn" id="lbClose" aria-label="Close">&#215;</button>',
+  '      <img id="lbImg" src="" alt=""/>',
+  '      <div class="lb-caption">',
+  '        <p class="lb-title" id="lbTitle"></p>',
+  '        <p class="lb-sub" id="lbSub"></p>',
+  '      </div>',
+  '      <span class="lb-hint">&#8592; &#8594; arrow keys to navigate &nbsp;&middot;&nbsp; esc to close</span>',
+  '    </div>',
+  '    <button class="lb-nav" id="lbNext" aria-label="Next image">&#8594;</button>',
+  '  </div>',
+  '</div>'
+].join('');
+
+var lbPanel   = document.getElementById('lbPanel');
+var lbImg     = document.getElementById('lbImg');
+var lbTitle   = document.getElementById('lbTitle');
+var lbSub     = document.getElementById('lbSub');
+var lbCounter = document.getElementById('lbCounter');
+var lbPrev    = document.getElementById('lbPrev');
+var lbNext    = document.getElementById('lbNext');
+var lbClose   = document.getElementById('lbClose');
+var lbBg      = document.getElementById('lbBg');
+
+function renderLight() {
+  var img = IMGS[currentIdx];
+  lbImg.src = img.src;
+  lbImg.alt = img.title;
+  lbTitle.textContent = img.title;
+  lbSub.textContent   = img.sub;
+  lbCounter.textContent = (currentIdx + 1) + ' / ' + n;
+}
+
 function openLight(i) {
-  document.querySelectorAll('.lb-panel').forEach(function(p){p.classList.remove('open');});
-  var el=document.getElementById('lb'+i);
-  if(el)el.classList.add('open');
-  document.body.style.overflow='hidden';
+  currentIdx = ((i % n) + n) % n;
+  renderLight();
+  lbPanel.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  lbClose.focus();
 }
+
 function closeLight() {
-  document.querySelectorAll('.lb-panel').forEach(function(p){p.classList.remove('open');});
-  document.body.style.overflow='';
+  lbPanel.classList.remove('open');
+  document.body.style.overflow = '';
+  lbImg.src = ''; // free memory
 }
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closeLight();});
+
+function goNext() { currentIdx = (currentIdx + 1) % n; renderLight(); }
+function goPrev() { currentIdx = (currentIdx - 1 + n) % n; renderLight(); }
+
+lbNext.addEventListener('click',  function(e) { e.stopPropagation(); goNext(); });
+lbPrev.addEventListener('click',  function(e) { e.stopPropagation(); goPrev(); });
+lbClose.addEventListener('click', closeLight);
+lbBg.addEventListener('click',    closeLight);
+
+// ── Keyboard navigation ──
+document.addEventListener('keydown', function(e) {
+  if (!lbPanel.classList.contains('open')) return;
+  if (e.key === 'Escape')     { closeLight(); }
+  if (e.key === 'ArrowRight') { goNext(); }
+  if (e.key === 'ArrowLeft')  { goPrev(); }
+});
+
+// ── Touch / swipe ──
+var touchStartX = 0;
+lbPanel.addEventListener('touchstart', function(e) {
+  touchStartX = e.touches[0].clientX;
+}, { passive: true });
+lbPanel.addEventListener('touchend', function(e) {
+  var dx = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(dx) > 45) { dx < 0 ? goNext() : goPrev(); }
+});
 </script>
 </body>
 </html>
