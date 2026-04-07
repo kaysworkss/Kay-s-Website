@@ -536,18 +536,40 @@
   }
 
   /* ── LIGHTBOX ── */
-  .lb-panel { display: none; position: fixed; inset: 0; z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem; }
+  .lb-panel {
+    display: none; position: fixed; inset: 0; z-index: 10000;
+    align-items: center; justify-content: center;
+    padding: 1.5rem;
+  }
   .lb-panel.open { display: flex; }
-  /* Restore cursor inside lightbox so nav buttons are usable */
   .lb-panel, .lb-panel * { cursor: auto !important; }
   .lb-bg { position: absolute; inset: 0; background: rgba(8,6,4,0.96); cursor: pointer !important; }
   body.light .lb-bg { background: rgba(240,232,218,0.97); }
-  .lb-content { position: relative; z-index: 10001; display: flex; align-items: center; gap: 1.2rem; max-width: 92vw; }
-  .lb-img-wrap { position: relative; max-height: 85vh; display: flex; flex-direction: column; align-items: center; }
-  .lb-img-wrap img { max-height: 78vh; max-width: 74vw; object-fit: contain; display: block; border-radius: 2px; }
+
+  /* Content — centred column on mobile, row on desktop */
+  .lb-content {
+    position: relative; z-index: 10001;
+    display: flex; align-items: center; justify-content: center;
+    gap: 1.2rem; width: 100%; max-width: 92vw;
+  }
+
+  /* Image wrapper — fills available space, centred */
+  .lb-img-wrap {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center;
+    flex: 1; min-width: 0;
+  }
+  .lb-img-wrap img {
+    max-height: 78vh; max-width: 100%;
+    width: auto; object-fit: contain;
+    display: block; border-radius: 2px;
+    margin: 0 auto;
+  }
+
   .lb-caption { margin-top: 0.75rem; text-align: center; }
   .lb-title { font-family: 'Cormorant Garamond', serif; font-size: 0.95rem; color: var(--text-soft); }
   .lb-sub { font-family: 'Crimson Pro', serif; font-size: 0.88rem; font-style: italic; color: var(--text-muted); letter-spacing: 0.02em; margin-top: 3px; }
+
   .lb-close-btn {
     position: absolute; top: -2.4rem; right: 0;
     background: none; border: none; color: rgba(232,213,176,0.7);
@@ -555,6 +577,8 @@
     transition: color 0.2s; padding: 4px;
   }
   .lb-close-btn:hover { color: var(--gold); }
+
+  /* Nav buttons — beside image on desktop */
   .lb-nav {
     background: rgba(30,20,12,0.55); border: 1px solid rgba(196,132,90,0.4);
     color: var(--gold); font-size: 20px;
@@ -566,20 +590,63 @@
   }
   .lb-nav:hover { background: rgba(196,132,90,0.22); border-color: var(--gold); transform: scale(1.08); }
   .lb-nav:active { transform: scale(0.96); }
+
   .lb-counter {
     position: absolute; top: -2.4rem; left: 0;
     font-family: 'Cinzel', serif; font-size: 0.65rem;
     letter-spacing: 0.2em; color: rgba(232,213,176,0.55); text-transform: uppercase;
   }
-  /* Keyboard hint */
   .lb-hint {
     position: absolute; bottom: -2.2rem; left: 50%; transform: translateX(-50%);
     font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.22em;
     text-transform: uppercase; color: rgba(232,213,176,0.3); white-space: nowrap;
   }
+
+  /* ── MOBILE lightbox — overlay nav buttons on the image edges ── */
   @media (max-width: 600px) {
-    .lb-nav { width: 38px; height: 38px; font-size: 16px; }
-    .lb-img-wrap img { max-width: 80vw; max-height: 65vh; }
+    .lb-panel { padding: 0; }
+
+    .lb-content {
+      flex-direction: column;
+      max-width: 100vw; width: 100vw;
+      height: 100vh;
+      justify-content: center;
+      gap: 0;
+    }
+
+    .lb-img-wrap {
+      width: 100vw;
+      max-height: 100vh;
+      justify-content: center;
+      padding: 3.5rem 0 5rem;
+    }
+    .lb-img-wrap img {
+      max-width: 92vw;
+      max-height: calc(100vh - 9rem);
+    }
+
+    /* Float nav buttons over the image, vertically centred */
+    .lb-nav {
+      position: fixed;
+      top: 50%; transform: translateY(-50%);
+      width: 40px; height: 40px; font-size: 16px;
+      z-index: 10002;
+      background: rgba(20,12,8,0.7);
+    }
+    .lb-nav:first-child  { left: 0.6rem; }
+    .lb-nav:last-child   { right: 0.6rem; }
+    .lb-nav:hover { transform: translateY(-50%) scale(1.08); }
+    .lb-nav:active { transform: translateY(-50%) scale(0.96); }
+
+    .lb-close-btn {
+      position: fixed; top: 1rem; right: 1rem;
+      font-size: 26px; background: rgba(20,12,8,0.6);
+      padding: 6px 10px; border-radius: 4px;
+    }
+    .lb-counter {
+      position: fixed; top: 1.1rem; left: 1rem;
+      font-size: 0.6rem;
+    }
     .lb-hint { display: none; }
   }
 
@@ -864,7 +931,7 @@
     </div>
     <div class="ao-chapter-card">
       <p class="ao-chapter-num">03</p>
-      <div><p class="ao-chapter-name">L&rsquo;abẹ Igi Orombo</p><p class="ao-chapter-yoruba">Under the Orange Tree &mdash; a moment of intimacy, truth, and shared vulnerability</p></div>
+      <div><p class="ao-chapter-name">L&rsquo;abẹ Igi Oronbo</p><p class="ao-chapter-yoruba">Under the Orange Tree &mdash; a moment of intimacy, truth, and shared vulnerability</p></div>
       <p class="ao-chapter-date">Jul 1</p>
     </div>
     <div class="ao-chapter-card">
@@ -1079,19 +1146,19 @@
       <div class="ao-tl-item ao-tl-dim">
         <p class="ao-tl-phase">Upcoming</p>
         <h3 class="ao-tl-heading">Six chapter drops &mdash; May through September</h3>
-        <p class="ao-tl-body">Monthly releases beginning May 1, 2026. Each chapter: 1/1 digital painting, digital sculpture set, written narrative, and optional archival print. Final drop September 27 on Transient Labs, Manifold, and Objkt.</p>
+        <p class="ao-tl-body">Monthly releases beginning May 1, 2026. Each chapter: 1/1 digital painting, digital sculpture set, written narrative, and optional archival print. Final drop September 27. Token gated auctions will be held on this website, there will also be limited edition releases on Transientlabs and Objkt.</p>
       </div>
       <div class="ao-tl-item ao-tl-dim">
         <p class="ao-tl-phase">Post-series</p>
         <h3 class="ao-tl-heading">Collector rewards &amp; world compendium</h3>
-        <p class="ao-tl-body">October&ndash;November 2026. Gold rewards unlock, digital book, character deep dives, exhibition possibilities, and optional commemorative items for collectors.</p>
+        <p class="ao-tl-body">October&ndash;November 2026. Gold rewards unlock, digital book, physical books on demand, character deep dives, exhibition possibilities, and optional commemorative items for collectors.</p>
       </div>
     </div>
     <div class="ao-wip-grid">
       <div class="ao-wip-card wip-active"><p class="ao-wip-status ao-status-live">&#9679; Now live</p><p class="ao-wip-label">Precursor &mdash; Apr 1&ndash;30</p></div>
       <div class="ao-wip-card"><p class="ao-wip-status ao-status-next">&#9675; May 1</p><p class="ao-wip-label">Ch. 01 &mdash; The Chiefs&rsquo; Meeting</p></div>
       <div class="ao-wip-card"><p class="ao-wip-status ao-status-next">&#9675; Jun 1</p><p class="ao-wip-label">Ch. 02 &mdash; Ìpàdé</p></div>
-      <div class="ao-wip-card"><p class="ao-wip-status ao-status-next">&#9675; Jul 1</p><p class="ao-wip-label">Ch. 03 &mdash; L&rsquo;abẹ Igi Orombo</p></div>
+      <div class="ao-wip-card"><p class="ao-wip-status ao-status-next">&#9675; Jul 1</p><p class="ao-wip-label">Ch. 03 &mdash; L&rsquo;abẹ Igi Oronbo</p></div>
       <div class="ao-wip-card"><p class="ao-wip-status ao-status-next">&#9675; Aug 1</p><p class="ao-wip-label">Ch. 04 &mdash; Ilé Agbẹgilérè</p></div>
       <div class="ao-wip-card"><p class="ao-wip-status ao-status-next">&#9675; Sep 1</p><p class="ao-wip-label">Ch. 05 &mdash; The Engagement</p></div>
       <div class="ao-wip-card"><p class="ao-wip-status ao-status-next">&#9675; Sep 27</p><p class="ao-wip-label">Ch. 06 &mdash; Aftermath</p></div>
@@ -1178,16 +1245,13 @@
 
 // ── GALLERY ──
 var IMGS = [
-  {src:"images/preperation.png",        title:"Still Life — Vessels",         sub:"World building reference"},
+  {src:"images/preperation.png",        title:"Ìgbáradì(preperation)",                     sub:"World building"},
   {src:"images/monostudy.png",           title:"Study in Monochrome",          sub:"Process sketch"},
   {src:"images/apotiolowebox.jpg",       title:"Àpótí Ọlọ́wẹ̀ — The Chest",  sub:"Digital sculpture"},
-  {src:"images/tokens.png",       title:"Collector Tokens",  sub:"Wood, bronze and gold tokens"},
-  {src:"images/RENDCOMBO .jpg",       title:"Collector Tokens",  sub:"Wood, bronze and gold tokens"},
   {src:"images/dopt.jpg",               title:"Door Panels",                   sub:"Narrative relief"},
   {src:"images/doorsketch.png",          title:"Ilekun Itan Sketch",            sub:"Concept development for Ilekun Itan"},
   {src:"images/Patterndesign.png",       title:"Brand Motif",                  sub:"Pattern design"},
   {src:"images/serieslogo.png",          title:"Series Identity",              sub:"Logotype"},
-  {src:"images/seriesinvite.jpg",       title:"Series Invite",  sub:"Series invite e-poster design"},
   {src:"images/tote bag front.png",      title:"Totebag design",               sub:"Tote bag sample mockup"},
   {src:"images/tote bag front2.png",     title:"Totebag design",               sub:"Tote bag sample mockup"},
   {src:"images/merch.jpg",                      title:"Totebag design Motif",         sub:"Tote bag motif design"},
