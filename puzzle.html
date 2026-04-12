@@ -695,9 +695,17 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 })();
 
 function _updateThemeBtn(theme) {
+  const isDark = theme === 'dark';
+  // Floating button (desktop / entry screen)
   const btn = document.getElementById('theme-toggle');
-  if (!btn) return;
-  btn.textContent = theme === 'dark' ? '☀️ Light' : '🌙 Dark';
+  if (btn) btn.textContent = isDark ? '☀️ Light' : '🌙 Dark';
+  // Toolbar row-3 button (mobile) — identified by its onclick
+  document.querySelectorAll('.btn-sm').forEach(b => {
+    if (b.getAttribute('onclick') === 'toggleTheme()') {
+      b.textContent = isDark ? '☀️' : '🌙';
+      b.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+    }
+  });
 }
 
 function toggleTheme() {
@@ -1245,14 +1253,17 @@ function arrangePieces() {
     .sort(() => rng() - 0.5);
 
   // ── Step 5: Interleave slots across all four sides ──
+  // Each slot carries a reference to its region for clamping
   const allSlots = [];
   const maxSlots = Math.max(...regions.map(r => r.slots.length));
   for (let i = 0; i < maxSlots; i++) {
-    regions.forEach(r => { if (i < r.slots.length) allSlots.push(r.slots[i]); });
+    regions.forEach(r => {
+      if (i < r.slots.length) allSlots.push({ ...r.slots[i], region: r });
+    });
   }
 
-  // ── Step 6: Place with jitter ──
-  const jitterMax = Math.round(Math.min(sPW, sPH) * 0.35);
+  // ── Step 6: Place with jitter — clamped strictly within the slot's region ──
+  const jitterMax = Math.round(Math.min(sPW, sPH) * 0.25); // reduced from 0.35
   shuffled.forEach((p, i) => {
     if (i >= allSlots.length) {
       p.x = tabPx + (i % 3) * (sPW + PAD);
@@ -1260,10 +1271,12 @@ function arrangePieces() {
       return;
     }
     const slot = allSlots[i];
+    const reg = slot.region;
     const jx = Math.round((rng() - 0.5) * 2 * jitterMax);
     const jy = Math.round((rng() - 0.5) * 2 * jitterMax);
-    p.x = Math.round(Math.max(tabPx, Math.min(CW - p.sPW - tabPx, slot.x + jx)));
-    p.y = Math.round(Math.max(tabPx, Math.min(CH - p.sPH - tabPx, slot.y + jy)));
+    // Clamp within the region bounds so pieces never drift toward the board
+    p.x = Math.round(Math.max(reg.x0, Math.min(reg.x1 - p.sPW, slot.x + jx)));
+    p.y = Math.round(Math.max(reg.y0, Math.min(reg.y1 - p.sPH, slot.y + jy)));
   });
 }
 
@@ -1332,33 +1345,29 @@ let _woodCanvas = null;
 // Jigsaw silhouette overlay — drawn once into an offscreen canvas
 let _jigsawOverlay = null;
 function getJigsawOverlay(w, h) {
-  if (_jigsawOverlay && _jigsawOverlay.width === w && _jigsawOverlay.height === h) return _jigsawOverlay;
+  const bw = Math.ceil(w / 64) * 64, bh = Math.ceil(h / 64) * 64;
+  if (_jigsawOverlay && _jigsawOverlay.width === bw && _jigsawOverlay.height === bh) return _jigsawOverlay;
   const jc = document.createElement('canvas');
-  jc.width = w; jc.height = h;
+  jc.width = bw; jc.height = bh;
   const ctx = jc.getContext('2d');
   const gs = 80; // grid size for background jigsaw silhouettes
   const T = gs * 0.22; // tab size
   ctx.strokeStyle = 'rgba(201,150,58,0.055)';
   ctx.lineWidth = 1;
-  // Simple grid of jigsaw-ish rectangles with knob hints
-  for (let gy = 0; gy < h + gs; gy += gs) {
-    for (let gx = 0; gx < w + gs; gx += gs) {
+  for (let gy = 0; gy < bh + gs; gy += gs) {
+    for (let gx = 0; gx < bw + gs; gx += gs) {
       const x = gx - (gs / 2), y = gy - (gs / 2);
       ctx.beginPath();
-      // top
       ctx.moveTo(x, y);
       ctx.lineTo(x + gs/2 - T*0.4, y);
       ctx.arc(x + gs/2, y - T*0.55, T*0.55, Math.PI, 0, false);
       ctx.lineTo(x + gs, y);
-      // right
       ctx.lineTo(x + gs, y + gs/2 - T*0.4);
       ctx.arc(x + gs + T*0.55, y + gs/2, T*0.55, Math.PI*1.5, Math.PI*0.5, false);
       ctx.lineTo(x + gs, y + gs);
-      // bottom
       ctx.lineTo(x + gs/2 + T*0.4, y + gs);
       ctx.arc(x + gs/2, y + gs + T*0.55, T*0.55, 0, Math.PI, false);
       ctx.lineTo(x, y + gs);
-      // left
       ctx.lineTo(x, y + gs/2 + T*0.4);
       ctx.arc(x - T*0.55, y + gs/2, T*0.55, Math.PI*0.5, Math.PI*1.5, false);
       ctx.closePath();
@@ -1377,57 +1386,96 @@ const _hctx = _hc.getContext('2d');
 
 function renderAll() {
   const ctx = BC.getContext('2d');
-  _cacheThemeStrokes(); // refresh stroke colours once per frame, not per piece
+  _cacheThemeStrokes();
   ctx.clearRect(0, 0, CW, CH);
-  // Wood texture background
-  ctx.drawImage(getWoodCanvas(CW, CH), 0, 0);
-  // Subtle jigsaw silhouette overlay
-  ctx.drawImage(getJigsawOverlay(CW, CH), 0, 0);
 
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+
+  // ── CAMERA TRANSFORM — everything below zooms and pans with the board ──
   ctx.save();
   ctx.translate(panX, panY);
   ctx.scale(zoom, zoom);
 
+  // ── BACKGROUND — drawn in world space so it zooms with the camera ──
+  // Calculate the world-space rectangle visible on screen
+  const wLeft   = -panX / zoom;
+  const wTop    = -panY / zoom;
+  const wRight  = (CW - panX) / zoom;
+  const wBottom = (CH - panY) / zoom;
+  const wW = wRight - wLeft, wH = wBottom - wTop;
+
+  // Tile the wood texture across the visible world area
+  const bgCanvas = getWoodCanvas(Math.ceil(CW / zoom) + 2, Math.ceil(CH / zoom) + 2);
+  ctx.drawImage(bgCanvas, wLeft, wTop, bgCanvas.width, bgCanvas.height);
+
+  // Jigsaw silhouette overlay — also in world space
+  const jCanvas = getJigsawOverlay(Math.ceil(CW / zoom) + 2, Math.ceil(CH / zoom) + 2);
+  ctx.drawImage(jCanvas, wLeft, wTop, jCanvas.width, jCanvas.height);
+
+  // ── MAT / SURROUND — high-contrast shade outside the work area ──
   if (window._asm) {
     const { x, y, w, h } = window._asm;
-    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
     ctx.save();
 
     if (isLight) {
-      // Light mode: drop-shadow inset effect so the board reads as a recessed mat
-      // Step 1 — soft outer shadow halo (drawn as a slightly larger rect behind)
-      ctx.globalAlpha = 0.10;
-      ctx.fillStyle = '#7a5820';
-      ctx.fillRect(x - 4/zoom, y - 4/zoom, w + 8/zoom, h + 8/zoom);
-      // Step 2 — inner fill: warm tinted wash to distinguish board from background
-      ctx.globalAlpha = 0.12;
-      ctx.fillStyle = '#c8a050';
+      // Light mode: dark warm mat outside the board so it pops against the light bg
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = '#6a4a18';
+      // Top strip
+      ctx.fillRect(wLeft, wTop, wW, y - wTop);
+      // Bottom strip
+      ctx.fillRect(wLeft, y + h, wW, wBottom - (y + h));
+      // Left strip
+      ctx.fillRect(wLeft, y, x - wLeft, h);
+      // Right strip
+      ctx.fillRect(x + w, y, wRight - (x + w), h);
+
+      // Board inner — slightly lighter warm wash to lift it off the surround
+      ctx.globalAlpha = 0.06;
+      ctx.fillStyle = '#f0e0b0';
       ctx.fillRect(x, y, w, h);
-      // Step 3 — solid dashed border
-      ctx.globalAlpha = 0.55;
-      ctx.strokeStyle = '#8a6020';
-      ctx.lineWidth = 1.5 / zoom;
-      ctx.setLineDash([6 / zoom, 4 / zoom]);
-      ctx.strokeRect(x, y, w, h);
-      ctx.setLineDash([]);
-      // Step 4 — corner accents for extra visibility
-      const cs = Math.min(w, h) * 0.06; // corner size
-      ctx.globalAlpha = 0.7;
+
+      // Border: solid dark line
+      ctx.globalAlpha = 0.70;
       ctx.strokeStyle = '#7a5010';
       ctx.lineWidth = 2 / zoom;
+      ctx.setLineDash([]);
+      ctx.strokeRect(x, y, w, h);
+
+      // Corner accents
+      const cs = Math.min(w, h) * 0.055;
+      ctx.globalAlpha = 0.85;
+      ctx.lineWidth = 2.5 / zoom;
       [[x, y], [x+w, y], [x, y+h], [x+w, y+h]].forEach(([cx, cy], qi) => {
         const sx = qi % 2 === 0 ? 1 : -1, sy = qi < 2 ? 1 : -1;
         ctx.beginPath();
         ctx.moveTo(cx + sx * cs, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + sy * cs);
         ctx.stroke();
       });
+
     } else {
-      // Dark mode: subtle gold tint + dashed border (existing style, slightly boosted)
-      ctx.globalAlpha = 0.07; ctx.fillStyle = '#c9963a'; ctx.fillRect(x, y, w, h);
-      ctx.globalAlpha = 0.28; ctx.strokeStyle = '#c9963a';
-      ctx.lineWidth = 1 / zoom; ctx.setLineDash([5 / zoom, 5 / zoom]);
-      ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+      // Dark mode: subtle lighter glow inside the board area to lift it
+      ctx.globalAlpha = 0.06;
+      ctx.fillStyle = '#c9963a';
+      ctx.fillRect(x, y, w, h);
+
+      // Darker mat outside — deepens the surround
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(wLeft, wTop, wW, y - wTop);
+      ctx.fillRect(wLeft, y + h, wW, wBottom - (y + h));
+      ctx.fillRect(wLeft, y, x - wLeft, h);
+      ctx.fillRect(x + w, y, wRight - (x + w), h);
+
+      // Gold dashed border
+      ctx.globalAlpha = 0.32;
+      ctx.strokeStyle = '#c9963a';
+      ctx.lineWidth = 1 / zoom;
+      ctx.setLineDash([5 / zoom, 5 / zoom]);
+      ctx.strokeRect(x, y, w, h);
+      ctx.setLineDash([]);
     }
+
     ctx.restore();
   }
 
@@ -2398,49 +2446,53 @@ function initBgPalette() {
   } catch {}
 }
 
-// Override getWoodCanvas to use active swatch colours
+// getWoodCanvas — returns a tiling-ready texture canvas.
+// Called with the visible world size (slightly larger than screen / zoom).
+// Cache by rounded size bucket to avoid regenerating on every tiny zoom change.
 function getWoodCanvas(w, h) {
-  if (_woodCanvas && _woodCanvas.width === w && _woodCanvas.height === h) return _woodCanvas;
+  // Bucket to nearest 64px so small zoom changes don't bust the cache
+  const bw = Math.ceil(w / 64) * 64, bh = Math.ceil(h / 64) * 64;
+  if (_woodCanvas && _woodCanvas.width === bw && _woodCanvas.height === bh) return _woodCanvas;
   const sw = BG_SWATCHES[_activeBgIdx];
   const wc = document.createElement('canvas');
-  wc.width = w; wc.height = h;
+  wc.width = bw; wc.height = bh;
   const ctx = wc.getContext('2d');
 
   if (sw.type === 'solid') {
     ctx.fillStyle = sw.colors[0];
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(0, 0, bw, bh);
   } else {
     // Wood gradient using swatch colours
-    const g = ctx.createLinearGradient(0, 0, w * 0.4, h);
+    const g = ctx.createLinearGradient(0, 0, bw * 0.4, bh);
     g.addColorStop(0,   sw.colors[0]);
     g.addColorStop(0.4, sw.colors[1]);
     g.addColorStop(1,   sw.colors[2]);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, bw, bh);
     // Grain
     const rng = (() => { let s = 0xdeadbeef; return () => { s ^= s<<13; s ^= s>>17; s ^= s<<5; return (s>>>0)/4294967296; }; })();
-    const numGrains = Math.floor(h / 4);
+    const numGrains = Math.floor(bh / 4);
     for (let i = 0; i < numGrains; i++) {
-      const y0 = rng()*h, amp = 2+rng()*8, freq = .003+rng()*.012, phase = rng()*Math.PI*2, lt = rng();
+      const y0 = rng()*bh, amp = 2+rng()*8, freq = .003+rng()*.012, phase = rng()*Math.PI*2, lt = rng();
       const alpha = .022+rng()*.055;
       const col = lt>.7 ? `rgba(180,110,60,${alpha})` : lt>.4 ? `rgba(40,20,8,${alpha*1.4})` : `rgba(220,160,80,${alpha*.6})`;
       ctx.beginPath(); ctx.moveTo(0, y0);
-      for (let x = 1; x <= w; x += 3) ctx.lineTo(x, y0 + Math.sin(x*freq+phase)*amp);
+      for (let x = 1; x <= bw; x += 3) ctx.lineTo(x, y0 + Math.sin(x*freq+phase)*amp);
       ctx.strokeStyle = col; ctx.lineWidth = .5+rng()*1.5; ctx.stroke();
     }
     ctx.save(); ctx.globalAlpha = .03;
     for (let i = 0; i < 300; i++) {
-      const x = rng()*w, y = rng()*h, len = 4+rng()*20;
+      const x = rng()*bw, y = rng()*bh, len = 4+rng()*20;
       ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+len*(rng()-.5)*.3, y+len);
       ctx.strokeStyle = rng()>.5 ? '#c89050' : '#1a0f08'; ctx.lineWidth = .4+rng(); ctx.stroke();
     }
     ctx.restore();
   }
   // Vignette on all types
-  const vg = ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,Math.max(w,h)*.72);
+  const vg = ctx.createRadialGradient(bw/2,bh/2,0,bw/2,bh/2,Math.max(bw,bh)*.72);
   const isLightTheme = document.documentElement.getAttribute('data-theme') === 'light';
   const vigAmt = isLightTheme ? 0.12 : 0.45;
   vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,`rgba(0,0,0,${vigAmt})`);
-  ctx.fillStyle = vg; ctx.fillRect(0,0,w,h);
+  ctx.fillStyle = vg; ctx.fillRect(0,0,bw,bh);
   _woodCanvas = wc; return wc;
 }
 
