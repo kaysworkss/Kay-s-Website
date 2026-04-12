@@ -51,8 +51,15 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 #no-challenge-screen p{color:var(--text-muted);max-width:400px}
 
 /* ── PLAYER ENTRY ── */
-#entry-screen{display:none;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(ellipse at 50% 30%,#1e1a0e 0%,#0a0a08 70%);padding:2rem}
+#entry-screen{display:none;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(ellipse at 50% 30%,#1e1a0e 0%,#0a0a08 70%);padding:1.25rem}
 #entry-screen .card{max-width:460px;width:100%;text-align:center}
+@media(max-width:480px){
+  #entry-screen{ padding:.75rem; }
+  #entry-screen .card{ padding:1.25rem; border-radius:10px; }
+  .logo-sub{ margin-bottom:1.5rem; }
+  .challenge-meta{ gap:.5rem; margin:0.75rem 0 1rem; }
+  .meta-badge{ padding:.3rem .65rem; font-size:.75rem; }
+}
 #entry-screen h2{font-family:'Cinzel',serif;color:var(--gold-light);font-size:1rem;letter-spacing:.1em;margin-bottom:.5rem}
 .challenge-meta{display:flex;gap:1rem;justify-content:center;margin:1rem 0 1.5rem;flex-wrap:wrap}
 .meta-badge{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:.4rem .9rem;font-size:.8rem;color:var(--text-muted)}
@@ -64,7 +71,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 /* ── GAME ── */
 #game-screen{position:fixed;inset:0;display:none;flex-direction:column}
 
-/* bottom toolbar */
+/* bottom toolbar — desktop */
 #toolbar{
   position:absolute;bottom:0;left:0;right:0;height:var(--bar-h);
   background:var(--surface);border-top:1px solid var(--border);
@@ -80,17 +87,58 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 #progress-wrap{flex:1;height:4px;background:rgba(201,150,58,.15);border-radius:2px;overflow:hidden}
 #progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold-light));transition:width .35s;width:0%}
 .tb-btns{display:flex;gap:.35rem;align-items:center;flex-shrink:0}
-@media(max-width:500px){
-  .tb-lbl{display:none}
-  .tb-val{font-size:.78rem}
-  #toolbar{gap:.4rem;padding:0 .6rem}
-  .btn-sm{padding:.24rem .5rem;font-size:.56rem}
+/* On desktop tb-top is invisible wrapper — its children flow inline */
+.tb-top{display:contents}
+
+/* ── MOBILE TOOLBAR — two rows ── */
+@media(max-width:600px){
+  :root{ --bar-h: 82px; }   /* taller toolbar to fit two rows */
+
+  #toolbar{
+    flex-direction:column;
+    height:var(--bar-h);
+    padding:.3rem .7rem .4rem;
+    gap:.3rem;
+    align-items:stretch;
+  }
+
+  /* top row: stats + progress */
+  .tb-top{
+    display:flex;align-items:center;gap:.5rem;width:100%;
+  }
+  /* bottom row: action buttons */
+  .tb-btns{
+    display:flex;align-items:center;justify-content:space-between;
+    width:100%;gap:.2rem;
+  }
+
+  .tb-stat{ min-width:0; }
+  .tb-val{ font-size:.8rem; }
+  .tb-lbl{ display:none; }
+  .tb-sep{ height:16px; }
+
+  #progress-wrap{ flex:1; height:5px; }
+  .tb-pct{ font-size:.7rem; white-space:nowrap; }
+
+  /* Bigger tap targets on mobile */
+  .btn-sm{
+    padding:.42rem .55rem;
+    font-size:.62rem;
+    min-width:32px;
+    min-height:32px;
+    display:flex;align-items:center;justify-content:center;
+    flex:1;                    /* equal width across bottom row */
+    max-width:44px;
+  }
+
+  /* Hide count badges (×3) on very small screens to save space */
+  .btn-sm span{ display:none; }
 }
 
 /* canvas fills everything above toolbar */
 #board-canvas{position:absolute;top:0;left:0;display:block;cursor:default}
 
-/* reference thumbnail */
+/* reference thumbnail — smaller on mobile */
 #ref-thumb{
   position:absolute;bottom:calc(var(--bar-h) + 8px);left:8px;z-index:20;
   background:var(--surface);border:1px solid var(--border-bright);border-radius:6px;
@@ -102,6 +150,11 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 #ref-thumb span{display:block;font-family:'Cinzel',serif;font-size:.48rem;
   letter-spacing:.1em;color:var(--text-muted);text-align:center;padding:.18rem;
   border-top:1px solid var(--border)}
+@media(max-width:600px){
+  #ref-thumb{ max-width:min(72px,15vw); }
+  #ref-thumb img{ max-height:50px; }
+  #ref-thumb span{ display:none; }
+}
 
 /* selection rectangle */
 #sel-rect{position:fixed;pointer-events:none;
@@ -113,8 +166,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
   width:0;overflow:hidden;transition:width .22s;
   background:var(--surface);border-left:1px solid var(--border);z-index:40}
 #lb-panel.open{width:min(260px,82vw)}
-.lb-inner{width:260px;padding:.85rem;overflow-y:auto;max-height:100%}
-.lb-title{font-family:'Cinzel',serif;font-size:.68rem;letter-spacing:.15em;
+.lb-inner{width:260px;padding:.85rem;overflow-y:auto;max-height:100%}.lb-title{font-family:'Cinzel',serif;font-size:.68rem;letter-spacing:.15em;
   color:var(--gold);margin-bottom:.75rem;text-transform:uppercase}
 .lb-row{display:flex;align-items:center;gap:.35rem;padding:.32rem 0;
   border-bottom:1px solid var(--border)}
@@ -142,7 +194,55 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 .lb-group-body{overflow:hidden;transition:max-height .25s ease}
 .lb-group-body.collapsed{max-height:0!important}
 
-/* ── WIN ── */
+/* ── BACKGROUND PALETTE ── */
+#bg-palette-btn{position:absolute;top:8px;right:8px;z-index:25;
+  background:var(--surface);border:1px solid var(--border);border-radius:50%;
+  width:32px;height:32px;cursor:pointer;display:none;align-items:center;
+  justify-content:center;font-size:.9rem;transition:border-color .15s;}
+#bg-palette-btn:hover{border-color:var(--gold)}
+#bg-palette{display:none;position:absolute;top:48px;right:8px;z-index:26;
+  background:var(--surface);border:1px solid var(--border-bright);
+  border-radius:10px;padding:.6rem;gap:.4rem;flex-wrap:wrap;width:156px;
+  box-shadow:0 6px 24px rgba(0,0,0,.5)}
+#bg-palette.open{display:flex}
+.bg-swatch{width:28px;height:28px;border-radius:6px;cursor:pointer;
+  border:2px solid transparent;transition:border-color .15s,transform .15s;flex-shrink:0}
+.bg-swatch:hover,.bg-swatch.active{border-color:var(--gold);transform:scale(1.12)}
+
+/* ── CHALLENGE PICKER (entry screen) ── */
+#challenge-picker{display:flex;flex-direction:column;gap:.75rem;margin-top:1rem;width:100%}
+.ch-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  padding:.85rem 1rem;cursor:pointer;transition:border-color .2s,background .2s;text-align:left;
+  display:flex;align-items:center;gap:.75rem}
+.ch-card:hover{border-color:var(--gold);background:rgba(201,150,58,.06)}
+.ch-card.selected{border-color:var(--gold);background:rgba(201,150,58,.1)}
+.ch-card-diff{font-family:'Cinzel',serif;font-size:.58rem;letter-spacing:.14em;
+  text-transform:uppercase;padding:.18rem .5rem;border-radius:4px;flex-shrink:0;
+  border:1px solid currentColor}
+.ch-card-diff.easy{color:#6abf6a;border-color:rgba(106,191,106,.4);background:rgba(106,191,106,.08)}
+.ch-card-diff.medium{color:var(--gold-light);border-color:rgba(232,184,92,.4);background:rgba(232,184,92,.08)}
+.ch-card-diff.hard{color:#e07070;border-color:rgba(224,112,112,.4);background:rgba(224,112,112,.08)}
+.ch-card-diff.expert{color:#c07ae0;border-color:rgba(192,122,224,.4);background:rgba(192,122,224,.08)}
+.ch-card-info{flex:1;min-width:0}
+.ch-card-title{font-family:'Cinzel',serif;font-size:.78rem;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-card-meta{font-size:.68rem;color:var(--text-muted);margin-top:.18rem}
+.ch-card-pieces{font-family:'Cinzel',serif;font-size:.62rem;color:var(--text-muted);flex-shrink:0}
+@media(max-width:480px){
+  .ch-card{padding:.7rem .8rem;gap:.6rem}
+  .ch-card-title{font-size:.72rem}
+}
+
+/* ── RESTART BUTTON in pause overlay ── */
+.pause-actions .btn-restart{border-color:var(--text-muted);color:var(--text-muted)}
+.pause-actions .btn-restart:hover{background:var(--text-muted);color:#0a0a08}
+
+@media(max-width:600px){
+  #lb-panel.open{ width:100vw; border-left:none; }
+  .lb-inner{ width:100%; padding:.75rem 1rem; }
+}
+
+
 #win-screen{display:none;position:fixed;inset:0;z-index:100;background:rgba(10,10,8,.95);align-items:center;justify-content:center;padding:1.5rem;overflow:auto}
 #win-screen.show{display:flex}
 .win-layout{display:flex;align-items:center;gap:2rem;flex-wrap:wrap;justify-content:center;max-width:900px;width:100%}
@@ -195,7 +295,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 
 /* ── WELLNESS TOAST ── */
 #wellness-toast{
-  display:none;position:fixed;bottom:calc(var(--bar-h) + 14px);left:50%;
+  display:none;position:fixed;bottom:calc(var(--bar-h) + 10px);left:50%;
   transform:translateX(-50%) translateY(12px);
   z-index:200;max-width:min(92vw,440px);width:100%;
   background:var(--surface);border:1px solid var(--border-bright);
@@ -216,6 +316,11 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 .wt-sub{font-size:.72rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.04em;margin-top:.3rem;opacity:.7}
 .wt-close{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.8rem;padding:.1rem .3rem;line-height:1;flex-shrink:0;margin-top:.1rem;transition:color .15s}
 .wt-close:hover{color:var(--gold)}
+@media(max-width:480px){
+  #wellness-toast{ padding:.75rem .85rem .75rem .75rem; border-radius:10px; }
+  .wt-icon{ font-size:1.6rem; }
+  .wt-msg{ font-size:.88rem; }
+}
 #pause-overlay{display:none;position:fixed;inset:0;z-index:80;
   background:rgba(10,8,4,.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   align-items:center;justify-content:center;flex-direction:column;gap:1.2rem}
@@ -232,16 +337,22 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 .img-lbl{font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.18em;color:var(--text-muted);text-transform:uppercase}
 .img-hdr-right{display:flex;align-items:center;gap:.5rem}
 .img-zoom-hint{font-size:.6rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.06em;opacity:.6}
-.img-close{background:none;border:1px solid var(--border-bright);color:var(--text-muted);border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.72rem;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.img-close{background:none;border:1px solid var(--border-bright);color:var(--text-muted);border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:.8rem;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
 .img-close:hover{border-color:var(--gold);color:var(--gold)}
 #modal-viewport{flex:1;overflow:hidden;position:relative;cursor:grab;touch-action:none}
 #modal-viewport.grabbing{cursor:grabbing}
 #modal-img-wrap{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform}
 #modal-img{display:block;border-radius:6px;border:1px solid var(--border-bright);max-width:none;user-select:none;-webkit-user-drag:none}
 .img-zoom-bar{position:absolute;bottom:.7rem;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:.5rem;background:rgba(10,10,8,.75);border:1px solid var(--border);border-radius:20px;padding:.28rem .7rem;z-index:10}
-.img-zoom-bar button{background:none;border:none;color:var(--gold);cursor:pointer;font-size:.9rem;line-height:1;padding:.1rem .25rem;font-family:'Cinzel',serif}
+.img-zoom-bar button{background:none;border:none;color:var(--gold);cursor:pointer;font-size:.9rem;line-height:1;padding:.15rem .3rem;font-family:'Cinzel',serif;min-width:28px;min-height:28px}
 .img-zoom-bar button:hover{color:var(--gold-light)}
 .img-zoom-pct{font-family:'Cinzel',serif;font-size:.6rem;color:var(--text-muted);min-width:3em;text-align:center}
+@media(max-width:600px){
+  .img-zoom-hint{ display:none; }
+  .img-hdr{ padding:.5rem .75rem; }
+  .img-zoom-bar{ bottom:1rem; padding:.4rem .9rem; }
+  .img-zoom-bar button{ font-size:1.1rem; }
+}
 </style>
 </head>
 <body>
@@ -274,14 +385,17 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
     <div class="logo" style="margin-bottom:.1rem">Àpótí <em>Ọlọ́wẹ̀</em></div>
     <div class="logo-kw" style="margin-bottom:.3rem">Kaysworks</div>
     <div class="logo-sub">Puzzle Challenge</div>
-    <h2 id="challenge-title-display">This Week's Puzzle</h2>
-    <div class="challenge-meta">
-      <div class="meta-badge">~<span id="piece-count-badge">1000</span> pieces</div>
-      <div class="meta-badge">Ends <span id="ends-at-badge">—</span></div>
+
+    <!-- Challenge picker — populated by JS -->
+    <div id="challenge-picker"></div>
+
+    <!-- Countdown for selected challenge -->
+    <div id="countdown-wrap" style="margin-top:.75rem;display:none">
+      <div class="countdown-bar"><div class="countdown-fill" id="countdown-fill" style="width:100%"></div></div>
+      <div class="countdown-label" id="countdown-label">Loading…</div>
     </div>
-    <div class="countdown-bar"><div class="countdown-fill" id="countdown-fill" style="width:100%"></div></div>
-    <div class="countdown-label" id="countdown-label">Loading…</div>
-    <div class="field" style="margin-top:1.5rem;text-align:left">
+
+    <div class="field" style="margin-top:1rem;text-align:left">
       <label>Your Name</label>
       <input type="text" id="player-name" placeholder="Enter your name for the leaderboard" maxlength="28">
     </div>
@@ -290,7 +404,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
       <div style="margin-top:.35rem;font-size:.72rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.04em">Progress is saved on this device only. Clearing your browser data will erase it.</div>
     </div>
     <div style="display:flex;gap:.6rem;margin-top:.75rem">
-      <button class="btn btn-solid" id="start-btn" style="flex:1" onclick="startGame(false)">Start Fresh</button>
+      <button class="btn btn-solid" id="start-btn" style="flex:1" onclick="startGame(false)" disabled>Select a challenge</button>
       <button class="btn" id="resume-btn" style="flex:1;display:none" onclick="startGame(true)">↩ Resume</button>
     </div>
     <div style="margin-top:.75rem;text-align:center">
@@ -312,6 +426,10 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
     <span>Reference</span>
   </div>
 
+  <!-- background palette picker -->
+  <button id="bg-palette-btn" title="Change background">🎨</button>
+  <div id="bg-palette"></div>
+
   <!-- leaderboard slide-out -->
   <div id="lb-panel">
     <div class="lb-inner">
@@ -325,23 +443,27 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 
   <!-- bottom toolbar -->
   <div id="toolbar">
-    <div class="tb-stat">
-      <div class="tb-val" id="timer-disp">00:00</div>
-      <div class="tb-lbl">Time</div>
+    <!-- Row 1: stats + progress -->
+    <div class="tb-top">
+      <div class="tb-stat">
+        <div class="tb-val" id="timer-disp">00:00</div>
+        <div class="tb-lbl">Time</div>
+      </div>
+      <div class="tb-sep"></div>
+      <div class="tb-stat">
+        <div class="tb-val" id="placed-disp">0</div>
+        <div class="tb-lbl">Placed</div>
+      </div>
+      <div class="tb-sep"></div>
+      <div id="progress-wrap"><div id="progress-fill"></div></div>
+      <div class="tb-pct" id="prog-lbl">0%</div>
     </div>
-    <div class="tb-sep"></div>
-    <div class="tb-stat">
-      <div class="tb-val" id="placed-disp">0</div>
-      <div class="tb-lbl">Placed</div>
-    </div>
-    <div class="tb-sep"></div>
-    <div id="progress-wrap"><div id="progress-fill"></div></div>
-    <div class="tb-pct" id="prog-lbl">0%</div>
-    <div class="tb-sep"></div>
+    <!-- Row 2: action buttons -->
     <div class="tb-btns">
       <button class="btn btn-sm" onclick="openImgModal()" title="Reference Image">🖼</button>
       <button class="btn btn-sm" id="hint-btn" onclick="useHint()" title="Hint — shows where a piece belongs">💡<span id="hint-count">×3</span></button>
       <button class="btn btn-sm" id="ghost-btn" onclick="useGhost()" title="Ghost — briefly overlays the full image">👁<span id="ghost-count">×3</span></button>
+      <button class="btn btn-sm" onclick="restartPuzzle()" title="Restart — rescatter all pieces">↺</button>
       <button class="btn btn-sm" onclick="scatter()" title="Scatter pieces randomly">🔀</button>
       <button class="btn btn-sm" onclick="arrangePieces();renderAll();" title="Arrange pieces neatly around the board">⊞</button>
       <button class="btn btn-sm" onclick="resetZoom()" title="Reset zoom">🔍</button>
@@ -376,6 +498,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
   <div class="pause-note">Progress auto-saved · Timer stopped</div>
   <div class="pause-actions">
     <button class="btn btn-solid" onclick="resumeGame()">▶ Resume</button>
+    <button class="btn btn-restart" onclick="restartPuzzle();resumeGame()">↺ Restart</button>
     <button class="btn" onclick="confirmQuit()">Quit</button>
   </div>
 </div>
@@ -455,11 +578,12 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
           <input type="datetime-local" id="ch-ends">
         </div>
         <div class="field">
-          <label>Approximate Piece Count</label>
+          <label>Difficulty Level</label>
           <select id="ch-pieces">
-            <option value="500">~500 pieces (easier)</option>
-            <option value="1000" selected>~1000 pieces (medium)</option>
-            <option value="1500">~1500 pieces (hard)</option>
+            <option value="150">Easy — ~150 pieces</option>
+            <option value="400">Medium — ~400 pieces</option>
+            <option value="1000" selected>Hard — ~1000 pieces</option>
+            <option value="1500">Expert — ~1500 pieces</option>
           </select>
         </div>
         <div class="field">
@@ -548,7 +672,10 @@ let lastTouchedPiece = null; // track most recently dragged piece for hint
 // Canvas — always exactly viewport size
 const BC = document.getElementById('board-canvas');
 let CW = 0, CH = 0;
-const BAR_H = 42;
+// BAR_H reads the CSS variable so it matches the two-row toolbar on mobile
+function getBarH() {
+  return parseInt(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) || 42;
+}
 
 // ═══════════════════════════════════════════════
 //  AUDIO
@@ -572,12 +699,14 @@ function playSnap() {
 // ═══════════════════════════════════════════════
 //  BOOT
 // ═══════════════════════════════════════════════
+let challenges = []; // all active challenges
 async function boot() {
   if (location.hash === '#admin') { showAdminLogin(); return; }
   try {
-    const res = await fetch(`${API}/challenge`);
+    const res = await fetch(`${API}/challenges`);
     if (!res.ok) throw new Error(await res.text());
-    challenge = await res.json();
+    challenges = await res.json();
+    if (!challenges.length) throw new Error('No active challenge at this time.');
     showEntryScreen();
   } catch(e) {
     const msg = e.message.includes('No active') ? e.message : 'Could not connect to challenge server.';
@@ -590,17 +719,75 @@ async function boot() {
 window.addEventListener('load', boot);
 
 // ═══════════════════════════════════════════════
-//  ENTRY SCREEN
+//  ENTRY SCREEN — challenge picker
 // ═══════════════════════════════════════════════
+const DIFF_LEVELS = [
+  { label:'Easy',   cls:'easy',   range:[1,   250]  },
+  { label:'Medium', cls:'medium', range:[251, 600]  },
+  { label:'Hard',   cls:'hard',   range:[601, 1200] },
+  { label:'Expert', cls:'expert', range:[1201, Infinity] },
+];
+function diffForCount(n) {
+  return DIFF_LEVELS.find(d => n >= d.range[0] && n <= d.range[1]) || DIFF_LEVELS[DIFF_LEVELS.length-1];
+}
+
 function showEntryScreen() {
-  document.getElementById('challenge-title-display').textContent = challenge.title;
-  document.getElementById('piece-count-badge').textContent = challenge.piece_count;
-  const endsAt = new Date(challenge.ends_at);
-  document.getElementById('ends-at-badge').textContent = endsAt.toLocaleDateString('en-GB', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const picker = document.getElementById('challenge-picker');
+  picker.innerHTML = '';
+
+  // Sort by piece count ascending (Easy → Expert)
+  const sorted = [...challenges].sort((a,b) => a.piece_count - b.piece_count);
+
+  sorted.forEach(ch => {
+    const diff = diffForCount(ch.piece_count);
+    const endsAt = new Date(ch.ends_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    const card = document.createElement('div');
+    card.className = 'ch-card';
+    card.dataset.id = ch.id;
+    card.innerHTML = `
+      <span class="ch-card-diff ${diff.cls}">${diff.label}</span>
+      <div class="ch-card-info">
+        <div class="ch-card-title">${esc(ch.title)}</div>
+        <div class="ch-card-meta">Ends ${endsAt}</div>
+      </div>
+      <span class="ch-card-pieces">~${ch.piece_count}pc</span>`;
+    card.addEventListener('click', () => selectChallenge(ch, card));
+    picker.appendChild(card);
+  });
+
+  // Auto-select if only one challenge, or if a saved session matches one
+  const savedMatch = sorted.find(ch => {
+    const key = `apoti_puzzle_save_${ch.id}`;
+    try { const d = JSON.parse(localStorage.getItem(key)); return d && d.placed < d.total; } catch { return false; }
+  });
+  const autoSelect = savedMatch || (sorted.length === 1 ? sorted[0] : null);
+  if (autoSelect) {
+    const card = picker.querySelector(`[data-id="${autoSelect.id}"]`);
+    if (card) selectChallenge(autoSelect, card);
+  }
+
+  show('entry-screen');
+  hide('loading-screen');
+}
+
+function selectChallenge(ch, cardEl) {
+  // Deselect all
+  document.querySelectorAll('.ch-card').forEach(c => c.classList.remove('selected'));
+  cardEl.classList.add('selected');
+  challenge = ch;
+
+  // Show countdown
+  document.getElementById('countdown-wrap').style.display = 'block';
+  clearInterval(countdownInterval);
   updateCountdown();
   countdownInterval = setInterval(updateCountdown, 1000);
 
-  // Check for saved progress
+  // Check for saved progress for this specific challenge
+  document.getElementById('resume-banner').style.display = 'none';
+  document.getElementById('resume-btn').style.display = 'none';
+  document.getElementById('start-btn').disabled = false;
+  document.getElementById('start-btn').textContent = 'Start Fresh';
+
   const saved = loadProgress();
   if (saved) {
     const pct = Math.round(saved.placed / saved.total * 100);
@@ -608,15 +795,12 @@ function showEntryScreen() {
     document.getElementById('resume-info').textContent = `${pct}% complete · ${t} elapsed — pick up where you left off`;
     document.getElementById('resume-banner').style.display = 'block';
     document.getElementById('resume-btn').style.display = 'block';
-    document.getElementById('start-btn').textContent = 'Start Fresh';
     if (saved.playerName) document.getElementById('player-name').value = saved.playerName;
   }
-
-  show('entry-screen');
-  hide('loading-screen');
 }
 
 function updateCountdown() {
+  if (!challenge) return;
   const now = Date.now();
   const ends = new Date(challenge.ends_at).getTime();
   const starts = new Date(challenge.starts_at).getTime();
@@ -625,9 +809,9 @@ function updateCountdown() {
   const pct = Math.min(100, remaining / total * 100);
   document.getElementById('countdown-fill').style.width = pct + '%';
   const s = Math.floor(remaining / 1000);
-  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const d2 = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   let label = '';
-  if (d > 0) label = `${d}d ${h}h ${m}m remaining`;
+  if (d2 > 0) label = `${d2}d ${h}h ${m}m remaining`;
   else if (h > 0) label = `${h}h ${m}m ${sec}s remaining`;
   else label = `${m}m ${sec}s remaining`;
   if (remaining <= 0) { label = 'Challenge has ended'; document.getElementById('start-btn').disabled = true; }
@@ -693,6 +877,10 @@ async function startGame(resume = false) {
   document.getElementById('game-screen').style.display = 'flex';
   document.getElementById('ref-img').src = img.src;
   document.getElementById('ref-thumb').style.display = 'block';
+  // Show and init background palette
+  const bgBtn = document.getElementById('bg-palette-btn');
+  bgBtn.style.display = 'flex';
+  initBgPalette();
 
   sizeCanvas(); // sets targets and initial scatter
 
@@ -885,10 +1073,14 @@ function makeEdges(rng) {
 // ═══════════════════════════════════════════════
 function sizeCanvas() {
   CW = window.innerWidth;
-  CH = window.innerHeight - BAR_H;
+  CH = window.innerHeight - getBarH();
   BC.width = CW; BC.height = CH;
   BC.style.width = CW + 'px'; BC.style.height = CH + 'px';
-  const maxW = CW * .60, maxH = CH * .60;
+  // On portrait mobile, use a smaller assembly zone (48%) so pieces have
+  // more room around the edges. On landscape/desktop keep 60%.
+  const isMobPortrait = CW < 600 && CH > CW;
+  const zoneFrac = isMobPortrait ? 0.48 : 0.60;
+  const maxW = CW * zoneFrac, maxH = CH * zoneFrac;
   const scale = Math.min(maxW / imgW, maxH / imgH, 1);
   const aW = Math.round(imgW * scale), aH = Math.round(imgH * scale);
   const asmX = Math.round((CW - aW) / 2), asmY = Math.round((CH - aH) / 2);
@@ -1065,67 +1257,6 @@ function resetZoom() { zoom = 1; panX = 0; panY = 0; renderAll(); }
 //  WOOD TEXTURE BACKGROUND (generated once, reused)
 // ═══════════════════════════════════════════════
 let _woodCanvas = null;
-function getWoodCanvas(w, h) {
-  if (_woodCanvas && _woodCanvas.width === w && _woodCanvas.height === h) return _woodCanvas;
-  const wc = document.createElement('canvas');
-  wc.width = w; wc.height = h;
-  const ctx = wc.getContext('2d');
-
-  // Base wood color gradient
-  const g = ctx.createLinearGradient(0, 0, w * 0.4, h);
-  g.addColorStop(0,   '#2b1f14');
-  g.addColorStop(0.3, '#3a2918');
-  g.addColorStop(0.6, '#2e2012');
-  g.addColorStop(1,   '#251a0f');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-
-  // Wood grain lines — horizontal sinusoidal streaks
-  const rng = (() => { let s = 0xdeadbeef; return () => { s ^= s<<13; s ^= s>>17; s ^= s<<5; return (s>>>0)/4294967296; }; })();
-  const numGrains = Math.floor(h / 4);
-  for (let i = 0; i < numGrains; i++) {
-    const y0 = rng() * h;
-    const amp = 2 + rng() * 8;
-    const freq = 0.003 + rng() * 0.012;
-    const phase = rng() * Math.PI * 2;
-    const lightness = rng();
-    const alpha = 0.022 + rng() * 0.055;
-    const col = lightness > 0.7
-      ? `rgba(120,80,40,${alpha})`
-      : lightness > 0.4
-        ? `rgba(60,35,15,${alpha * 1.4})`
-        : `rgba(200,140,70,${alpha * 0.6})`;
-    ctx.beginPath();
-    ctx.moveTo(0, y0);
-    for (let x = 1; x <= w; x += 3) {
-      ctx.lineTo(x, y0 + Math.sin(x * freq + phase) * amp);
-    }
-    ctx.strokeStyle = col;
-    ctx.lineWidth = 0.5 + rng() * 1.5;
-    ctx.stroke();
-  }
-
-  // Subtle cross-grain noise
-  ctx.save(); ctx.globalAlpha = 0.03;
-  for (let i = 0; i < 400; i++) {
-    const x = rng() * w, y = rng() * h;
-    const len = 4 + rng() * 20;
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len * (rng() - 0.5) * 0.3, y + len);
-    ctx.strokeStyle = rng() > 0.5 ? '#c89050' : '#1a0f08';
-    ctx.lineWidth = 0.4 + rng();
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // Vignette
-  const vg = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, Math.max(w, h) * 0.72);
-  vg.addColorStop(0, 'rgba(0,0,0,0)');
-  vg.addColorStop(1, 'rgba(0,0,0,0.42)');
-  ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);
-
-  _woodCanvas = wc;
-  return wc;
-}
-
 // Jigsaw silhouette overlay — drawn once into an offscreen canvas
 let _jigsawOverlay = null;
 function getJigsawOverlay(w, h) {
@@ -1304,6 +1435,11 @@ function renderAll() {
 function drawPiece(ctx, p, x, y, alpha) {
   if (!img || !window._asm) return;
   const sc = window._asm.scale;
+  // Thinner strokes on small screens so image content is more visible
+  const isMob = CW < 600;
+  const outerStroke = isMob ? 1.2 / sc : 2.2 / sc;
+  const innerStroke = isMob ? 0.5 / sc : 0.9 / sc;
+
   ctx.save(); ctx.globalAlpha = alpha;
   ctx.translate(x, y); ctx.scale(sc, sc);
   const tmp = { ...p, x: 0, y: 0 };
@@ -1318,10 +1454,10 @@ function drawPiece(ctx, p, x, y, alpha) {
   ctx.save(); ctx.globalAlpha = alpha;
   ctx.translate(x, y); ctx.scale(sc, sc);
   buildPath(ctx, tmp, 0, 0);
-  ctx.strokeStyle = 'rgba(0,0,0,.52)'; ctx.lineWidth = 2.2 / sc; ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,0,0,.52)'; ctx.lineWidth = outerStroke; ctx.stroke();
   buildPath(ctx, tmp, 0, 0);
   ctx.strokeStyle = p.placed ? 'rgba(201,150,58,.6)' : 'rgba(255,255,255,.14)';
-  ctx.lineWidth = 0.9 / sc; ctx.stroke();
+  ctx.lineWidth = innerStroke; ctx.stroke();
   ctx.restore();
 }
 
@@ -1916,9 +2052,128 @@ function confirmQuit() {
   document.getElementById('game-screen').style.display = 'none';
   document.getElementById('win-screen').classList.remove('show');
   document.getElementById('ref-thumb').style.display = 'none';
+  document.getElementById('bg-palette-btn').style.display = 'none';
   document.getElementById('lb-panel').classList.remove('open');
   img = null; pieces = []; groups = new Map(); window._asm = null;
   hideAll(); show('loading-screen'); boot();
+}
+
+// ═══════════════════════════════════════════════
+//  RESTART — rescatter all unplaced pieces, reset hints/ghost
+// ═══════════════════════════════════════════════
+function restartPuzzle() {
+  if (!confirm('Restart? All pieces will be rescattered. Progress will be lost.')) return;
+  // Rebuild all groups and unplace everything
+  groups = new Map(); nextGid = 0;
+  pieces.forEach(p => {
+    p.placed = false; p.x = 0; p.y = 0;
+    const gid = nextGid++;
+    p.groupId = gid;
+    groups.set(gid, new Set([p.id]));
+  });
+  // Reset start time and hints
+  startTime = Date.now();
+  clearSavedProgress();
+  resetHintGhost();
+  zoom = 1; panX = 0; panY = 0;
+  sizeCanvas(); // rescatter + render
+  updateStats();
+}
+
+// ═══════════════════════════════════════════════
+//  BACKGROUND SWATCHES
+// ═══════════════════════════════════════════════
+const BG_SWATCHES = [
+  { label:'Dark Wood',    type:'wood',  colors:['#2b1f14','#3a2918','#2e2012'] },
+  { label:'Mahogany',     type:'wood',  colors:['#3d1a0e','#5a2812','#3a1a0a'] },
+  { label:'Ash',          type:'wood',  colors:['#2e2820','#3d3428','#2a2418'] },
+  { label:'Ebony',        type:'wood',  colors:['#141210','#1e1a16','#111008'] },
+  { label:'Midnight',     type:'solid', colors:['#0a0a0f','#0a0a0f','#0a0a0f'] },
+  { label:'Charcoal',     type:'solid', colors:['#1a1a1a','#1a1a1a','#1a1a1a'] },
+  { label:'Deep Teal',    type:'solid', colors:['#0a1a18','#0a1a18','#0a1a18'] },
+  { label:'Deep Navy',    type:'solid', colors:['#0a0e1a','#0a0e1a','#0a0e1a'] },
+  { label:'Warm Black',   type:'solid', colors:['#100e08','#100e08','#100e08'] },
+];
+let _activeBgIdx = 0;
+
+function initBgPalette() {
+  const palette = document.getElementById('bg-palette');
+  const btn = document.getElementById('bg-palette-btn');
+  palette.innerHTML = '';
+  BG_SWATCHES.forEach((sw, i) => {
+    const s = document.createElement('div');
+    s.className = 'bg-swatch' + (i === _activeBgIdx ? ' active' : '');
+    s.title = sw.label;
+    s.style.background = sw.type === 'wood'
+      ? `linear-gradient(135deg, ${sw.colors[0]}, ${sw.colors[1]}, ${sw.colors[2]})`
+      : sw.colors[0];
+    s.addEventListener('click', () => {
+      _activeBgIdx = i;
+      palette.querySelectorAll('.bg-swatch').forEach((el,j) => el.classList.toggle('active', j===i));
+      _woodCanvas = null; _jigsawOverlay = null; // regenerate with new colours
+      renderAll();
+      // Persist choice
+      try { localStorage.setItem('apoti_bg', i); } catch {}
+    });
+    palette.appendChild(s);
+  });
+
+  // Toggle palette open/close
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    palette.classList.toggle('open');
+  });
+  document.addEventListener('click', () => palette.classList.remove('open'));
+
+  // Restore saved choice
+  try {
+    const saved = parseInt(localStorage.getItem('apoti_bg'));
+    if (!isNaN(saved) && saved < BG_SWATCHES.length) _activeBgIdx = saved;
+  } catch {}
+}
+
+// Override getWoodCanvas to use active swatch colours
+function getWoodCanvas(w, h) {
+  if (_woodCanvas && _woodCanvas.width === w && _woodCanvas.height === h) return _woodCanvas;
+  const sw = BG_SWATCHES[_activeBgIdx];
+  const wc = document.createElement('canvas');
+  wc.width = w; wc.height = h;
+  const ctx = wc.getContext('2d');
+
+  if (sw.type === 'solid') {
+    ctx.fillStyle = sw.colors[0];
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    // Wood gradient using swatch colours
+    const g = ctx.createLinearGradient(0, 0, w * 0.4, h);
+    g.addColorStop(0,   sw.colors[0]);
+    g.addColorStop(0.4, sw.colors[1]);
+    g.addColorStop(1,   sw.colors[2]);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    // Grain
+    const rng = (() => { let s = 0xdeadbeef; return () => { s ^= s<<13; s ^= s>>17; s ^= s<<5; return (s>>>0)/4294967296; }; })();
+    const numGrains = Math.floor(h / 4);
+    for (let i = 0; i < numGrains; i++) {
+      const y0 = rng()*h, amp = 2+rng()*8, freq = .003+rng()*.012, phase = rng()*Math.PI*2, lt = rng();
+      const alpha = .022+rng()*.055;
+      const col = lt>.7 ? `rgba(180,110,60,${alpha})` : lt>.4 ? `rgba(40,20,8,${alpha*1.4})` : `rgba(220,160,80,${alpha*.6})`;
+      ctx.beginPath(); ctx.moveTo(0, y0);
+      for (let x = 1; x <= w; x += 3) ctx.lineTo(x, y0 + Math.sin(x*freq+phase)*amp);
+      ctx.strokeStyle = col; ctx.lineWidth = .5+rng()*1.5; ctx.stroke();
+    }
+    ctx.save(); ctx.globalAlpha = .03;
+    for (let i = 0; i < 300; i++) {
+      const x = rng()*w, y = rng()*h, len = 4+rng()*20;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+len*(rng()-.5)*.3, y+len);
+      ctx.strokeStyle = rng()>.5 ? '#c89050' : '#1a0f08'; ctx.lineWidth = .4+rng(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // Vignette on all types
+  const vg = ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,Math.max(w,h)*.72);
+  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,0.45)');
+  ctx.fillStyle = vg; ctx.fillRect(0,0,w,h);
+  _woodCanvas = wc; return wc;
 }
 
 function pauseGame() {
