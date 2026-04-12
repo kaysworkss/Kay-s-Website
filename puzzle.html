@@ -117,6 +117,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 }
 .btn-sm span{font-size:.52rem;opacity:.7;margin-left:.15em;letter-spacing:0}
 .btn-sm.depleted{opacity:.3;pointer-events:none}
+.btn-sm.ghost-on{background:rgba(201,150,58,.18);border-color:var(--gold);}
 .tb-val{font-family:'Cinzel',serif;font-size:.88rem;color:var(--gold-light)}
 .tb-lbl{font-size:.48rem;letter-spacing:.1em;color:var(--text-muted);text-transform:uppercase}
 .tb-sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
@@ -242,7 +243,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 #bg-palette-btn:hover{border-color:var(--gold)}
 #bg-palette{display:none;position:absolute;top:48px;right:8px;z-index:26;
   background:var(--surface);border:1px solid var(--border-bright);
-  border-radius:10px;padding:.6rem;gap:.4rem;flex-wrap:wrap;width:156px;
+  border-radius:10px;padding:.6rem;gap:.4rem;flex-wrap:wrap;width:200px;
   box-shadow:0 6px 24px rgba(0,0,0,.5)}
 #bg-palette.open{display:flex}
 .bg-swatch{width:28px;height:28px;border-radius:6px;cursor:pointer;
@@ -1210,7 +1211,9 @@ function arrangePieces() {
   });
 
   // ── Step 2: Build four border regions ──
-  const margin = Math.max(sPW, sPH) * 0.55;
+  // Use a small fixed gap around the assembly zone (not a large piece-size multiplier)
+  // so regions don't extend outside the visible canvas on mobile.
+  const margin = Math.round(Math.min(sPW, sPH) * 0.15 + 6);
   const clX0 = asmX - margin, clY0 = asmY - margin;
   const clX1 = asmX + asmW + margin, clY1 = asmY + asmH + margin;
 
@@ -1269,7 +1272,7 @@ function scatterAround(asmX, asmY, asmW, asmH, reshuffle) {
   const sc = window._asm?.scale || 1;
   const sPW = Math.round(pieceW * sc), sPH = Math.round(pieceH * sc);
   const tabPx = Math.round(TAB * sc);
-  const margin = Math.max(sPW, sPH) * 0.55;
+  const margin = Math.round(Math.min(sPW, sPH) * 0.15 + 6);
   const clX0 = asmX - margin, clY0 = asmY - margin;
   const clX1 = asmX + asmW + margin, clY1 = asmY + asmH + margin;
   const regions = [
@@ -1412,18 +1415,12 @@ function renderAll() {
 
   // ── GHOST OVERLAY (inside camera transform) ──
   const _now = performance.now();
-  if (ghostExpiry > 0 && _now < ghostExpiry && img && window._asm) {
-    const remaining = ghostExpiry - _now;
-    const total = 4000;
-    let gAlpha;
-    if (remaining > total - 300) gAlpha = (total - remaining) / 300 * 0.30;
-    else if (remaining < 600) gAlpha = (remaining / 600) * 0.30;
-    else gAlpha = 0.30;
+  if (ghostExpiry > 0 && img && window._asm) {
     const { x, y, w, h, sPW, sPH } = window._asm;
     ctx.save();
-    ctx.globalAlpha = gAlpha;
+    ctx.globalAlpha = 0.32;
     ctx.drawImage(img, 0, 0, imgW, imgH, x, y, w, h);
-    ctx.globalAlpha = gAlpha * 0.35;
+    ctx.globalAlpha = 0.10;
     ctx.strokeStyle = 'rgba(201,150,58,1)';
     ctx.lineWidth = 0.5 / zoom;
     for (let c2 = 0; c2 <= cols; c2++) {
@@ -1675,6 +1672,8 @@ BC.addEventListener('wheel', e => {
 
 // ─── touch ───
 let _touches = {};
+let _touchPanTimer = null, _touchPanning = false, _touchPanStart = null;
+
 BC.addEventListener('touchstart', e => {
   if (isPaused) return;
   e.preventDefault();
@@ -1682,6 +1681,7 @@ BC.addEventListener('touchstart', e => {
   const ids = Object.keys(_touches);
   if (ids.length === 2) {
     isPinching = true; drag = null;
+    _touchPanning = false; clearTimeout(_touchPanTimer);
     const [a, b] = [_touches[ids[0]], _touches[ids[1]]];
     lastPinchDist = Math.hypot(b.x - a.x, b.y - a.y); return;
   }
@@ -1689,6 +1689,7 @@ BC.addEventListener('touchstart', e => {
     const t = e.touches[0];
     const hit = pieceAt(t.clientX, t.clientY);
     if (hit) {
+      clearTimeout(_touchPanTimer); _touchPanning = false;
       if (!hit.placed) lastTouchedPiece = hit;
       selectedIds.clear();
       const gp = gpArr(hit.groupId);
@@ -1697,6 +1698,14 @@ BC.addEventListener('touchstart', e => {
       const { x: wx, y: wy } = evWorld(t);
       drag = { pieces: gp, offsets: gp.map(p => ({ dx: wx - p.x, dy: wy - p.y })), wx, wy };
       renderAll();
+    } else {
+      // Long-press on empty area → pan mode
+      _touchPanStart = { clientX: t.clientX, clientY: t.clientY, panX, panY };
+      _touchPanning = false;
+      _touchPanTimer = setTimeout(() => {
+        _touchPanning = true;
+        BC.style.cursor = 'grabbing';
+      }, 300);
     }
   }
 }, { passive: false });
@@ -1705,6 +1714,14 @@ BC.addEventListener('touchmove', e => {
   if (isPaused) { e.preventDefault(); return; }
   Array.from(e.changedTouches).forEach(t => _touches[t.identifier] = { x: t.clientX, y: t.clientY });
   const ids = Object.keys(_touches);
+
+  // Cancel long-press pan timer if finger moved before threshold
+  if (!_touchPanning && _touchPanTimer && e.touches.length === 1) {
+    const t = e.touches[0];
+    const dx = t.clientX - _touchPanStart.clientX, dy = t.clientY - _touchPanStart.clientY;
+    if (Math.hypot(dx, dy) > 8) { clearTimeout(_touchPanTimer); _touchPanTimer = null; }
+  }
+
   if (ids.length >= 2 && isPinching) {
     const [a, b] = [_touches[ids[0]], _touches[ids[1]]];
     const dist = Math.hypot(b.x - a.x, b.y - a.y);
@@ -1714,6 +1731,13 @@ BC.addEventListener('touchmove', e => {
     panX = cx - (cx - panX) * (newZoom / zoom);
     panY = cy - (cy - panY) * (newZoom / zoom);
     zoom = newZoom; lastPinchDist = dist;
+    clampPan(); renderAll(); return;
+  }
+  // Long-press pan mode — single finger panning
+  if (_touchPanning && e.touches.length === 1) {
+    const t = e.touches[0];
+    panX = _touchPanStart.panX + (t.clientX - _touchPanStart.clientX);
+    panY = _touchPanStart.panY + (t.clientY - _touchPanStart.clientY);
     clampPan(); renderAll(); return;
   }
   if (drag && e.touches.length === 1) {
@@ -1729,6 +1753,9 @@ BC.addEventListener('touchend', e => {
   if (isPaused) return;
   Array.from(e.changedTouches).forEach(t => delete _touches[t.identifier]);
   if (Object.keys(_touches).length < 2) isPinching = false;
+  clearTimeout(_touchPanTimer); _touchPanTimer = null;
+  _touchPanning = false; _touchPanStart = null;
+  BC.style.cursor = 'default';
   if (!drag) return;
   e.preventDefault();
   trySnap(drag.pieces, drag.pieces[0].groupId);
@@ -1900,7 +1927,7 @@ window.addEventListener('resize', () => {
     const sc = window._asm.scale;
     const sPW = Math.round(pieceW * sc), sPH = Math.round(pieceH * sc);
     const tabPx = Math.round(TAB * sc);
-    const margin = Math.max(sPW, sPH) * 0.55;
+    const margin = Math.round(Math.min(sPW, sPH) * 0.15 + 6);
     const clX0 = asmX - margin, clY0 = asmY - margin;
     const clX1 = asmX + asmW + margin, clY1 = asmY + asmH + margin;
 
@@ -2221,7 +2248,7 @@ function returnPieceToSlot(p) {
   const sPW = Math.round(pieceW * scale), sPH = Math.round(pieceH * scale);
   const tabPx = Math.round(TAB * scale);
   const PAD = Math.max(8, Math.round(SNAP * 1.6));
-  const margin = Math.max(sPW, sPH) * 0.55;
+  const margin = Math.round(Math.min(sPW, sPH) * 0.15 + 6);
 
   // Unplace the piece and give it its own group
   p.placed = false;
@@ -2277,15 +2304,28 @@ function restartPuzzle() {
 //  BACKGROUND SWATCHES
 // ═══════════════════════════════════════════════
 const BG_SWATCHES = [
+  // ── Dark wood tones ──
   { label:'Dark Wood',    type:'wood',  colors:['#2b1f14','#3a2918','#2e2012'] },
   { label:'Mahogany',     type:'wood',  colors:['#3d1a0e','#5a2812','#3a1a0a'] },
   { label:'Ash',          type:'wood',  colors:['#2e2820','#3d3428','#2a2418'] },
   { label:'Ebony',        type:'wood',  colors:['#141210','#1e1a16','#111008'] },
+  // ── Dark solids ──
   { label:'Midnight',     type:'solid', colors:['#0a0a0f','#0a0a0f','#0a0a0f'] },
   { label:'Charcoal',     type:'solid', colors:['#1a1a1a','#1a1a1a','#1a1a1a'] },
   { label:'Deep Teal',    type:'solid', colors:['#0a1a18','#0a1a18','#0a1a18'] },
   { label:'Deep Navy',    type:'solid', colors:['#0a0e1a','#0a0e1a','#0a0e1a'] },
-  { label:'Warm Black',   type:'solid', colors:['#100e08','#100e08','#100e08'] },
+  // ── Light wood tones ──
+  { label:'Birch',        type:'wood',  colors:['#e8dcc8','#d4c5a8','#e0d4bc'] },
+  { label:'Pine',         type:'wood',  colors:['#d4b896','#c4a878','#cdb08a'] },
+  { label:'Oak',          type:'wood',  colors:['#c8a870','#b89858','#c0a068'] },
+  { label:'Maple',        type:'wood',  colors:['#e4c898','#d4b880','#dcc090'] },
+  // ── Light solids ──
+  { label:'Parchment',    type:'solid', colors:['#f5efe0','#f5efe0','#f5efe0'] },
+  { label:'Cream',        type:'solid', colors:['#faf4e8','#faf4e8','#faf4e8'] },
+  { label:'Sand',         type:'solid', colors:['#e8dcc0','#e8dcc0','#e8dcc0'] },
+  { label:'Stone',        type:'solid', colors:['#d8d4cc','#d8d4cc','#d8d4cc'] },
+  { label:'Sage',         type:'solid', colors:['#ccd8cc','#ccd8cc','#ccd8cc'] },
+  { label:'Soft Blue',    type:'solid', colors:['#ccd4e0','#ccd4e0','#ccd4e0'] },
 ];
 let _activeBgIdx = 0;
 
@@ -2470,19 +2510,24 @@ function _panToShowHint(p) {
 
 function useGhost() {
   if (isPaused) return;
-  // Ghost is unlimited — no counter decrement
-  ghostExpiry = performance.now() + 4000;
-
-  _showFeatureToast('Ghost active for 4s 👁');
-
-  // Drive the fade animation
-  if (ghostRAF) cancelAnimationFrame(ghostRAF);
-  const animGhost = () => {
+  // Toggle: if ghost is active, turn it off; otherwise turn it on persistently
+  if (ghostExpiry === Infinity) {
+    ghostExpiry = 0;
+    if (ghostRAF) { cancelAnimationFrame(ghostRAF); ghostRAF = null; }
+    document.getElementById('ghost-btn').classList.remove('ghost-on');
     renderAll();
-    if (performance.now() < ghostExpiry) ghostRAF = requestAnimationFrame(animGhost);
-    else { ghostExpiry = 0; ghostRAF = null; renderAll(); }
-  };
-  ghostRAF = requestAnimationFrame(animGhost);
+    _showFeatureToast('Ghost off');
+  } else {
+    ghostExpiry = Infinity; // stays on until toggled off
+    document.getElementById('ghost-btn').classList.add('ghost-on');
+    _showFeatureToast('Ghost on — tap 👁 again to hide');
+    if (ghostRAF) cancelAnimationFrame(ghostRAF);
+    const animGhost = () => {
+      if (ghostExpiry === Infinity) { renderAll(); ghostRAF = requestAnimationFrame(animGhost); }
+      else { ghostRAF = null; }
+    };
+    ghostRAF = requestAnimationFrame(animGhost);
+  }
 }
 
 function updateHintGhostUI() {
@@ -2505,6 +2550,8 @@ function resetHintGhost() {
   hintPiece = null; hintExpiry = 0; ghostExpiry = 0;
   lastTouchedPiece = null;
   if (ghostRAF) { cancelAnimationFrame(ghostRAF); ghostRAF = null; }
+  const gBtn = document.getElementById('ghost-btn');
+  if (gBtn) gBtn.classList.remove('ghost-on');
   updateHintGhostUI();
 }
 
