@@ -6,21 +6,54 @@
 <title>Àpótí Ọlọ́wẹ̀ — Puzzle Challenge</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>
-:root {
+/* ══════════════════════════════════════════
+   THEME TOKENS — dark (default) + light
+══════════════════════════════════════════ */
+:root, [data-theme="dark"] {
   --bg:#0a0a08;--surface:#111110;--surface2:#1a1a17;--surface3:#222220;
+  --bg-grad1:#1e1a0e;--bg-grad2:#0a0a08;
   --gold:#c9963a;--gold-light:#e8b85c;--gold-pale:#f5e4b8;
   --text:#f0e8d0;--text-muted:#8a7f68;
   --border:rgba(201,150,58,0.2);--border-bright:rgba(201,150,58,0.5);
+  --btn-txt:#0a0a08;
+  --win-bg:rgba(10,10,8,.95);--modal-bg:rgba(5,5,3,.93);
+  --pause-bg:rgba(10,8,4,.82);--zoom-bar-bg:rgba(10,10,8,.75);
+  --piece-outer:rgba(0,0,0,.52);--piece-inner:rgba(255,255,255,.14);
+  --piece-outer-mob:rgba(0,0,0,.30);--piece-inner-mob:rgba(255,255,255,.08);
   --radius:8px;--blue:#5a7ac9;--bar-h:42px;
 }
+[data-theme="light"] {
+  --bg:#f5f0e8;--surface:#ffffff;--surface2:#f0ebe0;--surface3:#e8e0d0;
+  --bg-grad1:#ede4d0;--bg-grad2:#f5f0e8;
+  --gold:#a07020;--gold-light:#b88828;--gold-pale:#7a5010;
+  --text:#2a1f0a;--text-muted:#8a7a58;
+  --border:rgba(160,112,32,.2);--border-bright:rgba(160,112,32,.5);
+  --btn-txt:#f5f0e8;
+  --win-bg:rgba(240,234,220,.97);--modal-bg:rgba(240,234,220,.96);
+  --pause-bg:rgba(220,210,190,.90);--zoom-bar-bg:rgba(240,234,220,.92);
+  --piece-outer:rgba(80,60,20,.32);--piece-inner:rgba(0,0,0,.07);
+  --piece-outer-mob:rgba(80,60,20,.18);--piece-inner-mob:rgba(0,0,0,.04);
+  --radius:8px;--blue:#3a5aaa;--bar-h:42px;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:'Crimson Text',serif;min-height:100vh;overflow-x:hidden}
+body{background:var(--bg);color:var(--text);font-family:'Crimson Text',serif;min-height:100vh;overflow-x:hidden;transition:background .25s,color .25s}
 html,body{touch-action:none;user-select:none}
+
+/* ── THEME TOGGLE ── */
+#theme-toggle{
+  position:fixed;top:10px;right:10px;z-index:1000;
+  background:var(--surface);border:1px solid var(--border-bright);
+  border-radius:20px;padding:.28rem .65rem;cursor:pointer;
+  font-size:.72rem;font-family:'Cinzel',serif;color:var(--gold);
+  letter-spacing:.06em;transition:all .2s;display:flex;align-items:center;gap:.35rem;
+  box-shadow:0 2px 8px rgba(0,0,0,.18);
+}
+#theme-toggle:hover{border-color:var(--gold);background:var(--surface2)}
 
 /* ── SHARED ── */
 .btn{font-family:'Cinzel',serif;letter-spacing:.1em;font-size:.8rem;padding:.65rem 1.5rem;border:1px solid var(--gold);background:transparent;color:var(--gold);border-radius:var(--radius);cursor:pointer;transition:all .2s}
-.btn:hover{background:var(--gold);color:#0a0a08}
-.btn-solid{background:var(--gold);color:#0a0a08}
+.btn:hover{background:var(--gold);color:var(--btn-txt)}
+.btn-solid{background:var(--gold);color:var(--btn-txt)}
 .btn-solid:hover{background:var(--gold-light);border-color:var(--gold-light)}
 .btn:disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
 .btn-sm{padding:.4rem 1rem;font-size:.7rem}
@@ -40,18 +73,18 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 .ok{color:#6abf6a;font-size:.85rem;margin-top:.5rem}
 
 /* ── LOADING ── */
-#loading-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;background:radial-gradient(ellipse at 50% 30%,#1e1a0e 0%,#0a0a08 70%)}
+#loading-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;background:radial-gradient(ellipse at 50% 30%,var(--bg-grad1) 0%,var(--bg-grad2) 70%)}
 .spinner{width:40px;height:40px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 #loading-screen p{color:var(--text-muted);font-size:.9rem;letter-spacing:.05em}
 
 /* ── NO CHALLENGE ── */
-#no-challenge-screen{display:none;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(ellipse at 50% 30%,#1e1a0e 0%,#0a0a08 70%);padding:2rem;text-align:center}
+#no-challenge-screen{display:none;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(ellipse at 50% 30%,var(--bg-grad1) 0%,var(--bg-grad2) 70%);padding:2rem;text-align:center}
 #no-challenge-screen h2{font-family:'Cinzel',serif;color:var(--gold);font-size:1.5rem;margin-bottom:.75rem}
 #no-challenge-screen p{color:var(--text-muted);max-width:400px}
 
 /* ── PLAYER ENTRY ── */
-#entry-screen{display:none;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(ellipse at 50% 30%,#1e1a0e 0%,#0a0a08 70%);padding:1.25rem}
+#entry-screen{display:none;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(ellipse at 50% 30%,var(--bg-grad1) 0%,var(--bg-grad2) 70%);padding:1.25rem}
 #entry-screen .card{max-width:460px;width:100%;text-align:center}
 @media(max-width:480px){
   #entry-screen{ padding:.75rem; }
@@ -235,7 +268,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 
 /* ── RESTART BUTTON in pause overlay ── */
 .pause-actions .btn-restart{border-color:var(--text-muted);color:var(--text-muted)}
-.pause-actions .btn-restart:hover{background:var(--text-muted);color:#0a0a08}
+.pause-actions .btn-restart:hover{background:var(--text-muted);color:var(--btn-txt)}
 
 @media(max-width:600px){
   #lb-panel.open{ width:100vw; border-left:none; }
@@ -243,7 +276,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 }
 
 
-#win-screen{display:none;position:fixed;inset:0;z-index:100;background:rgba(10,10,8,.95);align-items:center;justify-content:center;padding:1.5rem;overflow:auto}
+#win-screen{display:none;position:fixed;inset:0;z-index:100;background:var(--win-bg);align-items:center;justify-content:center;padding:1.5rem;overflow:auto}
 #win-screen.show{display:flex}
 .win-layout{display:flex;align-items:center;gap:2rem;flex-wrap:wrap;justify-content:center;max-width:900px;width:100%}
 .win-info{text-align:center;min-width:200px;flex-shrink:0}
@@ -252,7 +285,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 .win-info>p{color:var(--text-muted);margin-bottom:.6rem;font-size:.86rem}
 .win-time{font-family:'Cinzel',serif;font-size:clamp(1.5rem,6vw,2.1rem);color:var(--gold-light);margin:.4rem 0}
 .win-rank{font-family:'Cinzel',serif;font-size:.8rem;color:var(--gold);margin-bottom:.85rem;min-height:1.1em}
-.win-link{display:inline-block;margin:.4rem 0 .85rem;font-family:'Cinzel',serif;letter-spacing:.08em;font-size:.76rem;padding:.56rem 1.6rem;background:var(--gold);color:#0a0a08;border-radius:var(--radius);text-decoration:none;font-weight:600}
+.win-link{display:inline-block;margin:.4rem 0 .85rem;font-family:'Cinzel',serif;letter-spacing:.08em;font-size:.76rem;padding:.56rem 1.6rem;background:var(--gold);color:var(--btn-txt);border-radius:var(--radius);text-decoration:none;font-weight:600}
 .win-link:hover{background:var(--gold-light)}
 .win-actions{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin-top:.38rem}
 .btn-series{background:#c9993a;color:#1e0e06;border-color:#c9993a;text-decoration:none}
@@ -322,7 +355,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
   .wt-msg{ font-size:.88rem; }
 }
 #pause-overlay{display:none;position:fixed;inset:0;z-index:80;
-  background:rgba(10,8,4,.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  background:var(--pause-bg);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   align-items:center;justify-content:center;flex-direction:column;gap:1.2rem}
 #pause-overlay.show{display:flex}
 .pause-logo{font-family:'Cinzel',serif;font-size:clamp(1rem,3vw,1.6rem);color:var(--gold);letter-spacing:.15em;margin-bottom:.25rem}
@@ -331,7 +364,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 .pause-time{font-family:'Cinzel',serif;font-size:clamp(.9rem,2vw,1.2rem);color:var(--text-muted);letter-spacing:.1em}
 .pause-note{font-size:.75rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.06em;opacity:.7}
 .pause-actions{display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;margin-top:.5rem}
-#img-modal{display:none;position:fixed;inset:0;z-index:300;background:rgba(5,5,3,.93);flex-direction:column;padding:0}
+#img-modal{display:none;position:fixed;inset:0;z-index:300;background:var(--modal-bg);flex-direction:column;padding:0}
 #img-modal.show{display:flex}
 .img-hdr{display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;flex-shrink:0;border-bottom:1px solid var(--border)}
 .img-lbl{font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.18em;color:var(--text-muted);text-transform:uppercase}
@@ -343,7 +376,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 #modal-viewport.grabbing{cursor:grabbing}
 #modal-img-wrap{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform}
 #modal-img{display:block;border-radius:6px;border:1px solid var(--border-bright);max-width:none;user-select:none;-webkit-user-drag:none}
-.img-zoom-bar{position:absolute;bottom:.7rem;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:.5rem;background:rgba(10,10,8,.75);border:1px solid var(--border);border-radius:20px;padding:.28rem .7rem;z-index:10}
+.img-zoom-bar{position:absolute;bottom:.7rem;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:.5rem;background:var(--zoom-bar-bg);border:1px solid var(--border);border-radius:20px;padding:.28rem .7rem;z-index:10}
 .img-zoom-bar button{background:none;border:none;color:var(--gold);cursor:pointer;font-size:.9rem;line-height:1;padding:.15rem .3rem;font-family:'Cinzel',serif;min-width:28px;min-height:28px}
 .img-zoom-bar button:hover{color:var(--gold-light)}
 .img-zoom-pct{font-family:'Cinzel',serif;font-size:.6rem;color:var(--text-muted);min-width:3em;text-align:center}
@@ -356,6 +389,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 </style>
 </head>
 <body>
+<button id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">☀️ Light</button>
 
 <!-- ═══ LOADING ═══ -->
 <div id="loading-screen">
@@ -636,6 +670,37 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 </div>
 
 <script>
+// ═══════════════════════════════════════════════
+//  THEME — light / dark
+// ═══════════════════════════════════════════════
+(function initTheme() {
+  const saved = localStorage.getItem('apoti_theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved || (prefersDark ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', theme);
+  window.addEventListener('DOMContentLoaded', () => _updateThemeBtn(theme));
+})();
+
+function _updateThemeBtn(theme) {
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  btn.textContent = theme === 'dark' ? '☀️ Light' : '🌙 Dark';
+}
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const next = (html.getAttribute('data-theme') || 'dark') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('apoti_theme', next);
+  _updateThemeBtn(next);
+  _woodCanvas = null; _jigsawOverlay = null;
+  if (window._asm) renderAll();
+}
+
+function getThemeVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
 // ═══════════════════════════════════════════════
 //  CONFIG — set your API URL here
 // ═══════════════════════════════════════════════
@@ -1101,7 +1166,14 @@ function scatter() {
   renderAll();
 }
 
+// Returns true if an unplaced piece's centre is inside the assembly zone — leave it alone
+function _inWorkArea(p, asmX, asmY, asmW, asmH) {
+  const cx = p.x + p.sPW / 2, cy = p.y + p.sPH / 2;
+  return cx > asmX && cx < asmX + asmW && cy > asmY && cy < asmY + asmH;
+}
+
 // ── ARRANGE — pack all unplaced pieces neatly around the workspace
+//   • Skips placed pieces AND unplaced pieces already inside the work area
 //   • Disbands snapped groups so pieces can't auto-snap when laid out
 //   • Distributes evenly across all four border regions
 //   • Adds per-piece jitter so no two pieces land within snap distance of each other
@@ -1110,20 +1182,17 @@ function arrangePieces() {
   const { x: asmX, y: asmY, w: asmW, h: asmH, scale } = window._asm;
   const sPW = Math.round(pieceW * scale), sPH = Math.round(pieceH * scale);
   const tabPx = Math.round(TAB * scale);
-  const PAD = Math.max(8, Math.round(SNAP * 1.6)); // gap wider than snap threshold
+  const PAD = Math.max(8, Math.round(SNAP * 1.6));
 
-  // ── Step 1: Disband all unplaced groups so pieces won't auto-snap ──
-  // Each unplaced piece gets its own fresh group ID
+  // ── Step 1: Disband groups — only for pieces OUTSIDE the work area ──
   pieces.forEach(p => {
-    if (p.placed) return;
+    if (p.placed || _inWorkArea(p, asmX, asmY, asmW, asmH)) return;
     const newGid = nextGid++;
     groups.set(newGid, new Set([p.id]));
-    const oldGid = p.groupId;
-    // Remove this piece from its old group
-    const oldSet = groups.get(oldGid);
+    const oldSet = groups.get(p.groupId);
     if (oldSet) {
       oldSet.delete(p.id);
-      if (oldSet.size === 0) groups.delete(oldGid);
+      if (oldSet.size === 0) groups.delete(p.groupId);
     }
     p.groupId = newGid;
   });
@@ -1134,61 +1203,48 @@ function arrangePieces() {
   const clX1 = asmX + asmW + margin, clY1 = asmY + asmH + margin;
 
   const regions = [
-    { x0: tabPx, y0: tabPx,  x1: clX0,       y1: CH - tabPx }, // left
-    { x0: clX1,  y0: tabPx,  x1: CW - tabPx,  y1: CH - tabPx }, // right
-    { x0: clX0,  y0: tabPx,  x1: clX1,         y1: clY0       }, // top
-    { x0: clX0,  y0: clY1,   x1: clX1,         y1: CH - tabPx }, // bottom
+    { x0: tabPx, y0: tabPx,  x1: clX0,       y1: CH - tabPx },
+    { x0: clX1,  y0: tabPx,  x1: CW - tabPx,  y1: CH - tabPx },
+    { x0: clX0,  y0: tabPx,  x1: clX1,         y1: clY0       },
+    { x0: clX0,  y0: clY1,   x1: clX1,         y1: CH - tabPx },
   ].filter(r => r.x1 - r.x0 > sPW && r.y1 - r.y0 > sPH);
 
   if (!regions.length) return;
 
-  // ── Step 3: Compute capacity of each region and assign pieces evenly ──
-  // Capacity = how many pieces fit in a grid in that region
+  // ── Step 3: Build slots ──
   const cellW = sPW + PAD, cellH = sPH + PAD;
   regions.forEach(r => {
     r.cols = Math.max(1, Math.floor((r.x1 - r.x0) / cellW));
     r.rows = Math.max(1, Math.floor((r.y1 - r.y0) / cellH));
-    r.cap  = r.cols * r.rows;
-    r.slots = []; // will hold {x,y} for each slot
+    r.slots = [];
     for (let row = 0; row < r.rows; row++) {
       for (let col = 0; col < r.cols; col++) {
-        r.slots.push({
-          x: r.x0 + PAD / 2 + col * cellW,
-          y: r.y0 + PAD / 2 + row * cellH
-        });
+        r.slots.push({ x: r.x0 + PAD / 2 + col * cellW, y: r.y0 + PAD / 2 + row * cellH });
       }
     }
   });
 
-  const totalCap = regions.reduce((s, r) => s + r.cap, 0);
-  const unplaced = pieces.filter(p => !p.placed);
-
-  // ── Step 4: Shuffle pieces so arrangement is random each time ──
+  // ── Step 4: Shuffle only pieces that are outside the work area ──
   const rng = mkRng(Date.now() % 999983);
-  const shuffled = [...unplaced].sort(() => rng() - 0.5);
+  const shuffled = [...pieces.filter(p => !p.placed && !_inWorkArea(p, asmX, asmY, asmW, asmH))]
+    .sort(() => rng() - 0.5);
 
-  // ── Step 5: Distribute — fill regions proportionally ──
-  // Assign each slot from each region to a flat list, interleaved so
-  // pieces spread across all four sides rather than filling one then the next
+  // ── Step 5: Interleave slots across all four sides ──
   const allSlots = [];
   const maxSlots = Math.max(...regions.map(r => r.slots.length));
   for (let i = 0; i < maxSlots; i++) {
     regions.forEach(r => { if (i < r.slots.length) allSlots.push(r.slots[i]); });
   }
 
-  // ── Step 6: Place each piece into a slot with jitter ──
-  // Jitter range: up to ±40% of piece size but always > SNAP away from grid position
+  // ── Step 6: Place with jitter ──
   const jitterMax = Math.round(Math.min(sPW, sPH) * 0.35);
-
   shuffled.forEach((p, i) => {
     if (i >= allSlots.length) {
-      // Overflow: stack at canvas corners with padding
       p.x = tabPx + (i % 3) * (sPW + PAD);
       p.y = tabPx + Math.floor(i / 3) * (sPH + PAD);
       return;
     }
     const slot = allSlots[i];
-    // Jitter: random offset ensuring piece stays in its region
     const jx = Math.round((rng() - 0.5) * 2 * jitterMax);
     const jy = Math.round((rng() - 0.5) * 2 * jitterMax);
     p.x = Math.round(Math.max(tabPx, Math.min(CW - p.sPW - tabPx, slot.x + jx)));
@@ -1210,7 +1266,8 @@ function scatterAround(asmX, asmY, asmW, asmH, reshuffle) {
     { x0: clX0,   y0: tabPx,  x1: clX1,         y1: clY0 },
     { x0: clX0,   y0: clY1,   x1: clX1,         y1: CH - tabPx },
   ].filter(r => r.x1 - r.x0 > sPW * 0.5 && r.y1 - r.y0 > sPH * 0.5);
-  const unplaced = pieces.filter(p => !p.placed);
+  // Only scatter pieces outside the work area
+  const unplaced = pieces.filter(p => !p.placed && !_inWorkArea(p, asmX, asmY, asmW, asmH));
   const shuffled = [...unplaced].sort(() => rng() - .5);
   shuffled.forEach((p, i) => {
     const reg = regions[i % regions.length];
@@ -1435,10 +1492,7 @@ function renderAll() {
 function drawPiece(ctx, p, x, y, alpha) {
   if (!img || !window._asm) return;
   const sc = window._asm.scale;
-  // Thinner strokes on small screens so image content is more visible
   const isMob = CW < 600;
-  const outerStroke = isMob ? 1.2 / sc : 2.2 / sc;
-  const innerStroke = isMob ? 0.5 / sc : 0.9 / sc;
 
   ctx.save(); ctx.globalAlpha = alpha;
   ctx.translate(x, y); ctx.scale(sc, sc);
@@ -1454,10 +1508,12 @@ function drawPiece(ctx, p, x, y, alpha) {
   ctx.save(); ctx.globalAlpha = alpha;
   ctx.translate(x, y); ctx.scale(sc, sc);
   buildPath(ctx, tmp, 0, 0);
-  ctx.strokeStyle = 'rgba(0,0,0,.52)'; ctx.lineWidth = outerStroke; ctx.stroke();
+  // Theme-aware strokes — mobile is very thin so image content dominates
+  ctx.strokeStyle = getThemeVar(isMob ? '--piece-outer-mob' : '--piece-outer');
+  ctx.lineWidth = (isMob ? 0.6 : 2.2) / sc; ctx.stroke();
   buildPath(ctx, tmp, 0, 0);
-  ctx.strokeStyle = p.placed ? 'rgba(201,150,58,.6)' : 'rgba(255,255,255,.14)';
-  ctx.lineWidth = innerStroke; ctx.stroke();
+  ctx.strokeStyle = p.placed ? 'rgba(201,150,58,.6)' : getThemeVar(isMob ? '--piece-inner-mob' : '--piece-inner');
+  ctx.lineWidth = (isMob ? 0.25 : 0.9) / sc; ctx.stroke();
   ctx.restore();
 }
 
