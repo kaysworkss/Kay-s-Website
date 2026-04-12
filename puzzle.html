@@ -1390,11 +1390,44 @@ function renderAll() {
 
   if (window._asm) {
     const { x, y, w, h } = window._asm;
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
     ctx.save();
-    ctx.globalAlpha = .05; ctx.fillStyle = '#c9963a'; ctx.fillRect(x, y, w, h);
-    ctx.globalAlpha = .18; ctx.strokeStyle = '#c9963a';
-    ctx.lineWidth = 1 / zoom; ctx.setLineDash([5 / zoom, 5 / zoom]);
-    ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+
+    if (isLight) {
+      // Light mode: drop-shadow inset effect so the board reads as a recessed mat
+      // Step 1 — soft outer shadow halo (drawn as a slightly larger rect behind)
+      ctx.globalAlpha = 0.10;
+      ctx.fillStyle = '#7a5820';
+      ctx.fillRect(x - 4/zoom, y - 4/zoom, w + 8/zoom, h + 8/zoom);
+      // Step 2 — inner fill: warm tinted wash to distinguish board from background
+      ctx.globalAlpha = 0.12;
+      ctx.fillStyle = '#c8a050';
+      ctx.fillRect(x, y, w, h);
+      // Step 3 — solid dashed border
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = '#8a6020';
+      ctx.lineWidth = 1.5 / zoom;
+      ctx.setLineDash([6 / zoom, 4 / zoom]);
+      ctx.strokeRect(x, y, w, h);
+      ctx.setLineDash([]);
+      // Step 4 — corner accents for extra visibility
+      const cs = Math.min(w, h) * 0.06; // corner size
+      ctx.globalAlpha = 0.7;
+      ctx.strokeStyle = '#7a5010';
+      ctx.lineWidth = 2 / zoom;
+      [[x, y], [x+w, y], [x, y+h], [x+w, y+h]].forEach(([cx, cy], qi) => {
+        const sx = qi % 2 === 0 ? 1 : -1, sy = qi < 2 ? 1 : -1;
+        ctx.beginPath();
+        ctx.moveTo(cx + sx * cs, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + sy * cs);
+        ctx.stroke();
+      });
+    } else {
+      // Dark mode: subtle gold tint + dashed border (existing style, slightly boosted)
+      ctx.globalAlpha = 0.07; ctx.fillStyle = '#c9963a'; ctx.fillRect(x, y, w, h);
+      ctx.globalAlpha = 0.28; ctx.strokeStyle = '#c9963a';
+      ctx.lineWidth = 1 / zoom; ctx.setLineDash([5 / zoom, 5 / zoom]);
+      ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+    }
     ctx.restore();
   }
 
@@ -2404,7 +2437,9 @@ function getWoodCanvas(w, h) {
   }
   // Vignette on all types
   const vg = ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,Math.max(w,h)*.72);
-  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,0.45)');
+  const isLightTheme = document.documentElement.getAttribute('data-theme') === 'light';
+  const vigAmt = isLightTheme ? 0.12 : 0.45;
+  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,`rgba(0,0,0,${vigAmt})`);
   ctx.fillStyle = vg; ctx.fillRect(0,0,w,h);
   _woodCanvas = wc; return wc;
 }
