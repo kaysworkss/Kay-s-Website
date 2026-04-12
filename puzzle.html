@@ -1707,6 +1707,7 @@ function mergeG(gA, gB) {
   for (const id of sB) { sA.add(id); const p = pieces.find(pp => pp.id === id); if (p) p.groupId = gA; }
   groups.delete(gB);
 }
+
 // ═══════════════════════════════════════════════
 //  SNAP
 // ═══════════════════════════════════════════════
@@ -1716,93 +1717,75 @@ function trySnap(movedPieces, movedGid) {
   // ── Phase 1: snap to solved target position ──
   for (const p of movedPieces) {
     if (p.placed) continue;
-
-    const dist = Math.hypot(p.x - p.targetX, p.y - p.targetY);
-
-    if (dist < SNAP) {
+    if (Math.abs(p.x - p.targetX) < SNAP && Math.abs(p.y - p.targetY) < SNAP) {
       const gp = gpArr(movedGid);
-      const dx = p.targetX - p.x;
-      const dy = p.targetY - p.y;
-
-      gp.forEach(g => {
-        g.x += dx;
-        g.y += dy;
-        g.placed = true;
-      });
-
+      const dx = p.targetX - p.x, dy = p.targetY - p.y;
+      gp.forEach(g => { g.x += dx; g.y += dy; g.placed = true; });
       mergeNeighboursIfAligned(movedGid);
-      playSnap();
-      snapped = true;
-      break;
-      isDown = false;
-      activePiece = null;
-   if (canvas.hasPointerCapture(pointerId)) {
-      canvas.releasePointerCapture(pointerId);
-      }
+      playSnap(); snapped = true; break;
     }
   }
 
-  // ── Phase 2: snap to adjacent piece/group ──
+  // ── Phase 2: snap to an adjacent piece/group ──
+  // Use the NEIGHBOUR's own sPW/sPH (not the grid average) so edge pieces
+  // with remainder pixels don't produce a wrong expected position.
   if (!snapped) {
-    const dirs = [
-      { dc: 0, dr: -1 },
-      { dc: 1, dr: 0 },
-      { dc: 0, dr: 1 },
-      { dc: -1, dr: 0 }
-    ];
-
+    const dirs = [{ dc: 0, dr: -1 }, { dc: 1, dr: 0 }, { dc: 0, dr: 1 }, { dc: -1, dr: 0 }];
     outer:
     for (const p of movedPieces) {
       for (const { dc, dr } of dirs) {
-        const nc = p.col + dc;
-        const nr = p.row + dr;
-
+        const nc = p.col + dc, nr = p.row + dr;
         if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
-
-        const nb = pieces.find(pp =>
-          pp.col === nc &&
-          pp.row === nr &&
-          pp.groupId !== movedGid
-        );
-
+        const nb = pieces.find(pp => pp.col === nc && pp.row === nr && pp.groupId !== movedGid);
         if (!nb) continue;
 
+        // Expected position of p if it were perfectly adjacent to nb.
+        // Use nb's actual screen dimensions (not the grid average sPW/sPH)
+        // so edge/corner pieces with remainder pixels align correctly.
         const expX = nb.x - dc * nb.sPW;
         const expY = nb.y - dr * nb.sPH;
 
-        const dist = Math.hypot(p.x - expX, p.y - expY);
-
-        if (dist < SNAP) {
-          const dx = expX - p.x;
-          const dy = expY - p.y;
-
-          gpArr(movedGid).forEach(g => {
-            g.x += dx;
-            g.y += dy;
-          });
-
+        if (Math.abs(p.x - expX) < SNAP && Math.abs(p.y - expY) < SNAP) {
+          const dx = expX - p.x, dy = expY - p.y;
+          gpArr(movedGid).forEach(g => { g.x += dx; g.y += dy; });
           const tgid = nb.groupId;
           mergeG(tgid, movedGid);
           checkSolved(tgid);
-
-          playSnap();
-          snapped = true;
-          break outer;
-          isDown = false;
-          activePiece = null;
-       if (canvas.hasPointerCapture(pointerId)) {
-          canvas.releasePointerCapture(pointerId);
-          }
+          playSnap(); snapped = true; break outer;
         }
       }
     }
   }
 
-  if (snapped) {
-    checkWin();
-    autoSave();
+  if (snapped) { checkWin(); autoSave(); }
+}
+
+function mergeNeighboursIfAligned(gid) {
+  const gp = gpArr(gid);
+  for (const p of gp) {
+    [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dc, dr]) => {
+      const nc = p.col + dc, nr = p.row + dr;
+      if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) return;
+      const nb = pieces.find(pp => pp.col === nc && pp.row === nr);
+      if (!nb || nb.groupId === gid) return;
+      // Use nb's own sPW/sPH for the expected position check.
+      // Tolerance of 1px — only merge when pieces are genuinely touching.
+      const expX = p.x + dc * nb.sPW, expY = p.y + dr * nb.sPH;
+      if (Math.abs(nb.x - expX) < 1 && Math.abs(nb.y - expY) < 1) {
+        mergeG(gid, nb.groupId);
+      }
+    });
   }
 }
+
+function checkSolved(gid) {
+  const gp = gpArr(gid);
+  // Use a tighter threshold — SNAP * 0.8 — to avoid false positives
+  if (gp.every(p => Math.abs(p.x - p.targetX) < SNAP * 0.8 && Math.abs(p.y - p.targetY) < SNAP * 0.8)) {
+    gp.forEach(p => { p.x = p.targetX; p.y = p.targetY; p.placed = true; });
+  }
+}
+
 // ═══════════════════════════════════════════════
 //  RESIZE
 // ═══════════════════════════════════════════════
