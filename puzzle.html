@@ -738,8 +738,8 @@ let isPaused = false;
 let pausedElapsed = 0; // ms elapsed before pause
 
 // ── HINT & GHOST STATE ──
-const HINT_MAX = 3, GHOST_MAX = 3;
-let hintsLeft = HINT_MAX, ghostLeft = GHOST_MAX;
+const HINT_MAX = 3;
+let hintsLeft = HINT_MAX;
 let hintPiece = null;      // the piece whose target slot is highlighted
 let hintExpiry = 0;        // performance.now() when hint expires
 let ghostExpiry = 0;       // performance.now() when ghost expires
@@ -1023,7 +1023,7 @@ function autoSave() {
       placed: pieces.filter(p => p.placed).length,
       total: totalPieces,
       savedAt: Date.now(),
-      hintsLeft, ghostLeft,
+      hintsLeft,
       // Store positions as fractions of canvas so they survive resize/reload
       pieceState: pieces.map(p => ({
         id: p.id,
@@ -1072,7 +1072,6 @@ function restoreProgress() {
     renderAll(); updateStats();
     // Restore hint/ghost counts if saved
     if (typeof data.hintsLeft === 'number') hintsLeft = data.hintsLeft;
-    if (typeof data.ghostLeft === 'number') ghostLeft = data.ghostLeft;
     updateHintGhostUI();
     return data;
   } catch { return null; }
@@ -2503,31 +2502,6 @@ function updateHintGhostUI() {
 
 function resetHintGhost() {
   hintsLeft = HINT_MAX;
-  hintPiece = null; hintExpiry = 0; ghostExpiry = 0;
-  lastTouchedPiece = null;
-  if (ghostRAF) { cancelAnimationFrame(ghostRAF); ghostRAF = null; }
-  updateHintGhostUI();
-}
-
-function updateHintGhostUI() {
-  const hBtn = document.getElementById('hint-btn');
-  const gBtn = document.getElementById('ghost-btn');
-  const hCount = document.getElementById('hint-count');
-  const gCount = document.getElementById('ghost-count');
-  if (hBtn) {
-    hCount.textContent = `×${hintsLeft}`;
-    hBtn.classList.toggle('depleted', hintsLeft <= 0);
-    hBtn.title = hintsLeft > 0 ? `Hint — shows where a piece belongs (${hintsLeft} left)` : 'No hints remaining';
-  }
-  if (gBtn) {
-    gCount.textContent = `×${ghostLeft}`;
-    gBtn.classList.toggle('depleted', ghostLeft <= 0);
-    gBtn.title = ghostLeft > 0 ? `Ghost — overlays the full image for 4s (${ghostLeft} left)` : 'No ghost views remaining';
-  }
-}
-
-function resetHintGhost() {
-  hintsLeft = HINT_MAX; ghostLeft = GHOST_MAX;
   hintPiece = null; hintExpiry = 0; ghostExpiry = 0;
   lastTouchedPiece = null;
   if (ghostRAF) { cancelAnimationFrame(ghostRAF); ghostRAF = null; }
