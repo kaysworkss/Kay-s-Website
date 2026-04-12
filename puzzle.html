@@ -41,7 +41,7 @@ html,body{touch-action:none;user-select:none}
 
 /* ── THEME TOGGLE ── */
 #theme-toggle{
-  position:fixed;top:10px;right:10px;z-index:1000;
+  position:fixed;bottom:calc(var(--bar-h) + 10px);left:10px;z-index:50;
   background:var(--surface);border:1px solid var(--border-bright);
   border-radius:20px;padding:.28rem .65rem;cursor:pointer;
   font-size:.72rem;font-family:'Cinzel',serif;color:var(--gold);
@@ -49,6 +49,10 @@ html,body{touch-action:none;user-select:none}
   box-shadow:0 2px 8px rgba(0,0,0,.18);
 }
 #theme-toggle:hover{border-color:var(--gold);background:var(--surface2)}
+/* On entry/loading screens, anchor top-right instead */
+body:not(.game-active) #theme-toggle{
+  bottom:auto;top:14px;left:auto;right:14px;
+}
 
 /* ── SHARED ── */
 .btn{font-family:'Cinzel',serif;letter-spacing:.1em;font-size:.8rem;padding:.65rem 1.5rem;border:1px solid var(--gold);background:transparent;color:var(--gold);border-radius:var(--radius);cursor:pointer;transition:all .2s}
@@ -120,51 +124,50 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 #progress-wrap{flex:1;height:4px;background:rgba(201,150,58,.15);border-radius:2px;overflow:hidden}
 #progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold-light));transition:width .35s;width:0%}
 .tb-btns{display:flex;gap:.35rem;align-items:center;flex-shrink:0}
-/* On desktop tb-top is invisible wrapper — its children flow inline */
+/* On desktop tb-top and both tb-btns rows flow inline as one row */
 .tb-top{display:contents}
+#tb-row3{display:contents}
 
-/* ── MOBILE TOOLBAR — two rows ── */
+/* ── MOBILE TOOLBAR — three rows ── */
 @media(max-width:600px){
-  :root{ --bar-h: 82px; }   /* taller toolbar to fit two rows */
+  :root{ --bar-h: 118px; }
 
   #toolbar{
     flex-direction:column;
     height:var(--bar-h);
-    padding:.3rem .7rem .4rem;
-    gap:.3rem;
+    padding:.25rem .6rem .35rem;
+    gap:.22rem;
     align-items:stretch;
   }
 
-  /* top row: stats + progress */
   .tb-top{
     display:flex;align-items:center;gap:.5rem;width:100%;
+    flex-shrink:0;
   }
-  /* bottom row: action buttons */
   .tb-btns{
     display:flex;align-items:center;justify-content:space-between;
-    width:100%;gap:.2rem;
+    width:100%;gap:.18rem;flex-shrink:0;
   }
+  /* tb-row3 must also be a real flex row on mobile */
+  #tb-row3{ display:flex; }
 
   .tb-stat{ min-width:0; }
-  .tb-val{ font-size:.8rem; }
+  .tb-val{ font-size:.82rem; }
   .tb-lbl{ display:none; }
-  .tb-sep{ height:16px; }
+  .tb-sep{ height:14px; }
 
   #progress-wrap{ flex:1; height:5px; }
   .tb-pct{ font-size:.7rem; white-space:nowrap; }
 
-  /* Bigger tap targets on mobile */
   .btn-sm{
-    padding:.42rem .55rem;
-    font-size:.62rem;
-    min-width:32px;
-    min-height:32px;
+    padding:.45rem .4rem;
+    font-size:.65rem;
+    min-width:36px;
+    min-height:36px;
     display:flex;align-items:center;justify-content:center;
-    flex:1;                    /* equal width across bottom row */
-    max-width:44px;
+    flex:1;
+    max-width:52px;
   }
-
-  /* Hide count badges (×3) on very small screens to save space */
   .btn-sm span{ display:none; }
 }
 
@@ -184,9 +187,13 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
   letter-spacing:.1em;color:var(--text-muted);text-align:center;padding:.18rem;
   border-top:1px solid var(--border)}
 @media(max-width:600px){
+  #theme-toggle{ display:none !important; }
+  #bg-palette-btn{ display:none !important; }
   #ref-thumb{ max-width:min(72px,15vw); }
   #ref-thumb img{ max-height:50px; }
   #ref-thumb span{ display:none; }
+  /* bg palette anchors to bottom of toolbar on mobile */
+  #bg-palette{ bottom:var(--bar-h);top:auto;right:8px; }
 }
 
 /* selection rectangle */
@@ -492,17 +499,22 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
       <div id="progress-wrap"><div id="progress-fill"></div></div>
       <div class="tb-pct" id="prog-lbl">0%</div>
     </div>
-    <!-- Row 2: action buttons -->
-    <div class="tb-btns">
+    <!-- Row 2: view + assist tools -->
+    <div class="tb-btns" id="tb-row2">
       <button class="btn btn-sm" onclick="openImgModal()" title="Reference Image">🖼</button>
-      <button class="btn btn-sm" id="hint-btn" onclick="useHint()" title="Hint — shows where a piece belongs">💡<span id="hint-count">×3</span></button>
-      <button class="btn btn-sm" id="ghost-btn" onclick="useGhost()" title="Ghost — briefly overlays the full image">👁<span id="ghost-count">×3</span></button>
-      <button class="btn btn-sm" onclick="restartPuzzle()" title="Restart — rescatter all pieces">↺</button>
-      <button class="btn btn-sm" onclick="scatter()" title="Scatter pieces randomly">🔀</button>
-      <button class="btn btn-sm" onclick="arrangePieces();renderAll();" title="Arrange pieces neatly around the board">⊞</button>
+      <button class="btn btn-sm" id="hint-btn" onclick="useHint()" title="Hint">💡<span id="hint-count">×3</span></button>
+      <button class="btn btn-sm" id="ghost-btn" onclick="useGhost()" title="Ghost — overlay image">👁</button>
       <button class="btn btn-sm" onclick="resetZoom()" title="Reset zoom">🔍</button>
       <button class="btn btn-sm" onclick="toggleLeaderboard()" title="Leaderboard">🏆</button>
       <button class="btn btn-sm" id="pause-btn" onclick="pauseGame()" title="Pause">⏸</button>
+    </div>
+    <!-- Row 3: arrange + game tools -->
+    <div class="tb-btns" id="tb-row3">
+      <button class="btn btn-sm" onclick="restartPuzzle()" title="Restart">↺</button>
+      <button class="btn btn-sm" onclick="scatter()" title="Scatter pieces">🔀</button>
+      <button class="btn btn-sm" onclick="arrangePieces();renderAll();" title="Arrange pieces">⊞</button>
+      <button class="btn btn-sm" onclick="toggleTheme()" title="Toggle light/dark">🌓</button>
+      <button class="btn btn-sm" id="bg-btn-tb" onclick="document.getElementById('bg-palette').classList.toggle('open')" title="Background">🎨</button>
       <button class="btn btn-sm" onclick="confirmQuit()" title="Quit">↩</button>
     </div>
   </div>
@@ -940,6 +952,7 @@ async function startGame(resume = false) {
   document.getElementById('pause-btn').textContent = '⏸';
   resetHintGhost();
   document.getElementById('game-screen').style.display = 'flex';
+  document.body.classList.add('game-active');
   document.getElementById('ref-img').src = img.src;
   document.getElementById('ref-thumb').style.display = 'block';
   // Show and init background palette
@@ -1362,6 +1375,7 @@ const _hctx = _hc.getContext('2d');
 
 function renderAll() {
   const ctx = BC.getContext('2d');
+  _cacheThemeStrokes(); // refresh stroke colours once per frame, not per piece
   ctx.clearRect(0, 0, CW, CH);
   // Wood texture background
   ctx.drawImage(getWoodCanvas(CW, CH), 0, 0);
@@ -1489,31 +1503,53 @@ function renderAll() {
   }
 }
 
+// ── Cached theme stroke colours — refreshed on theme change and render ──
+let _strokeOuter = 'rgba(0,0,0,.52)';
+let _strokeOuterMob = 'rgba(0,0,0,.30)';
+let _strokeInner = 'rgba(255,255,255,.14)';
+let _strokeInnerMob = 'rgba(255,255,255,.08)';
+function _cacheThemeStrokes() {
+  const s = getComputedStyle(document.documentElement);
+  _strokeOuter    = s.getPropertyValue('--piece-outer').trim()    || 'rgba(0,0,0,.52)';
+  _strokeOuterMob = s.getPropertyValue('--piece-outer-mob').trim()|| 'rgba(0,0,0,.30)';
+  _strokeInner    = s.getPropertyValue('--piece-inner').trim()    || 'rgba(255,255,255,.14)';
+  _strokeInnerMob = s.getPropertyValue('--piece-inner-mob').trim()|| 'rgba(255,255,255,.08)';
+}
+
 function drawPiece(ctx, p, x, y, alpha) {
   if (!img || !window._asm) return;
   const sc = window._asm.scale;
   const isMob = CW < 600;
 
-  ctx.save(); ctx.globalAlpha = alpha;
-  ctx.translate(x, y); ctx.scale(sc, sc);
+  // ── Draw image slice (clipped to jigsaw shape) ──
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.scale(sc, sc);
   const tmp = { ...p, x: 0, y: 0 };
   buildPath(ctx, tmp, 0, 0);
   ctx.clip();
   const pad = TAB;
   const srcX = Math.max(0, p.sx - pad), srcY = Math.max(0, p.sy - pad);
-  const srcW = Math.min(imgW - srcX, p.pw + pad * 2), srcH = Math.min(imgH - srcY, p.ph + pad * 2);
+  const srcW = Math.min(imgW - srcX, p.pw + pad * 2);
+  const srcH = Math.min(imgH - srcY, p.ph + pad * 2);
   const dstX = -(p.sx - srcX), dstY = -(p.sy - srcY);
   ctx.drawImage(img, srcX, srcY, srcW, srcH, dstX, dstY, srcW, srcH);
   ctx.restore();
-  ctx.save(); ctx.globalAlpha = alpha;
-  ctx.translate(x, y); ctx.scale(sc, sc);
+
+  // ── Draw piece border (no clip — just stroke the outline) ──
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.scale(sc, sc);
   buildPath(ctx, tmp, 0, 0);
-  // Theme-aware strokes — mobile is very thin so image content dominates
-  ctx.strokeStyle = getThemeVar(isMob ? '--piece-outer-mob' : '--piece-outer');
-  ctx.lineWidth = (isMob ? 0.6 : 2.2) / sc; ctx.stroke();
+  ctx.strokeStyle = isMob ? _strokeOuterMob : _strokeOuter;
+  ctx.lineWidth = (isMob ? 0.6 : 2.2) / sc;
+  ctx.stroke();
   buildPath(ctx, tmp, 0, 0);
-  ctx.strokeStyle = p.placed ? 'rgba(201,150,58,.6)' : getThemeVar(isMob ? '--piece-inner-mob' : '--piece-inner');
-  ctx.lineWidth = (isMob ? 0.25 : 0.9) / sc; ctx.stroke();
+  ctx.strokeStyle = p.placed ? 'rgba(201,150,58,.55)' : (isMob ? _strokeInnerMob : _strokeInner);
+  ctx.lineWidth = (isMob ? 0.25 : 0.9) / sc;
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -1543,23 +1579,27 @@ function evWorld(e) { return { x: (e.clientX - panX) / zoom, y: (e.clientY - pan
 // ═══════════════════════════════════════════════
 let spaceDown = false;
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space') { spaceDown = true; BC.style.cursor = 'grab'; }
+  if (e.code === 'Space') { spaceDown = true; if (!drag) BC.style.cursor = 'grab'; }
   if (e.code === 'KeyP' && document.getElementById('game-screen').style.display === 'flex') {
     isPaused ? resumeGame() : pauseGame();
   }
   if (e.key === 'Escape' && isPaused) resumeGame();
 });
-document.addEventListener('keyup', e => { if (e.code === 'Space') { spaceDown = false; BC.style.cursor = 'default'; } });
+document.addEventListener('keyup', e => { if (e.code === 'Space') { spaceDown = false; if (!drag) BC.style.cursor = 'default'; } });
+// Prevent browser context menu so right-click pan works
+BC.addEventListener('contextmenu', e => { e.preventDefault(); });
 
 let panDrag = null;
 BC.addEventListener('mousedown', e => {
   if (isPaused) return;
-  if (e.button !== 0) return;
   e.preventDefault();
-  if (spaceDown) {
+  // Right-click or middle-click OR space+left = pan
+  const isPanBtn = e.button === 1 || e.button === 2 || (e.button === 0 && spaceDown);
+  if (isPanBtn) {
     panDrag = { startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY };
     BC.style.cursor = 'grabbing'; return;
   }
+  if (e.button !== 0) return;
   const { x: wx, y: wy } = evWorld(e);
   const hit = pieceAt(e.clientX, e.clientY);
   if (hit) {
@@ -1606,6 +1646,23 @@ window.addEventListener('mouseup', e => {
     selState = null; document.getElementById('sel-rect').style.display = 'none'; renderAll();
   }
 });
+
+// ── Shift+click or long-press (touch): return placed piece to border ──
+let _lpTimer = null, _lpTarget = null;
+BC.addEventListener('touchstart', e => {
+  if (isPaused || e.touches.length !== 1) return;
+  const t = e.touches[0];
+  const hit = pieceAt(t.clientX, t.clientY);
+  if (hit && hit.placed) {
+    _lpTarget = hit;
+    _lpTimer = setTimeout(() => {
+      if (_lpTarget) { returnPieceToSlot(_lpTarget); _lpTarget = null; }
+    }, 600);
+  }
+}, { passive: true });
+
+BC.addEventListener('touchmove', () => { clearTimeout(_lpTimer); _lpTarget = null; }, { passive: true });
+BC.addEventListener('touchend', () => { clearTimeout(_lpTimer); _lpTarget = null; }, { passive: true });
 
 BC.addEventListener('wheel', e => {
   if (isPaused) { e.preventDefault(); return; }
@@ -1727,8 +1784,9 @@ function trySnap(movedPieces, movedGid) {
   }
 
   // ── Phase 2: snap to an adjacent piece/group ──
-  // Use the NEIGHBOUR's own sPW/sPH (not the grid average) so edge pieces
-  // with remainder pixels don't produce a wrong expected position.
+  // Key fix: the expected position of the moved piece p relative to neighbour nb
+  // depends on p's OWN dimensions (how wide p is), not nb's dimensions.
+  // nb.x - dc * p.sPW places p's right edge flush with nb's left edge (dc=1).
   if (!snapped) {
     const dirs = [{ dc: 0, dr: -1 }, { dc: 1, dr: 0 }, { dc: 0, dr: 1 }, { dc: -1, dr: 0 }];
     outer:
@@ -1739,13 +1797,22 @@ function trySnap(movedPieces, movedGid) {
         const nb = pieces.find(pp => pp.col === nc && pp.row === nr && pp.groupId !== movedGid);
         if (!nb) continue;
 
-        // Expected position of p if it were perfectly adjacent to nb.
-        // Use nb's actual screen dimensions (not the grid average sPW/sPH)
-        // so edge/corner pieces with remainder pixels align correctly.
-        const expX = nb.x - dc * nb.sPW;
-        const expY = nb.y - dr * nb.sPH;
+        // Where p needs to be so it sits perfectly adjacent to nb:
+        // If dc=1 (nb is to the right of p): p.x = nb.x - p.sPW
+        // If dc=-1 (nb is to the left of p): p.x = nb.x + nb.sPW
+        // Same logic for rows. Use each piece's own dimension.
+        const expX = dc === 1  ? nb.x - p.sPW
+                   : dc === -1 ? nb.x + nb.sPW
+                   : nb.x + (p.col - nb.col) * p.sPW;
+        const expY = dr === 1  ? nb.y - p.sPH
+                   : dr === -1 ? nb.y + nb.sPH
+                   : nb.y + (p.row - nb.row) * p.sPH;
 
         if (Math.abs(p.x - expX) < SNAP && Math.abs(p.y - expY) < SNAP) {
+          // Verify the two groups don't already have mismatched internal geometry
+          // before merging — prevents false merges between unrelated groups
+          if (!_groupsCompatible(movedGid, nb.groupId, p, nb, dc, dr)) continue;
+
           const dx = expX - p.x, dy = expY - p.y;
           gpArr(movedGid).forEach(g => { g.x += dx; g.y += dy; });
           const tgid = nb.groupId;
@@ -1760,6 +1827,40 @@ function trySnap(movedPieces, movedGid) {
   if (snapped) { checkWin(); autoSave(); }
 }
 
+// Check that merging two groups is geometrically valid:
+// every piece in movedGid must land within 2px of its correct position
+// relative to every piece in the target group it now touches.
+function _groupsCompatible(movedGid, targetGid, refP, refNb, dc, dr) {
+  const sc = window._asm?.scale || 1;
+  const sPW = Math.round(pieceW * sc), sPH = Math.round(pieceH * sc);
+  const movedGp = gpArr(movedGid);
+  const targetGp = gpArr(targetGid);
+  // For each piece in the moved group, check all neighbours in the target group
+  for (const mp of movedGp) {
+    for (const tp of targetGp) {
+      const dCol = mp.col - tp.col;
+      const dRow = mp.row - tp.row;
+      // Only check directly adjacent pairs
+      if (Math.abs(dCol) + Math.abs(dRow) !== 1) continue;
+      // Expected position of mp given tp's position
+      const expX = tp.x + dCol * tp.sPW;
+      const expY = tp.y + dRow * tp.sPH;
+      // After the snap shift, mp.x will be expX — check that the shift is consistent
+      // with the reference pair (refP, refNb)
+      const refExpX = dc === 1  ? refNb.x - refP.sPW
+                    : dc === -1 ? refNb.x + refNb.sPW
+                    : refNb.x + (refP.col - refNb.col) * refP.sPW;
+      const refExpY = dr === 1  ? refNb.y - refP.sPH
+                    : dr === -1 ? refNb.y + refNb.sPH
+                    : refNb.y + (refP.row - refNb.row) * refP.sPH;
+      const shiftX = refExpX - refP.x, shiftY = refExpY - refP.y;
+      const mpAfterX = mp.x + shiftX, mpAfterY = mp.y + shiftY;
+      if (Math.abs(mpAfterX - expX) > 2 || Math.abs(mpAfterY - expY) > 2) return false;
+    }
+  }
+  return true;
+}
+
 function mergeNeighboursIfAligned(gid) {
   const gp = gpArr(gid);
   for (const p of gp) {
@@ -1768,8 +1869,6 @@ function mergeNeighboursIfAligned(gid) {
       if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) return;
       const nb = pieces.find(pp => pp.col === nc && pp.row === nr);
       if (!nb || nb.groupId === gid) return;
-      // Use nb's own sPW/sPH for the expected position check.
-      // Tolerance of 1px — only merge when pieces are genuinely touching.
       const expX = p.x + dc * nb.sPW, expY = p.y + dr * nb.sPH;
       if (Math.abs(nb.x - expX) < 1 && Math.abs(nb.y - expY) < 1) {
         mergeG(gid, nb.groupId);
@@ -1780,7 +1879,6 @@ function mergeNeighboursIfAligned(gid) {
 
 function checkSolved(gid) {
   const gp = gpArr(gid);
-  // Use a tighter threshold — SNAP * 0.8 — to avoid false positives
   if (gp.every(p => Math.abs(p.x - p.targetX) < SNAP * 0.8 && Math.abs(p.y - p.targetY) < SNAP * 0.8)) {
     gp.forEach(p => { p.x = p.targetX; p.y = p.targetY; p.placed = true; });
   }
@@ -1876,7 +1974,7 @@ async function checkWin() {
   try {
     const res = await fetch(`${API}/score`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ challenge_id: challenge.id, player_name: playerName, time_seconds: secs, piece_count: totalPieces, hints_used: HINT_MAX - hintsLeft, ghost_used: GHOST_MAX - ghostLeft })
+      body: JSON.stringify({ challenge_id: challenge.id, player_name: playerName, time_seconds: secs, piece_count: totalPieces, hints_used: HINT_MAX - hintsLeft })
     });
     const data = await res.json();
     if (data.rank) document.getElementById('win-rank').textContent = `You ranked #${data.rank} on the leaderboard!`;
@@ -2106,6 +2204,7 @@ function confirmQuit() {
   zoom = 1; panX = 0; panY = 0;
   stopConfetti();
   document.getElementById('game-screen').style.display = 'none';
+  document.body.classList.remove('game-active');
   document.getElementById('win-screen').classList.remove('show');
   document.getElementById('ref-thumb').style.display = 'none';
   document.getElementById('bg-palette-btn').style.display = 'none';
@@ -2115,8 +2214,47 @@ function confirmQuit() {
 }
 
 // ═══════════════════════════════════════════════
-//  RESTART — rescatter all unplaced pieces, reset hints/ghost
+//  RETURN TO SLOT — lift a placed piece back off the board
 // ═══════════════════════════════════════════════
+function returnPieceToSlot(p) {
+  if (!p || !p.placed || !window._asm) return;
+  const { x: asmX, y: asmY, w: asmW, h: asmH, scale } = window._asm;
+  const sPW = Math.round(pieceW * scale), sPH = Math.round(pieceH * scale);
+  const tabPx = Math.round(TAB * scale);
+  const PAD = Math.max(8, Math.round(SNAP * 1.6));
+  const margin = Math.max(sPW, sPH) * 0.55;
+
+  // Unplace the piece and give it its own group
+  p.placed = false;
+  const newGid = nextGid++;
+  const oldSet = groups.get(p.groupId);
+  if (oldSet) { oldSet.delete(p.id); if (oldSet.size === 0) groups.delete(p.groupId); }
+  p.groupId = newGid;
+  groups.set(newGid, new Set([p.id]));
+
+  // Place it in the nearest clear border region with jitter
+  const rng = mkRng(Date.now() % 99991);
+  const regions = [
+    { x0: tabPx,               y0: tabPx, x1: asmX - margin,       y1: CH - tabPx },
+    { x0: asmX + asmW + margin, y0: tabPx, x1: CW - tabPx,          y1: CH - tabPx },
+    { x0: asmX - margin,        y0: tabPx, x1: asmX + asmW + margin, y1: asmY - margin },
+    { x0: asmX - margin,        y0: asmY + asmH + margin, x1: asmX + asmW + margin, y1: CH - tabPx },
+  ].filter(r => r.x1 - r.x0 > sPW && r.y1 - r.y0 > sPH);
+
+  const reg = regions[Math.floor(rng() * regions.length)] || regions[0];
+  if (reg) {
+    const jMax = Math.round(Math.min(sPW, sPH) * 0.3);
+    p.x = Math.round(Math.max(tabPx, Math.min(CW - sPW - tabPx,
+      reg.x0 + PAD + rng() * (reg.x1 - reg.x0 - sPW - PAD * 2) + (rng() - 0.5) * 2 * jMax)));
+    p.y = Math.round(Math.max(tabPx, Math.min(CH - sPH - tabPx,
+      reg.y0 + PAD + rng() * (reg.y1 - reg.y0 - sPH - PAD * 2) + (rng() - 0.5) * 2 * jMax)));
+  }
+
+  lastTouchedPiece = p;
+  autoSave();
+  renderAll(); updateStats();
+  _showFeatureToast('Piece returned to border — drag it back when ready');
+}
 function restartPuzzle() {
   if (!confirm('Restart? All pieces will be rescattered. Progress will be lost.')) return;
   // Rebuild all groups and unplace everything
@@ -2332,16 +2470,11 @@ function _panToShowHint(p) {
 }
 
 function useGhost() {
-  if (isPaused || ghostLeft <= 0) return;
-  ghostLeft--;
+  if (isPaused) return;
+  // Ghost is unlimited — no counter decrement
   ghostExpiry = performance.now() + 4000;
-  updateHintGhostUI();
 
-  _showFeatureToast(
-    ghostLeft === 0
-      ? `Last ghost used — eyes open from here! 👁`
-      : `Ghost active for 4s · ${ghostLeft} remaining`
-  );
+  _showFeatureToast('Ghost active for 4s 👁');
 
   // Drive the fade animation
   if (ghostRAF) cancelAnimationFrame(ghostRAF);
@@ -2351,6 +2484,29 @@ function useGhost() {
     else { ghostExpiry = 0; ghostRAF = null; renderAll(); }
   };
   ghostRAF = requestAnimationFrame(animGhost);
+}
+
+function updateHintGhostUI() {
+  const hBtn = document.getElementById('hint-btn');
+  const gBtn = document.getElementById('ghost-btn');
+  const hCount = document.getElementById('hint-count');
+  if (hBtn) {
+    hCount.textContent = `×${hintsLeft}`;
+    hBtn.classList.toggle('depleted', hintsLeft <= 0);
+    hBtn.title = hintsLeft > 0 ? `Hint — shows where a piece belongs (${hintsLeft} left)` : 'No hints remaining';
+  }
+  if (gBtn) {
+    gBtn.classList.remove('depleted');
+    gBtn.title = 'Ghost — overlays the full image for 4s (unlimited)';
+  }
+}
+
+function resetHintGhost() {
+  hintsLeft = HINT_MAX;
+  hintPiece = null; hintExpiry = 0; ghostExpiry = 0;
+  lastTouchedPiece = null;
+  if (ghostRAF) { cancelAnimationFrame(ghostRAF); ghostRAF = null; }
+  updateHintGhostUI();
 }
 
 function updateHintGhostUI() {
