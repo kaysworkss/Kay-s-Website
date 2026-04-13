@@ -317,7 +317,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
   #ref-thumb{ max-width:min(72px,15vw); }
   #ref-thumb img{ max-height:50px; }
   #ref-thumb span{ display:none; }
-  #bg-btn-tb{ display:none !important; }
+
   /* Give Fix button a slightly smaller font so it fits the row */
   #rectify-btn{ font-size:.55rem; letter-spacing:.04em; }
 }
@@ -361,17 +361,17 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 .lb-group-body.collapsed{max-height:0!important}
 
 /* ── BACKGROUND PALETTE ── */
-#bg-palette-btn{position:absolute;top:8px;right:8px;z-index:25;
+#bg-palette-btn{position:absolute;top:8px;left:8px;z-index:25;
   background:var(--surface);border:1px solid var(--border);border-radius:50%;
   width:32px;height:32px;cursor:pointer;display:none;align-items:center;
   justify-content:center;font-size:.9rem;transition:border-color .15s;}
 #bg-palette-btn:hover{border-color:var(--gold)}
-#bg-palette{display:none;position:absolute;top:48px;right:8px;z-index:26;
+#bg-palette{display:none;position:absolute;top:48px;left:8px;z-index:26;
   background:var(--surface);border:1px solid var(--border-bright);
   border-radius:10px;padding:.6rem;gap:.4rem;flex-wrap:wrap;width:200px;
   box-shadow:0 6px 24px rgba(0,0,0,.5)}
 #bg-palette.open{display:flex}
-/* On mobile: palette btn moves to top-left, palette opens downward from it */
+/* On mobile: same position (top-left) */
 @media(max-width:600px){
   #bg-palette-btn{
     display:flex !important;
@@ -722,7 +722,6 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
       <button class="btn btn-sm" onclick="scatter()" title="Scatter pieces">🔀</button>
       <button class="btn btn-sm" onclick="arrangePieces();renderAll();" title="Arrange pieces">⊞</button>
       <button class="btn btn-sm" id="rectify-btn" onclick="rectifyBoard()" title="Fix misaligned placed pieces">Fix</button>
-      <button class="btn btn-sm" id="bg-btn-tb" onclick="document.getElementById('bg-palette').classList.toggle('open')" title="Background">🎨</button>
       <button class="btn btn-sm" onclick="confirmQuit()" title="Quit">↩</button>
     </div>
   </div>
@@ -772,7 +771,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
       <p>You completed the <em style="font-family:'Crimson Text',serif;font-style:italic;color:var(--gold-light)">ÀPÓTÍ ỌLỌ́WẸ̀</em> challenge</p>
       <div class="win-time" id="win-time">00:00</div>
       <div class="win-rank" id="win-rank"></div>
-      <a id="win-link" class="win-link" href="#" target="_blank" style="display:none">🔓 Claim Your Reward</a>
+      <a id="win-link" class="win-link" href="#" target="_blank" style="display:none">🐦 Post Your Win on X/Twitter</a>
       <div class="win-actions">
         <button class="btn" onclick="closeWin()">View Board</button>
         <a class="btn btn-series" href="https://www.kaysworks.com/apoti-olowe">Explore the Series ↗</a>
@@ -907,7 +906,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
     ctx.fillStyle = pat;
     // Dark mode: very subtle (pattern is already dark on dark)
     // Light mode: slightly more visible with a warm tint
-    ctx.globalAlpha = isLight ? 0.18 : 0.055;
+    ctx.globalAlpha = isLight ? 0.18 : 0.22;
     ctx.fillRect(0, 0, pc.width, pc.height);
     // In light mode add a warm overlay tint so pattern has brown warmth
     if (isLight) {
@@ -1243,14 +1242,12 @@ async function startGame(resume = false) {
 
   renderAll(); updateStats();
   _wellness.start();
-  // Show tool demo on first game start (mobile only, skippable)
-  if (window.innerWidth <= 600) {
-    try {
-      if (!localStorage.getItem('apoti_demo_done')) {
-        setTimeout(startToolDemo, 800);
-      }
-    } catch {}
-  }
+  // Show tool demo on first game start (all devices, skippable)
+  try {
+    if (!localStorage.getItem('apoti_demo_done')) {
+      setTimeout(startToolDemo, 800);
+    }
+  } catch {}
 }
 
 function loadImage(url) {
@@ -1458,7 +1455,7 @@ function _inWorkArea(p, asmX, asmY, asmW, asmH) {
   return cx > asmX && cx < asmX + asmW && cy > asmY && cy < asmY + asmH;
 }
 
-// ── ARRANGE — top and bottom only, split 50/50 ──
+// ── ARRANGE — all four sides, proportional by region capacity ──
 function arrangePieces() {
   if (!window._asm) return;
   const { x: asmX, y: asmY, w: asmW, h: asmH, scale } = window._asm;
@@ -1477,26 +1474,30 @@ function arrangePieces() {
     p.groupId = newGid;
   });
 
-  // Step 2: top and bottom regions only — full canvas width
+  // Step 2: all four regions around the board — full canvas
   const margin = Math.round(Math.min(sPW, sPH) * 0.08 + 3);
-  const clY0 = asmY - margin;
-  const clY1 = asmY + asmH + margin;
+  const clX0 = asmX - margin, clY0 = asmY - margin;
+  const clX1 = asmX + asmW + margin, clY1 = asmY + asmH + margin;
 
-  const topR = { id:'T', x0:tabPx, y0:tabPx,  x1:CW-tabPx, y1:clY0      };
-  const botR = { id:'B', x0:tabPx, y0:clY1,   x1:CW-tabPx, y1:CH-tabPx  };
-  const regions = [topR, botR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
+  const leftR  = { id:'L', x0:tabPx,  y0:tabPx,    x1:clX0,       y1:CH-tabPx  };
+  const rightR = { id:'R', x0:clX1,   y0:tabPx,    x1:CW-tabPx,   y1:CH-tabPx  };
+  const topR   = { id:'T', x0:clX0,   y0:tabPx,    x1:clX1,       y1:clY0      };
+  const botR   = { id:'B', x0:clX0,   y0:clY1,     x1:clX1,       y1:CH-tabPx  };
+  const regions = [leftR, rightR, topR, botR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
   if (!regions.length) return;
 
-  // Step 3: build slots — top fills bottom-up (inward), bottom fills top-down (inward)
+  // Step 3: build slots — each region fills inward toward the board
   regions.forEach(r => {
     r.cols = Math.max(1, Math.floor((r.x1 - r.x0) / cellW));
     r.rows = Math.max(1, Math.floor((r.y1 - r.y0) / cellH));
     r.cap  = r.cols * r.rows;
     r.slots = [];
     const rowArr = Array.from({length:r.rows}, (_,i) => i);
+    const colArr = Array.from({length:r.cols}, (_,i) => i);
     if (r.id === 'T') rowArr.reverse(); // bottom row first — closest to board
+    if (r.id === 'L') colArr.reverse(); // rightmost col first — closest to board
     for (const row of rowArr)
-      for (let col = 0; col < r.cols; col++)
+      for (const col of colArr)
         r.slots.push({ x: r.x0 + PAD/2 + col*cellW, y: r.y0 + PAD/2 + row*cellH, region: r });
   });
 
@@ -1507,10 +1508,15 @@ function arrangePieces() {
   if (!unplaced.length) return;
   const n = unplaced.length;
 
-  // Step 5: split exactly 50/50 — top gets ceil(n/2), bottom gets floor(n/2)
-  const topShare = Math.ceil(n / 2);
-  const botShare = n - topShare;
-  const shares = regions.map(r => r.id === 'T' ? topShare : botShare);
+  // Step 5: distribute proportionally by region capacity
+  const totalCap = regions.reduce((s, r) => s + r.cap, 0);
+  let distributed = 0;
+  const shares = regions.map((r, i) => {
+    if (i === regions.length - 1) return n - distributed;
+    const s = Math.round(n * r.cap / totalCap);
+    distributed += s;
+    return s;
+  });
 
   // Step 6: place with jitter clamped to region
   const jMax = Math.round(Math.min(sPW, sPH) * 0.10);
@@ -2360,9 +2366,12 @@ async function checkWin() {
   wc.width = Math.round(imgW * scale); wc.height = Math.round(imgH * scale);
   wc.getContext('2d').drawImage(img, 0, 0, imgW, imgH, 0, 0, wc.width, wc.height);
 
-  // Set reward link
+  // Set Twitter share link
   const wl = document.getElementById('win-link');
-  if (challenge.reward_url) { wl.href = challenge.reward_url; wl.style.display = 'inline-block'; }
+  const tweetText = `I just solved the ÀPÓTÍ ỌLỌ́WẸ̀ weekly puzzle challenge in ${fmtTime(secs)}! 🧩✨ Play at kaysworks.com`;
+  const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+  wl.href = twitterUrl;
+  wl.style.display = 'inline-block';
 
   // Run the reveal animation, then show win screen
   await runReveal();
@@ -2621,11 +2630,11 @@ const TOOL_STEPS = [
   { sel:'#tb-row3 button:nth-child(2)', icon:'🔀', title:'Scatter',
     desc:'Randomly redistributes all unplaced pieces around the canvas — handy when they pile up.' },
   { sel:'#tb-row3 button:nth-child(3)', icon:'⊞', title:'Arrange',
-    desc:'Neatly lines up all unplaced pieces above and below the board in equal rows, making every piece visible and easy to find.' },
+    desc:'Neatly lines up all unplaced pieces around all four sides of the board, making every piece visible and easy to find.' },
   { sel:'#rectify-btn', icon:'⚙', title:'Fix',
     desc:'Scans all placed pieces and snaps any that are slightly misaligned back to their exact position. Use this if the ghost overlay looks off.' },
   { sel:'#bg-palette-btn', icon:'🎨', title:'Background',
-    desc:'Opens a palette of 18 textures — dark woods, light woods, and solid tones. Your choice is saved between sessions.' },
+    desc:'The 🎨 button at the top-left opens a palette of 18 textures — dark woods, light woods, and solid tones. Your choice is saved between sessions.' },
 ];
 let _demoStep = 0;
 

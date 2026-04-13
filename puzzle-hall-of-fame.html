@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hall of Fame · Àpótí Ọlọ́wẹ̀ Puzzle Challenge</title>
+<meta name="description" content="Top solvers for every Àpótí Ọlọ́wẹ̀ weekly puzzle challenge, across all difficulty tiers.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:         #0e0a06;
+  --surface:    #1a1208;
+  --surface2:   #221808;
+  --border:     rgba(201,150,58,.18);
+  --border-hi:  rgba(201,150,58,.45);
+  --gold:       #c9963a;
+  --gold-light: #e8b85a;
+  --gold-dim:   #7a5a1a;
+  --text:       #e8dcc8;
+  --text-muted: #8a7a60;
+  --text-dim:   #5a4e38;
+  --wood:       #3a2210;
+  --radius:     10px;
+
+  /* tier colours */
+  --demo:   #5a9ac0;
+  --easy:   #5ab87a;
+  --medium: #c9963a;
+  --hard:   #c05a5a;
+  --expert: #9a5ac0;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Crimson Text', serif;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Grain overlay ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+  opacity: 0.55;
+}
+
+/* ── Header ── */
+.header {
+  position: relative; z-index: 1;
+  padding: 4rem 2rem 3rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.back-link {
+  position: absolute; top: 1.5rem; left: 1.5rem;
+  color: var(--text-muted); text-decoration: none;
+  font-family: 'Cinzel', serif; font-size: .7rem;
+  letter-spacing: .12em; text-transform: uppercase;
+  display: flex; align-items: center; gap: .4rem;
+  transition: color .2s;
+}
+.back-link:hover { color: var(--gold); }
+.header-eyebrow {
+  font-family: 'Cinzel', serif;
+  font-size: .65rem; letter-spacing: .2em;
+  color: var(--gold-dim); text-transform: uppercase;
+  margin-bottom: .75rem;
+}
+.header h1 {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(1.8rem, 5vw, 3.2rem);
+  font-weight: 700;
+  color: var(--gold-light);
+  letter-spacing: .04em;
+  text-shadow: 0 0 40px rgba(201,150,58,.25), 0 2px 8px rgba(0,0,0,.8);
+  line-height: 1.15;
+}
+.header-rule {
+  margin: 1rem auto .6rem;
+  width: 80px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.header p {
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-style: italic;
+  max-width: 480px; margin: 0 auto;
+}
+
+/* ── Filter bar ── */
+.filter-bar {
+  position: relative; z-index: 1;
+  display: flex; flex-wrap: wrap; gap: .5rem;
+  justify-content: center; align-items: center;
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.filter-label {
+  font-family: 'Cinzel', serif;
+  font-size: .62rem; letter-spacing: .15em;
+  color: var(--text-dim); text-transform: uppercase;
+  margin-right: .25rem;
+}
+.tier-btn {
+  padding: .28rem .8rem;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: 'Cinzel', serif; font-size: .65rem;
+  letter-spacing: .1em; text-transform: uppercase;
+  cursor: pointer; transition: all .2s;
+}
+.tier-btn:hover  { border-color: var(--gold); color: var(--gold); }
+.tier-btn.active { background: var(--gold); border-color: var(--gold); color: #0e0a06; }
+.tier-btn.t-demo   { --t: var(--demo); }
+.tier-btn.t-easy   { --t: var(--easy); }
+.tier-btn.t-medium { --t: var(--medium); }
+.tier-btn.t-hard   { --t: var(--hard); }
+.tier-btn.t-expert { --t: var(--expert); }
+.tier-btn.active { background: var(--t, var(--gold)); border-color: var(--t, var(--gold)); color: #fff; }
+
+/* ── Main grid ── */
+main {
+  position: relative; z-index: 1;
+  max-width: 1100px; margin: 0 auto;
+  padding: 2.5rem 1.5rem 5rem;
+}
+
+/* ── State messages ── */
+.state-msg {
+  text-align: center; padding: 4rem 2rem;
+  color: var(--text-muted); font-style: italic;
+}
+.state-msg .icon { font-size: 2.5rem; display: block; margin-bottom: .75rem; }
+.loading-dots span {
+  display: inline-block; animation: dot 1.2s infinite;
+}
+.loading-dots span:nth-child(2) { animation-delay: .2s; }
+.loading-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes dot { 0%,80%,100%{opacity:0} 40%{opacity:1} }
+
+/* ── Challenge card ── */
+.challenge-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 2rem;
+  transition: border-color .2s;
+}
+.challenge-card:hover { border-color: var(--border-hi); }
+.challenge-card.hidden { display: none; }
+
+.card-header {
+  display: flex; gap: 1rem; align-items: center;
+  padding: 1.1rem 1.4rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+.card-thumb {
+  width: 52px; height: 52px; border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.card-thumb-placeholder {
+  width: 52px; height: 52px; border-radius: 8px;
+  background: var(--wood); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; flex-shrink: 0;
+}
+.card-meta { flex: 1; min-width: 0; }
+.card-title {
+  font-family: 'Cinzel', serif;
+  font-size: .95rem; font-weight: 600;
+  color: var(--gold-light);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.card-sub {
+  font-size: .8rem; color: var(--text-muted);
+  margin-top: .1rem;
+}
+.tier-badge {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .18rem .6rem;
+  border-radius: 20px; font-size: .6rem;
+  font-family: 'Cinzel', serif; letter-spacing: .1em; text-transform: uppercase;
+  font-weight: 600;
+}
+.tier-badge.demo   { background: rgba(90,154,192,.18); color: var(--demo); border: 1px solid rgba(90,154,192,.35); }
+.tier-badge.easy   { background: rgba(90,184,122,.18); color: var(--easy); border: 1px solid rgba(90,184,122,.35); }
+.tier-badge.medium { background: rgba(201,150,58,.18); color: var(--medium); border: 1px solid rgba(201,150,58,.35); }
+.tier-badge.hard   { background: rgba(192,90,90,.18);  color: var(--hard);   border: 1px solid rgba(192,90,90,.35); }
+.tier-badge.expert { background: rgba(154,90,192,.18); color: var(--expert); border: 1px solid rgba(154,90,192,.35); }
+.active-badge {
+  padding: .18rem .6rem;
+  border-radius: 20px; font-size: .6rem;
+  font-family: 'Cinzel', serif; letter-spacing: .08em; text-transform: uppercase;
+  background: rgba(90,184,122,.15); color: var(--easy);
+  border: 1px solid rgba(90,184,122,.3);
+}
+
+/* ── Leaderboard table ── */
+.lb-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.lb-table th {
+  padding: .6rem 1.4rem;
+  font-family: 'Cinzel', serif; font-size: .58rem;
+  letter-spacing: .15em; text-transform: uppercase;
+  color: var(--text-dim); text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.lb-table th:last-child { text-align: right; }
+.lb-table td {
+  padding: .7rem 1.4rem;
+  font-size: .92rem;
+  border-bottom: 1px solid rgba(201,150,58,.06);
+  vertical-align: middle;
+}
+.lb-table tr:last-child td { border-bottom: none; }
+.lb-table tr { transition: background .15s; }
+.lb-table tr:hover td { background: rgba(201,150,58,.04); }
+
+/* Rank column */
+.rank {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .8rem; color: var(--text-dim);
+  width: 48px; text-align: center;
+}
+.rank-1, .rank-2, .rank-3 { font-weight: 500; }
+.rank-1 { color: #f0c040; }
+.rank-2 { color: #c0c0c0; }
+.rank-3 { color: #cd7f32; }
+
+.medal { font-size: 1rem; display: block; text-align: center; }
+
+/* Name column */
+.player-name {
+  font-family: 'Crimson Text', serif;
+  font-size: 1rem; color: var(--text);
+}
+
+/* Time column */
+.time-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .88rem; color: var(--gold);
+  text-align: right;
+}
+
+/* Hints column */
+.hints-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .78rem; color: var(--text-dim);
+  text-align: right;
+}
+
+/* Empty leaderboard */
+.lb-empty {
+  padding: 2rem 1.4rem;
+  text-align: center;
+  color: var(--text-dim); font-style: italic; font-size: .9rem;
+}
+
+/* ── Responsive ── */
+@media(max-width:600px){
+  .header { padding: 3rem 1rem 2rem; }
+  .back-link { position: static; display: inline-flex; margin-bottom: 1rem; }
+  main { padding: 1.5rem 1rem 4rem; }
+  .card-header { flex-wrap: wrap; }
+  .lb-table th:nth-child(4),
+  .lb-table td:nth-child(4) { display: none; } /* hide hints on mobile */
+}
+
+/* ── Section year headers ── */
+.year-divider {
+  display: flex; align-items: center; gap: 1rem;
+  margin: 2.5rem 0 1.2rem;
+}
+.year-divider span {
+  font-family: 'Cinzel', serif;
+  font-size: .7rem; letter-spacing: .2em;
+  color: var(--gold-dim); text-transform: uppercase;
+  white-space: nowrap;
+}
+.year-divider::before, .year-divider::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border));
+}
+.year-divider::after {
+  background: linear-gradient(270deg, transparent, var(--border));
+}
+
+/* ── Footer ── */
+footer {
+  position: relative; z-index: 1;
+  text-align: center;
+  padding: 2rem;
+  font-size: .75rem; color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  font-family: 'Cinzel', serif; letter-spacing: .1em;
+}
+footer a { color: var(--gold-dim); text-decoration: none; }
+footer a:hover { color: var(--gold); }
+
+/* ── Animations ── */
+.challenge-card { animation: fadeUp .4s ease both; }
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(14px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <a class="back-link" href="/puzzle.html">← Back to Puzzle</a>
+  <p class="header-eyebrow">Àpótí Ọlọ́wẹ̀ · Weekly Challenge</p>
+  <h1>Hall of Fame</h1>
+  <div class="header-rule"></div>
+  <p>The fastest minds who solved each weekly challenge</p>
+</header>
+
+<nav class="filter-bar">
+  <span class="filter-label">Filter:</span>
+  <button class="tier-btn active" data-tier="all">All</button>
+  <button class="tier-btn t-demo"   data-tier="Demo">Demo</button>
+  <button class="tier-btn t-easy"   data-tier="Easy">Easy</button>
+  <button class="tier-btn t-medium" data-tier="Medium">Medium</button>
+  <button class="tier-btn t-hard"   data-tier="Hard">Hard</button>
+  <button class="tier-btn t-expert" data-tier="Expert">Expert</button>
+</nav>
+
+<main id="main-content">
+  <div class="state-msg" id="loading-msg">
+    <span class="icon">🧩</span>
+    Loading the archives<span class="loading-dots"><span>.</span><span>.</span><span>.</span></span>
+  </div>
+</main>
+
+<footer>
+  <a href="https://kaysworks.com">Kaysworks</a> &nbsp;·&nbsp;
+  <a href="/puzzle.html">Play This Week's Challenge</a> &nbsp;·&nbsp;
+  <a href="/apoti-olowe.html">Àpótí Ọlọ́wẹ̀ Series</a>
+</footer>
+
+<script>
+const API = '/api';
+
+function fmtTime(s) {
+  const m = Math.floor(s / 60), sec = s % 60;
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+}
+
+const medals = ['🥇','🥈','🥉'];
+
+function buildCard(ch) {
+  const isActive = !ch.ended;
+  const entries  = ch.entries || [];
+
+  const img = ch.image_url
+    ? `<img class="card-thumb" src="${ch.image_url}" alt="" loading="lazy">`
+    : `<div class="card-thumb-placeholder">🎨</div>`;
+
+  const activePill = isActive
+    ? `<span class="active-badge">Active</span> `
+    : '';
+
+  const rows = entries.length
+    ? entries.map((e, i) => {
+        const rankCls = i < 3 ? `rank-${i+1}` : '';
+        const medalHtml = i < 3
+          ? `<span class="medal">${medals[i]}</span>`
+          : `<span style="font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--text-dim)">${i+1}</span>`;
+        return `<tr>
+          <td class="rank ${rankCls}">${medalHtml}</td>
+          <td class="player-name">${escHtml(e.player_name)}</td>
+          <td class="time-val">${fmtTime(e.time_seconds)}</td>
+          <td class="hints-val">${e.hints_used > 0 ? `${e.hints_used} hint${e.hints_used>1?'s':''}` : '—'}</td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="4" class="lb-empty">No scores yet — be the first to solve it!</td></tr>`;
+
+  return `
+<div class="challenge-card" data-tier="${escHtml(ch.tier)}">
+  <div class="card-header">
+    ${img}
+    <div class="card-meta">
+      <div class="card-title">${escHtml(ch.title || 'Weekly Challenge')}</div>
+      <div class="card-sub">
+        ${activePill}
+        <span class="tier-badge ${ch.tier_cls}">${ch.tier} · ${ch.piece_count} pieces</span>
+        &nbsp;<span style="color:var(--text-dim);font-size:.75rem">${fmtDate(ch.ends_at)}</span>
+      </div>
+    </div>
+  </div>
+  <table class="lb-table">
+    <thead>
+      <tr>
+        <th style="width:48px">#</th>
+        <th>Solver</th>
+        <th style="text-align:right">Time</th>
+        <th style="text-align:right">Hints</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+</div>`;
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function groupByYear(challenges) {
+  const map = {};
+  for (const ch of challenges) {
+    const yr = ch.ends_at ? new Date(ch.ends_at).getFullYear() : 'Unknown';
+    if (!map[yr]) map[yr] = [];
+    map[yr].push(ch);
+  }
+  return map;
+}
+
+let allChallenges = [];
+
+function renderCards(tierFilter) {
+  const main = document.getElementById('main-content');
+
+  const filtered = tierFilter === 'all'
+    ? allChallenges
+    : allChallenges.filter(ch => ch.tier === tierFilter);
+
+  if (!filtered.length) {
+    main.innerHTML = `<div class="state-msg"><span class="icon">🏺</span>No challenges found for this difficulty yet.</div>`;
+    return;
+  }
+
+  const byYear = groupByYear(filtered);
+  const years  = Object.keys(byYear).sort((a,b) => b - a);
+
+  let html = '';
+  for (const yr of years) {
+    html += `<div class="year-divider"><span>${yr}</span></div>`;
+    for (const ch of byYear[yr]) {
+      html += buildCard(ch);
+    }
+  }
+  main.innerHTML = html;
+
+  // stagger card animations
+  document.querySelectorAll('.challenge-card').forEach((el, i) => {
+    el.style.animationDelay = `${i * 0.06}s`;
+  });
+}
+
+// Filter buttons
+document.querySelectorAll('.tier-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tier-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderCards(btn.dataset.tier);
+  });
+});
+
+// Load data
+async function loadHallOfFame() {
+  try {
+    const res = await fetch(`${API}/hall-of-fame`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (!data || !data.length) {
+      document.getElementById('main-content').innerHTML =
+        `<div class="state-msg"><span class="icon">🏺</span>No challenges have been completed yet.<br>Check back after the first weekly challenge ends!</div>`;
+      return;
+    }
+
+    allChallenges = data;
+    renderCards('all');
+
+  } catch (err) {
+    document.getElementById('main-content').innerHTML =
+      `<div class="state-msg"><span class="icon">⚠️</span>Could not load the Hall of Fame.<br><small style="opacity:.6">${err.message}</small></div>`;
+  }
+}
+
+loadHallOfFame();
+</script>
+</body>
+</html>
