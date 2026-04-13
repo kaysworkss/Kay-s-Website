@@ -95,11 +95,11 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 }
 .logo em{font-family:'Cinzel',serif;font-style:normal;letter-spacing:.18em;font-size:1em;color:var(--gold-light)}
 .logo-kw{font-family:'Cinzel',serif;font-size:.62rem;letter-spacing:.38em;color:var(--text-muted);text-transform:uppercase;text-align:center;margin-top:.4rem}
-.logo-sub{font-family:'Cinzel',serif;font-size:.7rem;letter-spacing:.3em;color:var(--text-muted);text-transform:uppercase;text-align:center;margin-bottom:2rem}
+.logo-sub{font-family:'Cinzel',serif;font-size:.7rem;letter-spacing:.3em;color:var(--text-muted);text-transform:uppercase;text-align:center;margin-bottom:1.2rem}
 
 /* Decorative rule between logo and content */
 .logo-rule{
-  display:flex;align-items:center;gap:.8rem;margin:.8rem auto 1.4rem;
+  display:flex;align-items:center;gap:.8rem;margin:.5rem auto 1rem;
   width:100%;max-width:320px;
 }
 .logo-rule::before,.logo-rule::after{
@@ -160,13 +160,58 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 }
 
 /* ── PLAYER ENTRY ── */
-#entry-screen{display:none;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(ellipse at 50% 30%,var(--bg-grad1) 0%,var(--bg-grad2) 70%);padding:1.25rem}
+#entry-screen{
+  display:none;min-height:100vh;
+  align-items:center;justify-content:center;flex-direction:column;
+  background:radial-gradient(ellipse at 50% 30%,var(--bg-grad1) 0%,var(--bg-grad2) 70%);
+  padding:1.25rem;
+}
 #entry-screen .card{max-width:580px;width:100%;text-align:center}
+
+/* Mobile: make the whole screen scroll so nothing is ever cut off */
+@media(max-width:600px){
+  #entry-screen{
+    justify-content:flex-start;
+    padding:.5rem .6rem;
+    overflow-y:auto;
+    min-height:100dvh; /* use dynamic viewport height on mobile */
+  }
+  #entry-screen .card{
+    padding:1rem 1rem 1.2rem;
+    border-radius:10px;
+    margin:auto 0; /* vertically centre when content fits, scroll when it doesn't */
+    width:100%;
+  }
+  /* Shrink logo significantly on mobile */
+  .logo{ font-size:clamp(1.4rem,7vw,2rem); }
+  .logo-kw{ font-size:.55rem; letter-spacing:.28em; margin-top:.2rem; }
+  .logo-sub{ font-size:.6rem; margin-bottom:.6rem; }
+  /* Tighten decorative rule */
+  .logo-rule{ margin:.4rem auto .8rem; }
+  /* Challenge cards — compact */
+  #challenge-picker{ gap:.45rem; margin-top:.6rem; }
+  .ch-card{ padding:.6rem .75rem; gap:.5rem; }
+  .ch-card-title{ font-size:.72rem; }
+  .ch-card-meta{ font-size:.62rem; }
+  .ch-card-pieces{ font-size:.58rem; }
+  /* Countdown tighter */
+  #countdown-wrap{ margin-top:.5rem; }
+  .countdown-label{ font-size:.68rem; }
+  /* Name field */
+  .field{ margin-bottom:.65rem; }
+  label{ font-size:.6rem; margin-bottom:.2rem; }
+  input{ padding:.45rem .75rem; font-size:.9rem; }
+  /* Resume banner */
+  #resume-banner{ padding:.45rem .75rem; font-size:.75rem; margin-top:.5rem; }
+  /* Action buttons always visible */
+  #entry-screen .card > div[style*="flex"]{
+    margin-top:.6rem !important;
+  }
+  /* Reduce gap between back link and admin */
+  #entry-screen .card > div[style*="text-align:center"]{ margin-top:.5rem !important; }
+  #entry-screen .card > div[style*="text-align:right"]{ margin-top:.5rem !important; }
+}
 @media(max-width:480px){
-  #entry-screen{ padding:.75rem; }
-  #entry-screen .card{ padding:1.4rem 1.2rem; border-radius:10px; }
-  .logo{ font-size:clamp(1.6rem,8vw,2.4rem); }
-  .logo-sub{ margin-bottom:1.2rem; }
   .challenge-meta{ gap:.5rem; margin:0.75rem 0 1rem; }
   .meta-badge{ padding:.3rem .65rem; font-size:.75rem; }
 }
@@ -353,6 +398,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 .ch-card-diff{font-family:'Cinzel',serif;font-size:.58rem;letter-spacing:.14em;
   text-transform:uppercase;padding:.18rem .5rem;border-radius:4px;flex-shrink:0;
   border:1px solid currentColor}
+.ch-card-diff.demo{color:#8ab8e0;border-color:rgba(138,184,224,.4);background:rgba(138,184,224,.08)}
 .ch-card-diff.easy{color:#6abf6a;border-color:rgba(106,191,106,.4);background:rgba(106,191,106,.08)}
 .ch-card-diff.medium{color:var(--gold-light);border-color:rgba(232,184,92,.4);background:rgba(232,184,92,.08)}
 .ch-card-diff.hard{color:#e07070;border-color:rgba(224,112,112,.4);background:rgba(224,112,112,.08)}
@@ -513,16 +559,52 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 .img-zoom-bar button{background:none;border:none;color:var(--gold);cursor:pointer;font-size:.9rem;line-height:1;padding:.15rem .3rem;font-family:'Cinzel',serif;min-width:28px;min-height:28px}
 .img-zoom-bar button:hover{color:var(--gold-light)}
 .img-zoom-pct{font-family:'Cinzel',serif;font-size:.6rem;color:var(--text-muted);min-width:3em;text-align:center}
-@media(max-width:600px){
-  .img-zoom-hint{ display:none; }
-  .img-hdr{ padding:.5rem .75rem; }
-  .img-zoom-bar{ bottom:1rem; padding:.4rem .9rem; }
-  .img-zoom-bar button{ font-size:1.1rem; }
+/* ── TOOL DEMO OVERLAY ── */
+#tool-demo{display:none;position:fixed;inset:0;z-index:500;pointer-events:none}
+#tool-demo.show{display:block}
+#tool-demo-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72);pointer-events:auto}
+#tool-demo-card{
+  position:absolute;left:50%;transform:translateX(-50%);
+  bottom:calc(var(--bar-h) + 16px);
+  background:var(--surface);border:1px solid var(--border-bright);
+  border-radius:12px;padding:1rem 1.2rem;
+  width:min(320px,90vw);pointer-events:auto;
+  box-shadow:0 8px 40px rgba(0,0,0,.5);
+  text-align:center;
 }
+#tool-demo-icon{font-size:2rem;margin-bottom:.35rem}
+#tool-demo-title{font-family:'Cinzel',serif;font-size:.75rem;letter-spacing:.12em;color:var(--gold);text-transform:uppercase;margin-bottom:.3rem}
+#tool-demo-desc{font-family:'Crimson Text',serif;font-size:.95rem;color:var(--text);line-height:1.5;margin-bottom:.75rem}
+#tool-demo-progress{display:flex;gap:.3rem;justify-content:center;margin-bottom:.75rem}
+.tdp-dot{width:6px;height:6px;border-radius:50%;background:var(--border-bright);transition:background .2s}
+.tdp-dot.active{background:var(--gold)}
+#tool-demo-actions{display:flex;gap:.5rem;justify-content:center}
+#tool-demo-highlight{
+  position:absolute;border:2px solid var(--gold);border-radius:8px;
+  box-shadow:0 0 0 2000px rgba(0,0,0,.55),0 0 20px rgba(201,150,58,.4);
+  pointer-events:none;transition:all .3s ease;
+}
+
 </style>
 </head>
 <body>
 <button id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">☀️ Light</button>
+
+<!-- ═══ TOOL DEMO OVERLAY ═══ -->
+<div id="tool-demo">
+  <div id="tool-demo-backdrop" onclick="skipToolDemo()"></div>
+  <div id="tool-demo-highlight"></div>
+  <div id="tool-demo-card">
+    <div id="tool-demo-icon">🖼</div>
+    <div id="tool-demo-title">Reference Image</div>
+    <div id="tool-demo-desc">Tap to view the full puzzle image — useful when a piece has you stumped.</div>
+    <div id="tool-demo-progress"></div>
+    <div id="tool-demo-actions">
+      <button class="btn btn-sm" onclick="skipToolDemo()">Skip</button>
+      <button class="btn btn-sm btn-solid" onclick="nextToolStep()">Next →</button>
+    </div>
+  </div>
+</div>
 
 <!-- Àpótí pattern canvas — tiled behind everything -->
 <canvas id="pattern-canvas"></canvas>
@@ -539,7 +621,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 <div id="no-challenge-screen">
   <div class="nc-card">
     <div class="logo" style="margin-bottom:.3rem">ÀPÓTÍ <em>ỌLỌ́WẸ̀</em></div>
-    <div class="logo-kw" style="margin-bottom:.5rem">Puzzle Challenge</div>
+    <div class="logo-kw" style="margin-bottom:.5rem">Kaysworks</div>
     <div class="logo-rule"><div class="logo-rule-diamond"></div></div>
     <h2>No Active Challenge</h2>
     <p id="no-challenge-msg">There's no puzzle running right now. Check back soon for the next weekly challenge.</p>
@@ -645,6 +727,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
       <button class="btn btn-sm" onclick="restartPuzzle()" title="Restart">↺</button>
       <button class="btn btn-sm" onclick="scatter()" title="Scatter pieces">🔀</button>
       <button class="btn btn-sm" onclick="arrangePieces();renderAll();" title="Arrange pieces">⊞</button>
+      <button class="btn btn-sm" onclick="rectifyBoard()" title="Rectify — fix misaligned placed pieces">⚙</button>
       <button class="btn btn-sm" onclick="toggleTheme()" title="Toggle light/dark">🌓</button>
       <button class="btn btn-sm" id="bg-btn-tb" onclick="document.getElementById('bg-palette').classList.toggle('open')" title="Background">🎨</button>
       <button class="btn btn-sm" onclick="confirmQuit()" title="Quit">↩</button>
@@ -758,6 +841,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
         <div class="field">
           <label>Difficulty Level</label>
           <select id="ch-pieces">
+            <option value="24">Demo — ~24 pieces</option>
             <option value="150">Easy — ~150 pieces</option>
             <option value="400">Medium — ~400 pieces</option>
             <option value="1000" selected>Hard — ~1000 pieces</option>
@@ -971,17 +1055,22 @@ async function boot() {
 window.addEventListener('load', boot);
 
 // ═══════════════════════════════════════════════
-//  ENTRY SCREEN — challenge picker
+//  DIFFICULTY TIERS — single source of truth used by
+//  both the entry screen picker and the leaderboard
 // ═══════════════════════════════════════════════
-const DIFF_LEVELS = [
-  { label:'Easy',   cls:'easy',   range:[1,   250]  },
-  { label:'Medium', cls:'medium', range:[251, 600]  },
-  { label:'Hard',   cls:'hard',   range:[601, 1200] },
-  { label:'Expert', cls:'expert', range:[1201, Infinity] },
+const DIFF_TIERS = [
+  { label:'Demo',   cls:'demo',   pieces:24,   range:[1,    48]   },
+  { label:'Easy',   cls:'easy',   pieces:150,  range:[49,   250]  },
+  { label:'Medium', cls:'medium', pieces:400,  range:[251,  600]  },
+  { label:'Hard',   cls:'hard',   pieces:1000, range:[601,  1200] },
+  { label:'Expert', cls:'expert', pieces:1500, range:[1201, Infinity] },
 ];
+
 function diffForCount(n) {
-  return DIFF_LEVELS.find(d => n >= d.range[0] && n <= d.range[1]) || DIFF_LEVELS[DIFF_LEVELS.length-1];
+  return DIFF_TIERS.find(d => n >= d.range[0] && n <= d.range[1]) || DIFF_TIERS[DIFF_TIERS.length-1];
 }
+// Alias used by leaderboard render
+const diffTierForCount = diffForCount;
 
 function showEntryScreen() {
   const picker = document.getElementById('challenge-picker');
@@ -1161,6 +1250,14 @@ async function startGame(resume = false) {
 
   renderAll(); updateStats();
   _wellness.start();
+  // Show tool demo on first game start (mobile only, skippable)
+  if (window.innerWidth <= 600) {
+    try {
+      if (!localStorage.getItem('apoti_demo_done')) {
+        setTimeout(startToolDemo, 800);
+      }
+    } catch {}
+  }
 }
 
 function loadImage(url) {
@@ -1369,92 +1466,118 @@ function arrangePieces() {
   const { x: asmX, y: asmY, w: asmW, h: asmH, scale } = window._asm;
   const sPW = Math.round(pieceW * scale), sPH = Math.round(pieceH * scale);
   const tabPx = Math.round(TAB * scale);
-  const PAD = Math.max(8, Math.round(SNAP * 1.6));
+  const PAD = Math.max(6, Math.round(SNAP * 1.2));
 
-  // ── Step 1: Disband groups — only for pieces OUTSIDE the work area ──
+  // ── Step 1: Disband groups outside the work area ──
   pieces.forEach(p => {
     if (p.placed || _inWorkArea(p, asmX, asmY, asmW, asmH)) return;
     const newGid = nextGid++;
     groups.set(newGid, new Set([p.id]));
     const oldSet = groups.get(p.groupId);
-    if (oldSet) {
-      oldSet.delete(p.id);
-      if (oldSet.size === 0) groups.delete(p.groupId);
-    }
+    if (oldSet) { oldSet.delete(p.id); if (oldSet.size === 0) groups.delete(p.groupId); }
     p.groupId = newGid;
   });
 
   // ── Step 2: Build four border regions ──
-  // Use a small fixed gap around the assembly zone (not a large piece-size multiplier)
-  // so regions don't extend outside the visible canvas on mobile.
-  const margin = Math.round(Math.min(sPW, sPH) * 0.15 + 6);
+  const margin = Math.round(Math.min(sPW, sPH) * 0.12 + 4);
   const clX0 = asmX - margin, clY0 = asmY - margin;
   const clX1 = asmX + asmW + margin, clY1 = asmY + asmH + margin;
 
   const regions = [
-    { x0: tabPx, y0: tabPx,  x1: clX0,       y1: CH - tabPx },
-    { x0: clX1,  y0: tabPx,  x1: CW - tabPx,  y1: CH - tabPx },
-    { x0: clX0,  y0: tabPx,  x1: clX1,         y1: clY0       },
-    { x0: clX0,  y0: clY1,   x1: clX1,         y1: CH - tabPx },
+    { id:'L', x0: tabPx, y0: tabPx,  x1: clX0,       y1: CH - tabPx },
+    { id:'R', x0: clX1,  y0: tabPx,  x1: CW - tabPx,  y1: CH - tabPx },
+    { id:'T', x0: clX0,  y0: tabPx,  x1: clX1,         y1: clY0       },
+    { id:'B', x0: clX0,  y0: clY1,   x1: clX1,         y1: CH - tabPx },
   ].filter(r => r.x1 - r.x0 > sPW && r.y1 - r.y0 > sPH);
 
   if (!regions.length) return;
 
-  // ── Step 3: Build slots — fill inward toward the board edge ──
-  // Left/right: fill right-to-left / left-to-right (inward)
-  // Top/bottom: fill bottom-up / top-down (inward toward board)
+  // ── Step 3: Build slots in each region ──
+  // Fill inward: left→right-to-left, right→left-to-right, top→bottom-up, bottom→top-down
   const cellW = sPW + PAD, cellH = sPH + PAD;
-  regions.forEach((r, ri) => {
+  regions.forEach(r => {
     r.cols = Math.max(1, Math.floor((r.x1 - r.x0) / cellW));
     r.rows = Math.max(1, Math.floor((r.y1 - r.y0) / cellH));
+    r.cap  = r.cols * r.rows;
     r.slots = [];
-    // ri 0=left, 1=right, 2=top, 3=bottom
-    const colOrder = ri === 0
-      ? Array.from({length: r.cols}, (_,i) => r.cols - 1 - i) // left: right-to-left
-      : Array.from({length: r.cols}, (_,i) => i);              // others: left-to-right
-    const rowOrder = ri === 2
-      ? Array.from({length: r.rows}, (_,i) => r.rows - 1 - i) // top: bottom-up
-      : Array.from({length: r.rows}, (_,i) => i);              // others: top-down
-    for (const row of rowOrder) {
-      for (const col of colOrder) {
-        r.slots.push({
-          x: r.x0 + PAD / 2 + col * cellW,
-          y: r.y0 + PAD / 2 + row * cellH,
-          region: r
-        });
-      }
-    }
+    const colOrder = r.id === 'L'
+      ? Array.from({length: r.cols}, (_,i) => r.cols - 1 - i)
+      : Array.from({length: r.cols}, (_,i) => i);
+    const rowOrder = r.id === 'T'
+      ? Array.from({length: r.rows}, (_,i) => r.rows - 1 - i)
+      : Array.from({length: r.rows}, (_,i) => i);
+    for (const row of rowOrder)
+      for (const col of colOrder)
+        r.slots.push({ x: r.x0 + PAD/2 + col*cellW, y: r.y0 + PAD/2 + row*cellH, region: r });
   });
 
-  // ── Step 4: Shuffle only pieces that are outside the work area ──
+  // ── Step 4: Pieces to place (outside work area, unplaced) ──
   const rng = mkRng(Date.now() % 999983);
-  const shuffled = [...pieces.filter(p => !p.placed && !_inWorkArea(p, asmX, asmY, asmW, asmH))]
+  const unplaced = [...pieces.filter(p => !p.placed && !_inWorkArea(p, asmX, asmY, asmW, asmH))]
     .sort(() => rng() - 0.5);
 
-  // ── Step 5: Interleave slots across all four sides ──
-  // Each slot already carries its region reference from Step 3
-  const allSlots = [];
-  const maxSlots = Math.max(...regions.map(r => r.slots.length));
-  for (let i = 0; i < maxSlots; i++) {
-    regions.forEach(r => { if (i < r.slots.length) allSlots.push(r.slots[i]); });
-  }
+  if (!unplaced.length) return;
 
-  // ── Step 6: Place with jitter — clamped strictly within the slot's region ──
-  const jitterMax = Math.round(Math.min(sPW, sPH) * 0.25); // reduced from 0.35
-  shuffled.forEach((p, i) => {
-    if (i >= allSlots.length) {
-      p.x = tabPx + (i % 3) * (sPW + PAD);
-      p.y = tabPx + Math.floor(i / 3) * (sPH + PAD);
-      return;
-    }
-    const slot = allSlots[i];
-    const reg = slot.region;
-    const jx = Math.round((rng() - 0.5) * 2 * jitterMax);
-    const jy = Math.round((rng() - 0.5) * 2 * jitterMax);
-    // Clamp within the region bounds so pieces never drift toward the board
-    p.x = Math.round(Math.max(reg.x0, Math.min(reg.x1 - p.sPW, slot.x + jx)));
-    p.y = Math.round(Math.max(reg.y0, Math.min(reg.y1 - p.sPH, slot.y + jy)));
+  // ── Step 5: Distribute proportionally across regions ──
+  // Each region gets a share of pieces proportional to its slot capacity.
+  // This ensures all four sides are visually balanced regardless of capacity differences.
+  const totalCap = regions.reduce((s, r) => s + r.cap, 0);
+  const totalPieces2 = unplaced.length;
+
+  // Assign pieces to regions proportionally
+  let assigned = 0;
+  const regionAssignments = regions.map((r, ri) => {
+    const share = ri < regions.length - 1
+      ? Math.round(totalPieces2 * r.cap / totalCap)
+      : totalPieces2 - assigned; // last region gets remainder
+    assigned += share;
+    return { region: r, pieces: unplaced.slice(assigned - share, assigned) };
   });
+
+  // ── Step 6: Place each piece within its assigned region with jitter ──
+  const jMax = Math.round(Math.min(sPW, sPH) * 0.20);
+  regionAssignments.forEach(({ region: r, pieces: rPieces }) => {
+    rPieces.forEach((p, i) => {
+      const slot = i < r.slots.length ? r.slots[i] : r.slots[r.slots.length - 1];
+      const jx = Math.round((rng() - 0.5) * 2 * jMax);
+      const jy = Math.round((rng() - 0.5) * 2 * jMax);
+      p.x = Math.round(Math.max(r.x0, Math.min(r.x1 - p.sPW, slot.x + jx)));
+      p.y = Math.round(Math.max(r.y0, Math.min(r.y1 - p.sPH, slot.y + jy)));
+    });
+  });
+}
+
+// ── RECTIFY — snap all placed pieces to their exact target positions ──
+// Fixes visual glitches where placed pieces drifted slightly due to
+// floating-point rounding, resize events, or restore edge cases.
+function rectifyBoard() {
+  if (!window._asm) return;
+  let fixed = 0;
+  const sc = window._asm.scale;
+  const tol = Math.max(2, Math.round(Math.min(pieceW, pieceH) * sc * 0.05));
+
+  pieces.forEach(p => {
+    if (!p.placed) return;
+    // Snap to exact target
+    if (Math.abs(p.x - p.targetX) > tol || Math.abs(p.y - p.targetY) > tol) {
+      p.x = p.targetX; p.y = p.targetY; fixed++;
+    } else {
+      // Even within tolerance, set exact
+      p.x = p.targetX; p.y = p.targetY;
+    }
+  });
+
+  // Also re-merge any placed neighbours that should be in the same group
+  const placedPieces = pieces.filter(p => p.placed);
+  placedPieces.forEach(p => {
+    [[0,-1],[1,0],[0,1],[-1,0]].forEach(([dc,dr]) => {
+      const nb = pieces.find(pp => pp.col === p.col+dc && pp.row === p.row+dr && pp.placed);
+      if (nb && nb.groupId !== p.groupId) mergeG(p.groupId, nb.groupId);
+    });
+  });
+
+  renderAll(); updateStats();
+  _showFeatureToast(fixed > 0 ? `Rectified ${fixed} piece${fixed>1?'s':''} ✓` : 'Board looks good ✓');
 }
 
 function scatterAround(asmX, asmY, asmW, asmH, reshuffle) {
@@ -2478,6 +2601,77 @@ function stopConfetti() {
 
 function closeWin() { stopConfetti(); document.getElementById('win-screen').classList.remove('show'); }
 
+// ═══════════════════════════════════════════════
+//  TOOL DEMO — first-use onboarding for mobile
+// ═══════════════════════════════════════════════
+const TOOL_STEPS = [
+  { sel:'#tb-row2 button:nth-child(1)', icon:'🖼', title:'Reference Image',    desc:'Tap to view the full puzzle image when you need help identifying a piece.' },
+  { sel:'#hint-btn',                    icon:'💡', title:'Hint',               desc:'Highlights a piece and its target slot. Prefer corner and edge pieces first — they\'re easiest.' },
+  { sel:'#ghost-btn',                   icon:'👁', title:'Ghost Overlay',      desc:'Toggles a semi-transparent image over the board. Tap again to hide it.' },
+  { sel:'#tb-row2 button:nth-child(6)', icon:'⏸', title:'Pause',              desc:'Freezes the timer and saves your progress. Resume whenever you\'re ready.' },
+  { sel:'#tb-row3 button:nth-child(1)', icon:'↺', title:'Restart',            desc:'Rescatters all pieces and resets the timer. Your old save is cleared.' },
+  { sel:'#tb-row3 button:nth-child(3)', icon:'⊞', title:'Arrange',            desc:'Neatly distributes all outside pieces evenly around all four sides of the board.' },
+  { sel:'#tb-row3 button:nth-child(4)', icon:'⚙', title:'Rectify',            desc:'Fixes any misaligned placed pieces — tap if a piece looks slightly off after placing.' },
+  { sel:'#tb-row3 button:nth-child(5)', icon:'🌓', title:'Theme',             desc:'Switch between dark and light mode. Your choice is remembered.' },
+  { sel:'#bg-palette-btn',              icon:'🎨', title:'Background',         desc:'Choose from 18 background textures — dark woods, light woods, and solid tones.' },
+];
+let _demoStep = 0;
+
+function startToolDemo() {
+  _demoStep = 0;
+  document.getElementById('tool-demo').classList.add('show');
+  _renderDemoStep();
+}
+
+function _renderDemoStep() {
+  const step = TOOL_STEPS[_demoStep];
+  if (!step) { skipToolDemo(); return; }
+
+  document.getElementById('tool-demo-icon').textContent  = step.icon;
+  document.getElementById('tool-demo-title').textContent = step.title;
+  document.getElementById('tool-demo-desc').textContent  = step.desc;
+
+  // Progress dots
+  const prog = document.getElementById('tool-demo-progress');
+  prog.innerHTML = TOOL_STEPS.map((_, i) =>
+    `<div class="tdp-dot${i === _demoStep ? ' active' : ''}"></div>`).join('');
+
+  // Update button label on last step
+  const nextBtn = document.querySelector('#tool-demo-actions .btn-solid');
+  if (nextBtn) nextBtn.textContent = _demoStep === TOOL_STEPS.length - 1 ? 'Done ✓' : 'Next →';
+
+  // Highlight target element
+  const target = document.querySelector(step.sel);
+  const hl = document.getElementById('tool-demo-highlight');
+  if (target) {
+    const r = target.getBoundingClientRect();
+    const pad = 6;
+    hl.style.cssText = `
+      position:fixed;
+      left:${r.left - pad}px; top:${r.top - pad}px;
+      width:${r.width + pad*2}px; height:${r.height + pad*2}px;
+      border:2px solid var(--gold); border-radius:8px;
+      box-shadow:0 0 0 2000px rgba(0,0,0,.55),0 0 20px rgba(201,150,58,.4);
+      pointer-events:none; transition:all .3s ease;
+    `;
+    hl.style.display = 'block';
+  } else {
+    hl.style.display = 'none';
+  }
+}
+
+function nextToolStep() {
+  _demoStep++;
+  if (_demoStep >= TOOL_STEPS.length) { skipToolDemo(); return; }
+  _renderDemoStep();
+}
+
+function skipToolDemo() {
+  document.getElementById('tool-demo').classList.remove('show');
+  document.getElementById('tool-demo-highlight').style.display = 'none';
+  try { localStorage.setItem('apoti_demo_done', '1'); } catch {}
+}
+
 function confirmQuit() {
   if (!confirm('Quit this puzzle? Progress will be saved — you can resume next time.')) return;
   autoSave(); // save current state before quitting
@@ -2902,19 +3096,6 @@ function dismissWellness() {
 // ═══════════════════════════════════════════════
 
 // Difficulty tiers — label and approximate piece count ranges
-const DIFF_TIERS = [
-  { label: 'Demo',      pieces: 24,   range: [1,   35]   },
-  { label: 'Easy',      pieces: 48,   range: [36,  100]  },
-  { label: 'Medium',    pieces: 150,  range: [101, 300]  },
-  { label: 'Hard',      pieces: 400,  range: [301, 700]  },
-  { label: 'Challenge', pieces: 1000, range: [701, 1300] },
-  { label: 'Expert',    pieces: 1500, range: [1301, Infinity] },
-];
-
-function diffTierForCount(count) {
-  return DIFF_TIERS.find(t => count >= t.range[0] && count <= t.range[1]) || DIFF_TIERS[DIFF_TIERS.length - 1];
-}
-
 // Track which groups are collapsed; current difficulty always expanded
 const _lbCollapsed = new Set();
 
