@@ -3074,8 +3074,6 @@ function dismissWellness() {
 // ═══════════════════════════════════════════════
 
 // Difficulty tiers — label and approximate piece count ranges
-// Track which groups are collapsed; current difficulty always expanded
-const _lbCollapsed = new Set();
 
 async function fetchLeaderboard(){
   if(!challenge) return;
@@ -3083,84 +3081,45 @@ async function fetchLeaderboard(){
   list.innerHTML='<p class="lb-empty">Loading…</p>';
   try {
     const res=await fetch(`${API}/leaderboard/${challenge.id}`);
+    if(!res.ok) throw new Error('HTTP '+res.status);
     const scores=await res.json();
-    if(!scores.length){list.innerHTML='<p class="lb-empty">No scores yet — be the first!</p>';return}
+    if(!Array.isArray(scores)||!scores.length){
+      list.innerHTML='<p class="lb-empty">No scores yet — be the first!</p>';
+      return;
+    }
     renderLeaderboard(scores);
-  } catch { list.innerHTML='<p class="lb-empty">Could not load scores</p>'; }
+  } catch(err) {
+    console.error('Leaderboard fetch error:', err);
+    list.innerHTML='<p class="lb-empty">Could not load scores</p>';
+  }
 }
 
 function renderLeaderboard(scores) {
   const list = document.getElementById('lb-list');
-  const currentTier = diffTierForCount(totalPieces);
-
-  // Group scores by difficulty tier
-  const groups = new Map(); // tierLabel → [{player_name, time_seconds, piece_count}]
-  DIFF_TIERS.forEach(t => groups.set(t.label, []));
-  scores.forEach(s => {
-    const pc = s.piece_count || totalPieces; // fall back to current if backend doesn't send it
-    const tier = diffTierForCount(pc);
-    groups.get(tier.label).push(s);
-  });
-
-  // Only render tiers that have scores
-  const tiersWithScores = DIFF_TIERS.filter(t => groups.get(t.label).length > 0);
-  if (!tiersWithScores.length) {
-    list.innerHTML = '<p class="lb-empty">No scores yet — be the first!</p>';
-    return;
-  }
+  // Use the challenge's own piece_count for tier labelling
+  // (scores from the API may not carry piece_count)
+  const pc = (challenge && challenge.piece_count) ? challenge.piece_count : totalPieces;
+  const tier = diffTierForCount(pc);
 
   const medals = ['🥇','🥈','🥉'];
-  list.innerHTML = tiersWithScores.map(tier => {
-    const isCurrentTier = tier.label === currentTier.label;
-    const isCollapsed = _lbCollapsed.has(tier.label) || (!isCurrentTier && !_lbCollapsed.has('__init_' + tier.label));
-    const tierScores = groups.get(tier.label).slice(0, 10);
-    const rows = tierScores.map((s, i) => `
-      <div class="lb-row">
-        <span class="lb-rank ${i<3?'top':''}">${medals[i]||(i+1)+'.'}</span>
-        <span class="lb-name">${esc(s.player_name)}</span>
-        <span class="lb-time">${fmtTime(s.time_seconds)}</span>
-      </div>`).join('');
-    const bodyH = tierScores.length * 36; // approx height for transition
-    return `<div class="lb-group">
-      <div class="lb-group-hdr" onclick="toggleLbGroup('${tier.label}',this)">
-        <span class="lb-group-name${isCurrentTier?' active':''}">${tier.label}</span>
-        <div style="display:flex;align-items:center;gap:.35rem">
-          <span class="lb-group-badge${isCurrentTier?' active':''}">~${tier.pieces}pc</span>
-          <span class="lb-group-toggle">${isCollapsed ? '›' : '∨'}</span>
-        </div>
-      </div>
-      <div class="lb-group-body${isCollapsed?' collapsed':''}" style="max-height:${isCollapsed?0:bodyH+20}px">
-        ${rows}
-      </div>
+  const top10 = scores.slice(0, 10);
+
+  const header = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)">
+      <span style="font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.12em;color:var(--gold);text-transform:uppercase">${tier.label}</span>
+      <span style="font-family:'Cinzel',serif;font-size:.55rem;color:var(--text-muted)">~${pc}pc</span>
     </div>`;
-  }).join('');
 
-  // Mark all non-current tiers as collapsed by default on first load
-  tiersWithScores.forEach(t => {
-    if (t.label !== currentTier.label && !_lbCollapsed.has('__init_' + t.label)) {
-      _lbCollapsed.add(t.label);
-      _lbCollapsed.add('__init_' + t.label);
-    }
-  });
-  // Re-render once to apply initial collapse state correctly
-  if (tiersWithScores.some(t => !_lbCollapsed.has('__init_' + t.label))) renderLeaderboard(scores);
+  const rows = top10.map((s, i) => `
+    <div class="lb-row">
+      <span class="lb-rank ${i<3?'top':''}">${medals[i]||(i+1)+'.'}</span>
+      <span class="lb-name">${esc(s.player_name)}</span>
+      <span class="lb-time">${fmtTime(s.time_seconds)}</span>
+    </div>`).join('');
+
+  list.innerHTML = header + rows;
 }
 
-function toggleLbGroup(label, hdr) {
-  const body = hdr.nextElementSibling;
-  const toggle = hdr.querySelector('.lb-group-toggle');
-  if (_lbCollapsed.has(label)) {
-    _lbCollapsed.delete(label);
-    body.classList.remove('collapsed');
-    body.style.maxHeight = (body.scrollHeight + 20) + 'px';
-    if (toggle) toggle.textContent = '∨';
-  } else {
-    _lbCollapsed.add(label);
-    body.classList.add('collapsed');
-    body.style.maxHeight = '0';
-    if (toggle) toggle.textContent = '›';
-  }
-}
 
 function toggleLeaderboard(){
   const panel=document.getElementById('lb-panel');
