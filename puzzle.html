@@ -2040,24 +2040,32 @@ BC.addEventListener('wheel', e => {
 
 // ─── touch ───
 let _touches = {};
-let _touchPanTimer = null, _touchPanning = false, _touchPanStart = null;
+let _touchPanning = false, _touchPanStart = null;
+// Two-finger pan tracking — midpoint of the two fingers at pinch start
+let _pinchMidStart = null, _panAtPinchStart = null;
 
 BC.addEventListener('touchstart', e => {
   if (isPaused) return;
   e.preventDefault();
   Array.from(e.changedTouches).forEach(t => _touches[t.identifier] = { x: t.clientX, y: t.clientY });
   const ids = Object.keys(_touches);
+
   if (ids.length === 2) {
-    isPinching = true; drag = null;
-    _touchPanning = false; clearTimeout(_touchPanTimer);
+    // Two fingers: pinch-zoom + pan simultaneously
+    isPinching = true; drag = null; _touchPanning = false;
     const [a, b] = [_touches[ids[0]], _touches[ids[1]]];
-    lastPinchDist = Math.hypot(b.x - a.x, b.y - a.y); return;
+    lastPinchDist = Math.hypot(b.x - a.x, b.y - a.y);
+    _pinchMidStart = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    _panAtPinchStart = { panX, panY };
+    return;
   }
+
   if (ids.length === 1) {
     const t = e.touches[0];
     const hit = pieceAt(t.clientX, t.clientY);
     if (hit) {
-      clearTimeout(_touchPanTimer); _touchPanning = false;
+      // Finger landed on a piece — drag it
+      _touchPanning = false;
       if (!hit.placed) lastTouchedPiece = hit;
       selectedIds.clear();
       const gp = gpArr(hit.groupId);
@@ -2067,13 +2075,9 @@ BC.addEventListener('touchstart', e => {
       drag = { pieces: gp, offsets: gp.map(p => ({ dx: wx - p.x, dy: wy - p.y })), wx, wy };
       renderAll();
     } else {
-      // Long-press on empty area → pan mode
+      // Finger on empty space — pan immediately, no delay
+      _touchPanning = true;
       _touchPanStart = { clientX: t.clientX, clientY: t.clientY, panX, panY };
-      _touchPanning = false;
-      _touchPanTimer = setTimeout(() => {
-        _touchPanning = true;
-        BC.style.cursor = 'grabbing';
-      }, 300);
     }
   }
 }, { passive: false });
@@ -2083,31 +2087,34 @@ BC.addEventListener('touchmove', e => {
   Array.from(e.changedTouches).forEach(t => _touches[t.identifier] = { x: t.clientX, y: t.clientY });
   const ids = Object.keys(_touches);
 
-  // Cancel long-press pan timer if finger moved before threshold
-  if (!_touchPanning && _touchPanTimer && e.touches.length === 1) {
-    const t = e.touches[0];
-    const dx = t.clientX - _touchPanStart.clientX, dy = t.clientY - _touchPanStart.clientY;
-    if (Math.hypot(dx, dy) > 8) { clearTimeout(_touchPanTimer); _touchPanTimer = null; }
-  }
-
   if (ids.length >= 2 && isPinching) {
     const [a, b] = [_touches[ids[0]], _touches[ids[1]]];
     const dist = Math.hypot(b.x - a.x, b.y - a.y);
-    const delta = dist / lastPinchDist;
+    // Zoom centred on pinch midpoint
     const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
-    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * delta));
+    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * (dist / lastPinchDist)));
     panX = cx - (cx - panX) * (newZoom / zoom);
     panY = cy - (cy - panY) * (newZoom / zoom);
     zoom = newZoom; lastPinchDist = dist;
+    // Pan: also track midpoint movement
+    if (_pinchMidStart && _panAtPinchStart) {
+      const dMidX = cx - _pinchMidStart.x;
+      const dMidY = cy - _pinchMidStart.y;
+      panX += dMidX; panY += dMidY;
+      _pinchMidStart = { x: cx, y: cy };
+    }
     clampPan(); renderAll(); return;
   }
-  // Long-press pan mode — single finger panning
+
+  // Single finger pan
   if (_touchPanning && e.touches.length === 1) {
     const t = e.touches[0];
     panX = _touchPanStart.panX + (t.clientX - _touchPanStart.clientX);
     panY = _touchPanStart.panY + (t.clientY - _touchPanStart.clientY);
     clampPan(); renderAll(); return;
   }
+
+  // Piece drag
   if (drag && e.touches.length === 1) {
     const t = e.touches[0];
     const { x: wx, y: wy } = evWorld(t);
@@ -2120,8 +2127,9 @@ BC.addEventListener('touchmove', e => {
 BC.addEventListener('touchend', e => {
   if (isPaused) return;
   Array.from(e.changedTouches).forEach(t => delete _touches[t.identifier]);
-  if (Object.keys(_touches).length < 2) isPinching = false;
-  clearTimeout(_touchPanTimer); _touchPanTimer = null;
+  if (Object.keys(_touches).length < 2) {
+    isPinching = false; _pinchMidStart = null; _panAtPinchStart = null;
+  }
   _touchPanning = false; _touchPanStart = null;
   BC.style.cursor = 'default';
   if (!drag) return;
@@ -2591,15 +2599,33 @@ function closeWin() { stopConfetti(); document.getElementById('win-screen').clas
 //  TOOL DEMO — first-use onboarding for mobile
 // ═══════════════════════════════════════════════
 const TOOL_STEPS = [
-  { sel:'#tb-row2 button:nth-child(1)', icon:'🖼', title:'Reference Image',    desc:'Tap to view the full puzzle image when you need help identifying a piece.' },
-  { sel:'#hint-btn',                    icon:'💡', title:'Hint',               desc:'Highlights a piece and its target slot. Prefer corner and edge pieces first — they\'re easiest.' },
-  { sel:'#ghost-btn',                   icon:'👁', title:'Ghost Overlay',      desc:'Toggles a semi-transparent image over the board. Tap again to hide it.' },
-  { sel:'#tb-row2 button:nth-child(6)', icon:'⏸', title:'Pause',              desc:'Freezes the timer and saves your progress. Resume whenever you\'re ready.' },
-  { sel:'#tb-row3 button:nth-child(1)', icon:'↺', title:'Restart',            desc:'Rescatters all pieces and resets the timer. Your old save is cleared.' },
-  { sel:'#tb-row3 button:nth-child(3)', icon:'⊞', title:'Arrange',            desc:'Neatly distributes all outside pieces evenly around all four sides of the board.' },
-  { sel:'#tb-row3 button:nth-child(4)', icon:'⚙', title:'Rectify',            desc:'Fixes any misaligned placed pieces — tap if a piece looks slightly off after placing.' },
-  { sel:'#tb-row3 button:nth-child(5)', icon:'🌓', title:'Theme',             desc:'Switch between dark and light mode. Your choice is remembered.' },
-  { sel:'#bg-palette-btn',              icon:'🎨', title:'Background',         desc:'Choose from 18 background textures — dark woods, light woods, and solid tones.' },
+  // ── Gestures ──
+  { sel: null, icon:'👆', title:'Moving Around',
+    desc:'Drag any empty space to pan. Pinch with two fingers to zoom in or out — you can also pan while pinching. Drag a piece to move it.' },
+  // ── Row 2 ──
+  { sel:'#tb-row2 button:nth-child(1)', icon:'🖼', title:'Reference Image',
+    desc:'Shows the full puzzle image. Drag and pinch to zoom inside the preview. Tap outside the image to close it.' },
+  { sel:'#hint-btn', icon:'💡', title:'Hint (×3)',
+    desc:'Highlights an unplaced piece in blue and its target slot in gold, then pans the camera to show both. Corners and edges are prioritised.' },
+  { sel:'#ghost-btn', icon:'👁', title:'Ghost Overlay',
+    desc:'Fades the reference image over the board so you can see exactly where pieces belong. Tap again to hide it. Unlimited uses.' },
+  { sel:'#tb-row2 button:nth-child(4)', icon:'🔍', title:'Reset Zoom',
+    desc:'Snaps the view back to the default zoom and centres the board — useful after zooming in deeply.' },
+  { sel:'#tb-row2 button:nth-child(5)', icon:'🏆', title:'Leaderboard',
+    desc:'Opens the top-10 scores for this challenge. Scores are recorded when you complete the puzzle.' },
+  { sel:'#pause-btn', icon:'⏸', title:'Pause',
+    desc:'Freezes the timer and auto-saves your progress. Tap Resume or press Escape to continue.' },
+  // ── Row 3 ──
+  { sel:'#tb-row3 button:nth-child(1)', icon:'↺', title:'Restart',
+    desc:'Rescatters all pieces and resets the timer to zero. Your saved progress for this puzzle is cleared.' },
+  { sel:'#tb-row3 button:nth-child(2)', icon:'🔀', title:'Scatter',
+    desc:'Randomly redistributes all unplaced pieces around the canvas — handy when they pile up.' },
+  { sel:'#tb-row3 button:nth-child(3)', icon:'⊞', title:'Arrange',
+    desc:'Neatly lines up all unplaced pieces above and below the board in equal rows, making every piece visible and easy to find.' },
+  { sel:'#rectify-btn', icon:'⚙', title:'Fix',
+    desc:'Scans all placed pieces and snaps any that are slightly misaligned back to their exact position. Use this if the ghost overlay looks off.' },
+  { sel:'#bg-palette-btn', icon:'🎨', title:'Background',
+    desc:'Opens a palette of 18 textures — dark woods, light woods, and solid tones. Your choice is saved between sessions.' },
 ];
 let _demoStep = 0;
 
