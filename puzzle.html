@@ -1456,19 +1456,16 @@ function _inWorkArea(p, asmX, asmY, asmW, asmH) {
   return cx > asmX && cx < asmX + asmW && cy > asmY && cy < asmY + asmH;
 }
 
-// ── ARRANGE — pack all unplaced pieces neatly around the workspace
-//   • Skips placed pieces AND unplaced pieces already inside the work area
-//   • Disbands snapped groups so pieces can't auto-snap when laid out
-//   • Distributes evenly across all four border regions
-//   • Adds per-piece jitter so no two pieces land within snap distance of each other
+// ── ARRANGE — rectangular ring around the board, equal visual density per side ──
 function arrangePieces() {
   if (!window._asm) return;
   const { x: asmX, y: asmY, w: asmW, h: asmH, scale } = window._asm;
   const sPW = Math.round(pieceW * scale), sPH = Math.round(pieceH * scale);
   const tabPx = Math.round(TAB * scale);
-  const PAD = Math.max(6, Math.round(SNAP * 1.2));
+  const PAD = Math.max(5, Math.round(SNAP * 1.0));
+  const cellW = sPW + PAD, cellH = sPH + PAD;
 
-  // ── Step 1: Disband groups outside the work area ──
+  // Step 1: disband outside groups
   pieces.forEach(p => {
     if (p.placed || _inWorkArea(p, asmX, asmY, asmW, asmH)) return;
     const newGid = nextGid++;
@@ -1478,77 +1475,78 @@ function arrangePieces() {
     p.groupId = newGid;
   });
 
-  // ── Step 2: Build four border regions ──
-  const margin = Math.round(Math.min(sPW, sPH) * 0.12 + 4);
+  // Step 2: four border regions
+  const margin = Math.round(Math.min(sPW, sPH) * 0.08 + 3);
   const clX0 = asmX - margin, clY0 = asmY - margin;
   const clX1 = asmX + asmW + margin, clY1 = asmY + asmH + margin;
 
   const regions = [
-    { id:'L', x0: tabPx, y0: tabPx,  x1: clX0,       y1: CH - tabPx },
-    { id:'R', x0: clX1,  y0: tabPx,  x1: CW - tabPx,  y1: CH - tabPx },
-    { id:'T', x0: clX0,  y0: tabPx,  x1: clX1,         y1: clY0       },
-    { id:'B', x0: clX0,  y0: clY1,   x1: clX1,         y1: CH - tabPx },
+    { id:'L', x0:tabPx, y0:tabPx, x1:clX0,       y1:CH-tabPx  },
+    { id:'R', x0:clX1,  y0:tabPx, x1:CW-tabPx,   y1:CH-tabPx  },
+    { id:'T', x0:clX0,  y0:tabPx, x1:clX1,        y1:clY0      },
+    { id:'B', x0:clX0,  y0:clY1,  x1:clX1,        y1:CH-tabPx  },
   ].filter(r => r.x1 - r.x0 > sPW && r.y1 - r.y0 > sPH);
-
   if (!regions.length) return;
 
-  // ── Step 3: Build slots in each region ──
-  // Fill inward: left→right-to-left, right→left-to-right, top→bottom-up, bottom→top-down
-  const cellW = sPW + PAD, cellH = sPH + PAD;
+  // Step 3: build slots, inward first
   regions.forEach(r => {
     r.cols = Math.max(1, Math.floor((r.x1 - r.x0) / cellW));
     r.rows = Math.max(1, Math.floor((r.y1 - r.y0) / cellH));
     r.cap  = r.cols * r.rows;
     r.slots = [];
-    const colOrder = r.id === 'L'
-      ? Array.from({length: r.cols}, (_,i) => r.cols - 1 - i)
-      : Array.from({length: r.cols}, (_,i) => i);
-    const rowOrder = r.id === 'T'
-      ? Array.from({length: r.rows}, (_,i) => r.rows - 1 - i)
-      : Array.from({length: r.rows}, (_,i) => i);
-    for (const row of rowOrder)
-      for (const col of colOrder)
-        r.slots.push({ x: r.x0 + PAD/2 + col*cellW, y: r.y0 + PAD/2 + row*cellH, region: r });
+    const rowArr = Array.from({length:r.rows},(_,i)=>i);
+    const colArr = Array.from({length:r.cols},(_,i)=>i);
+    if (r.id==='T') rowArr.reverse();
+    if (r.id==='L') colArr.reverse();
+    for (const row of rowArr)
+      for (const col of colArr)
+        r.slots.push({x:r.x0+PAD/2+col*cellW, y:r.y0+PAD/2+row*cellH, region:r});
   });
 
-  // ── Step 4: Pieces to place (outside work area, unplaced) ──
+  // Step 4: unplaced pieces
   const rng = mkRng(Date.now() % 999983);
   const unplaced = [...pieces.filter(p => !p.placed && !_inWorkArea(p, asmX, asmY, asmW, asmH))]
     .sort(() => rng() - 0.5);
-
   if (!unplaced.length) return;
-
-  // ── Step 5: Split equally across all 4 sides ──
-  // Each region always gets exactly 1/4 of the pieces regardless of its slot
-  // capacity. This guarantees a rectangular ring — not a T-shirt shape.
-  // If pieces overflow a region's slots they reuse the last available slot
-  // with a small cascading offset so nothing is hidden.
   const n = unplaced.length;
-  const nR = regions.length; // usually 4, fewer if screen is very small
-  const baseShare = Math.floor(n / nR);
-  const remainder = n % nR;
 
-  // ── Step 6: Place each piece within its assigned region ──
-  const jMax = Math.round(Math.min(sPW, sPH) * 0.15);
-  let pieceIdx = 0;
+  // Step 5: PERIMETER-WEIGHT distribution
+  // Left/Right are tall & narrow  → weight = their row count (= pieces that fit in one column)
+  // Top/Bottom are wide & short  → weight = their col count (= pieces that fit in one row)
+  // This matches visual density so all four sides appear equally filled.
+  const perimWeight = r =>
+    (r.id==='L'||r.id==='R') ? r.rows : r.cols;
 
+  const totalW = regions.reduce((s,r) => s + perimWeight(r), 0);
+  let assigned = 0;
+  const shares = regions.map((r, ri) => {
+    const s = ri < regions.length - 1
+      ? Math.max(0, Math.round(n * perimWeight(r) / totalW))
+      : n - assigned;
+    assigned += s;
+    return s;
+  });
+  // Safety: if rounding pushed assigned > n, trim last region
+  const total = shares.reduce((a,b)=>a+b,0);
+  if (total > n) shares[shares.length-1] -= (total - n);
+
+  // Step 6: place with jitter, clamped to region
+  const jMax = Math.round(Math.min(sPW, sPH) * 0.10);
+  let idx = 0;
   regions.forEach((r, ri) => {
-    // This region's share — first `remainder` regions get one extra
-    const share = baseShare + (ri < remainder ? 1 : 0);
+    const share = Math.max(0, shares[ri]);
     for (let i = 0; i < share; i++) {
-      const p = unplaced[pieceIdx++];
+      const p = unplaced[idx++];
       if (!p) break;
-      // Use slot if available; otherwise cascade offset from last slot
-      const slotIdx = Math.min(i, r.slots.length - 1);
-      const slot = r.slots[slotIdx];
-      const overflow = Math.max(0, i - (r.slots.length - 1));
-      // Cascade overflows diagonally so they're visible, not stacked exactly
-      const cascX = overflow > 0 ? (overflow % 3) * (sPW * 0.4) : 0;
-      const cascY = overflow > 0 ? Math.floor(overflow / 3) * (sPH * 0.4) : 0;
-      const jx = Math.round((rng() - 0.5) * 2 * jMax);
-      const jy = Math.round((rng() - 0.5) * 2 * jMax);
-      p.x = Math.round(Math.max(r.x0, Math.min(r.x1 - p.sPW, slot.x + jx + cascX)));
-      p.y = Math.round(Math.max(r.y0, Math.min(r.y1 - p.sPH, slot.y + jy + cascY)));
+      const si = Math.min(i, r.slots.length - 1);
+      const slot = r.slots[si];
+      const ov = Math.max(0, i - (r.slots.length - 1));
+      const cascX = ov > 0 ? (ov % Math.max(1,r.cols)) * cellW * 0.55 : 0;
+      const cascY = ov > 0 ? Math.floor(ov / Math.max(1,r.cols)) * cellH * 0.55 : 0;
+      const jx = Math.round((rng()-0.5)*2*jMax);
+      const jy = Math.round((rng()-0.5)*2*jMax);
+      p.x = Math.round(Math.max(r.x0, Math.min(r.x1-p.sPW, slot.x+jx+cascX)));
+      p.y = Math.round(Math.max(r.y0, Math.min(r.y1-p.sPH, slot.y+jy+cascY)));
     }
   });
 }
