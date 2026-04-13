@@ -1427,13 +1427,22 @@ function sizeCanvas() {
   const aW = Math.round(imgW * scale), aH = Math.round(imgH * scale);
   const asmX = Math.round((CW - aW) / 2), asmY = Math.round((CH - aH) / 2);
   pieces.forEach(p => {
-    p.sPW = Math.round(p.pw * scale);
-    p.sPH = Math.round(p.ph * scale);
-    p.targetX = asmX + p.col * Math.round(pieceW * scale);
-    p.targetY = asmY + p.row * Math.round(pieceH * scale);
+    // Derive screen position from source coordinates to avoid per-column rounding drift.
+    // asmX + round(sx * scale) is exact; col * round(pieceW * scale) accumulates error.
+    const sx0 = Math.round(p.sx * scale);          // screen left edge of this piece
+    const sy0 = Math.round(p.sy * scale);          // screen top edge of this piece
+    const sx1 = Math.round((p.sx + p.pw) * scale); // screen right edge
+    const sy1 = Math.round((p.sy + p.ph) * scale); // screen bottom edge
+    p.sPW = sx1 - sx0;
+    p.sPH = sy1 - sy0;
+    p.targetX = asmX + sx0;
+    p.targetY = asmY + sy0;
   });
   SNAP = Math.min(Math.max(Math.round(Math.min(pieceW, pieceH) * scale * 0.45), 8), 38);
-  window._asm = { x: asmX, y: asmY, w: aW, h: aH, scale, sPW: Math.round(pieceW * scale), sPH: Math.round(pieceH * scale) };
+  // Base piece screen size: derived from source coords (round(pieceW*scale) can drift)
+  const baseSPW = Math.round(pieceW * scale);
+  const baseSPH = Math.round(pieceH * scale);
+  window._asm = { x: asmX, y: asmY, w: aW, h: aH, scale, sPW: baseSPW, sPH: baseSPH };
   scatterAround(asmX, asmY, aW, aH, false);
   renderAll(); updateStats();
 }
@@ -2182,16 +2191,16 @@ function trySnap(movedPieces, movedGid) {
         const nb = pieces.find(pp => pp.col === nc && pp.row === nr && pp.groupId !== movedGid);
         if (!nb) continue;
 
-        // Where p needs to be so it sits perfectly adjacent to nb:
-        // If dc=1 (nb is to the right of p): p.x = nb.x - p.sPW
-        // If dc=-1 (nb is to the left of p): p.x = nb.x + nb.sPW
-        // Same logic for rows. Use each piece's own dimension.
-        const expX = dc === 1  ? nb.x - p.sPW
-                   : dc === -1 ? nb.x + nb.sPW
-                   : nb.x + (p.col - nb.col) * p.sPW;
-        const expY = dr === 1  ? nb.y - p.sPH
-                   : dr === -1 ? nb.y + nb.sPH
-                   : nb.y + (p.row - nb.row) * p.sPH;
+        // Where p needs to be so it sits perfectly adjacent to nb.
+        // For direct neighbours (dc=±1 or dr=±1): use piece screen dimensions.
+        // Use targetX/Y difference as the ground truth for offset — avoids
+        // accumulated sPW errors across non-adjacent pieces in a group.
+        const expX = dc === 1  ? nb.x - p.sPW            // nb is right of p
+                   : dc === -1 ? nb.x + nb.sPW            // nb is left of p
+                   : nb.x + (p.targetX - nb.targetX);     // same column offset, use target diff
+        const expY = dr === 1  ? nb.y - p.sPH             // nb is below p
+                   : dr === -1 ? nb.y + nb.sPH            // nb is above p
+                   : nb.y + (p.targetY - nb.targetY);     // same row offset, use target diff
 
         if (Math.abs(p.x - expX) < SNAP && Math.abs(p.y - expY) < SNAP) {
           // Verify the two groups don't already have mismatched internal geometry
@@ -2216,8 +2225,6 @@ function trySnap(movedPieces, movedGid) {
 // every piece in movedGid must land within 2px of its correct position
 // relative to every piece in the target group it now touches.
 function _groupsCompatible(movedGid, targetGid, refP, refNb, dc, dr) {
-  const sc = window._asm?.scale || 1;
-  const sPW = Math.round(pieceW * sc), sPH = Math.round(pieceH * sc);
   const movedGp = gpArr(movedGid);
   const targetGp = gpArr(targetGid);
   // For each piece in the moved group, check all neighbours in the target group
@@ -2227,17 +2234,16 @@ function _groupsCompatible(movedGid, targetGid, refP, refNb, dc, dr) {
       const dRow = mp.row - tp.row;
       // Only check directly adjacent pairs
       if (Math.abs(dCol) + Math.abs(dRow) !== 1) continue;
-      // Expected position of mp given tp's position
-      const expX = tp.x + dCol * tp.sPW;
-      const expY = tp.y + dRow * tp.sPH;
-      // After the snap shift, mp.x will be expX — check that the shift is consistent
-      // with the reference pair (refP, refNb)
+      // Expected position of mp given tp's position — use targetX/Y diff (pixel-perfect)
+      const expX = tp.x + (mp.targetX - tp.targetX);
+      const expY = tp.y + (mp.targetY - tp.targetY);
+      // Compute the shift that will be applied (based on reference pair)
       const refExpX = dc === 1  ? refNb.x - refP.sPW
                     : dc === -1 ? refNb.x + refNb.sPW
-                    : refNb.x + (refP.col - refNb.col) * refP.sPW;
+                    : refNb.x + (refP.targetX - refNb.targetX);
       const refExpY = dr === 1  ? refNb.y - refP.sPH
                     : dr === -1 ? refNb.y + refNb.sPH
-                    : refNb.y + (refP.row - refNb.row) * refP.sPH;
+                    : refNb.y + (refP.targetY - refNb.targetY);
       const shiftX = refExpX - refP.x, shiftY = refExpY - refP.y;
       const mpAfterX = mp.x + shiftX, mpAfterY = mp.y + shiftY;
       if (Math.abs(mpAfterX - expX) > 2 || Math.abs(mpAfterY - expY) > 2) return false;
@@ -2254,7 +2260,9 @@ function mergeNeighboursIfAligned(gid) {
       if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) return;
       const nb = pieces.find(pp => pp.col === nc && pp.row === nr);
       if (!nb || nb.groupId === gid) return;
-      const expX = p.x + dc * nb.sPW, expY = p.y + dr * nb.sPH;
+      // Use targetX/Y difference as the expected offset — pixel-perfect regardless of piece size
+      const expX = p.x + (nb.targetX - p.targetX);
+      const expY = p.y + (nb.targetY - p.targetY);
       if (Math.abs(nb.x - expX) < 1 && Math.abs(nb.y - expY) < 1) {
         mergeG(gid, nb.groupId);
       }
