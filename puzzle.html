@@ -1518,32 +1518,38 @@ function arrangePieces() {
 
   if (!unplaced.length) return;
 
-  // ── Step 5: Distribute proportionally across regions ──
-  // Each region gets a share of pieces proportional to its slot capacity.
-  // This ensures all four sides are visually balanced regardless of capacity differences.
-  const totalCap = regions.reduce((s, r) => s + r.cap, 0);
-  const totalPieces2 = unplaced.length;
+  // ── Step 5: Split equally across all 4 sides ──
+  // Each region always gets exactly 1/4 of the pieces regardless of its slot
+  // capacity. This guarantees a rectangular ring — not a T-shirt shape.
+  // If pieces overflow a region's slots they reuse the last available slot
+  // with a small cascading offset so nothing is hidden.
+  const n = unplaced.length;
+  const nR = regions.length; // usually 4, fewer if screen is very small
+  const baseShare = Math.floor(n / nR);
+  const remainder = n % nR;
 
-  // Assign pieces to regions proportionally
-  let assigned = 0;
-  const regionAssignments = regions.map((r, ri) => {
-    const share = ri < regions.length - 1
-      ? Math.round(totalPieces2 * r.cap / totalCap)
-      : totalPieces2 - assigned; // last region gets remainder
-    assigned += share;
-    return { region: r, pieces: unplaced.slice(assigned - share, assigned) };
-  });
+  // ── Step 6: Place each piece within its assigned region ──
+  const jMax = Math.round(Math.min(sPW, sPH) * 0.15);
+  let pieceIdx = 0;
 
-  // ── Step 6: Place each piece within its assigned region with jitter ──
-  const jMax = Math.round(Math.min(sPW, sPH) * 0.20);
-  regionAssignments.forEach(({ region: r, pieces: rPieces }) => {
-    rPieces.forEach((p, i) => {
-      const slot = i < r.slots.length ? r.slots[i] : r.slots[r.slots.length - 1];
+  regions.forEach((r, ri) => {
+    // This region's share — first `remainder` regions get one extra
+    const share = baseShare + (ri < remainder ? 1 : 0);
+    for (let i = 0; i < share; i++) {
+      const p = unplaced[pieceIdx++];
+      if (!p) break;
+      // Use slot if available; otherwise cascade offset from last slot
+      const slotIdx = Math.min(i, r.slots.length - 1);
+      const slot = r.slots[slotIdx];
+      const overflow = Math.max(0, i - (r.slots.length - 1));
+      // Cascade overflows diagonally so they're visible, not stacked exactly
+      const cascX = overflow > 0 ? (overflow % 3) * (sPW * 0.4) : 0;
+      const cascY = overflow > 0 ? Math.floor(overflow / 3) * (sPH * 0.4) : 0;
       const jx = Math.round((rng() - 0.5) * 2 * jMax);
       const jy = Math.round((rng() - 0.5) * 2 * jMax);
-      p.x = Math.round(Math.max(r.x0, Math.min(r.x1 - p.sPW, slot.x + jx)));
-      p.y = Math.round(Math.max(r.y0, Math.min(r.y1 - p.sPH, slot.y + jy)));
-    });
+      p.x = Math.round(Math.max(r.x0, Math.min(r.x1 - p.sPW, slot.x + jx + cascX)));
+      p.y = Math.round(Math.max(r.y0, Math.min(r.y1 - p.sPH, slot.y + jy + cascY)));
+    }
   });
 }
 
