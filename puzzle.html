@@ -1476,16 +1476,28 @@ function arrangePieces() {
     p.groupId = newGid;
   });
 
-  // Step 2: all four regions around the board — full canvas
+  // Step 2: regions around the board
+  // Mobile portrait: top + bottom spanning full canvas width (more usable space)
+  // Desktop / landscape: all four sides
   const margin = Math.round(Math.min(sPW, sPH) * 0.08 + 3);
   const clX0 = asmX - margin, clY0 = asmY - margin;
   const clX1 = asmX + asmW + margin, clY1 = asmY + asmH + margin;
 
-  const leftR  = { id:'L', x0:tabPx,  y0:tabPx,    x1:clX0,       y1:CH-tabPx  };
-  const rightR = { id:'R', x0:clX1,   y0:tabPx,    x1:CW-tabPx,   y1:CH-tabPx  };
-  const topR   = { id:'T', x0:clX0,   y0:tabPx,    x1:clX1,       y1:clY0      };
-  const botR   = { id:'B', x0:clX0,   y0:clY1,     x1:clX1,       y1:CH-tabPx  };
-  const regions = [leftR, rightR, topR, botR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
+  const isMobPortrait = CW < 600 && CH > CW;
+
+  let regions;
+  if (isMobPortrait) {
+    // Full-width top and bottom strips — same as the original working mobile behaviour
+    const topR = { id:'T', x0:tabPx, y0:tabPx,  x1:CW-tabPx, y1:clY0      };
+    const botR = { id:'B', x0:tabPx, y0:clY1,   x1:CW-tabPx, y1:CH-tabPx  };
+    regions = [topR, botR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
+  } else {
+    const leftR  = { id:'L', x0:tabPx,  y0:tabPx,  x1:clX0,      y1:CH-tabPx };
+    const rightR = { id:'R', x0:clX1,   y0:tabPx,  x1:CW-tabPx,  y1:CH-tabPx };
+    const topR   = { id:'T', x0:clX0,   y0:tabPx,  x1:clX1,      y1:clY0     };
+    const botR   = { id:'B', x0:clX0,   y0:clY1,   x1:clX1,      y1:CH-tabPx };
+    regions = [leftR, rightR, topR, botR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
+  }
   if (!regions.length) return;
 
   // Step 3: build slots — each region fills inward toward the board
@@ -2633,7 +2645,7 @@ const TOOL_STEPS = [
   { sel:'#tb-row3 button:nth-child(2)', icon:'🔀', title:'Scatter',
     desc:'Randomly redistributes all unplaced pieces around the canvas — handy when they pile up.' },
   { sel:'#tb-row3 button:nth-child(3)', icon:'⊞', title:'Arrange',
-    desc:'Neatly lines up all unplaced pieces around all four sides of the board, making every piece visible and easy to find.' },
+    desc:'Neatly lines up all unplaced pieces around the board — above and below on mobile, all four sides on desktop.' },
   { sel:'#rectify-btn', icon:'⚙', title:'Fix',
     desc:'Scans all placed pieces and snaps any that are slightly misaligned back to their exact position. Use this if the ghost overlay looks off.' },
   { sel:'#bg-palette-btn', icon:'🎨', title:'Background',
