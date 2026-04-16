@@ -505,18 +505,18 @@
   /* ── PRECURSOR CARD ── */
   .precursor-card {
     background: var(--surface);
-    border: 1px solid rgba(201,153,58,0.25); border-radius: 10px;
-    padding: 1.6rem 1.8rem; margin-top: 2rem;
+    border: 1px solid rgba(201,153,58,0.25); border-radius: 8px;
+    padding: 0.9rem 1.1rem; margin-top: 2rem;
     transition: background 0.35s;
   }
   body.light .precursor-card { background: rgba(201,153,58,0.05); }
   .precursor-title {
     font-family: 'Cinzel', serif; font-size: 0.78rem;
     letter-spacing: 0.5em; text-transform: uppercase;
-    color: var(--gold); margin-bottom: 1.2rem;
+    color: var(--gold); margin-bottom: 0.6rem;
   }
   .precursor-phases { display: flex; flex-direction: column; }
-  .precursor-phase { display: flex; flex-direction: column; gap: 0.4rem; padding: 1rem 0; }
+  .precursor-phase { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.4rem 0; }
   .precursor-divider { border: none; border-top: 1px solid var(--divider); }
   .phase-label {
     font-family: 'Cinzel', serif; font-size: 0.72rem;
@@ -531,7 +531,7 @@
     letter-spacing: 0.2em; color: var(--gold); min-height: 1.2em;
   }
   .status-ended { color: var(--ash); }
-  .phase-btn { margin-top: 0.6rem; align-self: flex-start; cursor: none; }
+  .phase-btn { margin-top: 0.4rem; align-self: flex-start; cursor: none; }
 
   /* ── GALLERY ── */
   .gal-intro-text { font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.75rem; transition: color 0.35s; }
@@ -1043,31 +1043,17 @@
     <div class="precursor-card">
       <p class="precursor-title">Mint Entry Token</p>
       <div class="precursor-phases">
-        <div class="precursor-phase" id="phase-presale">
-          <p class="phase-label">Whitelist Presale</p>
-          <p class="phase-date">31st March 2026 &middot; 8:00 PM GMT+1</p>
-          <div class="phase-status">
-            <span class="status-live" id="presale-live" style="display:none;">✦ Mint is Live ✦</span>
-            <span class="status-ended" id="presale-ended" style="display:none;">Whitelist Presale Ended</span>
-            <span id="presale-countdown"></span>
-          </div>
-          <button class="btn-mint phase-btn" disabled style="opacity:0.38;animation:none;cursor:not-allowed;transform:none;filter:none;pointer-events:none;">Mint Entry Token (Whitelist Presale)</button>
-        </div>
-        <div class="precursor-divider"></div>
         <div class="precursor-phase" id="phase-public">
-          <p class="phase-label">Public Phase</p>
-          <p class="phase-date">4th April 2026 &middot; 10:00 AM GMT+1</p>
           <div class="phase-status">
             <span class="status-live" id="public-live" style="display:none;">✦ Mint is Live ✦</span>
             <span id="public-countdown"></span>
           </div>
-          <a href="https://opensea.io/item/ethereum/0x611cca3635b0f05b103031ee8d4f3261633292b4/1" target="_blank" rel="noopener noreferrer" class="btn-public-phase phase-btn">Mint Entry Token (Public Phase)</a>
+          <a href="https://opensea.io/item/ethereum/0x611cca3635b0f05b103031ee8d4f3261633292b4/1" target="_blank" rel="noopener noreferrer" class="btn-public-phase phase-btn">Mint Entry Token</a>
         </div>
       </div>
-    </div>
-
-    <div style="margin-top:1rem;">
-      <a href="https://www.transient.xyz/redemption/ethereum/0x6c7e9d96704f8683e988a7414528d3480b26dbb2" target="_blank" rel="noopener noreferrer" class="btn-token-burn">Burn and Redeem Bronze Token</a>
+      <div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid rgba(201,153,58,0.2);">
+        <a href="https://www.transient.xyz/redemption/ethereum/0x6c7e9d96704f8683e988a7414528d3480b26dbb2" target="_blank" rel="noopener noreferrer" class="btn-token-burn">Burn and Redeem Bronze Token</a>
+      </div>
     </div>
 
     <div style="margin-top:1.2rem;">
@@ -1076,37 +1062,7 @@
       </a>
     </div>
 
-    <script>
-    (function() {
-      var presaleTime = new Date('2026-03-31T20:00:00+01:00').getTime();
-      var presaleEnd  = new Date('2026-04-07T20:00:00+01:00').getTime();
-      var publicTime  = new Date('2026-04-04T09:00:00+01:00').getTime();
-      var publicEnd   = new Date('2026-04-11T10:00:00+01:00').getTime();
-      function pad(n) { return n < 10 ? '0'+n : String(n); }
-      function fmt(diff) {
-        var d=Math.floor(diff/86400000), h=Math.floor((diff%86400000)/3600000),
-            m=Math.floor((diff%3600000)/60000), s=Math.floor((diff%60000)/1000);
-        if(d>0) return pad(d)+'d '+pad(h)+'h '+pad(m)+'m '+pad(s)+'s';
-        if(h>0) return pad(h)+'h '+pad(m)+'m '+pad(s)+'s';
-        return pad(m)+'m '+pad(s)+'s';
-      }
-      var pLive=document.getElementById('presale-live'), pEnded=document.getElementById('presale-ended'),
-          pCd=document.getElementById('presale-countdown'), pubLive=document.getElementById('public-live'),
-          pubCd=document.getElementById('public-countdown');
-      function tick() {
-        var now=Date.now();
-        var dp=presaleTime-now, dpe=presaleEnd-now;
-        if(dp>0){ pCd.textContent=fmt(dp); pCd.style.display='inline'; pLive.style.display='none'; pEnded.style.display='none'; }
-        else if(dpe>0){ pCd.textContent='Ends in '+fmt(dpe); pCd.style.display='inline'; pLive.style.display='inline'; pEnded.style.display='none'; }
-        else{ pCd.style.display='none'; pLive.style.display='none'; pEnded.style.display='inline'; }
-        var dpub=publicTime-now, dpube=publicEnd-now;
-        if(dpub>0){ pubCd.textContent=fmt(dpub); pubCd.style.display='inline'; pubLive.style.display='none'; }
-        else if(dpube>0){ pubCd.textContent='Ends in '+fmt(dpube); pubCd.style.display='inline'; pubLive.style.display='inline'; }
-        else{ pubCd.style.display='none'; pubLive.textContent='Public Mint Ended'; pubLive.style.display='inline'; clearInterval(iv); }
-      }
-      tick(); var iv=setInterval(tick,1000);
-    })();
-    </script>
+
   </section>
 
   <!-- GALLERY -->
