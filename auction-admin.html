@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auction Admin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap');
+
+:root {
+  --clay:      #c4845a;
+  --rust:      #9e4f2e;
+  --sand:      #e8d5b0;
+  --linen:     #f5ede0;
+  --bark:      #4a3228;
+  --moss:      #6b7c5c;
+  --ash:       #8a7060;
+  --ink:       #1e1410;
+  --gold:      #c9993a;
+  --parchment: #ede0c8;
+  --bg:        #1e1510;
+  --bg-alt:    #2a1c14;
+  --text:      #e8d5b0;
+  --text-muted: #9a8070;
+  --divider:   rgba(196,132,90,0.18);
+  --rule:      rgba(196,132,90,0.25);
+  --accent:    #9e4f2e;
+  --success:   #6b7c5c;
+  --warn:      #c9993a;
+  --r: 3px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Crimson Pro', 'Cormorant Garamond', serif;
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+  padding: 48px 20px 80px;
+}
+
+.page { max-width: 660px; margin: 0 auto; }
+
+/* Header */
+.header { border-bottom: 1px solid var(--divider); padding-bottom: 20px; margin-bottom: 36px; }
+.header-eye {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.3em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 8px;
+}
+.header h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2.6rem; font-weight: 300; line-height: 1.05;
+  color: var(--text);
+}
+.header h1 em { font-style: italic; color: var(--clay); }
+.header p {
+  margin-top: 8px; font-family: 'Crimson Pro', serif;
+  font-size: 0.95rem; color: var(--text-muted);
+}
+
+/* Auth gate */
+.auth-gate {
+  background: var(--bg-alt); border: 1px solid var(--divider);
+  border-radius: var(--r); padding: 28px 24px; margin-bottom: 28px;
+}
+.auth-gate p {
+  font-size: 0.88rem; color: var(--text-muted); margin-bottom: 14px;
+}
+.auth-row { display: flex; gap: 10px; }
+.auth-row input {
+  flex: 1; background: var(--bg); border: 1px solid var(--divider);
+  border-radius: var(--r); color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+  padding: 9px 12px; outline: none; transition: border-color .2s;
+}
+.auth-row input:focus { border-color: var(--clay); }
+
+/* Cards */
+.card {
+  background: var(--bg-alt); border: 1px solid var(--divider);
+  border-radius: var(--r); margin-bottom: 16px; overflow: hidden;
+}
+.card-head {
+  padding: 12px 18px; border-bottom: 1px solid var(--divider);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-title {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
+}
+.card-badge { font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.1em; padding: 2px 8px; border-radius: 2px; }
+.badge-live     { background: rgba(107,124,92,0.2); color: var(--moss); border: 1px solid rgba(107,124,92,0.4); }
+.badge-upcoming { background: rgba(201,153,58,0.15); color: var(--gold); border: 1px solid rgba(201,153,58,0.35); }
+.badge-off      { background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid var(--divider); }
+.card-body { padding: 18px; }
+
+/* Fields */
+.field { margin-bottom: 14px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: block; font-family: 'Cinzel', serif;
+  font-size: 0.58rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+}
+.field input, .field textarea, .field select {
+  width: 100%; background: var(--bg); border: 1px solid var(--divider);
+  border-radius: var(--r); color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+  padding: 9px 12px; outline: none; transition: border-color .2s;
+}
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--clay); }
+.field input::placeholder, .field textarea::placeholder { color: rgba(196,132,90,0.3); }
+.field textarea { resize: vertical; min-height: 90px; }
+.field-hint {
+  font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+  color: var(--text-muted); margin-top: 5px; font-style: italic;
+}
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* Status toggle */
+.status-group { display: flex; gap: 6px; }
+.status-btn {
+  flex: 1; padding: 9px;
+  border: 1px solid var(--divider); border-radius: var(--r);
+  background: var(--bg);
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  cursor: pointer; transition: all .18s; color: var(--text-muted);
+}
+.status-btn.active-live {
+  background: rgba(107,124,92,0.15);
+  border-color: rgba(107,124,92,0.5); color: var(--moss);
+}
+.status-btn.active-upcoming {
+  background: rgba(201,153,58,0.12);
+  border-color: rgba(201,153,58,0.4); color: var(--gold);
+}
+.status-btn.active-off {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(196,132,90,0.35); color: var(--text);
+}
+
+/* Buttons */
+.btn {
+  font-family: 'Cinzel', serif; font-size: 0.62rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  padding: 10px 18px; border-radius: var(--r);
+  border: 1px solid; cursor: pointer; transition: all .18s;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary {
+  background: var(--rust); border-color: var(--rust);
+  color: var(--linen); width: 100%; justify-content: center; padding: 13px;
+}
+.btn-primary:hover:not(:disabled) { background: var(--bark); border-color: var(--bark); }
+.btn-outline {
+  background: transparent;
+  border-color: rgba(196,132,90,0.35); color: var(--text-muted);
+}
+.btn-outline:hover { border-color: var(--clay); color: var(--clay); }
+.btn-danger  { background: transparent; border-color: rgba(158,79,46,0.45); color: var(--clay); }
+.btn-danger:hover:not(:disabled)  { background: var(--rust); border-color: var(--rust); color: var(--linen); }
+
+/* Loading overlay */
+.loading-bar {
+  height: 2px; background: var(--divider); border-radius: 1px;
+  overflow: hidden; margin-bottom: 20px; display: none;
+}
+.loading-bar.show { display: block; }
+.loading-fill {
+  height: 100%; width: 0%; background: var(--clay);
+  animation: loading-anim 1.4s ease-in-out infinite;
+}
+@keyframes loading-anim {
+  0%   { width: 0%;   margin-left: 0; }
+  50%  { width: 60%;  margin-left: 20%; }
+  100% { width: 0%;   margin-left: 100%; }
+}
+
+/* Preview bar */
+.preview-bar {
+  background: var(--bg-alt); border: 1px solid var(--divider);
+  border-radius: var(--r); padding: 13px 16px;
+  align-items: center; justify-content: space-between;
+  margin-bottom: 20px; display: none;
+}
+.preview-bar.show { display: flex; }
+.preview-url {
+  font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+  color: var(--text-muted); word-break: break-all;
+}
+
+/* Sync badge */
+.sync-badge {
+  font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.15em;
+  text-transform: uppercase; padding: 3px 8px; border-radius: 2px;
+  border: 1px solid var(--divider); color: var(--text-muted);
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.sync-badge.synced { color: var(--moss); border-color: rgba(107,124,92,0.4); }
+.sync-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--bark); color: var(--sand);
+  border-radius: var(--r); padding: 12px 16px;
+  font-family: 'Crimson Pro', serif; font-size: 0.9rem;
+  max-width: 300px; z-index: 99; display: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  border: 1px solid var(--divider);
+}
+.toast.show { display: block; }
+.toast-title { font-weight: 600; margin-bottom: 3px; }
+.toast-title.ok  { color: #a8d4a0; }
+.toast-title.err { color: var(--clay); }
+
+/* Danger zone */
+.danger-zone {
+  border: 1px solid rgba(158,79,46,0.35);
+  border-radius: var(--r); padding: 16px 18px; margin-top: 32px;
+}
+.danger-title {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 12px;
+}
+
+/* Main content hidden until authed */
+#main-content { display: none; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="header-eye">// Admin Panel</div>
+    <h1>Auction<br><em>Control</em></h1>
+    <p>Configure what collectors see on the auction page. Changes are saved to the server and take effect immediately.</p>
+  </div>
+
+  <!-- Auth gate -->
+  <div class="auth-gate" id="auth-gate">
+    <div class="card-title" style="margin-bottom:10px">Admin password</div>
+    <p>Enter your admin password to load and edit the auction configuration.</p>
+    <div class="auth-row">
+      <input type="password" id="admin-pw" placeholder="••••••••••••" onkeydown="if(event.key==='Enter')authenticate()" />
+      <button class="btn btn-outline" onclick="authenticate()">Unlock →</button>
+    </div>
+  </div>
+
+  <div class="loading-bar" id="loading-bar"><div class="loading-fill"></div></div>
+
+  <!-- Main content (shown after auth) -->
+  <div id="main-content">
+
+    <!-- Status -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Auction status</div>
+        <div class="card-badge badge-off" id="status-badge">Off</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>Collector-facing status</label>
+          <div class="status-group">
+            <button class="status-btn active-off" id="btn-off"      onclick="setStatus('off')">Off</button>
+            <button class="status-btn"             id="btn-upcoming" onclick="setStatus('upcoming')">Upcoming</button>
+            <button class="status-btn"             id="btn-live"     onclick="setStatus('live')">Live</button>
+          </div>
+        </div>
+        <div class="field-hint">
+          <b>Off</b> — landing page only, no auction shown.<br>
+          <b>Upcoming</b> — shows countdown to launch date, no bidding.<br>
+          <b>Live</b> — full auction page with bidding enabled.
+        </div>
+      </div>
+    </div>
+
+    <!-- Auction config -->
+    <div class="card" id="auction-card">
+      <div class="card-head">
+        <div class="card-title">Auction configuration</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>Auction contract address</label>
+          <input id="contract-addr" placeholder="0x…" oninput="onContractInput()" />
+          <div class="field-hint">Your deployed GatedAuction.sol contract address</div>
+        </div>
+
+        <div class="field" id="upcoming-date-field" style="display:none">
+          <label>Launch date &amp; time (for upcoming countdown)</label>
+          <input type="datetime-local" id="launch-date" />
+          <div class="field-hint">Shown on the upcoming auction page as a countdown</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Artwork info -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Artwork information</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>Title</label>
+          <input id="art-title" placeholder="e.g. Àpótí Ọlọ́wẹ̀ — Chapter I" />
+        </div>
+        <div class="field">
+          <label>Artist name</label>
+          <input id="art-artist" placeholder="e.g. Kayode Oyeniyi" />
+        </div>
+        <div class="field">
+          <label>About the artwork</label>
+          <textarea id="art-about" placeholder="Describe the artwork, its inspiration, medium, and significance…"></textarea>
+          <div class="field-hint">Shown in the retractable "About" panel on the auction page</div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Year</label>
+            <input id="art-year" placeholder="2025" />
+          </div>
+          <div class="field">
+            <label>Medium</label>
+            <input id="art-medium" placeholder="e.g. Digital painting" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Custom image URL (optional override)</label>
+          <input id="art-image" placeholder="https://… or ipfs://… — leave blank to auto-fetch from contract" />
+          <div class="field-hint">If blank, the image is pulled from the NFT's tokenURI automatically</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gate info -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Gate token information</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>Gate token name</label>
+          <input id="gate-name" placeholder="e.g. Àpótí Ọlọ́wẹ̀ Editions" />
+          <div class="field-hint">Shown to collectors who are not eligible to bid</div>
+        </div>
+        <div class="field">
+          <label>How to acquire (link or description)</label>
+          <input id="gate-link" placeholder="https://… or e.g. Available on OpenSea" />
+        </div>
+      </div>
+    </div>
+
+    <!-- RPC -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Network</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>RPC URL (optional — uses MetaMask if blank)</label>
+          <input id="rpc-url" placeholder="https://eth-mainnet.g.alchemy.com/v2/…" />
+          <div class="field-hint">Provide a public RPC so collectors without MetaMask can view auction state read-only</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save -->
+    <button class="btn btn-primary" id="save-btn" onclick="saveConfig()">Save &amp; publish</button>
+
+    <!-- Preview bar -->
+    <div class="preview-bar" id="preview-bar" style="margin-top:16px">
+      <div>
+        <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px">Collector page</div>
+        <div class="preview-url" id="preview-url"></div>
+      </div>
+      <a id="preview-link" href="AuctionPage.html" target="_blank" class="btn btn-outline" style="white-space:nowrap;text-decoration:none">Open →</a>
+    </div>
+
+    <!-- Danger zone -->
+    <div class="danger-zone">
+      <div class="danger-title">Danger zone</div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Clear all saved configuration. The collector page will show the landing state.</p>
+      <button class="btn btn-danger" id="clear-btn" onclick="clearConfig()">Clear all configuration</button>
+    </div>
+
+  </div><!-- /main-content -->
+</div><!-- /page -->
+
+<div class="toast" id="toast">
+  <div class="toast-title" id="toast-title"></div>
+  <div id="toast-body" style="font-size:11px;color:rgba(245,240,232,.6)"></div>
+</div>
+
+<script>
+// ─── Config ───────────────────────────────────────────────────────────────────
+// The API endpoint — adjust if your Vercel project uses a custom domain.
+const API_URL = "/api/auction-config";
+
+// Admin password is kept only in memory for the session; never persisted.
+let adminPassword = "";
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+async function authenticate() {
+  const pw = document.getElementById("admin-pw").value;
+  if (!pw) { toast("err", "Password required", "Please enter your admin password"); return; }
+
+  setLoading(true);
+  try {
+    // Verify the password by attempting a POST with no-op data
+    const res = await apiFetch("GET");
+    if (res.status === 401) {
+      toast("err", "Wrong password", "Admin password is incorrect");
+      return;
+    }
+    adminPassword = pw;
+    document.getElementById("auth-gate").style.display = "none";
+    document.getElementById("main-content").style.display = "block";
+    populateForm(res.config);
+    updatePreviewBar();
+    toast("ok", "Unlocked", "Configuration loaded from server");
+  } catch (err) {
+    toast("err", "Connection error", err.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ─── API helpers ──────────────────────────────────────────────────────────────
+
+async function apiFetch(method, body) {
+  const opts = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Password": adminPassword,
+    },
+  };
+  if (body) opts.body = JSON.stringify(body);
+
+  const res = await fetch(API_URL, opts);
+  const json = await res.json();
+  if (!json.ok && res.status !== 401) throw new Error(json.error || "Unknown error");
+  json.status = res.status;
+  return json;
+}
+
+// ─── Populate form from config object ────────────────────────────────────────
+
+function populateForm(cfg) {
+  if (!cfg) return;
+  document.getElementById("contract-addr").value = cfg.contractAddr || "";
+  document.getElementById("art-title").value     = cfg.artTitle     || "";
+  document.getElementById("art-artist").value    = cfg.artArtist    || "";
+  document.getElementById("art-about").value     = cfg.artAbout     || "";
+  document.getElementById("art-year").value      = cfg.artYear      || "";
+  document.getElementById("art-medium").value    = cfg.artMedium    || "";
+  document.getElementById("art-image").value     = cfg.artImage     || "";
+  document.getElementById("gate-name").value     = cfg.gateName     || "";
+  document.getElementById("gate-link").value     = cfg.gateLink     || "";
+  document.getElementById("rpc-url").value       = cfg.rpcUrl       || "";
+  document.getElementById("launch-date").value   = cfg.launchDate   || "";
+  setStatus(cfg.status || "off", false);
+}
+
+// ─── Status toggle ────────────────────────────────────────────────────────────
+
+function setStatus(s, updateUI = true) {
+  const ids = ["off","upcoming","live"];
+  const classes = { off: "active-off", upcoming: "active-upcoming", live: "active-live" };
+  const labels  = { off: "Off", upcoming: "Upcoming", live: "Live" };
+  const badges  = { off: "badge-off", upcoming: "badge-upcoming", live: "badge-live" };
+
+  ids.forEach(id => {
+    const btn = document.getElementById("btn-" + id);
+    btn.className = "status-btn" + (id === s ? " " + classes[id] : "");
+  });
+
+  const badge = document.getElementById("status-badge");
+  badge.textContent = labels[s];
+  badge.className = "card-badge " + badges[s];
+
+  document.getElementById("upcoming-date-field").style.display = s === "upcoming" ? "block" : "none";
+}
+
+// ─── Contract validation ──────────────────────────────────────────────────────
+
+function onContractInput() {
+  const val = document.getElementById("contract-addr").value.trim();
+  document.getElementById("contract-addr").style.borderColor =
+    val && !ethers.isAddress(val) ? "var(--accent)" : "";
+}
+
+// ─── Save ─────────────────────────────────────────────────────────────────────
+
+async function saveConfig() {
+  const contractAddr = document.getElementById("contract-addr").value.trim();
+  if (contractAddr && !ethers.isAddress(contractAddr)) {
+    toast("err", "Invalid address", "Contract address must be a valid 42-char Ethereum address");
+    return;
+  }
+
+  const status = ["live","upcoming","off"].find(s =>
+    document.getElementById("btn-" + s).className.includes("active")
+  ) || "off";
+
+  const cfg = {
+    status,
+    contractAddr,
+    artTitle:   document.getElementById("art-title").value.trim(),
+    artArtist:  document.getElementById("art-artist").value.trim(),
+    artAbout:   document.getElementById("art-about").value.trim(),
+    artYear:    document.getElementById("art-year").value.trim(),
+    artMedium:  document.getElementById("art-medium").value.trim(),
+    artImage:   document.getElementById("art-image").value.trim(),
+    gateName:   document.getElementById("gate-name").value.trim(),
+    gateLink:   document.getElementById("gate-link").value.trim(),
+    rpcUrl:     document.getElementById("rpc-url").value.trim(),
+    launchDate: document.getElementById("launch-date").value,
+  };
+
+  setLoading(true);
+  setBusy(true);
+  try {
+    await apiFetch("POST", cfg);
+    updatePreviewBar();
+    toast("ok", "Saved", "Collector page updated — changes are live");
+  } catch (err) {
+    toast("err", "Save failed", err.message);
+  } finally {
+    setLoading(false);
+    setBusy(false);
+  }
+}
+
+// ─── Clear ────────────────────────────────────────────────────────────────────
+
+async function clearConfig() {
+  if (!confirm("Clear all configuration? The collector page will reset to the landing state.")) return;
+  setLoading(true);
+  setBusy(true);
+  try {
+    const res = await apiFetch("DELETE");
+    populateForm(res.config);
+    document.getElementById("preview-bar").classList.remove("show");
+    toast("ok", "Cleared", "All configuration has been removed");
+  } catch (err) {
+    toast("err", "Clear failed", err.message);
+  } finally {
+    setLoading(false);
+    setBusy(false);
+  }
+}
+
+// ─── Preview bar ──────────────────────────────────────────────────────────────
+
+function updatePreviewBar() {
+  const bar  = document.getElementById("preview-bar");
+  const url  = document.getElementById("preview-url");
+  const link = document.getElementById("preview-link");
+  const fullUrl = window.location.href.replace(/AuctionAdmin\.html.*$/, "AuctionPage.html");
+  url.textContent = fullUrl;
+  link.href = fullUrl;
+  bar.classList.add("show");
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+
+function setLoading(on) {
+  document.getElementById("loading-bar").classList.toggle("show", on);
+}
+
+function setBusy(on) {
+  document.getElementById("save-btn").disabled  = on;
+  document.getElementById("clear-btn").disabled = on;
+}
+
+let toastTimer;
+function toast(type, title, body) {
+  clearTimeout(toastTimer);
+  document.getElementById("toast-title").textContent = title;
+  document.getElementById("toast-title").className   = "toast-title " + type;
+  document.getElementById("toast-body").textContent  = body || "";
+  document.getElementById("toast").classList.add("show");
+  toastTimer = setTimeout(() => document.getElementById("toast").classList.remove("show"), 4500);
+}
+</script>
+</body>
+</html>
