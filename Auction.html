@@ -927,6 +927,17 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           </div>
         </div>
 
+        <!-- Outbid notification opt-in -->
+        <div id="notif-optin" style="display:none;margin-bottom:18px;padding:14px 16px;background:var(--bg-alt);border:1px solid var(--divider);border-radius:3px">
+          <div class="slabel" style="margin-bottom:8px">Outbid notifications</div>
+          <div style="font-family:'Crimson Pro',serif;font-size:0.88rem;color:var(--text-muted);font-style:italic;margin-bottom:10px">Get notified by email and browser alert if someone outbids you.</div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <input id="notif-email" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--divider);border-radius:3px;color:var(--text);font-family:'Crimson Pro',serif;font-size:0.9rem;padding:7px 10px;outline:none;min-width:0"/>
+            <button onclick="registerNotifications()" style="font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;background:var(--moss);color:var(--linen);border:none;border-radius:3px;padding:7px 13px;cursor:pointer;white-space:nowrap;transition:background .2s" onmouseover="this.style.background='#7d9068'" onmouseout="this.style.background='var(--moss)'">Notify me</button>
+          </div>
+          <div id="notif-optin-status" style="font-family:'Crimson Pro',serif;font-size:0.8rem;font-style:italic;color:var(--text-muted)"></div>
+        </div>
+
         <!-- Bid form -->
         <div class="bid-form" id="bid-form" style="display:none">
           <div class="slabel">Place your bid</div>
@@ -1835,6 +1846,8 @@ function aucOnBid(bid, confirmed = false) {
   } else if (!isMine && wasLeading) {
     aucSpeak(AUCTIONEER.onOutbidYou(amt, bid.bidder), "You've been outbid!");
     _shake();
+    // Fire outbid notification for the previous leader
+    _triggerOutbidNotification(prevLeader, amt, bid.bidder);
   } else if (isMine && prevLeader && !isMine) {
     aucSpeak(AUCTIONEER.onYouOutbid(amt, prevLeader), "You're leading 👑");
     _confetti(30);
@@ -2196,6 +2209,7 @@ function initCollectorRoom() {
 function onRoomEligibilityGranted() {
   _roomEligible = true;
   _updateChatInputState();
+  showNotifOptin();
   const KAY = "0x72a04d812494cf3f6880483c6269291ce5751a83";
   if (signerAddress && signerAddress.toLowerCase() === KAY.toLowerCase()) {
     document.getElementById("tab-auctioneer").style.display = "block";
@@ -2206,10 +2220,127 @@ function onRoomEligibilityGranted() {
 function onRoomEligibilityRevoked() {
   _roomEligible = false;
   _updateChatInputState();
+  hideNotifOptin();
   document.getElementById("tab-auctioneer").style.display = "none";
   if (_currentMode === "auctioneer") setMode("collector");
 }
 
-</script>
-</body>
+// ─── Outbid Notification System ──────────────────────────────────────────────
+
+let _pushSubscription = null;
+
+// Show opt-in panel once wallet is eligible
+function showNotifOptin() {
+  const panel = document.getElementById("notif-optin");
+  if (!panel) return;
+  // Check if already registered
+  const saved = localStorage.getItem("notif_wallet_" + (signerAddress || "").toLowerCase());
+  if (saved) {
+    panel.style.display = "block";
+    document.getElementById("notif-optin-status").textContent = "✓ Notifications active for this wallet";
+    document.getElementById("notif-email").value = JSON.parse(saved).email || "";
+    return;
+  }
+  panel.style.display = "block";
+}
+
+function hideNotifOptin() {
+  const panel = document.getElementById("notif-optin");
+  if (panel) panel.style.display = "none";
+}
+
+// Register email + browser push
+async function registerNotifications() {
+  const emailEl  = document.getElementById("notif-email");
+  const statusEl = document.getElementById("notif-optin-status");
+  const email     = emailEl.value.trim();
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    statusEl.style.color = "var(--rust)";
+    statusEl.textContent = "Please enter a valid email address.";
+    return;
+  }
+  if (!signerAddress) {
+    statusEl.style.color = "var(--rust)";
+    statusEl.textContent = "Connect your wallet first.";
+    return;
+  }
+
+  statusEl.style.color = "var(--text-muted)";
+  statusEl.textContent = "Saving…";
+
+  // 1. Store in Supabase
+  try {
+    await _sb.insert("collector_notifications", {
+      wallet_address: signerAddress.toLowerCase(),
+      email,
+      auction_id: _auctionId || cfg.contractAddr || "",
+    });
+  } catch(e) {
+    // Upsert — ignore duplicate key errors
+    if (!e.message?.includes("duplicate") && !e.message?.includes("unique")) {
+      statusEl.style.color = "var(--rust)";
+      statusEl.textContent = "Could not save — " + e.message;
+      return;
+    }
+  }
+
+  // 2. Request browser push permission
+  let pushOk = false;
+  if ("Notification" in window && "serviceWorker" in navigator) {
+    try {
+      const perm = await Notification.requestPermission();
+      pushOk = perm === "granted";
+    } catch(_) {}
+  }
+
+  // 3. Cache locally so we don't prompt again
+  localStorage.setItem("notif_wallet_" + signerAddress.toLowerCase(), JSON.stringify({ email, push: pushOk }));
+
+  statusEl.style.color = "var(--moss)";
+  statusEl.textContent = "✓ You'll be notified by email" + (pushOk ? " and browser alert" : "") + " if outbid.";
+}
+
+// Trigger outbid notification — called from aucOnBid
+async function _triggerOutbidNotification(outbidWallet, newAmt, newBidder) {
+  if (!outbidWallet) return;
+
+  // Browser push — fires immediately if the outbid collector is on the page
+  if (signerAddress && outbidWallet.toLowerCase() === signerAddress.toLowerCase()) {
+    _sendBrowserPush(newAmt, newBidder);
+  }
+
+  // Email — call Vercel serverless function
+  try {
+    await fetch("/api/notify-outbid", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        outbid_wallet:  outbidWallet.toLowerCase(),
+        new_bidder:     newBidder,
+        new_amount:     newAmt,
+        auction_id:     _auctionId || cfg.contractAddr || "",
+        art_title:      cfg.artTitle || "Àpótí Ọlọ́wẹ̀",
+        auction_url:    window.location.href,
+      }),
+    });
+  } catch(_) {}
+}
+
+// Browser push notification
+function _sendBrowserPush(newAmt, newBidder) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  const short = newBidder.slice(0,6) + "…" + newBidder.slice(-4);
+  try {
+    new Notification("You've been outbid — Àpótí Ọlọ́wẹ̀", {
+      body: `${short} placed ${newAmt}. Head back to reclaim your lead.`,
+      icon: "/favicon.ico",
+      badge: "/favicon.ico",
+      tag: "outbid",
+      renotify: true,
+    });
+  } catch(_) {}
+}
+
+
 </html>
