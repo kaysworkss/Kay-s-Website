@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   }
 
   const SUPABASE_URL  = process.env.SUPABASE_URL  || "https://haijshusgcbdexfueunr.supabase.co";
-  const SUPABASE_ANON = process.env.SUPABASE_ANON;
+  const SUPABASE_ANON = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const RESEND_KEY    = process.env.RESEND_API_KEY;
 
   if (!RESEND_KEY || !SUPABASE_ANON) {
