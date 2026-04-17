@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auction</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap');
+
+:root {
+  --clay:      #c4845a;
+  --rust:      #9e4f2e;
+  --sand:      #e8d5b0;
+  --linen:     #f5ede0;
+  --bark:      #4a3228;
+  --moss:      #6b7c5c;
+  --ash:       #8a7060;
+  --ink:       #1e1410;
+  --gold:      #c9993a;
+  --parchment: #ede0c8;
+  /* auction page dark defaults */
+  --bg:        #1e1510;
+  --bg-alt:    #2a1c14;
+  --text:      #e8d5b0;
+  --text-muted: #9a8070;
+  --surface:   rgba(255,255,255,0.04);
+  --divider:   rgba(196,132,90,0.18);
+  --rule:      rgba(196,132,90,0.25);
+  --success:   #6b7c5c;
+  --accent:    #9e4f2e;
+  --r: 3px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Crimson Pro', 'Cormorant Garamond', serif;
+  font-size: 15px;
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ════════════════════════════════
+   LANDING VIEW
+════════════════════════════════ */
+#view-landing {
+  display: none; min-height: 100vh;
+  align-items: center; justify-content: center;
+  flex-direction: column; text-align: center; padding: 60px 24px;
+}
+#view-landing.show { display: flex; }
+
+.landing-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.65rem;
+  letter-spacing: 0.3em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 20px;
+}
+.landing-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(3rem, 8vw, 5.5rem);
+  font-weight: 300; line-height: 1.05;
+  color: var(--text); margin-bottom: 18px;
+}
+.landing-title em { font-style: italic; color: var(--clay); }
+.landing-sub {
+  font-family: 'Crimson Pro', serif; font-size: 1.05rem;
+  color: var(--text-muted); max-width: 400px; margin: 0 auto 32px;
+  line-height: 1.7;
+}
+.landing-rule { width: 40px; height: 1px; background: var(--divider); margin: 0 auto; }
+
+/* ════════════════════════════════
+   UPCOMING VIEW
+════════════════════════════════ */
+#view-upcoming { display: none; min-height: 100vh; }
+#view-upcoming.show { display: block; }
+.upcoming-layout { display: grid; grid-template-columns: 1fr 420px; min-height: 100vh; }
+
+/* ════════════════════════════════
+   LIVE VIEW
+════════════════════════════════ */
+#view-live { display: none; min-height: 100vh; }
+#view-live.show { display: block; }
+.live-layout { display: grid; grid-template-columns: 1fr 400px; min-height: 100vh; }
+
+/* ── Shared: art column ── */
+.art-col {
+  position: sticky; top: 0; height: 100vh;
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--divider);
+  background: var(--bg-alt); overflow: hidden;
+  isolation: isolate;
+}
+
+.art-frame {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 48px; position: relative; overflow: hidden;
+}
+
+.art-placeholder {
+  width: 220px; height: 220px;
+  border: 1px dashed rgba(196,132,90,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
+}
+
+.art-img { max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; display: none; }
+
+.art-info { padding: 20px 24px 26px; border-top: 1px solid var(--divider); }
+
+.art-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 6px;
+}
+.art-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.6rem; font-weight: 600; line-height: 1.15;
+  color: var(--text); letter-spacing: 0.01em;
+}
+.art-artist {
+  font-family: 'Crimson Pro', serif; font-size: 0.9rem;
+  color: var(--text-muted); margin-top: 5px; font-style: italic;
+}
+
+/* About toggle */
+.about-toggle {
+  margin-top: 14px; display: flex; align-items: center;
+  gap: 8px; background: transparent;
+  border: 1px solid rgba(196,132,90,0.3); border-radius: 3px;
+  padding: 7px 12px;
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-muted); cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+  width: 100%; justify-content: space-between;
+}
+.about-toggle:hover { border-color: var(--clay); color: var(--clay); }
+.about-toggle-arrow { transition: transform .25s; }
+.about-toggle.open .about-toggle-arrow { transform: rotate(180deg); }
+
+/* About panel */
+.about-panel {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: var(--bg-alt);
+  border-top: 1px solid var(--divider);
+  padding: 28px 26px 36px;
+  transform: translateY(101%);
+  transition: transform .4s cubic-bezier(.4,0,.2,1);
+  overflow-y: auto;
+  max-height: calc(100% - 60px);
+  z-index: 20;
+}
+.about-panel.open { transform: translateY(0); }
+
+.about-close {
+  position: absolute; top: 14px; right: 16px;
+  background: transparent; border: none; cursor: pointer;
+  font-family: 'Cinzel', serif; font-size: 0.7rem;
+  color: var(--text-muted); letter-spacing: 0.1em;
+  transition: color .15s;
+}
+.about-close:hover { color: var(--clay); }
+
+.about-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.35rem; font-weight: 600;
+  color: var(--text); margin-bottom: 10px;
+}
+.about-meta {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 14px;
+}
+.about-body {
+  font-family: 'Crimson Pro', serif; font-size: 1rem;
+  color: var(--text-muted); line-height: 1.85; white-space: pre-wrap;
+}
+
+/* ── Right bid column ── */
+.bid-col { overflow-y: auto; display: flex; flex-direction: column; background: var(--bg); }
+.bid-inner { padding: 36px 28px 64px; flex: 1; }
+
+/* Wallet row */
+.wallet-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 28px; padding-bottom: 18px;
+  border-bottom: 1px solid var(--divider);
+}
+.wallet-status {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Crimson Pro', serif; font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--divider); transition: .3s; }
+.dot.on  { background: var(--moss); box-shadow: 0 0 4px var(--moss); }
+.dot.err { background: var(--rust); }
+.addr {
+  font-family: 'Crimson Pro', serif; font-size: 0.85rem;
+  color: var(--clay); font-style: italic;
+}
+.wallet-btns { display: flex; gap: 6px; }
+
+/* Section labels */
+.slabel {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 12px;
+}
+
+/* Countdown */
+.countdown { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+.count-cell {
+  background: var(--bg-alt); border: 1px solid var(--divider);
+  padding: 12px 6px 10px; text-align: center; border-radius: 3px;
+}
+.count-num {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2.2rem; font-weight: 600;
+  color: var(--text); line-height: 1;
+}
+.count-label {
+  font-family: 'Cinzel', serif; font-size: 0.55rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-muted); margin-top: 4px;
+}
+.status-line {
+  font-family: 'Crimson Pro', serif; font-size: 0.9rem;
+  color: var(--text-muted); font-style: italic;
+  text-align: center; margin-bottom: 24px;
+}
+.status-line.live     { color: var(--moss); font-style: normal; }
+.status-line.ended    { color: var(--rust); }
+.status-line.settled  { color: var(--moss); font-style: normal; }
+.status-line.upcoming-line { color: var(--gold); }
+
+/* Stats grid */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 24px; }
+.stat-cell {
+  background: var(--bg-alt); border: 1px solid var(--divider);
+  border-radius: 3px; padding: 14px;
+}
+.stat-label {
+  font-family: 'Cinzel', serif; font-size: 0.55rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 5px;
+}
+.stat-val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.7rem; font-weight: 600;
+  color: var(--text); line-height: 1;
+}
+.stat-val.hi { color: var(--clay); }
+.stat-sub {
+  font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+  color: var(--text-muted); margin-top: 4px; font-style: italic;
+}
+
+/* Eligibility */
+.eligibility {
+  padding: 10px 14px; border-radius: 3px;
+  font-family: 'Crimson Pro', serif; font-size: 0.9rem;
+  margin-bottom: 20px; display: none; gap: 10px; align-items: flex-start;
+}
+.eligibility.show { display: flex; }
+.eligibility.yes {
+  background: rgba(107,124,92,0.12);
+  border: 1px solid rgba(107,124,92,0.35);
+  color: var(--moss);
+}
+.eligibility.no {
+  background: rgba(158,79,46,0.1);
+  border: 1px solid rgba(158,79,46,0.3);
+  color: var(--clay);
+}
+.eligibility-icon { flex-shrink: 0; margin-top: 2px; font-size: 0.85rem; }
+.eligibility-detail {
+  font-size: 0.8rem; color: var(--text-muted);
+  margin-top: 3px; font-style: italic;
+}
+
+/* Settled banner */
+.settled-banner {
+  background: rgba(107,124,92,0.1);
+  border: 1px solid rgba(107,124,92,0.3);
+  border-radius: 3px; padding: 16px 18px;
+  margin-bottom: 22px; text-align: center; display: none;
+}
+.settled-banner.show { display: block; }
+.settled-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.4rem; font-weight: 600;
+  color: var(--moss); margin-bottom: 5px;
+}
+.settled-sub {
+  font-family: 'Crimson Pro', serif;
+  font-size: 0.9rem; color: var(--text-muted);
+}
+
+/* Bid form */
+.bid-form { margin-bottom: 26px; }
+.bid-row {
+  display: flex; align-items: stretch;
+  margin-bottom: 10px;
+  border: 1px solid rgba(196,132,90,0.4);
+  border-radius: 3px; overflow: hidden;
+  transition: border-color .2s;
+}
+.bid-row:focus-within { border-color: var(--clay); }
+.bid-input {
+  flex: 1; width: 0; background: var(--bg-alt);
+  border: none; color: var(--text);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2rem; font-weight: 300;
+  padding: 12px 16px; outline: none;
+}
+.bid-input::placeholder { color: rgba(196,132,90,0.3); }
+.bid-eth {
+  background: var(--bg-alt);
+  border-left: 1px solid var(--divider);
+  display: flex; align-items: center; padding: 0 14px;
+  font-family: 'Cinzel', serif; font-size: 0.65rem;
+  letter-spacing: 0.15em; color: var(--text-muted);
+}
+.bid-hint {
+  font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+  color: var(--text-muted); margin-bottom: 14px; font-style: italic;
+}
+
+/* Bid button — matches site btn-mint style */
+@keyframes pulseBid {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(158,79,46,0.5); }
+  50%       { box-shadow: 0 0 0 8px rgba(158,79,46,0); }
+}
+.btn-bid {
+  width: 100%;
+  font-family: 'Cinzel', serif; font-size: 0.7rem;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  background: var(--rust); color: var(--linen);
+  border: none; border-radius: 4px;
+  padding: 0.9rem 2rem; cursor: pointer;
+  transition: background 0.3s, transform 0.2s, filter 0.3s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  animation: pulseBid 2.4s ease-in-out infinite;
+}
+.btn-bid:hover:not(:disabled) {
+  background: #c45a30; filter: brightness(1.15);
+  transform: translateY(-2px); animation: none;
+  box-shadow: 0 4px 22px rgba(196,90,48,0.45);
+}
+.btn-bid:disabled { opacity: .35; cursor: not-allowed; animation: none; }
+
+/* Small secondary button */
+.btn-sm {
+  background: transparent;
+  border: 1px solid rgba(196,132,90,0.3); border-radius: 3px;
+  color: var(--text-muted);
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  padding: 7px 13px; cursor: pointer; transition: all .2s;
+}
+.btn-sm:hover { border-color: var(--clay); color: var(--clay); }
+.btn-sm.danger { border-color: rgba(158,79,46,0.45); color: var(--rust); }
+.btn-sm.danger:hover { background: var(--rust); color: var(--linen); border-color: var(--rust); }
+
+/* Bid history */
+.history-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.history-count  {
+  font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+  color: var(--text-muted); font-style: italic;
+}
+.history-list { display: flex; flex-direction: column; gap: 3px; }
+.history-item {
+  display: grid; grid-template-columns: 1fr auto;
+  align-items: center; gap: 12px;
+  padding: 10px 13px;
+  background: var(--bg-alt);
+  border-radius: 3px; border: 1px solid transparent;
+  animation: slideIn .25s ease;
+}
+@keyframes slideIn { from { opacity:0; transform: translateY(-3px); } to { opacity:1; transform:none; } }
+.history-item.leader {
+  background: rgba(196,132,90,0.06);
+  border-color: rgba(196,132,90,0.22);
+}
+.history-addr {
+  font-family: 'Crimson Pro', serif; font-size: 0.9rem; color: var(--text);
+}
+.history-meta {
+  font-family: 'Crimson Pro', serif; font-size: 0.78rem;
+  color: var(--text-muted); font-style: italic; margin-top: 2px;
+}
+.history-amount {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem; font-weight: 600; white-space: nowrap; color: var(--text);
+}
+.history-item.leader .history-amount { color: var(--clay); }
+.history-empty {
+  padding: 20px; text-align: center;
+  font-family: 'Crimson Pro', serif; font-size: 0.9rem;
+  color: var(--text-muted); font-style: italic;
+  background: var(--bg-alt); border-radius: 3px;
+}
+
+hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
+
+/* Notification */
+.notif {
+  position: fixed; bottom: 22px; right: 22px;
+  background: var(--bark); color: var(--sand);
+  border-radius: 4px; padding: 13px 16px;
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+  max-width: 320px; z-index: 999; display: none;
+  box-shadow: 0 6px 24px rgba(0,0,0,.4);
+  border: 1px solid rgba(196,132,90,0.2);
+  animation: notifIn .2s ease;
+}
+.notif.show { display: block; }
+@keyframes notifIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:none; } }
+.notif-title { font-weight: 600; margin-bottom: 3px; font-size: 0.95rem; }
+.notif-title.ok   { color: #a8d4a0; }
+.notif-title.err  { color: var(--clay); }
+.notif-title.info { color: var(--gold); }
+.notif-body { font-size: 0.82rem; color: rgba(232,213,176,.65); word-break: break-all; }
+
+/* Spinner */
+.spin {
+  width: 13px; height: 13px;
+  border: 1.5px solid rgba(245,237,224,.2);
+  border-top-color: var(--linen);
+  border-radius: 50%; animation: spin .65s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Responsive */
+@media (max-width: 760px) {
+  .live-layout, .upcoming-layout { grid-template-columns: 1fr; }
+  .art-col { position: relative; height: auto; min-height: 280px; }
+  .art-frame { padding: 32px; min-height: 220px; }
+  .count-num { font-size: 1.7rem; }
+  .bid-inner { padding: 24px 18px 48px; }
+}
+/* Loading view */
+#view-loading {
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 18px;
+  background: var(--bg);
+}
+#view-loading.show { display: flex; }
+.loading-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.3em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.loading-bar-wrap {
+  width: 120px; height: 1px; background: var(--divider); border-radius: 1px; overflow: hidden;
+}
+.loading-bar-fill {
+  height: 100%; width: 0; background: var(--clay);
+  animation: loadingSlide 1.4s ease-in-out infinite;
+}
+@keyframes loadingSlide {
+  0%   { width: 0%;  margin-left: 0; }
+  50%  { width: 60%; margin-left: 20%; }
+  100% { width: 0%;  margin-left: 100%; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- ── LOADING VIEW ── -->
+<div id="view-loading">
+  <div class="loading-eyebrow">Loading auction</div>
+  <div class="loading-bar-wrap"><div class="loading-bar-fill"></div></div>
+</div>
+
+<!-- ── LANDING VIEW ── -->
+<div id="view-landing">
+  <div class="landing-eyebrow">Private auction</div>
+  <div class="landing-title" id="landing-title">Coming<br>Soon</div>
+  <div class="landing-sub" id="landing-sub">An exclusive token-gated auction is being prepared. Check back soon.</div>
+  <div class="landing-rule"></div>
+</div>
+
+<!-- ── UPCOMING VIEW ── -->
+<div id="view-upcoming">
+  <div class="upcoming-layout">
+    <div class="art-col" id="upcoming-art-col">
+      <div class="art-frame">
+        <div class="art-placeholder" id="upcoming-placeholder">Artwork preview</div>
+        <img class="art-img" id="upcoming-img" alt="NFT" />
+      </div>
+      <!-- About panel (upcoming) — direct child of art-col so it overlays full column -->
+      <div class="about-panel" id="upcoming-about-panel">
+        <button class="about-close" onclick="closeAbout('upcoming')">✕</button>
+        <div class="about-title" id="upcoming-about-title"></div>
+        <div class="about-meta"  id="upcoming-about-meta"></div>
+        <div class="about-body"  id="upcoming-about-body"></div>
+      </div>
+      <div class="art-info">
+        <div class="art-eyebrow" id="upcoming-art-eyebrow">Upcoming auction</div>
+        <div class="art-name"    id="upcoming-art-name">—</div>
+        <div class="art-artist"  id="upcoming-art-artist"></div>
+        <button class="about-toggle" id="upcoming-about-toggle" onclick="toggleAbout('upcoming')" style="display:none">
+          <span>About this work</span>
+          <span class="about-toggle-arrow">▾</span>
+        </button>
+      </div>
+    </div>
+    <div class="bid-col">
+      <div class="bid-inner">
+        <div style="margin-bottom:28px;padding-bottom:16px;border-bottom:1px solid var(--rule)">
+          <div class="slabel">Upcoming auction</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:500;margin-bottom:4px" id="upcoming-launch-label">Opening soon</div>
+          <div style="font-size:11px;color:var(--text-muted);font-style:italic" id="upcoming-launch-date"></div>
+        </div>
+
+        <div id="upcoming-countdown-section" style="margin-bottom:28px">
+          <div class="slabel">Time until auction opens</div>
+          <div class="countdown">
+            <div class="count-cell"><div class="count-num" id="up-cd-d">00</div><div class="count-label">Days</div></div>
+            <div class="count-cell"><div class="count-num" id="up-cd-h">00</div><div class="count-label">Hrs</div></div>
+            <div class="count-cell"><div class="count-num" id="up-cd-m">00</div><div class="count-label">Min</div></div>
+            <div class="count-cell"><div class="count-num" id="up-cd-s">00</div><div class="count-label">Sec</div></div>
+          </div>
+          <div class="status-line upcoming-line" style="margin-top:8px">Bidding opens at the time above</div>
+        </div>
+
+        <div style="background:var(--bg-alt);border:1px solid var(--rule);border-radius:var(--r);padding:16px">
+          <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">Gate requirement</div>
+          <div style="font-size:13px" id="upcoming-gate-name">Token-gated auction</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px" id="upcoming-gate-detail"></div>
+          <a id="upcoming-gate-link" href="#" target="_blank" style="display:none;margin-top:10px;font-size:11px;color:var(--accent);text-decoration:none">Acquire gate token →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── LIVE VIEW ── -->
+<div id="view-live">
+  <div class="live-layout">
+
+    <!-- Left: artwork -->
+    <div class="art-col">
+      <div class="art-frame">
+        <div class="art-placeholder" id="live-placeholder">Token artwork</div>
+        <img class="art-img" id="live-img" alt="NFT" />
+      </div>
+      <!-- About panel (live) — direct child of art-col so it overlays full column -->
+      <div class="about-panel" id="live-about-panel">
+        <button class="about-close" onclick="closeAbout('live')">✕</button>
+        <div class="about-title" id="live-about-title"></div>
+        <div class="about-meta"  id="live-about-meta"></div>
+        <div class="about-body"  id="live-about-body"></div>
+      </div>
+      <div class="art-info">
+        <div class="art-eyebrow" id="live-art-eyebrow">Live auction</div>
+        <div class="art-name"    id="live-art-name">—</div>
+        <div class="art-artist"  id="live-art-artist"></div>
+        <button class="about-toggle" id="live-about-toggle" onclick="toggleAbout('live')" style="display:none">
+          <span>About this work</span>
+          <span class="about-toggle-arrow">▾</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: bid panel -->
+    <div class="bid-col">
+      <div class="bid-inner">
+
+        <!-- Wallet -->
+        <div class="wallet-row">
+          <div class="wallet-status">
+            <div class="dot" id="dot"></div>
+            <span id="wallet-label">Not connected</span>
+          </div>
+          <div class="wallet-btns">
+            <button class="btn-sm" id="connect-btn" onclick="connectWallet()">Connect wallet</button>
+            <button class="btn-sm danger" id="disconnect-btn" style="display:none" onclick="disconnectWallet()">Disconnect</button>
+          </div>
+        </div>
+
+        <!-- Settled banner -->
+        <div class="settled-banner" id="settled-banner">
+          <div class="settled-title">Auction Settled</div>
+          <div class="settled-sub" id="settled-sub"></div>
+        </div>
+
+        <!-- Countdown -->
+        <div id="countdown-section" style="display:none;margin-bottom:24px">
+          <div class="slabel">Time remaining</div>
+          <div class="countdown">
+            <div class="count-cell"><div class="count-num" id="cd-d">00</div><div class="count-label">Days</div></div>
+            <div class="count-cell"><div class="count-num" id="cd-h">00</div><div class="count-label">Hrs</div></div>
+            <div class="count-cell"><div class="count-num" id="cd-m">00</div><div class="count-label">Min</div></div>
+            <div class="count-cell"><div class="count-num" id="cd-s">00</div><div class="count-label">Sec</div></div>
+          </div>
+          <div class="status-line" id="status-line"></div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid" id="stats-grid" style="display:none">
+          <div class="stat-cell">
+            <div class="stat-label">Current bid</div>
+            <div class="stat-val hi" id="stat-bid">—</div>
+            <div class="stat-sub"    id="stat-bidder">No bids yet</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-label">Minimum bid</div>
+            <div class="stat-val" id="stat-min">—</div>
+            <div class="stat-sub" id="stat-min-sub">Reserve price</div>
+          </div>
+        </div>
+
+        <!-- Eligibility -->
+        <div class="eligibility" id="eligibility">
+          <div class="eligibility-icon" id="elig-icon">✓</div>
+          <div>
+            <div id="elig-text">You are eligible to bid</div>
+            <div class="eligibility-detail" id="elig-detail"></div>
+          </div>
+        </div>
+
+        <!-- Bid form -->
+        <div class="bid-form" id="bid-form" style="display:none">
+          <div class="slabel">Place your bid</div>
+          <div class="bid-row">
+            <input class="bid-input" id="bid-input" type="number" step="0.001" placeholder="0.00" oninput="onBidInput()" />
+            <div class="bid-eth">ETH</div>
+          </div>
+          <div class="bid-hint" id="bid-hint">Enter an amount above the minimum bid</div>
+          <button class="btn-bid" id="bid-btn" onclick="placeBid()" disabled>Place bid</button>
+          <button class="btn-sm" onclick="refreshState()" style="width:100%;margin-top:8px;justify-content:center">↻ Refresh</button>
+        </div>
+
+        <!-- Bid history -->
+        <div id="history-section" style="display:none">
+          <hr>
+          <div class="history-header">
+            <div class="slabel" style="margin:0">Bid history</div>
+            <div class="history-count" id="history-count"></div>
+          </div>
+          <div class="history-list" id="history-list"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Notification -->
+<div class="notif" id="notif">
+  <div class="notif-title" id="notif-title"></div>
+  <div class="notif-body"  id="notif-body"></div>
+</div>
+
+<script>
+// ─── Config — loaded from Vercel API (read-only, no auth needed) ──────────────
+
+const AUCTION_API = "/api/auction-config";
+
+async function loadConfig() {
+  try {
+    const res  = await fetch(AUCTION_API);
+    const json = await res.json();
+    return json.ok ? json.config : {};
+  } catch (e) {
+    console.warn("Could not load auction config from API:", e);
+    return {};
+  }
+}
+
+// ─── ABI ─────────────────────────────────────────────────────────────────────
+
+const AUCTION_ABI = [
+  "function bid() external payable",
+  "function isEligible(address wallet) external view returns (bool)",
+  "function auctionState() external view returns (bool started, bool settled, uint256 endTime, uint256 timeRemaining, address highestBidder, uint256 highestBid, uint256 minNextBid)",
+  "function reservePrice() external view returns (uint256)",
+  "function nftContract() external view returns (address)",
+  "function nftTokenId() external view returns (uint256)",
+  "event BidPlaced(address indexed bidder, uint256 amount)",
+  "event AuctionSettled(address indexed winner, uint256 amount)",
+  "event AuctionExtended(uint256 newEndTime)",
+];
+
+const ERC721_ABI = [
+  "function tokenURI(uint256 tokenId) external view returns (string)",
+  "function name() external view returns (string)",
+];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let cfg = {};
+let provider = null, signer = null, signerAddress = null;
+let auctionContract = null;
+let endTimestamp = 0, isLive = false, minNextBid = 0n;
+let bidHistory = [];
+let countdownTimer = null, pollTimer = null, upcomingTimer = null;
+let notifTimer = null;
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+window.addEventListener("load", async () => {
+  // Show a subtle loading state while we fetch config from the API
+  document.getElementById("view-loading").classList.add("show");
+
+  cfg = await loadConfig();
+  const status = cfg.status || "off";
+
+  document.getElementById("view-loading").classList.remove("show");
+
+  // Show correct view
+  if (status === "live") {
+    document.getElementById("view-live").classList.add("show");
+    await initLive();
+  } else if (status === "upcoming") {
+    document.getElementById("view-upcoming").classList.add("show");
+    initUpcoming();
+  } else {
+    document.getElementById("view-landing").classList.add("show");
+    if (cfg.artTitle) document.getElementById("landing-title").textContent = cfg.artTitle;
+  }
+});
+
+// ─── UPCOMING INIT ────────────────────────────────────────────────────────────
+
+function initUpcoming() {
+  // Artwork info
+  if (cfg.artTitle)  document.getElementById("upcoming-art-name").textContent   = cfg.artTitle;
+  if (cfg.artArtist) document.getElementById("upcoming-art-artist").textContent = cfg.artArtist;
+
+  // About panel
+  populateAbout("upcoming");
+
+  // Gate info
+  if (cfg.gateName) document.getElementById("upcoming-gate-name").textContent = cfg.gateName;
+  if (cfg.gateName) document.getElementById("upcoming-gate-detail").textContent = "You must hold this token to participate in the auction.";
+  if (cfg.gateLink) {
+    const link = document.getElementById("upcoming-gate-link");
+    link.href = cfg.gateLink.startsWith("http") ? cfg.gateLink : "#";
+    link.textContent = cfg.gateLink.startsWith("http") ? "Acquire gate token →" : cfg.gateLink;
+    link.style.display = "block";
+  }
+
+  // Launch date countdown
+  if (cfg.launchDate) {
+    const launch = new Date(cfg.launchDate).getTime();
+    document.getElementById("upcoming-launch-date").textContent = new Date(cfg.launchDate).toLocaleString();
+    upcomingTimer = setInterval(() => tickUpcoming(launch), 1000);
+    tickUpcoming(launch);
+  }
+
+  // Image
+  loadStaticImage("upcoming");
+}
+
+function tickUpcoming(launchMs) {
+  const diff = Math.max(0, Math.floor((launchMs - Date.now()) / 1000));
+  document.getElementById("up-cd-d").textContent = String(Math.floor(diff / 86400)).padStart(2,"0");
+  document.getElementById("up-cd-h").textContent = String(Math.floor((diff % 86400) / 3600)).padStart(2,"0");
+  document.getElementById("up-cd-m").textContent = String(Math.floor((diff % 3600) / 60)).padStart(2,"0");
+  document.getElementById("up-cd-s").textContent = String(diff % 60).padStart(2,"0");
+  if (diff === 0) {
+    clearInterval(upcomingTimer);
+    document.getElementById("upcoming-launch-label").textContent = "Auction is open";
+  }
+}
+
+// ─── LIVE INIT ────────────────────────────────────────────────────────────────
+
+async function initLive() {
+  // Artwork info from config
+  if (cfg.artTitle)  document.getElementById("live-art-name").textContent   = cfg.artTitle;
+  if (cfg.artArtist) document.getElementById("live-art-artist").textContent = cfg.artArtist;
+  populateAbout("live");
+  loadStaticImage("live");
+
+  // Connect read-only provider
+  if (!provider) {
+    if (cfg.rpcUrl) {
+      try { provider = new ethers.JsonRpcProvider(cfg.rpcUrl); } catch(_) {}
+    } else if (window.ethereum) {
+      provider = new ethers.BrowserProvider(window.ethereum);
+    }
+  }
+
+  if (!provider || !cfg.contractAddr || !ethers.isAddress(cfg.contractAddr)) return;
+
+  auctionContract = new ethers.Contract(cfg.contractAddr, AUCTION_ABI, provider);
+
+  await refreshState();
+  await loadBidHistory();
+  if (cfg.contractAddr) await loadNFTMeta();
+
+  clearInterval(countdownTimer);
+  clearInterval(pollTimer);
+  countdownTimer = setInterval(tickCountdown, 1000);
+  pollTimer      = setInterval(refreshState, 15000);
+
+  auctionContract.removeAllListeners();
+  auctionContract.on("BidPlaced",       (bidder, amount, e) => { pushBid(bidder, amount, null, e.log?.transactionHash); refreshState(); });
+  auctionContract.on("AuctionExtended", (newEnd)            => { endTimestamp = Number(newEnd); notify("info","Auction extended","A last-minute bid extended the deadline."); });
+  auctionContract.on("AuctionSettled",  (winner, amount)    => { showSettled(winner, amount); clearInterval(countdownTimer); clearInterval(pollTimer); });
+}
+
+// ─── About panel ──────────────────────────────────────────────────────────────
+
+function populateAbout(view) {
+  const title  = cfg.artTitle  || "";
+  const artist = cfg.artArtist || "";
+  const year   = cfg.artYear   || "";
+  const medium = cfg.artMedium || "";
+  const about  = cfg.artAbout  || "";
+
+  if (!about && !title) return;
+
+  document.getElementById(`${view}-about-title`).textContent = title;
+  const metaParts = [artist, year, medium].filter(Boolean);
+  document.getElementById(`${view}-about-meta`).textContent  = metaParts.join(" · ");
+  document.getElementById(`${view}-about-body`).textContent  = about;
+  document.getElementById(`${view}-about-toggle`).style.display = "flex";
+}
+
+function toggleAbout(view) {
+  const panel  = document.getElementById(`${view}-about-panel`);
+  const toggle = document.getElementById(`${view}-about-toggle`);
+  const open   = panel.classList.toggle("open");
+  toggle.classList.toggle("open", open);
+}
+
+function closeAbout(view) {
+  document.getElementById(`${view}-about-panel`).classList.remove("open");
+  document.getElementById(`${view}-about-toggle`).classList.remove("open");
+}
+
+// ─── Image loading ────────────────────────────────────────────────────────────
+
+function loadStaticImage(view) {
+  if (!cfg.artImage) return;
+  const img  = document.getElementById(`${view}-img`);
+  const phld = document.getElementById(`${view}-placeholder`);
+  const primary = toHTTP(cfg.artImage);
+  // Always show the img element — hide placeholder immediately
+  if (phld) phld.style.display = "none";
+  img.style.display = "block";
+  img.style.width = "100%";
+  img.style.height = "100%";
+  img.style.objectFit = "contain";
+  img.src = primary;
+  img.onerror = () => {
+    // Try fallback gateways one by one
+    const fallbacks = [
+      "https://ipfs.io/ipfs/",
+      "https://gateway.pinata.cloud/ipfs/",
+      "https://nftstorage.link/ipfs/",
+      "https://nftstorage.link/ipfs/",
+    ];
+    const cid = extractCID(cfg.artImage);
+    if (!cid) {
+      // Not IPFS — just show placeholder again
+      img.style.display = "none";
+      if (phld) phld.style.display = "flex";
+      return;
+    }
+    let tried = 0;
+    function tryNext() {
+      if (tried >= fallbacks.length) {
+        img.style.display = "none";
+        if (phld) phld.style.display = "flex";
+        return;
+      }
+      const url = fallbacks[tried++] + cid;
+      if (url === primary) { tryNext(); return; }
+      img.onerror = tryNext;
+      img.src = url;
+    }
+    tryNext();
+  };
+}
+
+function extractCID(url) {
+  if (!url) return null;
+  if (url.startsWith("ipfs://")) return url.slice(7);
+  const gateways = [
+    "https://cloudflare-ipfs.com/ipfs/",
+    "https://gateway.pinata.cloud/ipfs/",
+    "https://ipfs.io/ipfs/",
+    "https://nftstorage.link/ipfs/",
+  ];
+  for (const gw of gateways) {
+    if (url.startsWith(gw)) return url.slice(gw.length);
+  }
+  return null;
+}
+
+async function loadNFTMeta() {
+  try {
+    const nftAddr = await auctionContract.nftContract();
+    const tokenId = await auctionContract.nftTokenId();
+    const nft     = new ethers.Contract(nftAddr, ERC721_ABI, provider);
+
+    // Only overwrite from chain if admin didn't fill in title
+    if (!cfg.artTitle) {
+      try { const n = await nft.name(); if (n) document.getElementById("live-art-name").textContent = n; } catch(_) {}
+    }
+
+    document.getElementById("live-art-eyebrow").textContent = `Live auction · #${tokenId}`;
+
+    // Only pull image from chain if admin didn't provide one
+    if (!cfg.artImage) {
+      try {
+        const uri  = await nft.tokenURI(tokenId);
+        const meta = await fetchJSON(toHTTP(uri));
+        if (meta?.name && !cfg.artTitle) document.getElementById("live-art-name").textContent = meta.name;
+        if (meta?.image) {
+          const img  = document.getElementById("live-img");
+          const phld = document.getElementById("live-placeholder");
+          img.src = toHTTP(meta.image);
+          img.style.display = "block";
+          img.onload = () => phld && (phld.style.display = "none");
+          // Also populate about if not already set
+          if (!cfg.artAbout && meta.description) {
+            document.getElementById("live-about-body").textContent = meta.description;
+          }
+        }
+      } catch(_) {}
+    }
+  } catch(e) { console.log("NFT meta:", e); }
+}
+
+// ─── Wallet ───────────────────────────────────────────────────────────────────
+
+async function connectWallet() {
+  const btn = document.getElementById("connect-btn");
+  btn.textContent = "Connecting…";
+  btn.disabled = true;
+
+  try {
+    if (!window.ethereum) throw new Error("MetaMask not found — open via http://localhost");
+    await window.ethereum.request({ method: "eth_requestAccounts" });
+
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer   = await provider.getSigner();
+    const addr = await signer.getAddress();
+
+    // Signature challenge — forces active approval on every connect
+    const ts  = Date.now();
+    const msg = `Gated Auction — wallet verification\n\nAddress: ${addr}\nTimestamp: ${ts}\n\nThis signature proves wallet ownership. It does not cost gas or authorise any transaction.`;
+    btn.textContent = "Sign to verify…";
+    const sig = await signer.signMessage(msg);
+    const rec = ethers.verifyMessage(msg, sig);
+    if (rec.toLowerCase() !== addr.toLowerCase()) throw new Error("Signature mismatch");
+
+    signerAddress = addr;
+    sessionStorage.removeItem("wallet_disconnected");
+
+    document.getElementById("dot").className = "dot on";
+    document.getElementById("wallet-label").innerHTML = `<span class="addr">${addr.slice(0,6)}…${addr.slice(-4)}</span>`;
+    btn.textContent = "Connected";
+    btn.disabled = true;
+    btn.style.display = "none";
+    document.getElementById("disconnect-btn").style.display = "block";
+
+    window.ethereum.on("accountsChanged", () => location.reload());
+
+    if (auctionContract) {
+      auctionContract = auctionContract.connect(signer);
+      await checkEligibility();
+    }
+
+  } catch(e) {
+    document.getElementById("dot").className = "dot err";
+    document.getElementById("wallet-label").textContent = "Connect failed";
+    btn.textContent = "Connect wallet";
+    btn.disabled = false;
+    const msg = (e.code === 4001 || e.message?.includes("rejected") || e.message?.includes("denied"))
+      ? "Signature rejected — required to verify wallet" : e.message;
+    notify("err", "Connection failed", msg);
+  }
+}
+
+function disconnectWallet() {
+  signer = null;
+  signerAddress = null;
+  sessionStorage.setItem("wallet_disconnected", "true");
+
+  document.getElementById("dot").className = "dot";
+  document.getElementById("wallet-label").textContent = "Not connected";
+  document.getElementById("connect-btn").textContent  = "Connect wallet";
+  document.getElementById("connect-btn").disabled     = false;
+  document.getElementById("connect-btn").style.display    = "block";
+  document.getElementById("disconnect-btn").style.display = "none";
+  document.getElementById("eligibility").className = "eligibility";
+  document.getElementById("bid-btn").disabled = true;
+
+  if (auctionContract && provider) auctionContract = auctionContract.connect(provider);
+  notify("info", "Disconnected", "Reconnecting will require a fresh wallet signature.");
+}
+
+// ─── Auction state ────────────────────────────────────────────────────────────
+
+async function refreshState() {
+  if (!auctionContract) return;
+  try {
+    const s = await auctionContract.auctionState();
+    const { started, settled, endTime, highestBidder, highestBid, minNextBid: mnb } = s;
+
+    endTimestamp = Number(endTime);
+    minNextBid   = mnb;
+    const now    = Math.floor(Date.now() / 1000);
+    isLive       = started && !settled && Number(endTime) > now;
+    const noBids = highestBidder === ethers.ZeroAddress;
+
+    if (started) { document.getElementById("countdown-section").style.display = "block"; tickCountdown(); }
+
+    const sl = document.getElementById("status-line");
+    if (!started)     { sl.textContent = "Auction not yet started"; sl.className = "status-line"; }
+    else if (settled) { sl.textContent = "Auction settled";         sl.className = "status-line settled"; }
+    else if (isLive)  { sl.textContent = "Live — bids open";        sl.className = "status-line live"; }
+    else              { sl.textContent = "Ended — awaiting settlement"; sl.className = "status-line ended"; }
+
+    if (started) {
+      document.getElementById("stats-grid").style.display = "grid";
+      document.getElementById("stat-bid").textContent      = noBids ? "—" : ethers.formatEther(highestBid) + " ETH";
+      document.getElementById("stat-bidder").textContent   = noBids ? "No bids yet" : shortAddr(highestBidder);
+      document.getElementById("stat-min").textContent      = ethers.formatEther(mnb) + " ETH";
+      document.getElementById("stat-min-sub").textContent  = noBids ? "Reserve price" : "Min increment";
+    }
+
+    if (isLive && !settled) {
+      document.getElementById("bid-form").style.display = "block";
+      document.getElementById("history-section").style.display = "block";
+      updateBidHint();
+    } else {
+      document.getElementById("bid-form").style.display = "none";
+    }
+
+    if (started) document.getElementById("history-section").style.display = "block";
+    if (settled) showSettled(highestBidder, highestBid);
+
+  } catch(e) { console.error("refreshState:", e); }
+}
+
+function updateBidHint() {
+  const min = ethers.formatEther(minNextBid);
+  document.getElementById("bid-hint").textContent = `Minimum bid: ${min} ETH`;
+  if (!document.getElementById("bid-input").value) document.getElementById("bid-input").value = min;
+  onBidInput();
+}
+
+function onBidInput() {
+  const val = parseFloat(document.getElementById("bid-input").value || "0");
+  const min = parseFloat(ethers.formatEther(minNextBid));
+  const ok  = document.getElementById("eligibility").classList.contains("yes");
+  document.getElementById("bid-btn").disabled = val < min || !ok || !isLive;
+}
+
+// ─── Countdown ────────────────────────────────────────────────────────────────
+
+function tickCountdown() {
+  const diff = Math.max(0, endTimestamp - Math.floor(Date.now() / 1000));
+  document.getElementById("cd-d").textContent = String(Math.floor(diff / 86400)).padStart(2,"0");
+  document.getElementById("cd-h").textContent = String(Math.floor((diff % 86400) / 3600)).padStart(2,"0");
+  document.getElementById("cd-m").textContent = String(Math.floor((diff % 3600) / 60)).padStart(2,"0");
+  document.getElementById("cd-s").textContent = String(diff % 60).padStart(2,"0");
+  if (diff === 0 && isLive) {
+    isLive = false;
+    document.getElementById("status-line").textContent = "Ended — awaiting settlement";
+    document.getElementById("status-line").className   = "status-line ended";
+    document.getElementById("bid-form").style.display  = "none";
+  }
+}
+
+// ─── Eligibility ──────────────────────────────────────────────────────────────
+
+async function checkEligibility() {
+  if (!auctionContract || !signerAddress) return;
+  try {
+    const ok = await auctionContract.isEligible(signerAddress);
+    const el = document.getElementById("eligibility");
+    el.className = `eligibility show ${ok ? "yes" : "no"}`;
+    document.getElementById("elig-icon").textContent = ok ? "✓" : "✗";
+    document.getElementById("elig-text").textContent = ok
+      ? "You are eligible to bid"
+      : `You don't hold the required token`;
+    document.getElementById("elig-detail").textContent = !ok && cfg.gateName
+      ? `Required: ${cfg.gateName}${cfg.gateLink ? " — " + cfg.gateLink : ""}` : "";
+    onBidInput();
+  } catch(e) { console.log("Eligibility:", e); }
+}
+
+// ─── Bid ─────────────────────────────────────────────────────────────────────
+
+async function placeBid() {
+  if (!signer || !auctionContract) { notify("err","Not connected","Connect wallet first"); return; }
+  const amt = document.getElementById("bid-input").value.trim();
+  if (!amt || isNaN(+amt) || +amt <= 0) { notify("err","Invalid amount","Enter a valid ETH amount"); return; }
+
+  let wei;
+  try { wei = ethers.parseEther(amt); } catch { notify("err","Invalid amount","Could not parse ETH value"); return; }
+  if (wei < minNextBid) { notify("err","Bid too low",`Minimum is ${ethers.formatEther(minNextBid)} ETH`); return; }
+
+  const btn = document.getElementById("bid-btn");
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spin"></div> Submitting…`;
+
+  try {
+    const tx = await auctionContract.connect(signer).bid({ value: wei });
+    notify("info","Bid submitted",`Tx: ${tx.hash.slice(0,12)}…`);
+    await tx.wait();
+    notify("ok","Bid confirmed",`Your bid of ${amt} ETH is now leading`);
+    document.getElementById("bid-input").value = "";
+    await refreshState();
+    await checkEligibility();
+  } catch(e) {
+    notify("err","Bid failed", e?.reason || e?.shortMessage || e?.message || "Transaction failed");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "Place bid";
+    onBidInput();
+  }
+}
+
+// ─── Bid history ─────────────────────────────────────────────────────────────
+
+async function loadBidHistory() {
+  if (!auctionContract || !provider) return;
+  bidHistory = [];
+  try {
+    const cur    = await provider.getBlockNumber();
+    const events = await auctionContract.queryFilter(auctionContract.filters.BidPlaced(), Math.max(0, cur - 50000), cur);
+    for (const e of events) {
+      const block = await provider.getBlock(e.blockNumber).catch(() => null);
+      bidHistory.unshift({ bidder: e.args[0], amount: e.args[1], timestamp: block?.timestamp ?? 0, txHash: e.transactionHash });
+    }
+    renderHistory();
+  } catch(e) { console.log("History:", e); }
+}
+
+function pushBid(bidder, amount, timestamp, txHash) {
+  bidHistory.unshift({ bidder, amount, timestamp: timestamp ?? Math.floor(Date.now() / 1000), txHash });
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById("history-list");
+  document.getElementById("history-count").textContent = bidHistory.length
+    ? `${bidHistory.length} bid${bidHistory.length === 1 ? "" : "s"}` : "";
+
+  if (!bidHistory.length) {
+    list.innerHTML = `<div class="history-empty">No bids yet — be the first</div>`;
+    return;
+  }
+
+  list.innerHTML = bidHistory.map((b, i) => {
+    const isLeader = i === 0;
+    const isMine   = signerAddress && b.bidder.toLowerCase() === signerAddress.toLowerCase();
+    const label    = isMine ? "You" : shortAddr(b.bidder);
+    const date     = b.timestamp ? new Date(b.timestamp * 1000).toLocaleString() : "just now";
+    const link     = b.txHash ? ` <a href="https://etherscan.io/tx/${b.txHash}" target="_blank" style="color:var(--text-muted);text-decoration:none;font-size:10px">↗</a>` : "";
+    return `<div class="history-item ${isLeader ? "leader" : ""}">
+      <div>
+        <div class="history-addr">${label}${isLeader ? " · <span style='color:var(--accent);font-size:10px'>Leading</span>" : ""}</div>
+        <div class="history-meta">${date}${link}</div>
+      </div>
+      <div class="history-amount">${ethers.formatEther(b.amount)} ETH</div>
+    </div>`;
+  }).join("");
+}
+
+// ─── Settled ─────────────────────────────────────────────────────────────────
+
+function showSettled(winner, amount) {
+  const b = document.getElementById("settled-banner");
+  b.classList.add("show");
+  const mine = signerAddress && winner.toLowerCase() === signerAddress.toLowerCase();
+  document.getElementById("settled-sub").textContent = mine
+    ? `Congratulations — you won with ${ethers.formatEther(amount)} ETH`
+    : `Won by ${shortAddr(winner)} for ${ethers.formatEther(amount)} ETH`;
+  document.getElementById("bid-form").style.display = "none";
+}
+
+// ─── Notify ───────────────────────────────────────────────────────────────────
+
+function notify(type, title, body) {
+  clearTimeout(notifTimer);
+  document.getElementById("notif-title").textContent = title;
+  document.getElementById("notif-title").className   = "notif-title " + type;
+  document.getElementById("notif-body").textContent  = body || "";
+  document.getElementById("notif").classList.add("show");
+  notifTimer = setTimeout(() => document.getElementById("notif").classList.remove("show"), 6000);
+}
+
+// ─── Utils ────────────────────────────────────────────────────────────────────
+
+function shortAddr(a) { return !a || a === ethers.ZeroAddress ? "—" : `${a.slice(0,6)}…${a.slice(-4)}`; }
+function toHTTP(url, gateway) {
+  if (!url) return url;
+  const gw = gateway || "https://cloudflare-ipfs.com/ipfs/";
+  if (url.startsWith("ipfs://")) return gw + url.slice(7);
+  if (url.startsWith("ar://"))   return "https://arweave.net/" + url.slice(5);
+  // Strip known gateway prefixes and re-serve through cloudflare for reliability
+  const knownGateways = [
+    "https://gateway.pinata.cloud/ipfs/",
+    "https://ipfs.io/ipfs/",
+    "https://nftstorage.link/ipfs/",
+  ];
+  for (const gw2 of knownGateways) {
+    if (url.startsWith(gw2)) {
+      const cid = url.slice(gw2.length);
+      return "https://cloudflare-ipfs.com/ipfs/" + cid;
+    }
+  }
+  return url;
+}
+async function fetchJSON(url) { const r = await fetch(url); return r.json(); }
+</script>
+</body>
+</html>
