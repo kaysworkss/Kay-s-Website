@@ -845,9 +845,44 @@ function loadStaticImage(view) {
   if (!cfg.artImage) return;
   const img  = document.getElementById(`${view}-img`);
   const phld = document.getElementById(`${view}-placeholder`);
-  img.src = toHTTP(cfg.artImage);
+  const primary = toHTTP(cfg.artImage);
+  img.src = primary;
   img.style.display = "block";
   img.onload = () => phld && (phld.style.display = "none");
+  img.onerror = () => {
+    // Try fallback gateway
+    const fallbacks = [
+      "https://ipfs.io/ipfs/",
+      "https://gateway.pinata.cloud/ipfs/",
+      "https://nftstorage.link/ipfs/",
+    ];
+    const cid = extractCID(cfg.artImage);
+    if (!cid) return;
+    let tried = 0;
+    function tryNext() {
+      if (tried >= fallbacks.length) return;
+      const url = fallbacks[tried++] + cid;
+      if (url === primary) { tryNext(); return; }
+      img.onerror = tryNext;
+      img.src = url;
+    }
+    tryNext();
+  };
+}
+
+function extractCID(url) {
+  if (!url) return null;
+  if (url.startsWith("ipfs://")) return url.slice(7);
+  const gateways = [
+    "https://cloudflare-ipfs.com/ipfs/",
+    "https://gateway.pinata.cloud/ipfs/",
+    "https://ipfs.io/ipfs/",
+    "https://nftstorage.link/ipfs/",
+  ];
+  for (const gw of gateways) {
+    if (url.startsWith(gw)) return url.slice(gw.length);
+  }
+  return null;
 }
 
 async function loadNFTMeta() {
@@ -1151,10 +1186,23 @@ function notify(type, title, body) {
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
 function shortAddr(a) { return !a || a === ethers.ZeroAddress ? "—" : `${a.slice(0,6)}…${a.slice(-4)}`; }
-function toHTTP(url) {
+function toHTTP(url, gateway) {
   if (!url) return url;
-  if (url.startsWith("ipfs://")) return "https://ipfs.io/ipfs/" + url.slice(7);
+  const gw = gateway || "https://cloudflare-ipfs.com/ipfs/";
+  if (url.startsWith("ipfs://")) return gw + url.slice(7);
   if (url.startsWith("ar://"))   return "https://arweave.net/" + url.slice(5);
+  // Strip known gateway prefixes and re-serve through cloudflare for reliability
+  const knownGateways = [
+    "https://gateway.pinata.cloud/ipfs/",
+    "https://ipfs.io/ipfs/",
+    "https://nftstorage.link/ipfs/",
+  ];
+  for (const gw2 of knownGateways) {
+    if (url.startsWith(gw2)) {
+      const cid = url.slice(gw2.length);
+      return "https://cloudflare-ipfs.com/ipfs/" + cid;
+    }
+  }
   return url;
 }
 async function fetchJSON(url) { const r = await fetch(url); return r.json(); }
