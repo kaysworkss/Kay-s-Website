@@ -93,11 +93,12 @@ body {
   display: flex; flex-direction: column;
   border-right: 1px solid var(--divider);
   background: var(--bg-alt); overflow: hidden;
+  isolation: isolate;
 }
 
 .art-frame {
   flex: 1; display: flex; align-items: center; justify-content: center;
-  padding: 48px; position: relative;
+  padding: 48px; position: relative; overflow: hidden;
 }
 
 .art-placeholder {
@@ -108,7 +109,7 @@ body {
   letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
 }
 
-.art-img { max-width: 100%; max-height: 100%; object-fit: contain; display: none; }
+.art-img { max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; display: none; }
 
 .art-info { padding: 20px 24px 26px; border-top: 1px solid var(--divider); }
 
@@ -127,42 +128,44 @@ body {
   color: var(--text-muted); margin-top: 5px; font-style: italic;
 }
 
-/* About toggle */
+/* About toggle — roadmap pill style */
 .about-toggle {
-  margin-top: 14px; display: flex; align-items: center;
-  gap: 8px; background: transparent;
-  border: 1px solid rgba(196,132,90,0.3); border-radius: 3px;
-  padding: 7px 12px;
+  margin-top: 12px;
+  display: inline-flex; align-items: center; gap: 0.4rem;
   font-family: 'Cinzel', serif; font-size: 0.6rem;
-  letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--text-muted); cursor: pointer;
-  transition: border-color 0.2s, color 0.2s;
-  width: 100%; justify-content: space-between;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--clay);
+  border: 1px solid rgba(196,132,90,0.4);
+  padding: 0.25rem 0.7rem;
+  border-radius: 3px;
+  background: rgba(158,79,46,0.08);
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
 }
-.about-toggle:hover { border-color: var(--clay); color: var(--clay); }
-.about-toggle-arrow { transition: transform .25s; }
-.about-toggle.open .about-toggle-arrow { transform: rotate(180deg); }
+.about-toggle:hover { background: rgba(158,79,46,0.18); }
+.about-toggle-icon { font-size: 0.7rem; line-height: 1; }
 
 /* About panel */
+/* about panel — roadmap-style collapsible */
 .about-panel {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  background: var(--bg-alt);
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: max-height 0.6s ease, opacity 0.4s ease;
+}
+.about-panel.open {
+  max-height: 2000px;
+  opacity: 1;
+  pointer-events: auto;
   border-top: 1px solid var(--divider);
+}
+.about-panel-inner {
   padding: 22px 24px 28px;
-  transform: translateY(100%);
-  transition: transform .35s ease;
-  overflow-y: auto; max-height: 68%; z-index: 10;
 }
-.about-panel.open { transform: translateY(0); }
 
-.about-close {
-  position: absolute; top: 14px; right: 16px;
-  background: transparent; border: none; cursor: pointer;
-  font-family: 'Cinzel', serif; font-size: 0.7rem;
-  color: var(--text-muted); letter-spacing: 0.1em;
-  transition: color .15s;
-}
-.about-close:hover { color: var(--clay); }
+.about-close { display: none; }
 
 .about-title {
   font-family: 'Cormorant Garamond', serif;
@@ -490,12 +493,13 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 <div id="view-upcoming">
   <div class="upcoming-layout">
     <div class="art-col" id="upcoming-art-col">
-      <div class="art-frame" style="position:relative">
+      <div class="art-frame">
         <div class="art-placeholder" id="upcoming-placeholder">Artwork preview</div>
         <img class="art-img" id="upcoming-img" alt="NFT" />
-        <!-- About panel (upcoming) -->
-        <div class="about-panel" id="upcoming-about-panel">
-          <button class="about-close" onclick="closeAbout('upcoming')">✕</button>
+      </div>
+      <!-- About panel (upcoming) — direct child of art-col so it overlays full column -->
+      <div class="about-panel" id="upcoming-about-panel">
+        <div class="about-panel-inner">
           <div class="about-title" id="upcoming-about-title"></div>
           <div class="about-meta"  id="upcoming-about-meta"></div>
           <div class="about-body"  id="upcoming-about-body"></div>
@@ -506,8 +510,8 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
         <div class="art-name"    id="upcoming-art-name">—</div>
         <div class="art-artist"  id="upcoming-art-artist"></div>
         <button class="about-toggle" id="upcoming-about-toggle" onclick="toggleAbout('upcoming')" style="display:none">
-          <span>About this work</span>
-          <span class="about-toggle-arrow">▾</span>
+          <span class="about-toggle-icon" id="upcoming-toggle-icon">+</span>
+          <span id="upcoming-toggle-label">About this work</span>
         </button>
       </div>
     </div>
@@ -547,12 +551,13 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 
     <!-- Left: artwork -->
     <div class="art-col">
-      <div class="art-frame" style="position:relative">
+      <div class="art-frame">
         <div class="art-placeholder" id="live-placeholder">Token artwork</div>
         <img class="art-img" id="live-img" alt="NFT" />
-        <!-- About panel -->
-        <div class="about-panel" id="live-about-panel">
-          <button class="about-close" onclick="closeAbout('live')">✕</button>
+      </div>
+      <!-- About panel (live) — direct child of art-col so it overlays full column -->
+      <div class="about-panel" id="live-about-panel">
+        <div class="about-panel-inner">
           <div class="about-title" id="live-about-title"></div>
           <div class="about-meta"  id="live-about-meta"></div>
           <div class="about-body"  id="live-about-body"></div>
@@ -563,8 +568,8 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
         <div class="art-name"    id="live-art-name">—</div>
         <div class="art-artist"  id="live-art-artist"></div>
         <button class="about-toggle" id="live-about-toggle" onclick="toggleAbout('live')" style="display:none">
-          <span>About this work</span>
-          <span class="about-toggle-arrow">▾</span>
+          <span class="about-toggle-icon" id="live-toggle-icon">+</span>
+          <span id="live-toggle-label">About this work</span>
         </button>
       </div>
     </div>
@@ -829,14 +834,27 @@ function populateAbout(view) {
 
 function toggleAbout(view) {
   const panel  = document.getElementById(`${view}-about-panel`);
-  const toggle = document.getElementById(`${view}-about-toggle`);
-  const open   = panel.classList.toggle("open");
-  toggle.classList.toggle("open", open);
+  const icon   = document.getElementById(`${view}-toggle-icon`);
+  const label  = document.getElementById(`${view}-toggle-label`);
+  const isOpen = panel.classList.contains("open");
+  if (isOpen) {
+    panel.classList.remove("open");
+    if (icon)  icon.textContent  = '+';
+    if (label) label.textContent = 'About this work';
+  } else {
+    panel.classList.add("open");
+    if (icon)  icon.textContent  = '−';
+    if (label) label.textContent = 'Collapse';
+  }
 }
 
 function closeAbout(view) {
-  document.getElementById(`${view}-about-panel`).classList.remove("open");
-  document.getElementById(`${view}-about-toggle`).classList.remove("open");
+  const panel = document.getElementById(`${view}-about-panel`);
+  const icon  = document.getElementById(`${view}-toggle-icon`);
+  const label = document.getElementById(`${view}-toggle-label`);
+  panel.classList.remove("open");
+  if (icon)  icon.textContent  = '+';
+  if (label) label.textContent = 'About this work';
 }
 
 // ─── Image loading ────────────────────────────────────────────────────────────
@@ -846,21 +864,35 @@ function loadStaticImage(view) {
   const img  = document.getElementById(`${view}-img`);
   const phld = document.getElementById(`${view}-placeholder`);
   const primary = toHTTP(cfg.artImage);
-  img.src = primary;
+  // Always show the img element — hide placeholder immediately
+  if (phld) phld.style.display = "none";
   img.style.display = "block";
-  img.onload = () => phld && (phld.style.display = "none");
+  img.style.width = "100%";
+  img.style.height = "100%";
+  img.style.objectFit = "contain";
+  img.src = primary;
   img.onerror = () => {
-    // Try fallback gateway
+    // Try fallback gateways one by one
     const fallbacks = [
       "https://ipfs.io/ipfs/",
       "https://gateway.pinata.cloud/ipfs/",
       "https://nftstorage.link/ipfs/",
+      "https://nftstorage.link/ipfs/",
     ];
     const cid = extractCID(cfg.artImage);
-    if (!cid) return;
+    if (!cid) {
+      // Not IPFS — just show placeholder again
+      img.style.display = "none";
+      if (phld) phld.style.display = "flex";
+      return;
+    }
     let tried = 0;
     function tryNext() {
-      if (tried >= fallbacks.length) return;
+      if (tried >= fallbacks.length) {
+        img.style.display = "none";
+        if (phld) phld.style.display = "flex";
+        return;
+      }
       const url = fallbacks[tried++] + cid;
       if (url === primary) { tryNext(); return; }
       img.onerror = tryNext;
