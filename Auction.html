@@ -835,7 +835,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   <div class="mode-toggle-bar">
     <div class="mode-tabs">
       <button class="mode-tab active" id="tab-collector" onclick="setMode('collector')">Collector view</button>
-      <button class="mode-tab" id="tab-auctioneer" onclick="setMode('auctioneer')">Auctioneer mode</button>
+      <button class="mode-tab" id="tab-auctioneer" onclick="setMode('auctioneer')" style="display:none">Auctioneer mode</button>
     </div>
     <div class="online-pill">
       <span class="live-dot"></span>
@@ -2127,13 +2127,18 @@ function _updateChatInputState() {
 }
 
 // ── Auctioneer gavel calls ─────────────────────────────────────────────────────
+const KAY_WALLET = "0x72a04d812494cf3f6880483c6269291ce5751a83";
+function _isKay() { return signerAddress && signerAddress.toLowerCase() === KAY_WALLET.toLowerCase(); }
+
 async function gavCall(type) {
+  if (!_isKay()) return;
   const text = _pickRoom(GAVEL_CALLS[type]);
   await _postMsg("auctioneer", text);
   if (type === "sold") _confetti(80);
 }
 
 async function sendGavelCustom() {
+  if (!_isKay()) return;
   const inp = document.getElementById("gavel-custom-input");
   const val = inp.value.trim();
   if (!val) return;
@@ -2191,12 +2196,18 @@ function initCollectorRoom() {
 function onRoomEligibilityGranted() {
   _roomEligible = true;
   _updateChatInputState();
+  const KAY = "0x72a04d812494cf3f6880483c6269291ce5751a83";
+  if (signerAddress && signerAddress.toLowerCase() === KAY.toLowerCase()) {
+    document.getElementById("tab-auctioneer").style.display = "block";
+  }
 }
 
 // Called from disconnectWallet()
 function onRoomEligibilityRevoked() {
   _roomEligible = false;
   _updateChatInputState();
+  document.getElementById("tab-auctioneer").style.display = "none";
+  if (_currentMode === "auctioneer") setMode("collector");
 }
 
 </script>
