@@ -1,88 +1,54 @@
 /**
  * /api/auction-config
  *
- * GET    — public, returns current auction config as JSON
- * POST   — admin only (X-Admin-Password header), saves new config
- * DELETE — admin only, resets config to defaults
+ * GET  — public, returns the current auction config as JSON
+ * POST — admin only (requires X-Admin-Password header), saves new config
+ * DELETE — admin only, clears config back to default
  *
- * Storage: Vercel Edge Config
- *
- * Required environment variables (set in Vercel Dashboard → Project → Settings → Env Vars):
- *   EDGE_CONFIG              — auto-added by Vercel when you link an Edge Config store
- *   EDGE_CONFIG_ID           — the ID of your Edge Config store (e.g. ecfg_xxxx), found in the store URL
- *   VERCEL_API_TOKEN         — a Vercel API token with read/write scope (create at vercel.com/account/tokens)
- *   ADMIN_PASSWORD           — your chosen admin password
+ * Storage: Vercel KV (Redis). Set KV_REST_API_URL + KV_REST_API_TOKEN
+ * in your Vercel project's Environment Variables.
  */
 
-import { createClient } from "@vercel/edge-config";
+const KV_KEY = "auction_config";
 
-const EDGE_CONFIG_KEY = "auction_config";
+// ── KV helpers (thin wrapper around Vercel KV REST API) ──────────────────────
 
-// ── Edge Config read client ───────────────────────────────────────────────────
-// Uses the EDGE_CONFIG connection string env var (auto-set by Vercel after linking).
-
-const edgeConfig = createClient(process.env.EDGE_CONFIG);
-
-// ── Edge Config write helpers (via Vercel REST API) ───────────────────────────
-// Edge Config is read-optimised; writes go through the Vercel REST API.
-
-async function ecWrite(key, value) {
-  const storeId = process.env.EDGE_CONFIG_ID;
-  const token   = process.env.VERCEL_API_TOKEN;
-
-  if (!storeId || !token) {
-    throw new Error("EDGE_CONFIG_ID or VERCEL_API_TOKEN env var is missing");
-  }
-
+async function kvGet(key) {
   const res = await fetch(
-    `https://api.vercel.com/v1/edge-config/${storeId}/items`,
-    {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        items: [{ operation: "upsert", key, value }],
-      }),
-    }
+    `${process.env.KV_REST_API_URL}/get/${key}`,
+    { headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}` } }
   );
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Edge Config write failed (${res.status}): ${text}`);
-  }
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json.result ?? null; // returns the raw string stored, or null
 }
 
-async function ecDelete(key) {
-  const storeId = process.env.EDGE_CONFIG_ID;
-  const token   = process.env.VERCEL_API_TOKEN;
-
-  if (!storeId || !token) {
-    throw new Error("EDGE_CONFIG_ID or VERCEL_API_TOKEN env var is missing");
-  }
-
+async function kvSet(key, value) {
   const res = await fetch(
-    `https://api.vercel.com/v1/edge-config/${storeId}/items`,
+    `${process.env.KV_REST_API_URL}/set/${key}`,
     {
-      method: "PATCH",
+      method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        items: [{ operation: "delete", key }],
-      }),
+      body: JSON.stringify({ value }),
     }
   );
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Edge Config delete failed (${res.status}): ${text}`);
-  }
+  if (!res.ok) throw new Error(`KV set failed: ${res.status}`);
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
+async function kvDel(key) {
+  await fetch(
+    `${process.env.KV_REST_API_URL}/del/${key}`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}` },
+    }
+  );
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
 
 function isAuthorised(req) {
   const pw = process.env.ADMIN_PASSWORD;
@@ -93,7 +59,7 @@ function isAuthorised(req) {
   return req.headers["x-admin-password"] === pw;
 }
 
-// ── CORS ──────────────────────────────────────────────────────────────────────
+// ── CORS helper ───────────────────────────────────────────────────────────────
 
 function cors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -101,22 +67,22 @@ function cors(res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Admin-Password");
 }
 
-// ── Default config ────────────────────────────────────────────────────────────
+// ── Default / empty config ────────────────────────────────────────────────────
 
 const DEFAULT_CONFIG = {
-  status:       "off",
+  status: "off",
   contractAddr: "",
-  artTitle:     "",
-  artArtist:    "",
-  artAbout:     "",
-  artYear:      "",
-  artMedium:    "",
-  artImage:     "",
-  gateName:     "",
-  gateLink:     "",
-  rpcUrl:       "",
-  launchDate:   "",
-  savedAt:      null,
+  artTitle: "",
+  artArtist: "",
+  artAbout: "",
+  artYear: "",
+  artMedium: "",
+  artImage: "",
+  gateName: "",
+  gateLink: "",
+  rpcUrl: "",
+  launchDate: "",
+  savedAt: null,
 };
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -124,20 +90,24 @@ const DEFAULT_CONFIG = {
 export default async function handler(req, res) {
   cors(res);
 
-  if (req.method === "OPTIONS") return res.status(204).end();
+  // Preflight
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
 
   // ── GET ───────────────────────────────────────────────────────────────────
   if (req.method === "GET") {
     try {
-      const config = await edgeConfig.get(EDGE_CONFIG_KEY);
-      return res.status(200).json({ ok: true, config: config ?? DEFAULT_CONFIG });
+      const raw = await kvGet(KV_KEY);
+      const config = raw ? JSON.parse(raw) : DEFAULT_CONFIG;
+      return res.status(200).json({ ok: true, config });
     } catch (err) {
       console.error("GET error:", err);
       return res.status(500).json({ ok: false, error: "Failed to read config" });
     }
   }
 
-  // ── POST ──────────────────────────────────────────────────────────────────
+  // ── POST ─────────────────────────────────────────────────────────────────
   if (req.method === "POST") {
     if (!isAuthorised(req)) {
       return res.status(401).json({ ok: false, error: "Unauthorized" });
@@ -150,6 +120,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Invalid JSON body" });
     }
 
+    // Whitelist fields — never store arbitrary keys
     const config = {
       status:       ["live", "upcoming", "off"].includes(body.status) ? body.status : "off",
       contractAddr: String(body.contractAddr  || "").slice(0, 100),
@@ -167,7 +138,7 @@ export default async function handler(req, res) {
     };
 
     try {
-      await ecWrite(EDGE_CONFIG_KEY, config);
+      await kvSet(KV_KEY, JSON.stringify(config));
       return res.status(200).json({ ok: true, config });
     } catch (err) {
       console.error("POST error:", err);
@@ -181,7 +152,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ ok: false, error: "Unauthorized" });
     }
     try {
-      await ecDelete(EDGE_CONFIG_KEY);
+      await kvDel(KV_KEY);
       return res.status(200).json({ ok: true, config: DEFAULT_CONFIG });
     } catch (err) {
       console.error("DELETE error:", err);
