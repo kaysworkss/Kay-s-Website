@@ -1863,7 +1863,9 @@ function _renderMsg(row) {
   wrap.dataset.msgId         = row.id;
   wrap.dataset.walletAddress = row.wallet_address || "";
   wrap.dataset.msgType       = row.type || "";
-  const ts = _nowStr();
+  const ts = row.created_at
+    ? new Date(row.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : _nowStr();
 
   const isMyAuc  = row.type === "auctioneer" && _isKay();
   const isMyAddr = row.wallet_address && signerAddress && row.wallet_address.toLowerCase() === signerAddress.toLowerCase();
