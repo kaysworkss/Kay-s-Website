@@ -2125,86 +2125,82 @@ async function _triggerOutbidNotification(outbidWallet, newAmt, newBidder) {
 }
 
 // ─── Presence — live visitor + eligible wallet counts ────────────────────────
-// Uses Supabase JS client loaded from CDN for proper Presence protocol support
+// Uses a dedicated presence table + polling — no extra CDN dependency
 
-let _presenceClient  = null;
-let _presenceRoom    = null;
-let _presenceState   = {};
-let _presenceType    = "visitor";
+let _presenceType     = "visitor";
+let _presenceId       = null;   // row id in presence table
+let _presencePollTimer = null;
+const _PRESENCE_TABLE  = "auction_presence";
+const _HEARTBEAT_MS    = 15000;  // update every 15s so rows stay fresh
+const _EXPIRY_S        = 45;     // rows older than 45s are considered offline
 
-function _initPresence() {
-  // Lazily load Supabase JS client if not already available
-  if (window.supabase) {
-    _setupPresence();
-  } else {
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js";
-    s.onload = _setupPresence;
-    s.onerror = () => console.warn("Presence: could not load Supabase JS client");
-    document.head.appendChild(s);
-  }
+async function _initPresence() {
+  // Insert or upsert our presence row
+  _presenceId = "p_" + Math.random().toString(36).slice(2, 12);
+  await _upsertPresence();
+  // Poll counts every 10s
+  _presencePollTimer = setInterval(_pollPresence, 10000);
+  // Heartbeat every 15s to keep our row fresh
+  setInterval(_upsertPresence, _HEARTBEAT_MS);
+  // Poll immediately
+  _pollPresence();
+  // Remove on tab close
+  window.addEventListener("beforeunload", _removePresence);
 }
 
-function _setupPresence() {
+async function _upsertPresence() {
+  if (!_auctionId) return;
   try {
-    _presenceClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-    const channelName = "presence-" + (_auctionId || "auction");
-    _presenceRoom = _presenceClient.channel(channelName, {
-      config: { presence: { key: "k_" + Math.random().toString(36).slice(2,9) } }
+    await fetch(`${SUPABASE_URL}/rest/v1/${_PRESENCE_TABLE}`, {
+      method: "POST",
+      headers: { ..._sb.headers, "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify({
+        id:         _presenceId,
+        auction_id: _auctionId,
+        role:       _presenceType,
+        wallet:     signerAddress || "",
+        seen_at:    new Date().toISOString(),
+      }),
     });
+  } catch(_) {}
+}
 
-    _presenceRoom
-      .on("presence", { event: "sync" }, () => {
-        const state = _presenceRoom.presenceState();
-        _presenceState = {};
-        for (const [key, entries] of Object.entries(state)) {
-          const meta = entries[0] || {};
-          _presenceState[key] = { type: meta.role || "visitor", wallet: meta.wallet || "" };
-        }
-        _renderPresenceCounts();
-      })
-      .on("presence", { event: "join" }, ({ key, newPresences }) => {
-        const meta = newPresences[0] || {};
-        _presenceState[key] = { type: meta.role || "visitor", wallet: meta.wallet || "" };
-        _renderPresenceCounts();
-      })
-      .on("presence", { event: "leave" }, ({ key }) => {
-        delete _presenceState[key];
-        _renderPresenceCounts();
-      })
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await _presenceRoom.track({ role: _presenceType, wallet: signerAddress || "" });
-        }
-      });
-
-    window.addEventListener("beforeunload", () => {
-      try { _presenceRoom.untrack(); } catch(_) {}
+async function _removePresence() {
+  if (!_presenceId || !_auctionId) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/${_PRESENCE_TABLE}?id=eq.${_presenceId}`, {
+      method: "DELETE", headers: _sb.headers,
     });
-  } catch(e) {
-    console.warn("Presence setup error:", e);
-  }
+  } catch(_) {}
+}
+
+async function _pollPresence() {
+  if (!_auctionId) return;
+  try {
+    // Only count rows updated in the last _EXPIRY_S seconds
+    const cutoff = new Date(Date.now() - _EXPIRY_S * 1000).toISOString();
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${_PRESENCE_TABLE}?auction_id=eq.${encodeURIComponent(_auctionId)}&seen_at=gte.${encodeURIComponent(cutoff)}&select=role`,
+      { headers: _sb.headers }
+    );
+    if (!res.ok) return;
+    const rows = await res.json();
+    const total    = rows.length;
+    const eligible = rows.filter(r => r.role === "eligible").length;
+    _renderPresenceCounts(total, eligible);
+  } catch(_) {}
 }
 
 async function _upgradePresence(type) {
   _presenceType = type;
-  if (_presenceRoom) {
-    try {
-      await _presenceRoom.track({ role: type, wallet: signerAddress || "" });
-    } catch(e) { console.warn("Presence track error:", e); }
-  }
+  await _upsertPresence();
+  _pollPresence();
 }
 
-function _renderPresenceCounts() {
-  const all      = Object.values(_presenceState);
-  const total    = all.length;
-  const eligible = all.filter(p => p.type === "eligible").length;
-
+function _renderPresenceCounts(total, eligible) {
   const countEl = document.getElementById("online-count");
   const eligEl  = document.getElementById("eligible-count");
-
   if (countEl) countEl.textContent = total === 1 ? "1 watching" : `${total} watching`;
-
   if (eligEl) {
     if (_isKay() && eligible > 0) {
       eligEl.style.display = "inline";
