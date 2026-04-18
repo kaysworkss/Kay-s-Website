@@ -1840,7 +1840,9 @@ function _renderMsg(row) {
   if (!feed) return;
   const wrap = document.createElement("div");
   wrap.className = "chat-msg-wrap";
-  wrap.dataset.msgId = row.id;
+  wrap.dataset.msgId         = row.id;
+  wrap.dataset.walletAddress = row.wallet_address || "";
+  wrap.dataset.msgType       = row.type || "";
   const ts = _nowStr();
 
   const isMyAuc  = row.type === "auctioneer" && _isKay();
@@ -1872,8 +1874,25 @@ function _renderMsg(row) {
   feed.scrollTop = feed.scrollHeight;
 }
 
-// ── Delete gesture: long press (mobile) + right-click (desktop) ────────────────
+// ── Re-attach delete gestures after wallet connects ────────────────────────────
+function _reattachDeleteGestures() {
+  const feed = document.getElementById("chat-feed");
+  if (!feed) return;
+  feed.querySelectorAll(".chat-msg-wrap").forEach(wrap => {
+    if (wrap.dataset.deleteAttached) return; // already has gesture
+    const msgId  = wrap.dataset.msgId;
+    const addr   = wrap.dataset.walletAddress || "";
+    const type   = wrap.dataset.msgType || "";
+    const isMyAuc  = type === "auctioneer" && _isKay();
+    const isMyAddr = addr && signerAddress && addr.toLowerCase() === signerAddress.toLowerCase();
+    if (isMyAuc || isMyAddr) {
+      _attachDeleteGesture(wrap, msgId);
+      wrap.dataset.deleteAttached = "1";
+    }
+  });
+}
 function _attachDeleteGesture(wrap, msgId) {
+  wrap.dataset.deleteAttached = "1";
   let pressTimer = null;
 
   // Long press — mobile
@@ -2023,6 +2042,8 @@ function onRoomEligibilityGranted() {
   _updateChatInputState();
   showNotifOptin();
   if (_isKay()) document.getElementById("tab-auctioneer").style.display = "block";
+  // Re-scan all rendered messages now that we know the wallet — attach delete to own messages
+  _reattachDeleteGestures();
 }
 
 function onRoomEligibilityRevoked() {
