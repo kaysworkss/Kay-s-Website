@@ -83,9 +83,10 @@ body {
 /* ════════════════════════════════
    LIVE VIEW
 ════════════════════════════════ */
-#view-live { display: none; min-height: 100vh; }
-#view-live.show { display: block; }
-.live-layout { display: grid; grid-template-columns: 1fr 400px; min-height: 100vh; }
+#view-live { display: none; min-height: 100vh; flex-direction: column; }
+#view-live.show { display: flex; }
+.live-layout { display: grid; grid-template-columns: 1fr 400px; flex: 1; }
+.live-layout-wrap { display: flex; flex: 1; min-height: 0; }
 
 /* ── Shared: art column ── */
 .art-col {
@@ -428,6 +429,100 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 .notif-title.info { color: var(--gold); }
 .notif-body { font-size: 0.82rem; color: rgba(232,213,176,.65); word-break: break-all; }
 
+
+/* ════════════════════════════════
+   AUCTIONEER
+════════════════════════════════ */
+#auctioneer-wrap {
+  margin-bottom: 22px;
+  border: 1px solid var(--divider);
+  border-radius: 4px;
+  background: var(--bg-alt);
+  overflow: hidden;
+}
+#auctioneer-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid transparent;
+  transition: border-color .3s;
+}
+#auctioneer-wrap.speaking #auctioneer-bar {
+  border-bottom-color: var(--divider);
+}
+.auc-avatar {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(196,132,90,0.12);
+  border: 1px solid rgba(196,132,90,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  position: relative;
+}
+.auc-avatar::after {
+  content: '';
+  position: absolute; inset: -3px;
+  border-radius: 50%;
+  border: 1.5px solid var(--clay);
+  opacity: 0;
+  transition: opacity .3s;
+}
+#auctioneer-wrap.speaking .auc-avatar::after {
+  opacity: 1;
+  animation: auc-pulse 1.4s ease-in-out infinite;
+}
+@keyframes auc-pulse {
+  0%,100% { transform: scale(1); opacity: .6; }
+  50%      { transform: scale(1.12); opacity: 1; }
+}
+.auc-name {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--clay);
+}
+.auc-status {
+  font-family: 'Crimson Pro', serif; font-size: 0.78rem;
+  color: var(--text-muted); font-style: italic;
+}
+#auctioneer-bubble {
+  max-height: 0; overflow: hidden;
+  transition: max-height .5s ease, opacity .4s ease;
+  opacity: 0; padding: 0 14px;
+}
+#auctioneer-wrap.speaking #auctioneer-bubble {
+  max-height: 200px; opacity: 1; padding: 12px 14px 14px;
+}
+#auctioneer-text {
+  font-family: 'Crimson Pro', serif; font-size: 1.05rem;
+  color: var(--sand); line-height: 1.65;
+  min-height: 1.65em;
+}
+.auc-cursor {
+  display: inline-block; width: 2px; height: 1em;
+  background: var(--clay); margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: auc-blink .7s step-end infinite;
+}
+@keyframes auc-blink { 0%,100%{opacity:1} 50%{opacity:0} }
+@keyframes auc-shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-5px)} 40%,80%{transform:translateX(5px)} }
+
+/* bid flash effect on history leader */
+@keyframes bid-flash {
+  0%   { background: rgba(196,132,90,0.35); }
+  100% { background: rgba(196,132,90,0.06); }
+}
+.history-item.flash { animation: bid-flash 1.2s ease forwards; }
+
+/* confetti particle */
+.confetti-piece {
+  position: fixed; pointer-events: none; z-index: 9999;
+  width: 7px; height: 7px; border-radius: 1px;
+  animation: confetti-fall linear forwards;
+}
+@keyframes confetti-fall {
+  0%   { transform: translateY(0) rotate(0deg);   opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
 /* Spinner */
 .spin {
   width: 13px; height: 13px;
@@ -445,6 +540,194 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   .count-num { font-size: 1.7rem; }
   .bid-inner { padding: 24px 18px 48px; }
 }
+/* ════════════════════════════════
+   AUCTIONEER MODE TOGGLE
+════════════════════════════════ */
+.mode-toggle-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 28px; border-bottom: 1px solid var(--divider);
+  background: var(--bg-alt);
+}
+.mode-tabs { display: flex; gap: 4px; }
+.mode-tab {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  background: transparent; border: 1px solid rgba(196,132,90,0.2);
+  border-radius: 3px; color: var(--text-muted);
+  padding: 5px 12px; cursor: pointer; transition: all .2s;
+}
+.mode-tab:hover { border-color: var(--clay); color: var(--clay); }
+.mode-tab.active { background: var(--rust); color: var(--linen); border-color: var(--rust); }
+.online-pill {
+  font-family: 'Crimson Pro', serif; font-size: 0.78rem;
+  color: var(--text-muted); font-style: italic;
+  display: flex; align-items: center; gap: 6px;
+}
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--moss); animation: live-blink 1.4s ease-in-out infinite; }
+@keyframes live-blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ════════════════════════════════
+   COLLECTOR ROOM (right panel)
+════════════════════════════════ */
+#collector-room {
+  display: none; flex-direction: column;
+  border-left: 1px solid var(--divider);
+  background: var(--bg); width: 320px; flex-shrink: 0;
+}
+#collector-room.show { display: flex; }
+.room-header {
+  padding: 12px 16px; border-bottom: 1px solid var(--divider);
+  background: var(--bg-alt);
+}
+.room-title {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--clay);
+  margin-bottom: 2px;
+}
+.room-sub {
+  font-family: 'Crimson Pro', serif; font-size: 0.8rem;
+  color: var(--text-muted); font-style: italic;
+  display: flex; align-items: center; gap: 6px;
+}
+
+.chat-feed {
+  flex: 1; overflow-y: auto; padding: 10px 13px;
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 380px; min-height: 200px;
+}
+.chat-msg-wrap { animation: chatFadeUp .22s ease; }
+@keyframes chatFadeUp { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+
+.chat-bubble-collector { display: flex; align-items: flex-start; gap: 8px; }
+.chat-c-avatar {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; margin-top: 1px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Cinzel', serif; font-size: 0.5rem; font-weight: 600;
+}
+.chat-c-bubble {
+  background: var(--bg-alt); border: 1px solid var(--divider);
+  border-radius: 3px; padding: 7px 10px; max-width: 220px;
+}
+.chat-c-name {
+  font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px;
+}
+.chat-c-text {
+  font-family: 'Crimson Pro', serif; font-size: 0.88rem;
+  color: var(--text); line-height: 1.45;
+}
+.chat-c-time {
+  font-family: 'Crimson Pro', serif; font-size: 0.7rem;
+  color: var(--text-muted); font-style: italic; margin-top: 2px;
+}
+
+.chat-bubble-bid .chat-c-bubble {
+  background: rgba(196,132,90,.08); border-color: rgba(196,132,90,.28);
+}
+.chat-bubble-bid .chat-c-text { color: var(--clay); font-weight: 600; }
+
+.chat-bubble-auc { display: flex; align-items: flex-start; gap: 8px; }
+.chat-auc-avatar {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; margin-top: 1px;
+  background: rgba(196,132,90,0.15); border: 1px solid rgba(196,132,90,0.35);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Cinzel', serif; font-size: 0.5rem; color: var(--clay); font-weight: 600;
+}
+.chat-auc-bubble {
+  background: rgba(158,79,46,.1); border: 1px solid rgba(196,132,90,.3);
+  border-radius: 3px; padding: 7px 10px; max-width: 220px;
+}
+.chat-auc-name {
+  font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--clay); margin-bottom: 3px;
+}
+
+.reaction-line {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  padding: 2px 4px;
+}
+.react-pill {
+  background: rgba(196,132,90,.14); border: 1px solid var(--divider);
+  border-radius: 10px; padding: 2px 8px;
+  font-family: 'Crimson Pro', serif; font-size: 0.8rem; color: var(--clay);
+  cursor: pointer; transition: background .15s;
+}
+.react-pill:hover { background: rgba(196,132,90,.28); }
+
+/* Chat input area */
+.chat-input-zone {
+  padding: 11px 13px; border-top: 1px solid var(--divider);
+  background: var(--bg-alt);
+}
+.react-row { display: flex; gap: 5px; margin-bottom: 8px; flex-wrap: wrap; }
+.react-btn-sm {
+  font-size: 15px; background: transparent;
+  border: 1px solid var(--divider); border-radius: 3px;
+  padding: 3px 8px; cursor: pointer; transition: all .15s; line-height: 1.2;
+}
+.react-btn-sm:hover { border-color: var(--clay); transform: scale(1.18); background: rgba(196,132,90,.1); }
+.chat-compose-row { display: flex; gap: 6px; }
+.chat-compose-input {
+  flex: 1; background: var(--bg); border: 1px solid var(--divider);
+  border-radius: 3px; color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.88rem;
+  padding: 6px 10px; outline: none; min-width: 0;
+}
+.chat-compose-input:focus { border-color: var(--clay); }
+.chat-compose-input::placeholder { color: rgba(196,132,90,.3); }
+.chat-send-btn {
+  font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  background: var(--bark); color: var(--sand); border: none;
+  border-radius: 3px; padding: 6px 11px; cursor: pointer;
+  transition: background .2s; white-space: nowrap;
+}
+.chat-send-btn:hover { background: #6a4535; }
+
+/* ════════════════════════════════
+   AUCTIONEER MODE GAVEL PANEL
+════════════════════════════════ */
+#gavel-panel {
+  display: none; border-top: 1px solid var(--divider);
+  background: var(--bg-alt); padding: 16px 20px;
+}
+#gavel-panel.show { display: block; }
+.gavel-title {
+  font-family: 'Cinzel', serif; font-size: 0.56rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 10px;
+}
+.gavel-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.gavel-btn {
+  font-family: 'Cinzel', serif; font-size: 0.54rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  background: transparent; border: 1px solid var(--divider);
+  border-radius: 3px; color: var(--text-muted);
+  padding: 6px 11px; cursor: pointer; transition: all .2s; white-space: nowrap;
+}
+.gavel-btn:hover { border-color: var(--clay); color: var(--clay); background: rgba(196,132,90,.08); }
+.gavel-btn.gold { border-color: rgba(201,153,58,.35); color: var(--gold); }
+.gavel-btn.gold:hover { background: rgba(201,153,58,.1); border-color: var(--gold); }
+.gavel-btn.danger { border-color: rgba(158,79,46,.4); color: var(--rust); }
+.gavel-btn.danger:hover { background: var(--rust); color: var(--linen); border-color: var(--rust); }
+.gavel-custom-row { display: flex; gap: 6px; }
+.gavel-input {
+  flex: 1; background: var(--bg); border: 1px solid var(--divider);
+  border-radius: 3px; color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.88rem;
+  padding: 6px 10px; outline: none; min-width: 0;
+}
+.gavel-input:focus { border-color: var(--clay); }
+.gavel-input::placeholder { color: rgba(196,132,90,.3); }
+.gavel-call-btn {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  background: var(--rust); color: var(--linen); border: none;
+  border-radius: 3px; padding: 6px 13px; cursor: pointer;
+  transition: background .2s; white-space: nowrap;
+}
+.gavel-call-btn:hover { background: #c45a30; }
+
 /* Loading view */
 #view-loading {
   display: none; position: fixed; inset: 0; z-index: 9999;
@@ -547,7 +830,20 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 
 <!-- ── LIVE VIEW ── -->
 <div id="view-live">
-  <div class="live-layout">
+
+  <!-- Mode toggle bar -->
+  <div class="mode-toggle-bar">
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="tab-collector" onclick="setMode('collector')">Collector view</button>
+      <button class="mode-tab" id="tab-auctioneer" onclick="setMode('auctioneer')" style="display:none">Auctioneer mode</button>
+    </div>
+    <div class="online-pill">
+      <span class="live-dot"></span>
+      <span id="online-count">4 collectors watching</span>
+    </div>
+  </div>
+
+  <div class="live-layout" style="flex:1">
 
     <!-- Left: artwork -->
     <div class="art-col">
@@ -631,6 +927,17 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           </div>
         </div>
 
+        <!-- Outbid notification opt-in -->
+        <div id="notif-optin" style="display:none;margin-bottom:18px;padding:14px 16px;background:var(--bg-alt);border:1px solid var(--divider);border-radius:3px">
+          <div class="slabel" style="margin-bottom:8px">Outbid notifications</div>
+          <div style="font-family:'Crimson Pro',serif;font-size:0.88rem;color:var(--text-muted);font-style:italic;margin-bottom:10px">Get notified by email and browser alert if someone outbids you.</div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <input id="notif-email" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--divider);border-radius:3px;color:var(--text);font-family:'Crimson Pro',serif;font-size:0.9rem;padding:7px 10px;outline:none;min-width:0"/>
+            <button onclick="registerNotifications()" style="font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;background:var(--moss);color:var(--linen);border:none;border-radius:3px;padding:7px 13px;cursor:pointer;white-space:nowrap;transition:background .2s" onmouseover="this.style.background='#7d9068'" onmouseout="this.style.background='var(--moss)'">Notify me</button>
+          </div>
+          <div id="notif-optin-status" style="font-family:'Crimson Pro',serif;font-size:0.8rem;font-style:italic;color:var(--text-muted)"></div>
+        </div>
+
         <!-- Bid form -->
         <div class="bid-form" id="bid-form" style="display:none">
           <div class="slabel">Place your bid</div>
@@ -653,9 +960,61 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           <div class="history-list" id="history-list"></div>
         </div>
 
+        <!-- Gavel panel — auctioneer mode -->
+        <div id="gavel-panel">
+          <div class="gavel-title">Your auctioneer calls</div>
+          <div class="gavel-btns">
+            <button class="gavel-btn" onclick="gavCall('open')">Open the floor</button>
+            <button class="gavel-btn" onclick="gavCall('encourage')">Encourage bids</button>
+            <button class="gavel-btn" onclick="gavCall('pressure')">Apply pressure</button>
+            <button class="gavel-btn gold" onclick="gavCall('going1')">Going once…</button>
+            <button class="gavel-btn gold" onclick="gavCall('going2')">Going twice…</button>
+            <button class="gavel-btn danger" onclick="gavCall('sold')">Sold!</button>
+          </div>
+          <div class="slabel" style="margin-bottom:6px">Custom call</div>
+          <div class="gavel-custom-row">
+            <input class="gavel-input" id="gavel-custom-input" placeholder="Speak to the room…" onkeydown="if(event.key==='Enter')sendGavelCustom()"/>
+            <button class="gavel-call-btn" onclick="sendGavelCustom()">Call it</button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
+
+  <!-- Collector room — right side panel -->
+  <div id="collector-room">
+    <div class="room-header">
+      <div class="room-title">Collector room</div>
+      <div class="room-sub">
+        <span class="live-dot"></span>
+        <span id="room-online">Live</span>
+      </div>
+    </div>
+
+    <div class="chat-feed" id="chat-feed"></div>
+
+    <div class="chat-input-zone">
+      <div class="slabel" style="margin-bottom:6px">React</div>
+      <div class="react-row">
+        <button class="react-btn-sm" onclick="sendRoomReaction('🔥')" disabled>🔥</button>
+        <button class="react-btn-sm" onclick="sendRoomReaction('👑')" disabled>👑</button>
+        <button class="react-btn-sm" onclick="sendRoomReaction('💎')" disabled>💎</button>
+        <button class="react-btn-sm" onclick="sendRoomReaction('🫀')" disabled>🫀</button>
+        <button class="react-btn-sm" onclick="sendRoomReaction('⚡')" disabled>⚡</button>
+        <button class="react-btn-sm" onclick="sendRoomReaction('🎯')" disabled>🎯</button>
+      </div>
+      <div class="slabel" style="margin-bottom:6px">Comment as collector</div>
+      <div id="room-locked" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:8px 10px;background:rgba(158,79,46,.08);border:1px solid rgba(158,79,46,.25);border-radius:3px;font-family:'Crimson Pro',serif;font-size:.82rem;color:var(--text-muted);font-style:italic">
+        <span style="font-size:14px">🔒</span> Connect an eligible wallet to join the room
+      </div>
+      <div class="chat-compose-row">
+        <input class="chat-compose-input" id="room-chat-input" placeholder="Connect eligible wallet to chat…" disabled onkeydown="if(event.key==='Enter')sendRoomMsg()"/>
+        <button class="chat-send-btn" onclick="sendRoomMsg()" disabled>Send</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- Notification -->
@@ -724,6 +1083,8 @@ window.addEventListener("load", async () => {
   if (status === "live") {
     document.getElementById("view-live").classList.add("show");
     await initLive();
+    aucOnOpen();
+    initCollectorRoom();
   } else if (status === "upcoming") {
     document.getElementById("view-upcoming").classList.add("show");
     initUpcoming();
@@ -990,6 +1351,7 @@ async function connectWallet() {
     if (auctionContract) {
       auctionContract = auctionContract.connect(signer);
       await checkEligibility();
+      onRoomEligibilityGranted();
     }
 
   } catch(e) {
@@ -1016,6 +1378,7 @@ function disconnectWallet() {
   document.getElementById("disconnect-btn").style.display = "none";
   document.getElementById("eligibility").className = "eligibility";
   document.getElementById("bid-btn").disabled = true;
+  onRoomEligibilityRevoked();
 
   if (auctionContract && provider) auctionContract = auctionContract.connect(provider);
   notify("info", "Disconnected", "Reconnecting will require a fresh wallet signature.");
@@ -1093,6 +1456,8 @@ function tickCountdown() {
     document.getElementById("status-line").className   = "status-line ended";
     document.getElementById("bid-form").style.display  = "none";
   }
+  // Last-minute warnings
+  if (isLive && (diff === 300 || diff === 120 || diff === 60)) aucLastMinutes(diff);
 }
 
 // ─── Eligibility ──────────────────────────────────────────────────────────────
@@ -1134,8 +1499,11 @@ async function placeBid() {
     await tx.wait();
     notify("ok","Bid confirmed",`Your bid of ${amt} ETH is now leading`);
     document.getElementById("bid-input").value = "";
+    const _confirmedBid = { bidder: signerAddress, amount: wei };
     await refreshState();
     await checkEligibility();
+    aucOnBid(_confirmedBid, true);
+    if (window._roomHookBid) window._roomHookBid(signerAddress, wei);
   } catch(e) {
     notify("err","Bid failed", e?.reason || e?.shortMessage || e?.message || "Transaction failed");
   } finally {
@@ -1162,8 +1530,15 @@ async function loadBidHistory() {
 }
 
 function pushBid(bidder, amount, timestamp, txHash) {
-  bidHistory.unshift({ bidder, amount, timestamp: timestamp ?? Math.floor(Date.now() / 1000), txHash });
+  const bid = { bidder, amount, timestamp: timestamp ?? Math.floor(Date.now() / 1000), txHash };
+  bidHistory.unshift(bid);
   renderHistory();
+  // Flash the new leader row
+  const items = document.querySelectorAll(".history-item");
+  if (items[0]) { items[0].classList.remove("flash"); void items[0].offsetWidth; items[0].classList.add("flash"); }
+  aucOnBid(bid, false);
+  // Also surface in collector room
+  if (window._roomHookBid) window._roomHookBid(bidder, amount);
 }
 
 function renderHistory() {
@@ -1202,6 +1577,7 @@ function showSettled(winner, amount) {
     ? `Congratulations — you won with ${ethers.formatEther(amount)} ETH`
     : `Won by ${shortAddr(winner)} for ${ethers.formatEther(amount)} ETH`;
   document.getElementById("bid-form").style.display = "none";
+  aucOnWon(winner, amount);
 }
 
 // ─── Notify ───────────────────────────────────────────────────────────────────
@@ -1238,6 +1614,733 @@ function toHTTP(url, gateway) {
   return url;
 }
 async function fetchJSON(url) { const r = await fetch(url); return r.json(); }
-</script>
-</body>
+
+// ─── Digital Auctioneer ──────────────────────────────────────────────────────
+
+const AUCTIONEER = {
+  // Called when the auction page first loads live
+  onOpen: [
+    "The room is open. The work is before you. Let's begin.",
+    "Ladies and gentlemen — the auction is live. History starts with the first bid.",
+    "The gavel is raised. Who dares to go first?",
+    "Àpótí Ọlọ́wẹ̀ is now live. The floor is yours.",
+  ],
+
+  // First bid ever — special moment
+  onFirstBid(amt, isMine) {
+    if (isMine) return [
+      `YASSS. You just made history — first bid ever, ${amt} ETH. Kay is literally doing a backflip right now.`,
+      `The first bid is in — and it's YOU. ${amt} ETH. The energy just shifted in this room.`,
+      `${amt} ETH from the brave soul who started it all. That's YOU. This moment is yours forever.`,
+    ];
+    return [
+      `FIRST BID IN THE ROOM — ${amt} ETH. Someone just changed the game. Kay is going to do a backflip when he sees this.`,
+      `We have lift-off! ${amt} ETH breaks the silence. The auction is officially alive, people.`,
+      `The first bid lands — ${amt} ETH. Whoever you are, you just made history with this piece.`,
+    ];
+  },
+
+  // Outbid someone (you got outbid)
+  onOutbidYou(newAmt, newAddr) {
+    return [
+      `Ohhh — ${shortAddr(newAddr)} just swept in with ${newAmt} ETH and took your crown. Are you going to let that stand?`,
+      `${newAmt} ETH just knocked you off the top. ${shortAddr(newAddr)} is feeling bold. Your move.`,
+      `You've been outbid. ${newAmt} ETH from ${shortAddr(newAddr)}. The Àpótí doesn't wait for anyone — bid back.`,
+      `${shortAddr(newAddr)} said "not today" and dropped ${newAmt} ETH. This is your moment to respond.`,
+    ];
+  },
+
+  // You just outbid someone else
+  onYouOutbid(amt, prevLeader) {
+    return [
+      `YES. ${amt} ETH — you just dethroned ${shortAddr(prevLeader)}. The room feels it.`,
+      `${amt} ETH! You're leading now. ${shortAddr(prevLeader)} is going to have something to say about that.`,
+      `Crown changed. You're on top at ${amt} ETH. Protect that position.`,
+      `Kay sees your ${amt} ETH and approves. You're the one to beat now.`,
+    ];
+  },
+
+  // New bid from someone else (you're watching)
+  onNewBid(amt, addr, bidCount, isMine) {
+    if (isMine) return [
+      `${amt} ETH — you're still leading. The room is watching.`,
+      `Your ${amt} ETH bid is confirmed. Breathe. You've got this.`,
+      `${amt} ETH, locked in. Kay knows who you are now.`,
+    ];
+    if (bidCount === 2) return [
+      `${shortAddr(addr)} enters at ${amt} ETH. We have competition. Things are getting interesting.`,
+      `Oh — ${shortAddr(addr)} woke up and chose violence. ${amt} ETH. The battle has begun.`,
+    ];
+    if (bidCount >= 10) return [
+      `${amt} ETH from ${shortAddr(addr)}. This auction is on FIRE. ${bidCount} bids deep and climbing.`,
+      `${shortAddr(addr)} is not playing — ${amt} ETH. At ${bidCount} bids, this piece is clearly special.`,
+      `This room has ENERGY. ${amt} ETH from ${shortAddr(addr)}. Kay can feel it from wherever he is.`,
+    ];
+    return [
+      `${shortAddr(addr)} steps up with ${amt} ETH. The pressure is real.`,
+      `${amt} ETH on the table from ${shortAddr(addr)}. Are you watching? Because you should be.`,
+      `Another bid — ${amt} ETH from ${shortAddr(addr)}. This work is not going quietly.`,
+      `${shortAddr(addr)} says ${amt} ETH. The Àpótí demands more. Always more.`,
+    ];
+  },
+
+  // Record-breaking bid (highest ever in session)
+  onRecord(amt) {
+    return [
+      `🔥 NEW RECORD — ${amt} ETH. This is the highest bid we've ever seen for this piece. HISTORIC.`,
+      `${amt} ETH — that is a RECORD. Someone believes in this work deeply. Kay is speechless.`,
+      `We are in uncharted territory. ${amt} ETH. New record. The Àpótí is speaking.`,
+    ];
+  },
+
+  // Bid confirmed on-chain
+  onConfirmed(amt, isMine) {
+    if (isMine) return [
+      `${amt} ETH confirmed on-chain. It's real. It's yours — for now. Don't look away.`,
+      `The blockchain has spoken — ${amt} ETH, confirmed. You're in the lead.`,
+    ];
+    return [
+      `Confirmed on-chain — ${amt} ETH. The record is permanent now.`,
+      `${amt} ETH is locked in. The Ethereum network witnessed it.`,
+    ];
+  },
+
+  // Last 5 minutes
+  onLastMinutes(minsLeft) {
+    if (minsLeft <= 1) return [
+      `FINAL MINUTE. If you want this piece, NOW is the only time. There is no later.`,
+      `60 seconds. That's all that stands between you and this moment passing forever.`,
+      `One minute left. The gavel is hovering. Someone make a move.`,
+    ];
+    return [
+      `${minsLeft} minutes remain. The window is closing. If you've been watching — it's time to act.`,
+      `${minsLeft} minutes on the clock. The Àpótí waits for no one.`,
+      `Final ${minsLeft} minutes. This is where collectors become owners.`,
+    ];
+  },
+
+  // Auction settled — winner
+  onWon(amt) {
+    return [
+      `🏆 SOLD — ${amt} ETH. Congratulations. You own a piece of the Àpótí Ọlọ́wẹ̀ story. Kay made this for someone like you.`,
+      `The gavel falls. ${amt} ETH. It's yours. Welcome to the collection.`,
+      `${amt} ETH — SOLD to the one who wanted it most. Kay salutes you.`,
+    ];
+  },
+
+  // Auction settled — someone else won
+  onSold(winner, amt) {
+    return [
+      `SOLD — ${amt} ETH to ${shortAddr(winner)}. A collector of taste. The Àpótí found its home.`,
+      `The gavel has fallen. ${shortAddr(winner)} wins at ${amt} ETH. History recorded.`,
+      `${amt} ETH. ${shortAddr(winner)} is the new custodian. Congratulations from Kay and this entire room.`,
+    ];
+  },
+
+  // Idle — no bids for a while
+  onIdle(bidCount) {
+    if (bidCount === 0) return [
+      `The room is quiet. The work is waiting. Someone needs to start this conversation.`,
+      `No bids yet. This is rare. This is your moment. First bid writes the first chapter.`,
+      `The Àpótí Ọlọ́wẹ̀ sits patiently. It has waited this long. But the clock hasn't.`,
+    ];
+    return [
+      `The room has gone quiet. ${bidCount} bid${bidCount===1?'':'s'} so far — but this piece deserves more.`,
+      `Silence. After ${bidCount} bid${bidCount===1?'':'s'}, no one wants to move? The next bid could be the one that wins it.`,
+      `Watching and waiting. ${bidCount} bid${bidCount===1?'':'s'} in. The auction is still very much alive.`,
+    ];
+  },
+};
+
+// ─── Auctioneer state ─────────────────────────────────────────────────────────
+let _aucTyping   = null;
+let _aucIdle     = null;
+let _aucLastBid  = 0;
+let _aucPrevHigh = 0n;
+let _aucPrevLeader = null;
+let _aucSessionHigh = 0n;
+let _aucOpened   = false;
+
+function _pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function aucSpeak(lines, status) {
+  const wrap   = document.getElementById("auctioneer-wrap");
+  const bubble = document.getElementById("auctioneer-bubble");
+  const textEl = document.getElementById("auctioneer-text");
+  const statEl = document.getElementById("auc-status");
+  if (!wrap) return;
+
+  wrap.style.display = "block";
+  if (status) statEl.textContent = status;
+
+  const msg = _pick(Array.isArray(lines) ? lines : [lines]);
+
+  // Cancel previous typing
+  clearTimeout(_aucTyping);
+  wrap.classList.remove("speaking");
+  void wrap.offsetWidth; // force reflow
+
+  wrap.classList.add("speaking");
+  textEl.textContent = "";
+  textEl.innerHTML   = '<span class="auc-cursor"></span>';
+
+  let i = 0;
+  function type() {
+    if (i < msg.length) {
+      textEl.innerHTML = msg.slice(0, ++i) + '<span class="auc-cursor"></span>';
+      _aucTyping = setTimeout(type, 28 + Math.random() * 18);
+    } else {
+      textEl.textContent = msg;
+    }
+  }
+  type();
+
+  // Auto-collapse after delay
+  clearTimeout(_aucIdle);
+  _aucIdle = setTimeout(() => {
+    wrap.classList.remove("speaking");
+    if (statEl) statEl.textContent = "Watching the room…";
+    _startIdleCheck();
+  }, Math.max(6000, msg.length * 60));
+}
+
+function _startIdleCheck() {
+  clearTimeout(_aucIdle);
+  _aucIdle = setTimeout(() => {
+    if (Date.now() - _aucLastBid > 90000 && isLive && document.getElementById("auctioneer-wrap")?.style.display !== "none") {
+      aucSpeak(AUCTIONEER.onIdle(bidHistory.length), "Stirring the room…");
+    }
+    _startIdleCheck();
+  }, 90000);
+}
+
+function aucOnOpen() {
+  if (_aucOpened) return;
+  _aucOpened = true;
+  setTimeout(() => aucSpeak(AUCTIONEER.onOpen, "The auction is live"), 1200);
+  _startIdleCheck();
+}
+
+function aucOnBid(bid, confirmed = false) {
+  _aucLastBid = Date.now();
+  clearTimeout(_aucIdle);
+
+  const amt     = ethers.formatEther(bid.amount) + " ETH";
+  const isMine  = signerAddress && bid.bidder.toLowerCase() === signerAddress.toLowerCase();
+  const isFirst = bidHistory.length === 1;
+  const isRecord = bid.amount > _aucSessionHigh;
+  const prevLeader = _aucPrevLeader;
+  const wasLeading = prevLeader && signerAddress && prevLeader.toLowerCase() === signerAddress.toLowerCase();
+
+  if (isRecord) _aucSessionHigh = bid.amount;
+
+  if (confirmed) {
+    aucSpeak(AUCTIONEER.onConfirmed(amt, isMine), "Bid confirmed ✓");
+    _confetti(isMine ? 60 : 20);
+  } else if (isFirst) {
+    aucSpeak(AUCTIONEER.onFirstBid(amt, isMine), "First bid! 🎉");
+    _confetti(40);
+  } else if (isRecord) {
+    aucSpeak(AUCTIONEER.onRecord(amt), "New record 🔥");
+    _confetti(80);
+  } else if (!isMine && wasLeading) {
+    aucSpeak(AUCTIONEER.onOutbidYou(amt, bid.bidder), "You've been outbid!");
+    _shake();
+    // Fire outbid notification for the previous leader
+    _triggerOutbidNotification(prevLeader, amt, bid.bidder);
+  } else if (isMine && prevLeader && !isMine) {
+    aucSpeak(AUCTIONEER.onYouOutbid(amt, prevLeader), "You're leading 👑");
+    _confetti(30);
+  } else {
+    aucSpeak(AUCTIONEER.onNewBid(amt, bid.bidder, bidHistory.length, isMine), "New bid");
+  }
+
+  _aucPrevLeader = bid.bidder;
+  _aucPrevHigh   = bid.amount;
+
+  _startIdleCheck();
+}
+
+function aucOnWon(winner, amount) {
+  const amt    = ethers.formatEther(amount) + " ETH";
+  const isMine = signerAddress && winner.toLowerCase() === signerAddress.toLowerCase();
+  if (isMine) {
+    aucSpeak(AUCTIONEER.onWon(amt), "Sold! 🏆");
+    _confetti(120);
+  } else {
+    aucSpeak(AUCTIONEER.onSold(winner, amt), "Sold!");
+  }
+}
+
+function aucLastMinutes(secsLeft) {
+  const mins = Math.ceil(secsLeft / 60);
+  aucSpeak(AUCTIONEER.onLastMinutes(mins), `${mins}min remaining ⏳`);
+}
+
+// ─── Confetti ─────────────────────────────────────────────────────────────────
+function _confetti(count = 30) {
+  const colors = ["#c9993a","#c4845a","#e8d5b0","#6b7c5c","#9e4f2e","#f5ede0"];
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const el = document.createElement("div");
+      el.className = "confetti-piece";
+      el.style.left     = Math.random() * 100 + "vw";
+      el.style.top      = "-10px";
+      el.style.background = colors[Math.floor(Math.random() * colors.length)];
+      el.style.transform  = `rotate(${Math.random()*360}deg)`;
+      el.style.animationDuration = (1.5 + Math.random() * 2) + "s";
+      el.style.animationDelay   = (Math.random() * 0.6) + "s";
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 4000);
+    }, i * 18);
+  }
+}
+
+// ─── Shake (outbid alert) ─────────────────────────────────────────────────────
+function _shake() {
+  const wrap = document.getElementById("auctioneer-wrap");
+  if (!wrap) return;
+  wrap.style.animation = "none";
+  void wrap.offsetWidth;
+  wrap.style.animation = "auc-shake .4s ease";
+  setTimeout(() => wrap.style.animation = "", 500);
+}
+
+// ─── Auctioneer Mode & Collector Room (Supabase-backed) ──────────────────────
+
+const SUPABASE_URL  = "https://haijshusgcbdexfueunr.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhaWpzaHVzZ2NiZGV4ZnVldW5yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NTIyNTgsImV4cCI6MjA5MTUyODI1OH0.og3RtGfKWMw5F00fU8ZfEopLy3x7k_k7DUhr6FPPiKg";
+
+// Supabase REST helpers — no SDK needed, pure fetch
+const _sb = {
+  headers: { "apikey": SUPABASE_ANON, "Authorization": "Bearer " + SUPABASE_ANON, "Content-Type": "application/json" },
+
+  async select(table, query = "") {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, { headers: _sb.headers });
+    return res.ok ? res.json() : [];
+  },
+
+  async insert(table, row) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: "POST",
+      headers: { ..._sb.headers, "Prefer": "return=representation" },
+      body: JSON.stringify(row),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Insert failed"); }
+    return res.json();
+  },
+
+  // Realtime via Supabase Realtime WebSocket (postgres_changes)
+  subscribeInserts(table, onRow) {
+    const wsUrl = SUPABASE_URL.replace("https://", "wss://") + "/realtime/v1/websocket?apikey=" + SUPABASE_ANON + "&vsn=1.0.0";
+    const ws = new WebSocket(wsUrl);
+    const topic = `realtime:public:${table}`;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ topic, event: "phx_join", payload: { config: { broadcast: { self: true }, postgres_changes: [{ event: "INSERT", schema: "public", table }] } }, ref: "1" }));
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.event === "postgres_changes" && msg.payload?.data?.record) {
+          onRow(msg.payload.data.record);
+        }
+        // Heartbeat
+        if (msg.event === "phx_reply" && msg.ref === "1") {
+          setInterval(() => ws.send(JSON.stringify({ topic: "phoenix", event: "heartbeat", payload: {}, ref: "hb" })), 20000);
+        }
+      } catch (_) {}
+    };
+
+    ws.onerror = () => console.warn("Collector room: realtime WS error");
+    return ws;
+  },
+};
+
+// ── State ──────────────────────────────────────────────────────────────────────
+let _currentMode  = "collector";
+let _roomEligible = false;   // true once wallet connected + isEligible passes
+let _auctionId    = null;    // set from cfg.auctionId or contract address — scopes messages to this auction
+let _realtimeWS   = null;
+let _seenMsgIds   = new Set();
+
+// ── Gavel call lines ───────────────────────────────────────────────────────────
+const GAVEL_CALLS = {
+  open:[
+    "The room is open. Àpótí Ọlọ́wẹ̀ is before you. Let the first bid write the first chapter.",
+    "Ladies and gentlemen — the floor is yours. Who dares to go first?",
+    "The gavel is raised. This is the moment. Begin.",
+    "We open now. Kay's work has found its moment. The floor is yours.",
+  ],
+  encourage:[
+    "The work is patient. The clock is not. Someone needs to step forward.",
+    "I see the room watching. That watching tells me someone wants this. Bid it.",
+    "The Àpótí Ọlọ́wẹ̀ was made to be owned by someone who truly sees. Do you see it?",
+    "Every minute of silence is a minute lost. Who moves first?",
+  ],
+  pressure:[
+    "The lead is getting comfortable. Comfortable leads win auctions. Challenge it.",
+    "We have one bid holding the room. One. Who else wants to be part of this story?",
+    "The clock is moving whether you act or not. The question is — will you?",
+    "There are collectors in this room who haven't moved yet. I can see them. Act.",
+  ],
+  going1:[
+    "Going once — at the current bid. Last chance to enter.",
+    "Going once… The gavel is rising. This is your final warning.",
+    "Going once. One collector stands between this piece and its new home.",
+  ],
+  going2:[
+    "Going twice. The room has had its chance. One more moment…",
+    "Twice now. The lead holds. Anyone? Anyone at all?",
+    "Going twice… silence speaks. Make it loud before I bring this down.",
+  ],
+  sold:[
+    "SOLD! The gavel falls. Àpótí Ọlọ́wẹ̀ has found its custodian. Kay salutes you.",
+    "And that is SOLD. History recorded on-chain. Congratulations to our winner.",
+    "SOLD at the current bid. A beautiful close to a beautiful auction. Kay is honoured.",
+  ],
+};
+
+// ── UI helpers ─────────────────────────────────────────────────────────────────
+function _nowStr() { return new Date().toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }); }
+function _pickRoom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function _addrColor(addr) {
+  // Deterministic warm palette from address checksum
+  const palette = ["#c4845a","#c9993a","#6b7c5c","#8a7060","#9e4f2e","#b07d4a"];
+  let n = 0; for (let i = 0; i < Math.min(addr.length, 8); i++) n += addr.charCodeAt(i);
+  return palette[n % palette.length];
+}
+function _initials(addr) { return addr.slice(2,4).toUpperCase(); }
+
+function _renderMsg(row) {
+  // Deduplicate
+  if (_seenMsgIds.has(row.id)) return;
+  _seenMsgIds.add(row.id);
+
+  const feed = document.getElementById("chat-feed");
+  if (!feed) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "chat-msg-wrap";
+  const ts = _nowStr();
+
+  if (row.type === "auctioneer") {
+    wrap.innerHTML = `<div class="chat-bubble-auc">
+      <div class="chat-auc-avatar">KA</div>
+      <div class="chat-auc-bubble">
+        <div class="chat-auc-name">Kay · Auctioneer</div>
+        <div class="chat-c-text" style="color:#e8d5b0">${_esc(row.message)}</div>
+        <div class="chat-c-time">${ts}</div>
+      </div></div>`;
+  } else if (row.type === "reaction") {
+    // Group reactions — find existing pill for this emoji or append new
+    const emoji = row.message;
+    const existing = feed.querySelector(`.react-pill[data-emoji="${emoji}"]`);
+    if (existing) {
+      const count = parseInt(existing.dataset.count || "1") + 1;
+      existing.dataset.count = count;
+      existing.textContent = `${emoji} ${count}`;
+      feed.scrollTop = feed.scrollHeight;
+      return;
+    }
+    wrap.innerHTML = `<div class="reaction-line">
+      <span class="react-pill" data-emoji="${emoji}" data-count="1">${emoji} 1</span>
+    </div>`;
+  } else {
+    // Regular collector message
+    const addr  = row.wallet_address || "0x????";
+    const short = addr.slice(0,6) + "…" + addr.slice(-4);
+    const color = _addrColor(addr);
+    const init  = _initials(addr);
+    const isMe  = signerAddress && addr.toLowerCase() === signerAddress.toLowerCase();
+    const badge = row.is_bid
+      ? `<span style="font-family:'Cinzel',serif;font-size:.46rem;letter-spacing:.12em;text-transform:uppercase;background:rgba(107,124,92,.15);border:1px solid rgba(107,124,92,.35);border-radius:3px;padding:1px 5px;color:#6b7c5c;margin-left:5px">Bid</span>` : "";
+    const bubbleStyle = row.is_bid ? "background:rgba(196,132,90,.08);border-color:rgba(196,132,90,.28);" : "";
+    const textStyle   = row.is_bid ? "color:var(--clay);font-weight:600;" : "";
+    wrap.innerHTML = `<div class="chat-bubble-collector" style="${isMe ? "flex-direction:row-reverse" : ""}">
+      <div class="chat-c-avatar" style="background:${color}22;color:${color}">${init}</div>
+      <div class="chat-c-bubble" style="${bubbleStyle}${isMe ? "text-align:right;" : ""}">
+        <div class="chat-c-name" style="color:${color}">${isMe ? "You" : short}${badge}</div>
+        <div class="chat-c-text" style="${textStyle}">${_esc(row.message)}</div>
+        <div class="chat-c-time">${ts}</div>
+      </div></div>`;
+  }
+
+  feed.appendChild(wrap);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function _esc(str) {
+  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// ── Load history from Supabase ─────────────────────────────────────────────────
+async function _loadHistory() {
+  if (!_auctionId) return;
+  const rows = await _sb.select(
+    "collector_messages",
+    `auction_id=eq.${encodeURIComponent(_auctionId)}&order=created_at.asc&limit=100`
+  );
+  if (Array.isArray(rows)) rows.forEach(_renderMsg);
+}
+
+// ── Subscribe to new messages via Realtime ─────────────────────────────────────
+function _subscribeRoom() {
+  if (_realtimeWS) { try { _realtimeWS.close(); } catch(_) {} }
+  _realtimeWS = _sb.subscribeInserts("collector_messages", (row) => {
+    if (row.auction_id === _auctionId) _renderMsg(row);
+  });
+}
+
+// ── Write a message to Supabase ────────────────────────────────────────────────
+async function _postMsg(type, message, isBid = false) {
+  if (!_auctionId) return;
+  try {
+    await _sb.insert("collector_messages", {
+      auction_id:     _auctionId,
+      wallet_address: type === "auctioneer" ? "auctioneer" : (signerAddress || "unknown"),
+      type,
+      message,
+      is_bid:         isBid,
+    });
+  } catch(e) {
+    notify("err", "Chat error", e.message);
+  }
+}
+
+// ── Mode toggle ────────────────────────────────────────────────────────────────
+function setMode(mode) {
+  _currentMode = mode;
+  document.getElementById("tab-collector").classList.toggle("active", mode === "collector");
+  document.getElementById("tab-auctioneer").classList.toggle("active", mode === "auctioneer");
+  document.getElementById("collector-room").classList.toggle("show", true);
+  document.getElementById("gavel-panel").classList.toggle("show", mode === "auctioneer");
+  _updateChatInputState();
+}
+
+// ── Enable/disable chat input based on eligibility ─────────────────────────────
+function _updateChatInputState() {
+  const input   = document.getElementById("room-chat-input");
+  const sendBtn = document.querySelector(".chat-send-btn");
+  const locked  = document.getElementById("room-locked");
+  const reacts  = document.querySelectorAll(".react-btn-sm");
+
+  if (_roomEligible) {
+    if (input)   { input.disabled = false; input.placeholder = "Write as a collector…"; }
+    if (sendBtn) sendBtn.disabled = false;
+    if (locked)  locked.style.display = "none";
+    reacts.forEach(b => b.disabled = false);
+  } else {
+    if (input)   { input.disabled = true; input.placeholder = "Connect eligible wallet to chat…"; }
+    if (sendBtn) sendBtn.disabled = true;
+    if (locked)  locked.style.display = "flex";
+    reacts.forEach(b => b.disabled = true);
+  }
+}
+
+// ── Auctioneer gavel calls ─────────────────────────────────────────────────────
+const KAY_WALLET = "0x72a04d812494cf3f6880483c6269291ce5751a83";
+function _isKay() { return signerAddress && signerAddress.toLowerCase() === KAY_WALLET.toLowerCase(); }
+
+async function gavCall(type) {
+  if (!_isKay()) return;
+  const text = _pickRoom(GAVEL_CALLS[type]);
+  await _postMsg("auctioneer", text);
+  if (type === "sold") _confetti(80);
+}
+
+async function sendGavelCustom() {
+  if (!_isKay()) return;
+  const inp = document.getElementById("gavel-custom-input");
+  const val = inp.value.trim();
+  if (!val) return;
+  inp.value = "";
+  await _postMsg("auctioneer", val);
+}
+
+// ── Collector message ──────────────────────────────────────────────────────────
+async function sendRoomMsg() {
+  if (!_roomEligible) return;
+  const inp = document.getElementById("room-chat-input");
+  const val = inp.value.trim();
+  if (!val || val.length > 280) return;
+  inp.value = "";
+  inp.disabled = true;
+  await _postMsg("collector", val);
+  inp.disabled = false;
+  inp.focus();
+}
+
+// ── Reactions ──────────────────────────────────────────────────────────────────
+async function sendRoomReaction(emoji) {
+  if (!_roomEligible) return;
+  await _postMsg("reaction", emoji);
+}
+
+// ── Surface on-chain bids in collector room ────────────────────────────────────
+window._roomHookBid = async function(bidder, amount) {
+  const short  = bidder.slice(0,6) + "…" + bidder.slice(-4);
+  const amtStr = typeof amount === "bigint" ? ethers.formatEther(amount) + " ETH" : amount;
+  await _postMsg("collector", amtStr, true);
+  // Override wallet_address properly via a direct insert
+  if (!_auctionId) return;
+  try {
+    await _sb.insert("collector_messages", {
+      auction_id: _auctionId, wallet_address: bidder,
+      type: "collector", message: amtStr, is_bid: true,
+    });
+  } catch(_) {}
+};
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+function initCollectorRoom() {
+  // Auction ID = contract address (scopes chat to this auction deployment)
+  // Falls back to a config key or date string so it always has something
+  _auctionId = cfg.contractAddr || cfg.auctionId || new Date().toISOString().slice(0,10);
+
+  setMode("collector");
+  _updateChatInputState();
+  _loadHistory();
+  _subscribeRoom();
+}
+
+// Called from connectWallet() after eligibility confirmed
+function onRoomEligibilityGranted() {
+  _roomEligible = true;
+  _updateChatInputState();
+  showNotifOptin();
+  const KAY = "0x72a04d812494cf3f6880483c6269291ce5751a83";
+  if (signerAddress && signerAddress.toLowerCase() === KAY.toLowerCase()) {
+    document.getElementById("tab-auctioneer").style.display = "block";
+  }
+}
+
+// Called from disconnectWallet()
+function onRoomEligibilityRevoked() {
+  _roomEligible = false;
+  _updateChatInputState();
+  hideNotifOptin();
+  document.getElementById("tab-auctioneer").style.display = "none";
+  if (_currentMode === "auctioneer") setMode("collector");
+}
+
+// ─── Outbid Notification System ──────────────────────────────────────────────
+
+let _pushSubscription = null;
+
+// Show opt-in panel once wallet is eligible
+function showNotifOptin() {
+  const panel = document.getElementById("notif-optin");
+  if (!panel) return;
+  // Check if already registered
+  const saved = localStorage.getItem("notif_wallet_" + (signerAddress || "").toLowerCase());
+  if (saved) {
+    panel.style.display = "block";
+    document.getElementById("notif-optin-status").textContent = "✓ Notifications active for this wallet";
+    document.getElementById("notif-email").value = JSON.parse(saved).email || "";
+    return;
+  }
+  panel.style.display = "block";
+}
+
+function hideNotifOptin() {
+  const panel = document.getElementById("notif-optin");
+  if (panel) panel.style.display = "none";
+}
+
+// Register email + browser push
+async function registerNotifications() {
+  const emailEl  = document.getElementById("notif-email");
+  const statusEl = document.getElementById("notif-optin-status");
+  const email     = emailEl.value.trim();
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    statusEl.style.color = "var(--rust)";
+    statusEl.textContent = "Please enter a valid email address.";
+    return;
+  }
+  if (!signerAddress) {
+    statusEl.style.color = "var(--rust)";
+    statusEl.textContent = "Connect your wallet first.";
+    return;
+  }
+
+  statusEl.style.color = "var(--text-muted)";
+  statusEl.textContent = "Saving…";
+
+  // 1. Store in Supabase
+  try {
+    await _sb.insert("collector_notifications", {
+      wallet_address: signerAddress.toLowerCase(),
+      email,
+      auction_id: _auctionId || cfg.contractAddr || "",
+    });
+  } catch(e) {
+    // Upsert — ignore duplicate key errors
+    if (!e.message?.includes("duplicate") && !e.message?.includes("unique")) {
+      statusEl.style.color = "var(--rust)";
+      statusEl.textContent = "Could not save — " + e.message;
+      return;
+    }
+  }
+
+  // 2. Request browser push permission
+  let pushOk = false;
+  if ("Notification" in window && "serviceWorker" in navigator) {
+    try {
+      const perm = await Notification.requestPermission();
+      pushOk = perm === "granted";
+    } catch(_) {}
+  }
+
+  // 3. Cache locally so we don't prompt again
+  localStorage.setItem("notif_wallet_" + signerAddress.toLowerCase(), JSON.stringify({ email, push: pushOk }));
+
+  statusEl.style.color = "var(--moss)";
+  statusEl.textContent = "✓ You'll be notified by email" + (pushOk ? " and browser alert" : "") + " if outbid.";
+}
+
+// Trigger outbid notification — called from aucOnBid
+async function _triggerOutbidNotification(outbidWallet, newAmt, newBidder) {
+  if (!outbidWallet) return;
+
+  // Browser push — fires immediately if the outbid collector is on the page
+  if (signerAddress && outbidWallet.toLowerCase() === signerAddress.toLowerCase()) {
+    _sendBrowserPush(newAmt, newBidder);
+  }
+
+  // Email — call Vercel serverless function
+  try {
+    await fetch("/api/notify-outbid", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        outbid_wallet:  outbidWallet.toLowerCase(),
+        new_bidder:     newBidder,
+        new_amount:     newAmt,
+        auction_id:     _auctionId || cfg.contractAddr || "",
+        art_title:      cfg.artTitle || "Àpótí Ọlọ́wẹ̀",
+        auction_url:    window.location.href,
+      }),
+    });
+  } catch(_) {}
+}
+
+// Browser push notification
+function _sendBrowserPush(newAmt, newBidder) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  const short = newBidder.slice(0,6) + "…" + newBidder.slice(-4);
+  try {
+    new Notification("You've been outbid — Àpótí Ọlọ́wẹ̀", {
+      body: `${short} placed ${newAmt}. Head back to reclaim your lead.`,
+      icon: "/favicon.ico",
+      badge: "/favicon.ico",
+      tag: "outbid",
+      renotify: true,
+    });
+  } catch(_) {}
+}
+
+
 </html>
