@@ -725,7 +725,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
       <button class="mode-tab active" id="tab-collector" onclick="setMode('collector')">Collector view</button>
       <button class="mode-tab" id="tab-auctioneer" onclick="setMode('auctioneer')" style="display:none">Auctioneer mode</button>
     </div>
-    <div class="online-pill"><span class="live-dot"></span><span id="online-count">Live</span></div>
+    <div class="online-pill"><span class="live-dot"></span><span id="online-count">Live</span><span id="eligible-count" style="display:none;margin-left:4px;padding:1px 7px;background:rgba(107,124,92,.15);border:1px solid rgba(107,124,92,.3);border-radius:10px;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:.12em;text-transform:uppercase;color:var(--moss)"></span></div>
   </div>
 
   <div id="live-flex-wrap" style="display:flex;flex:1">
@@ -2055,6 +2055,7 @@ function initCollectorRoom() {
   _updateChatInputState();
   _loadHistory();
   _subscribeRoom();
+  _initPresence();
 }
 
 function onRoomEligibilityGranted() {
@@ -2062,8 +2063,8 @@ function onRoomEligibilityGranted() {
   _updateChatInputState();
   showNotifOptin();
   if (_isKay()) document.getElementById("tab-auctioneer").style.display = "block";
-  // Re-scan all rendered messages now that we know the wallet — attach delete to own messages
   _reattachDeleteGestures();
+  _upgradePresence("eligible");
 }
 
 function onRoomEligibilityRevoked() {
@@ -2072,6 +2073,7 @@ function onRoomEligibilityRevoked() {
   hideNotifOptin();
   document.getElementById("tab-auctioneer").style.display = "none";
   if (_currentMode === "auctioneer") setMode("collector");
+  _upgradePresence("visitor");
 }
 
 // ── Notifications ──────────────────────────────────────────────────────────────
@@ -2120,6 +2122,122 @@ async function _triggerOutbidNotification(outbidWallet, newAmt, newBidder) {
       body: JSON.stringify({ outbid_wallet: outbidWallet.toLowerCase(), new_bidder: newBidder, new_amount: newAmt, auction_id: _auctionId||"", art_title: cfg.artTitle||"Igbaradi", auction_url: window.location.href }),
     });
   } catch(_) {}
+}
+
+// ─── Presence — live visitor + eligible wallet counts ────────────────────────
+
+let _presenceChannel = null;
+let _presenceKey     = null;  // unique key for this browser tab
+
+function _initPresence() {
+  // Generate a unique key for this tab session
+  _presenceKey = "visitor_" + Math.random().toString(36).slice(2, 10);
+
+  const wsUrl = SUPABASE_URL.replace("https://", "wss://") + "/realtime/v1/websocket?apikey=" + SUPABASE_ANON + "&vsn=1.0.0";
+  const ws    = new WebSocket(wsUrl);
+  const topic = "realtime:presence:" + (_auctionId || "auction");
+
+  _presenceChannel = ws;
+
+  ws.onopen = () => {
+    // Join presence channel
+    ws.send(JSON.stringify({
+      topic, event: "phx_join",
+      payload: { config: { presence: { key: _presenceKey } } },
+      ref: "p1"
+    }));
+
+    // Heartbeat
+    setInterval(() => ws.send(JSON.stringify({ topic: "phoenix", event: "heartbeat", payload: {}, ref: "hb_p" })), 20000);
+
+    // Broadcast initial visitor state
+    setTimeout(() => _broadcastPresence("visitor"), 500);
+  };
+
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      // presence_state — full snapshot on join
+      if (msg.event === "presence_state") _updatePresenceCounts(msg.payload);
+      // presence_diff — joins/leaves
+      if (msg.event === "presence_diff") {
+        _handlePresenceDiff(msg.payload);
+      }
+    } catch (_) {}
+  };
+
+  ws.onerror = () => console.warn("Presence WS error");
+
+  // Clean up on tab close
+  window.addEventListener("beforeunload", () => {
+    try { ws.close(); } catch (_) {}
+  });
+}
+
+// Broadcast our current presence state
+function _broadcastPresence(type) {
+  if (!_presenceChannel || _presenceChannel.readyState !== WebSocket.OPEN) return;
+  const topic = "realtime:presence:" + (_auctionId || "auction");
+  _presenceChannel.send(JSON.stringify({
+    topic, event: "broadcast",
+    payload: {
+      type: "presence",
+      key:  _presenceKey,
+      data: { type, wallet: type === "eligible" ? (signerAddress || "") : "" }
+    },
+    ref: "pb"
+  }));
+}
+
+function _upgradePresence(type) {
+  _broadcastPresence(type);
+}
+
+// Track presence state locally
+let _presenceState = {}; // key -> { type, wallet }
+
+function _updatePresenceCounts(state) {
+  // state is { key: [{ phx_ref, metas: [{ type, wallet }] }] }
+  _presenceState = {};
+  for (const [key, entries] of Object.entries(state || {})) {
+    const meta = entries[0]?.metas?.[0] || entries[0] || {};
+    _presenceState[key] = { type: meta.type || "visitor", wallet: meta.wallet || "" };
+  }
+  _renderPresenceCounts();
+}
+
+function _handlePresenceDiff(diff) {
+  // Add joins
+  for (const [key, entries] of Object.entries(diff.joins || {})) {
+    const meta = entries[0]?.metas?.[0] || entries[0] || {};
+    _presenceState[key] = { type: meta.type || "visitor", wallet: meta.wallet || "" };
+  }
+  // Remove leaves
+  for (const key of Object.keys(diff.leaves || {})) {
+    delete _presenceState[key];
+  }
+  _renderPresenceCounts();
+}
+
+function _renderPresenceCounts() {
+  const all      = Object.values(_presenceState);
+  const total    = all.length;
+  const eligible = all.filter(p => p.type === "eligible").length;
+
+  const countEl   = document.getElementById("online-count");
+  const eligEl    = document.getElementById("eligible-count");
+
+  if (countEl) countEl.textContent = total === 1 ? "1 watching" : `${total} watching`;
+
+  // Only Kay sees the eligible breakdown
+  if (eligEl) {
+    if (_isKay() && eligible > 0) {
+      eligEl.style.display = "inline";
+      eligEl.textContent   = eligible + " eligible";
+    } else {
+      eligEl.style.display = "none";
+    }
+  }
 }
 
 </script>
