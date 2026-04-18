@@ -812,6 +812,20 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             </div>
           </div>
 
+          <!-- Withdraw (outbid refund) -->
+          <div id="withdraw-panel" style="display:none;margin-bottom:18px;padding:14px 16px;background:rgba(201,153,58,0.07);border:1px solid rgba(201,153,58,0.35);border-radius:3px">
+            <div class="slabel" style="margin-bottom:6px;color:var(--gold)">Funds available to withdraw</div>
+            <div style="font-family:'Crimson Pro',serif;font-size:0.95rem;color:var(--text);margin-bottom:4px">
+              <span id="withdraw-amount" style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;color:var(--gold)">—</span>
+              <span style="font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.15em;color:var(--text-muted);margin-left:6px">ETH</span>
+            </div>
+            <div style="font-family:'Crimson Pro',serif;font-size:0.82rem;color:var(--text-muted);font-style:italic;margin-bottom:12px">You were outbid. Your ETH is held safely by the contract and ready to reclaim.</div>
+            <button id="withdraw-btn" onclick="withdrawFunds()" style="font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;background:var(--gold);color:var(--ink);border:none;border-radius:3px;padding:9px 18px;cursor:pointer;width:100%;transition:filter .2s">
+              Withdraw funds
+            </button>
+            <div id="withdraw-status" style="font-family:'Crimson Pro',serif;font-size:0.8rem;font-style:italic;color:var(--text-muted);margin-top:8px;display:none"></div>
+          </div>
+
           <!-- Outbid notification opt-in -->
           <div id="notif-optin" style="display:none;margin-bottom:18px;padding:14px 16px;background:var(--bg-alt);border:1px solid var(--divider);border-radius:3px">
             <div class="slabel" style="margin-bottom:8px">Outbid notifications</div>
@@ -924,6 +938,8 @@ async function loadConfig() {
 
 const AUCTION_ABI = [
   "function bid() external payable",
+  "function withdraw() external",
+  "function pendingReturns(address bidder) external view returns (uint256)",
   "function isEligible(address wallet) external view returns (bool)",
   "function auctionState() external view returns (bool started, bool settled, uint256 endTime, uint256 timeRemaining, address highestBidder, uint256 highestBid, uint256 minNextBid)",
   "function reservePrice() external view returns (uint256)",
@@ -1232,6 +1248,7 @@ async function connectWallet() {
     if (auctionContract) {
       auctionContract = auctionContract.connect(signer);
       await checkEligibility();
+      await checkPendingReturn();
       onRoomEligibilityGranted();
     }
 
@@ -1306,6 +1323,9 @@ async function refreshState() {
     if (started) document.getElementById("history-section").style.display = "block";
     if (settled) showSettled(highestBidder, highestBid);
 
+    // Refresh pending return balance on every state poll
+    await checkPendingReturn();
+
   } catch(e) { console.error("refreshState:", e); }
 }
 
@@ -1359,7 +1379,52 @@ async function checkEligibility() {
   } catch(e) { console.log("Eligibility:", e); }
 }
 
-// ─── Bid ─────────────────────────────────────────────────────────────────────
+// ─── Pending return (outbid refund) ──────────────────────────────────────────
+
+async function checkPendingReturn() {
+  const panel     = document.getElementById("withdraw-panel");
+  const amountEl  = document.getElementById("withdraw-amount");
+  if (!auctionContract || !signerAddress || !panel) return;
+  try {
+    const pending = await auctionContract.pendingReturns(signerAddress);
+    if (pending > 0n) {
+      amountEl.textContent  = ethers.formatEther(pending);
+      panel.style.display   = "block";
+    } else {
+      panel.style.display   = "none";
+    }
+  } catch(e) {
+    console.log("pendingReturns check:", e);
+  }
+}
+
+async function withdrawFunds() {
+  if (!signer || !auctionContract) { notify("err","Not connected","Connect wallet first"); return; }
+  const btn      = document.getElementById("withdraw-btn");
+  const statusEl = document.getElementById("withdraw-status");
+  btn.disabled   = true;
+  btn.textContent = "Withdrawing…";
+  statusEl.style.display   = "block";
+  statusEl.style.color     = "var(--text-muted)";
+  statusEl.textContent     = "Confirm the transaction in your wallet…";
+  try {
+    const tx = await auctionContract.connect(signer).withdraw();
+    statusEl.textContent = `Tx submitted — ${tx.hash.slice(0,12)}…`;
+    await tx.wait();
+    notify("ok","Withdrawal successful","Your ETH has been returned to your wallet.");
+    document.getElementById("withdraw-panel").style.display = "none";
+    statusEl.style.display = "none";
+  } catch(e) {
+    statusEl.style.color   = "var(--rust)";
+    statusEl.textContent   = e?.reason || e?.shortMessage || e?.message || "Withdrawal failed";
+    notify("err","Withdrawal failed", statusEl.textContent);
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = "Withdraw funds";
+  }
+}
+
+
 
 async function placeBid() {
   if (!signer || !auctionContract) { notify("err","Not connected","Connect wallet first"); return; }
@@ -1863,9 +1928,7 @@ function _renderMsg(row) {
   wrap.dataset.msgId         = row.id;
   wrap.dataset.walletAddress = row.wallet_address || "";
   wrap.dataset.msgType       = row.type || "";
-  const ts = row.created_at
-    ? new Date(row.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    : _nowStr();
+  const ts = _nowStr();
 
   const isMyAuc  = row.type === "auctioneer" && _isKay();
   const isMyAddr = row.wallet_address && signerAddress && row.wallet_address.toLowerCase() === signerAddress.toLowerCase();
