@@ -2125,98 +2125,74 @@ async function _triggerOutbidNotification(outbidWallet, newAmt, newBidder) {
 }
 
 // ─── Presence — live visitor + eligible wallet counts ────────────────────────
+// Uses Supabase JS client loaded from CDN for proper Presence protocol support
 
-let _presenceChannel = null;
-let _presenceKey     = null;  // unique key for this browser tab
+let _presenceClient  = null;
+let _presenceRoom    = null;
+let _presenceState   = {};
+let _presenceType    = "visitor";
 
 function _initPresence() {
-  // Generate a unique key for this tab session
-  _presenceKey = "visitor_" + Math.random().toString(36).slice(2, 10);
+  // Lazily load Supabase JS client if not already available
+  if (window.supabase) {
+    _setupPresence();
+  } else {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js";
+    s.onload = _setupPresence;
+    s.onerror = () => console.warn("Presence: could not load Supabase JS client");
+    document.head.appendChild(s);
+  }
+}
 
-  const wsUrl = SUPABASE_URL.replace("https://", "wss://") + "/realtime/v1/websocket?apikey=" + SUPABASE_ANON + "&vsn=1.0.0";
-  const ws    = new WebSocket(wsUrl);
-  const topic = "realtime:presence:" + (_auctionId || "auction");
+function _setupPresence() {
+  try {
+    _presenceClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    const channelName = "presence-" + (_auctionId || "auction");
+    _presenceRoom = _presenceClient.channel(channelName, {
+      config: { presence: { key: "k_" + Math.random().toString(36).slice(2,9) } }
+    });
 
-  _presenceChannel = ws;
+    _presenceRoom
+      .on("presence", { event: "sync" }, () => {
+        const state = _presenceRoom.presenceState();
+        _presenceState = {};
+        for (const [key, entries] of Object.entries(state)) {
+          const meta = entries[0] || {};
+          _presenceState[key] = { type: meta.role || "visitor", wallet: meta.wallet || "" };
+        }
+        _renderPresenceCounts();
+      })
+      .on("presence", { event: "join" }, ({ key, newPresences }) => {
+        const meta = newPresences[0] || {};
+        _presenceState[key] = { type: meta.role || "visitor", wallet: meta.wallet || "" };
+        _renderPresenceCounts();
+      })
+      .on("presence", { event: "leave" }, ({ key }) => {
+        delete _presenceState[key];
+        _renderPresenceCounts();
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await _presenceRoom.track({ role: _presenceType, wallet: signerAddress || "" });
+        }
+      });
 
-  ws.onopen = () => {
-    // Join presence channel
-    ws.send(JSON.stringify({
-      topic, event: "phx_join",
-      payload: { config: { presence: { key: _presenceKey } } },
-      ref: "p1"
-    }));
+    window.addEventListener("beforeunload", () => {
+      try { _presenceRoom.untrack(); } catch(_) {}
+    });
+  } catch(e) {
+    console.warn("Presence setup error:", e);
+  }
+}
 
-    // Heartbeat
-    setInterval(() => ws.send(JSON.stringify({ topic: "phoenix", event: "heartbeat", payload: {}, ref: "hb_p" })), 20000);
-
-    // Broadcast initial visitor state
-    setTimeout(() => _broadcastPresence("visitor"), 500);
-  };
-
-  ws.onmessage = (e) => {
+async function _upgradePresence(type) {
+  _presenceType = type;
+  if (_presenceRoom) {
     try {
-      const msg = JSON.parse(e.data);
-      // presence_state — full snapshot on join
-      if (msg.event === "presence_state") _updatePresenceCounts(msg.payload);
-      // presence_diff — joins/leaves
-      if (msg.event === "presence_diff") {
-        _handlePresenceDiff(msg.payload);
-      }
-    } catch (_) {}
-  };
-
-  ws.onerror = () => console.warn("Presence WS error");
-
-  // Clean up on tab close
-  window.addEventListener("beforeunload", () => {
-    try { ws.close(); } catch (_) {}
-  });
-}
-
-// Broadcast our current presence state
-function _broadcastPresence(type) {
-  if (!_presenceChannel || _presenceChannel.readyState !== WebSocket.OPEN) return;
-  const topic = "realtime:presence:" + (_auctionId || "auction");
-  _presenceChannel.send(JSON.stringify({
-    topic, event: "broadcast",
-    payload: {
-      type: "presence",
-      key:  _presenceKey,
-      data: { type, wallet: type === "eligible" ? (signerAddress || "") : "" }
-    },
-    ref: "pb"
-  }));
-}
-
-function _upgradePresence(type) {
-  _broadcastPresence(type);
-}
-
-// Track presence state locally
-let _presenceState = {}; // key -> { type, wallet }
-
-function _updatePresenceCounts(state) {
-  // state is { key: [{ phx_ref, metas: [{ type, wallet }] }] }
-  _presenceState = {};
-  for (const [key, entries] of Object.entries(state || {})) {
-    const meta = entries[0]?.metas?.[0] || entries[0] || {};
-    _presenceState[key] = { type: meta.type || "visitor", wallet: meta.wallet || "" };
+      await _presenceRoom.track({ role: type, wallet: signerAddress || "" });
+    } catch(e) { console.warn("Presence track error:", e); }
   }
-  _renderPresenceCounts();
-}
-
-function _handlePresenceDiff(diff) {
-  // Add joins
-  for (const [key, entries] of Object.entries(diff.joins || {})) {
-    const meta = entries[0]?.metas?.[0] || entries[0] || {};
-    _presenceState[key] = { type: meta.type || "visitor", wallet: meta.wallet || "" };
-  }
-  // Remove leaves
-  for (const key of Object.keys(diff.leaves || {})) {
-    delete _presenceState[key];
-  }
-  _renderPresenceCounts();
 }
 
 function _renderPresenceCounts() {
@@ -2224,12 +2200,11 @@ function _renderPresenceCounts() {
   const total    = all.length;
   const eligible = all.filter(p => p.type === "eligible").length;
 
-  const countEl   = document.getElementById("online-count");
-  const eligEl    = document.getElementById("eligible-count");
+  const countEl = document.getElementById("online-count");
+  const eligEl  = document.getElementById("eligible-count");
 
   if (countEl) countEl.textContent = total === 1 ? "1 watching" : `${total} watching`;
 
-  // Only Kay sees the eligible breakdown
   if (eligEl) {
     if (_isKay() && eligible > 0) {
       eligEl.style.display = "inline";
