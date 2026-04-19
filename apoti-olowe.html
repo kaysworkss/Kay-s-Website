@@ -622,6 +622,51 @@
     animation: pulseMint 2.4s ease-in-out infinite;
   }
   .btn-mint:hover { background: #c45a30; filter: brightness(1.22); transform: translateY(-2px); animation: none; box-shadow: 0 4px 22px rgba(196,90,48,0.45); }
+  /* ── Live auction button state ── */
+  @keyframes pulseAucLive {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(201,153,58,0.7), 0 0 18px rgba(201,153,58,0.25); }
+    50%       { box-shadow: 0 0 0 10px rgba(201,153,58,0), 0 0 28px rgba(201,153,58,0.45); }
+  }
+  @keyframes aucLiveDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(0.85); }
+  }
+  .btn-mint.auction-live {
+    background: linear-gradient(135deg, #b8860b 0%, #c9993a 45%, #d4aa50 100%);
+    color: #1e1410;
+    border: 1px solid rgba(201,153,58,0.6);
+    animation: pulseAucLive 2s ease-in-out infinite;
+  }
+  .btn-mint.auction-live:hover {
+    background: linear-gradient(135deg, #c8960e 0%, #d4aa50 45%, #e0be6a 100%);
+    filter: brightness(1.12);
+    transform: translateY(-2px);
+    animation: none;
+    box-shadow: 0 6px 28px rgba(201,153,58,0.55);
+  }
+  .auc-live-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: #1e1410; margin-right: 7px; vertical-align: middle;
+    animation: aucLiveDot 1.4s ease-in-out infinite;
+  }
+  .auc-countdown-strip {
+    display: none; margin-top: 10px;
+    font-family: 'Cinzel', serif; font-size: 0.58rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--gold, #c9993a); text-align: center;
+  }
+  .auc-countdown-strip.show { display: block; }
+  .auc-cd-nums {
+    font-family: 'Cormorant Garamond', serif; font-size: 1.35rem;
+    font-weight: 600; letter-spacing: 0.06em; color: #e8d5b0;
+    margin-top: 3px;
+  }
+  .auc-upcoming-strip {
+    display: none; margin-top: 10px;
+    font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+    font-style: italic; color: #9a8070; text-align: center;
+  }
+  .auc-upcoming-strip.show { display: block; }
   .btn-token-burn {
     font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.25em; text-transform: uppercase;
     background: linear-gradient(135deg,#c8922a 0%,#a97430 40%,#7a5020 65%,#d4a84b 100%);
@@ -1295,9 +1340,16 @@
     </div>
 
     <div style="margin-top:1.2rem;">
-      <a href="/auction" class="btn-mint" aria-label="Bid on the Àpótí Ọlọ́wẹ̀ auction" style="display:inline-block;cursor:pointer;">
+      <a href="/auction" id="ao-auction-btn" class="btn-mint" aria-label="Bid on the Àpótí Ọlọ́wẹ̀ auction" style="display:inline-block;cursor:pointer;">
         &#9670;&nbsp; Bid on the Auction
       </a>
+      <div class="auc-countdown-strip" id="ao-cd-strip">
+        <span>Auction ends in</span>
+        <div class="auc-cd-nums" id="ao-cd-nums">-- : -- : --</div>
+      </div>
+      <div class="auc-upcoming-strip" id="ao-upcoming-strip">
+        Auction opening soon
+      </div>
     </div>
 
 
@@ -1605,6 +1657,88 @@ lbPanel.addEventListener('touchend', function(e) {
   var dx = e.changedTouches[0].clientX - touchStartX;
   if (Math.abs(dx) > 45) { dx < 0 ? goNext() : goPrev(); }
 });
+</script>
+
+<script>
+/* ── Auction live indicator — apoti-olowe.html ── */
+(function() {
+  const AUCTION_API   = "/api/auction-config";
+  const btn           = document.getElementById("ao-auction-btn");
+  const cdStrip       = document.getElementById("ao-cd-strip");
+  const cdNums        = document.getElementById("ao-cd-nums");
+  const upcomingStrip = document.getElementById("ao-upcoming-strip");
+  let _cdTimer = null;
+
+  function _fmt(s) {
+    const d  = Math.floor(s / 86400);
+    const h  = Math.floor((s % 86400) / 3600);
+    const m  = Math.floor((s % 3600) / 60);
+    const sc = s % 60;
+    if (d > 0) return `${d}d ${String(h).padStart(2,"0")}h ${String(m).padStart(2,"0")}m`;
+    return `${String(h).padStart(2,"0")} : ${String(m).padStart(2,"0")} : ${String(sc).padStart(2,"0")}`;
+  }
+
+  function _startCountdown(endTs) {
+    clearInterval(_cdTimer);
+    cdStrip.classList.add("show");
+    function tick() {
+      const diff = Math.max(0, endTs - Math.floor(Date.now() / 1000));
+      cdNums.textContent = _fmt(diff);
+      if (diff === 0) { clearInterval(_cdTimer); cdStrip.classList.remove("show"); }
+    }
+    tick();
+    _cdTimer = setInterval(tick, 1000);
+  }
+
+  async function _checkAuction() {
+    try {
+      const res  = await fetch(AUCTION_API);
+      const json = await res.json();
+      if (!json.ok) return;
+      const cfg    = json.config || {};
+      const status = cfg.status  || "off";
+
+      if (status === "live") {
+        btn.classList.add("auction-live");
+        btn.innerHTML = '<span class="auc-live-dot"></span>Live Auction — Bid Now';
+        upcomingStrip.classList.remove("show");
+
+        // Try cfg.endTime first (cheap), then fall back to RPC call
+        if (cfg.endTime) {
+          _startCountdown(Number(cfg.endTime));
+        } else if (cfg.rpcUrl && cfg.contractAddr) {
+          try {
+            const ABI = ["function auctionState() external view returns (bool,bool,uint256,uint256,address,uint256,uint256)"];
+            // Use ethers from auction.html's CDN if already on page, else load it
+            const ethersLib = window.ethers || await import("https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js").then(() => window.ethers);
+            const p = new ethersLib.JsonRpcProvider(cfg.rpcUrl);
+            const c = new ethersLib.Contract(cfg.contractAddr, ABI, p);
+            const s = await c.auctionState();
+            const endTime = Number(s[2]);
+            if (endTime > 0) _startCountdown(endTime);
+          } catch(_) {}
+        }
+
+      } else if (status === "upcoming") {
+        btn.classList.remove("auction-live");
+        btn.innerHTML = '&#9670;&nbsp; Bid on the Auction';
+        upcomingStrip.classList.add("show");
+        cdStrip.classList.remove("show");
+        clearInterval(_cdTimer);
+
+      } else {
+        btn.classList.remove("auction-live");
+        btn.innerHTML = '&#9670;&nbsp; Bid on the Auction';
+        cdStrip.classList.remove("show");
+        upcomingStrip.classList.remove("show");
+        clearInterval(_cdTimer);
+      }
+    } catch(_) {}
+  }
+
+  _checkAuction();
+  setInterval(_checkAuction, 60000);
+}());
 </script>
 </body>
 </html>
