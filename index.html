@@ -2709,9 +2709,11 @@
     try {
       const res  = await fetch(AUCTION_API);
       const json = await res.json();
-      if (!json.ok) return;
+      console.log("[AuctionCheck] raw response:", JSON.stringify(json).slice(0, 300));
+      if (!json.ok) { console.warn("[AuctionCheck] json.ok is falsy — bailing"); return; }
       const cfg = json.config || {};
       const status = cfg.status || "off";
+      console.log("[AuctionCheck] status:", status, "| endTime:", cfg.endTime, "| rpcUrl:", cfg.rpcUrl, "| contractAddr:", cfg.contractAddr);
 
       if (status === "live") {
         // Gold glowing button
