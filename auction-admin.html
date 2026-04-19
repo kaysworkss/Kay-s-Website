@@ -677,15 +677,28 @@ async function saveToHallOfFame() {
       settled_at:          new Date().toISOString(),
     };
 
-    const saveRes = await fetch(`${SUPABASE_URL}/rest/v1/auction_results`, {
-      method:"POST",
-      headers:{
-        apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
-        "Content-Type":"application/json",
-        "Prefer":"resolution=merge-duplicates,return=minimal"
-      },
-      body:JSON.stringify(record),
-    });
+    // Check if record already exists — use PATCH to update, POST to insert
+    const existsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(record.auction_id)}&select=auction_id`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const existing = await existsRes.json();
+    const alreadyExists = Array.isArray(existing) && existing.length > 0;
+
+    const saveRes = await fetch(
+      alreadyExists
+        ? `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(record.auction_id)}`
+        : `${SUPABASE_URL}/rest/v1/auction_results`,
+      {
+        method: alreadyExists ? "PATCH" : "POST",
+        headers:{
+          apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
+          "Content-Type":"application/json",
+          "Prefer":"return=minimal"
+        },
+        body:JSON.stringify(record),
+      }
+    );
 
     if (!saveRes.ok) {
       const err = await saveRes.text();
