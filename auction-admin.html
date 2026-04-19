@@ -441,6 +441,36 @@ body {
       </div>
     </div>
 
+    <!-- Auctioneer Profile -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-head">
+        <div class="card-title">Auctioneer Profile</div>
+        <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(196,132,90,0.1);color:var(--clay);border:1px solid rgba(196,132,90,0.3)">Kay · Host</span>
+      </div>
+      <div class="card-body">
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">
+          Set your display name and avatar as the auctioneer. This appears next to every message you send in the collector room and in the Hall of Fame chat archive.
+        </p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);">
+          <img id="auc-avatar-preview" class="profile-entry-avatar" src="" alt="" style="width:40px;height:40px;">
+          <div>
+            <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--clay);margin-bottom:2px">Kay · Auctioneer</div>
+            <div id="auc-current-name" style="font-family:'Crimson Pro',serif;font-size:0.88rem;color:var(--text-muted);font-style:italic">Loading…</div>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:8px">
+          <label>Display name</label>
+          <input id="auc-name" placeholder="e.g. Kayode Oyeniyi" maxlength="40" style="width:100%;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:9px 12px;outline:none;transition:border-color .2s;" />
+        </div>
+        <div class="field" style="margin-bottom:14px">
+          <label>Avatar URL</label>
+          <input id="auc-avatar" placeholder="https://…" maxlength="300" oninput="previewAucAvatar()" style="width:100%;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:9px 12px;outline:none;transition:border-color .2s;" />
+        </div>
+        <button class="btn btn-outline" id="auc-save-btn" onclick="saveAuctioneerProfile()" style="width:100%;justify-content:center;">Save auctioneer profile</button>
+        <div class="profile-status" id="auc-profile-status"></div>
+      </div>
+    </div>
+
     <!-- Collector Profiles -->
     <div class="card" style="margin-top:16px">
       <div class="card-head">
@@ -526,6 +556,7 @@ async function authenticate() {
     document.getElementById("main-content").style.display = "block";
     populateForm(res.config);
     updatePreviewBar();
+    loadAuctioneerProfile();
     toast("ok", "Unlocked", "Configuration loaded from server");
   } catch (err) {
     toast("err", "Connection error", err.message);
@@ -797,6 +828,85 @@ async function saveToHallOfFame() {
     toast("err", "Save failed", e.message);
   } finally {
     btn.disabled = false;
+  }
+}
+
+// ─── Auctioneer Profile ──────────────────────────────────────────────────────
+
+const KAY_WALLET = "0x72a04d812494cf3f6880483c6269291ce5751a83";
+
+async function loadAuctioneerProfile() {
+  try {
+    const res  = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(KAY_WALLET)}&limit=1`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const rows = await res.json();
+    const p    = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    const nameEl   = document.getElementById("auc-current-name");
+    const nameInp  = document.getElementById("auc-name");
+    const avatInp  = document.getElementById("auc-avatar");
+    if (p) {
+      if (nameEl)  nameEl.textContent  = p.display_name || "No name set";
+      if (nameInp) nameInp.value       = p.display_name || "";
+      if (avatInp) avatInp.value       = p.avatar_url   || "";
+      previewAucAvatar();
+    } else {
+      if (nameEl) nameEl.textContent = "No profile set yet";
+    }
+  } catch(e) { console.log("loadAuctioneerProfile:", e); }
+}
+
+function previewAucAvatar() {
+  const url     = document.getElementById("auc-avatar").value.trim();
+  const preview = document.getElementById("auc-avatar-preview");
+  if (!preview) return;
+  if (url) {
+    preview.src = url;
+    preview.style.display = "block";
+    preview.onerror = () => { preview.style.display = "none"; };
+  } else {
+    preview.style.display = "none";
+  }
+}
+
+async function saveAuctioneerProfile() {
+  const btn      = document.getElementById("auc-save-btn");
+  const statusEl = document.getElementById("auc-profile-status");
+  const name     = document.getElementById("auc-name").value.trim().slice(0, 40);
+  const avatar   = document.getElementById("auc-avatar").value.trim().slice(0, 300);
+  btn.disabled   = true; btn.textContent = "Saving…";
+  statusEl.className = "profile-status"; statusEl.textContent = "";
+  try {
+    // Check if exists
+    const chkRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(KAY_WALLET)}&select=wallet`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const chk    = await chkRes.json();
+    const exists = Array.isArray(chk) && chk.length > 0;
+    const record = { wallet:KAY_WALLET, display_name:name, avatar_url:avatar, updated_at:new Date().toISOString() };
+    await fetch(
+      exists
+        ? `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(KAY_WALLET)}`
+        : `${SUPABASE_URL}/rest/v1/collector_profiles`,
+      {
+        method: exists ? "PATCH" : "POST",
+        headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
+          "Content-Type":"application/json", "Prefer":"return=minimal" },
+        body: JSON.stringify(record),
+      }
+    );
+    document.getElementById("auc-current-name").textContent = name || "Kay · Auctioneer";
+    statusEl.className   = "profile-status ok";
+    statusEl.textContent = "✓ Auctioneer profile saved";
+    btn.textContent      = "Saved ✓";
+    setTimeout(() => { btn.textContent = "Save auctioneer profile"; btn.disabled = false; }, 2000);
+    toast("ok", "Profile saved", name ? name : "Auctioneer profile updated");
+  } catch(e) {
+    statusEl.className   = "profile-status err";
+    statusEl.textContent = "Error: " + e.message;
+    btn.textContent      = "Save auctioneer profile"; btn.disabled = false;
   }
 }
 
