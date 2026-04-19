@@ -1708,13 +1708,13 @@ lbPanel.addEventListener('touchend', function(e) {
           _startCountdown(Number(cfg.endTime));
         } else if (cfg.rpcUrl && cfg.contractAddr) {
           try {
-            const ABI = ["function auctionState() external view returns (bool,bool,uint256,uint256,address,uint256,uint256)"];
+            const ABI = ["function auctionState() external view returns (bool,bool,bool,uint256,uint256,address,uint256,uint256,uint8,bool)"];
             // Use ethers from auction.html's CDN if already on page, else load it
             const ethersLib = window.ethers || await import("https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js").then(() => window.ethers);
             const p = new ethersLib.JsonRpcProvider(cfg.rpcUrl);
             const c = new ethersLib.Contract(cfg.contractAddr, ABI, p);
             const s = await c.auctionState();
-            const endTime = Number(s[2]);
+            const endTime = Number(s[3]);
             if (endTime > 0) _startCountdown(endTime);
           } catch(_) {}
         }

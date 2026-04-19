@@ -688,12 +688,13 @@ async function saveToHallOfFame() {
       throw new Error("Contract returned no data — is this the correct contract address?");
     }
 
-    // Decode: started(bool), settled(bool), endTime(uint256), timeRemaining(uint256),
-    //         highestBidder(address), highestBid(uint256), minNextBid(uint256)
-    const hex    = rpcData.result.slice(2);
-    const settled       = parseInt(hex.slice(32, 64), 16) === 1;
-    const highestBidder = "0x" + hex.slice(64*4 + 24, 64*4 + 64);  // 5th word, last 20 bytes
-    const highestBidHex = hex.slice(64*5, 64*6);
+    // Decode FlexAuction auctionState() — 10 x 32-byte words:
+    // [0] deposited, [1] live, [2] settled, [3] endTime, [4] timeRemaining,
+    // [5] highestBidder, [6] highestBid, [7] minNextBid, [8] mode, [9] isOpen
+    const hex           = rpcData.result.slice(2);
+    const settled       = parseInt(hex.slice(2 * 64, 3 * 64), 16) === 1;
+    const highestBidder = "0x" + hex.slice(5 * 64 + 24, 5 * 64 + 64);  // word 5, last 20 bytes
+    const highestBidHex = hex.slice(6 * 64, 7 * 64);
     const highestBid    = parseInt(highestBidHex, 16);
     const winningBid    = highestBid / 1e18;
 

@@ -890,6 +890,14 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
               <input class="gavel-input" id="gavel-custom-input" placeholder="Speak to the room…" onkeydown="if(event.key==='Enter')sendGavelCustom()"/>
               <button class="gavel-call-btn" onclick="sendGavelCustom()">Call it</button>
             </div>
+            <!-- FlexAuction on-chain actions -->
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--divider)">
+              <div class="slabel" style="margin-bottom:8px">On-chain actions</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button id="settle-btn" class="gavel-btn gold" onclick="settleAuction()" style="display:none">Settle auction</button>
+                <button id="cancel-btn" class="gavel-btn danger" onclick="cancelAuction()" style="display:none">Cancel auction</button>
+              </div>
+            </div>
           </div>
 
         </div>
@@ -975,15 +983,28 @@ async function loadConfig() {
 // ─── ABI ─────────────────────────────────────────────────────────────────────
 
 const AUCTION_ABI = [
+  // Core actions
   "function bid() external payable",
+  "function settle() external",
+  "function cancel() external",
+  "function startAuction() external",
+  // Eligibility & state
   "function isEligible(address wallet) external view returns (bool)",
-  "function auctionState() external view returns (bool started, bool settled, uint256 endTime, uint256 timeRemaining, address highestBidder, uint256 highestBid, uint256 minNextBid)",
+  "function auctionState() external view returns (bool _deposited, bool _live, bool _settled, uint256 _endTime, uint256 _timeRemaining, address _highestBidder, uint256 _highestBid, uint256 _minNextBid, uint8 _mode, bool _isOpen)",
+  // Read-only
   "function reservePrice() external view returns (uint256)",
   "function nftContract() external view returns (address)",
   "function nftTokenId() external view returns (uint256)",
+  "function auctionMode() external view returns (uint8)",
+  "function deposited() external view returns (bool)",
+  "function scheduledStart() external view returns (uint256)",
+  // Events
   "event BidPlaced(address indexed bidder, uint256 amount)",
   "event AuctionSettled(address indexed winner, uint256 amount)",
   "event AuctionExtended(uint256 newEndTime)",
+  "event AuctionStarted(uint256 endTime)",
+  "event AuctionCancelled()",
+  "event ReserveActivated(address indexed firstBidder, uint256 amount, uint256 endTime)",
 ];
 
 const ERC721_ABI = [
@@ -1325,31 +1346,50 @@ async function refreshState() {
   if (!auctionContract) return;
   try {
     const s = await auctionContract.auctionState();
-    const { started, settled, endTime, highestBidder, highestBid, minNextBid: mnb } = s;
+    // FlexAuction: _deposited, _live, _settled, _endTime, _timeRemaining,
+    //              _highestBidder, _highestBid, _minNextBid, _mode, _isOpen
+    const deposited     = s[0];
+    const live          = s[1];
+    const settled       = s[2];
+    const endTime       = s[3];
+    const highestBidder = s[5];
+    const highestBid    = s[6];
+    const mnb           = s[7];
+    const mode          = Number(s[8]); // 0 = open/manual, 1 = reserve-activated
+    const isOpen        = s[9];         // true when bids are being accepted
 
     endTimestamp = Number(endTime);
     minNextBid   = mnb;
-    const now    = Math.floor(Date.now() / 1000);
-    isLive       = started && !settled && Number(endTime) > now;
+    isLive       = live && !settled;
     const noBids = highestBidder === ethers.ZeroAddress;
 
-    if (started) { document.getElementById("countdown-section").style.display = "block"; tickCountdown(); }
-
-    const sl = document.getElementById("status-line");
-    if (!started)     { sl.textContent = "Auction not yet started"; sl.className = "status-line"; }
-    else if (settled) { sl.textContent = "Auction settled";         sl.className = "status-line settled"; }
-    else if (isLive)  { sl.textContent = "Live — bids open";        sl.className = "status-line live"; }
-    else              { sl.textContent = "Ended — awaiting settlement"; sl.className = "status-line ended"; }
-
-    if (started) {
-      document.getElementById("stats-grid").style.display = "grid";
-      document.getElementById("stat-bid").textContent      = noBids ? "—" : ethers.formatEther(highestBid) + " ETH";
-      document.getElementById("stat-bidder").textContent   = noBids ? "No bids yet" : shortAddr(highestBidder);
-      document.getElementById("stat-min").textContent      = ethers.formatEther(mnb) + " ETH";
-      document.getElementById("stat-min-sub").textContent  = noBids ? "Reserve price" : "Min increment";
+    // Show countdown when live with a known end time
+    if (live && endTimestamp > 0) {
+      document.getElementById("countdown-section").style.display = "block";
+      tickCountdown();
     }
 
-    if (isLive && !settled) {
+    // Status line — covers all FlexAuction states
+    const sl = document.getElementById("status-line");
+    if (!deposited)                              { sl.textContent = "Awaiting NFT deposit";            sl.className = "status-line"; }
+    else if (settled)                            { sl.textContent = "Auction settled";                  sl.className = "status-line settled"; }
+    else if (!live && mode === 1 && noBids)      { sl.textContent = "Waiting for first bid to start";  sl.className = "status-line upcoming-line"; }
+    else if (!live && mode === 0)                { sl.textContent = "Waiting for seller to start";      sl.className = "status-line upcoming-line"; }
+    else if (live && !isOpen)                    { sl.textContent = "Live — reserve not yet met";       sl.className = "status-line"; }
+    else if (isOpen)                             { sl.textContent = "Live — bids open";                 sl.className = "status-line live"; }
+    else                                         { sl.textContent = "Ended — awaiting settlement";      sl.className = "status-line ended"; }
+
+    // Stats
+    if (deposited) {
+      document.getElementById("stats-grid").style.display = "grid";
+      document.getElementById("stat-bid").textContent     = noBids ? "—" : ethers.formatEther(highestBid) + " ETH";
+      document.getElementById("stat-bidder").textContent  = noBids ? "No bids yet" : shortAddr(highestBidder);
+      document.getElementById("stat-min").textContent     = ethers.formatEther(mnb) + " ETH";
+      document.getElementById("stat-min-sub").textContent = noBids ? "Reserve price" : "Min increment";
+    }
+
+    // Bid form — only when open
+    if (isOpen && !settled) {
       document.getElementById("bid-form").style.display = "block";
       document.getElementById("history-section").style.display = "block";
       updateBidHint();
@@ -1357,8 +1397,14 @@ async function refreshState() {
       document.getElementById("bid-form").style.display = "none";
     }
 
-    if (started) document.getElementById("history-section").style.display = "block";
-    if (settled) showSettled(highestBidder, highestBid);
+    if (deposited) document.getElementById("history-section").style.display = "block";
+    if (settled)   showSettled(highestBidder, highestBid);
+
+    // Settle button — only for auctioneer when ended but not yet settled
+    const settleBtn = document.getElementById("settle-btn");
+    const cancelBtn = document.getElementById("cancel-btn");
+    if (settleBtn) settleBtn.style.display = (_isKay() && !live && !settled && !noBids) ? "block" : "none";
+    if (cancelBtn) cancelBtn.style.display = (_isKay() && !settled && noBids && deposited) ? "block" : "none";
 
   } catch(e) { console.error("refreshState:", e); }
 }
@@ -1438,8 +1484,6 @@ async function placeBid() {
     await refreshState();
     await checkEligibility();
     aucOnBid(_confirmedBid, true);
-    if (window._roomHookBid) window._roomHookBid(signerAddress, wei);
-    if (window._roomHookBid) window._roomHookBid(signerAddress, wei);
   } catch(e) {
     notify("err","Bid failed", e?.reason || e?.shortMessage || e?.message || "Transaction failed");
   } finally {
@@ -1452,17 +1496,28 @@ async function placeBid() {
 // ─── Bid history ─────────────────────────────────────────────────────────────
 
 async function loadBidHistory() {
-  if (!auctionContract || !provider) return;
+  // Load from Supabase — avoids eth_getLogs restrictions on free RPC tier
   bidHistory = [];
+  const auctionId = cfg.contractAddr?.toLowerCase();
+  if (!auctionId) { renderHistory(); return; }
   try {
-    const cur    = await provider.getBlockNumber();
-    const events = await auctionContract.queryFilter(auctionContract.filters.BidPlaced(), Math.max(0, cur - 50000), cur);
-    for (const e of events) {
-      const block = await provider.getBlock(e.blockNumber).catch(() => null);
-      bidHistory.unshift({ bidder: e.args[0], amount: e.args[1], timestamp: block?.timestamp ?? 0, txHash: e.transactionHash });
+    const rows = await _sb.select(
+      "collector_messages",
+      `auction_id=eq.${encodeURIComponent(auctionId)}&is_bid=eq.true&order=created_at.desc&limit=50`
+    );
+    if (!Array.isArray(rows)) { renderHistory(); return; }
+    for (const row of rows) {
+      const ethVal = parseFloat(row.message);
+      if (isNaN(ethVal)) continue;
+      bidHistory.push({
+        bidder:    row.wallet_address || "0x0000",
+        amount:    ethers.parseEther(ethVal.toString()),
+        timestamp: row.created_at ? Math.floor(new Date(row.created_at).getTime() / 1000) : 0,
+        txHash:    null,
+      });
     }
     renderHistory();
-  } catch(e) { console.log("History:", e); }
+  } catch(e) { console.log("History error:", e); renderHistory(); }
 }
 
 function pushBid(bidder, amount, timestamp, txHash) {
@@ -1512,6 +1567,41 @@ function showSettled(winner, amount) {
     : `Won by ${shortAddr(winner)} for ${ethers.formatEther(amount)} ETH`;
   document.getElementById("bid-form").style.display = "none";
   aucOnWon(winner, amount);
+}
+
+// ─── Settle / Cancel (auctioneer only) ───────────────────────────────────────
+
+async function settleAuction() {
+  if (!signer || !auctionContract) { notify("err","Not connected","Connect wallet first"); return; }
+  const btn = document.getElementById("settle-btn");
+  btn.disabled = true; btn.textContent = "Settling…";
+  try {
+    const tx = await auctionContract.connect(signer).settle();
+    notify("info","Settlement submitted",`Tx: ${tx.hash.slice(0,12)}…`);
+    await tx.wait();
+    notify("ok","Auction settled","The NFT has been transferred to the winner.");
+    btn.style.display = "none";
+  } catch(e) {
+    notify("err","Settle failed", e?.reason || e?.shortMessage || e?.message || "Transaction failed");
+    btn.disabled = false; btn.textContent = "Settle auction";
+  }
+}
+
+async function cancelAuction() {
+  if (!signer || !auctionContract) { notify("err","Not connected","Connect wallet first"); return; }
+  if (!confirm("Cancel the auction? This can only be done if there are no bids.")) return;
+  const btn = document.getElementById("cancel-btn");
+  btn.disabled = true; btn.textContent = "Cancelling…";
+  try {
+    const tx = await auctionContract.connect(signer).cancel();
+    notify("info","Cancel submitted",`Tx: ${tx.hash.slice(0,12)}…`);
+    await tx.wait();
+    notify("ok","Auction cancelled","The NFT has been returned.");
+    btn.style.display = "none";
+  } catch(e) {
+    notify("err","Cancel failed", e?.reason || e?.shortMessage || e?.message || "Transaction failed");
+    btn.disabled = false; btn.textContent = "Cancel auction";
+  }
 }
 
 // ─── Notify ───────────────────────────────────────────────────────────────────
