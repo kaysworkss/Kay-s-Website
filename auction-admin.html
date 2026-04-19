@@ -404,9 +404,18 @@ body {
         <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(201,153,58,0.12);color:var(--gold);border:1px solid rgba(201,153,58,0.3)">Permanent record</span>
       </div>
       <div class="card-body">
-        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:14px">
-          Save this auction's final result — winner, winning bid, bid count, and artwork details — to the public Hall of Fame. This reads the final state directly from the contract so the data is accurate.
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">
+          Save this auction's final result to the public Hall of Fame. The winner address and bid are read from the contract. You can optionally override the winner's display name and avatar below — useful if the collector hasn't set up their profile yet.
         </p>
+        <div class="field" style="margin-bottom:10px">
+          <label>Winner display name (optional override)</label>
+          <input id="hof-winner-name" placeholder="e.g. Adebayo — leave blank to use their wallet address" />
+          <div class="field-hint">Overrides the collector's own profile name in the Hall of Fame for this auction only.</div>
+        </div>
+        <div class="field" style="margin-bottom:14px">
+          <label>Winner avatar URL (optional override)</label>
+          <input id="hof-winner-avatar" placeholder="https://… — leave blank to use their profile avatar" />
+        </div>
         <button class="btn-hof" id="hof-btn" onclick="saveToHallOfFame()">
           ◇ &nbsp;Save auction to Hall of Fame
         </button>
@@ -647,19 +656,25 @@ async function saveToHallOfFame() {
       bidCount = parseInt(cr?.split("/")?.[1] || "0") || 0;
     } catch(_) {}
 
+    // Read optional winner overrides from admin fields
+    const winnerNameOverride   = document.getElementById("hof-winner-name")?.value.trim()   || "";
+    const winnerAvatarOverride = document.getElementById("hof-winner-avatar")?.value.trim() || "";
+
     const record = {
-      auction_id:    contractAddr.toLowerCase(),
-      art_title:     cfg.artTitle   || document.getElementById("art-title").value.trim()   || "",
-      art_artist:    cfg.artArtist  || document.getElementById("art-artist").value.trim()  || "",
-      art_image:     cfg.artImage   || document.getElementById("art-image").value.trim()   || "",
-      art_about:     cfg.artAbout   || document.getElementById("art-about").value.trim()   || "",
-      art_year:      cfg.artYear    || document.getElementById("art-year").value.trim()    || "",
-      art_medium:    cfg.artMedium  || document.getElementById("art-medium").value.trim()  || "",
-      winner:        highestBidder.toLowerCase(),
-      winning_bid:   winningBid,
-      bid_count:     bidCount,
-      contract_addr: contractAddr,
-      settled_at:    new Date().toISOString(),
+      auction_id:          contractAddr.toLowerCase(),
+      art_title:           cfg.artTitle   || document.getElementById("art-title").value.trim()   || "",
+      art_artist:          cfg.artArtist  || document.getElementById("art-artist").value.trim()  || "",
+      art_image:           cfg.artImage   || document.getElementById("art-image").value.trim()   || "",
+      art_about:           cfg.artAbout   || document.getElementById("art-about").value.trim()   || "",
+      art_year:            cfg.artYear    || document.getElementById("art-year").value.trim()    || "",
+      art_medium:          cfg.artMedium  || document.getElementById("art-medium").value.trim()  || "",
+      winner:              highestBidder.toLowerCase(),
+      winner_display_name: winnerNameOverride,
+      winner_avatar_url:   winnerAvatarOverride,
+      winning_bid:         winningBid,
+      bid_count:           bidCount,
+      contract_addr:       contractAddr,
+      settled_at:          new Date().toISOString(),
     };
 
     const saveRes = await fetch(`${SUPABASE_URL}/rest/v1/auction_results`, {
@@ -677,8 +692,28 @@ async function saveToHallOfFame() {
       throw new Error("Supabase save failed: " + err);
     }
 
+    // If admin provided overrides, also upsert collector_profiles so it shows
+    // in the live chat and everywhere else too
+    if (winnerNameOverride || winnerAvatarOverride) {
+      await fetch(`${SUPABASE_URL}/rest/v1/collector_profiles`, {
+        method:"POST",
+        headers:{
+          apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
+          "Content-Type":"application/json",
+          "Prefer":"resolution=merge-duplicates,return=minimal"
+        },
+        body: JSON.stringify({
+          wallet:       highestBidder.toLowerCase(),
+          display_name: winnerNameOverride  || undefined,
+          avatar_url:   winnerAvatarOverride || undefined,
+          updated_at:   new Date().toISOString(),
+        }),
+      });
+    }
+
+    const winnerLabel = winnerNameOverride || `${highestBidder.slice(0,6)}…${highestBidder.slice(-4)}`;
     statusEl.className   = "hof-status ok";
-    statusEl.textContent = `✓ Saved — ${cfg.artTitle||"Auction"} · ${winningBid.toFixed(4)} ETH · Winner ${highestBidder.slice(0,6)}…${highestBidder.slice(-4)}`;
+    statusEl.textContent = `✓ Saved — ${cfg.artTitle||"Auction"} · ${winningBid.toFixed(4)} ETH · ${winnerLabel}`;
     toast("ok", "Hall of Fame updated", "The auction result has been recorded.");
 
   } catch(e) {
