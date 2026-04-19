@@ -39,6 +39,24 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 
+/* ── Custom cursor ── */
+html, body, * { cursor: none !important; }
+.cursor { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999; }
+.cursor-dot {
+  width: 10px; height: 10px; background: var(--sand);
+  border-radius: 50%; position: absolute;
+  transform: translate(-50%, -50%);
+  transition: background 0.3s ease, transform 0.1s ease;
+}
+.cursor-ring {
+  width: 36px; height: 36px; border: 1.5px solid var(--sand);
+  border-radius: 50%; position: absolute;
+  transform: translate(-50%, -50%);
+  transition: width 0.25s, height 0.25s, border-color 0.3s ease;
+  opacity: 0.8;
+}
+body:hover .cursor-ring { opacity: 0.8; }
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -51,6 +69,28 @@ body {
 /* ════════════════════════════════
    LANDING VIEW
 ════════════════════════════════ */
+/* ── Landing nav ── */
+.landing-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 32px;
+  background: rgba(30,20,10,0); /* transparent by default, visible on landing */
+}
+.landing-nav-logo {
+  font-family: 'Montserrat', sans-serif; font-size: 1rem;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--clay); text-decoration: none;
+  display: flex; align-items: center;
+}
+.landing-nav-links { display: flex; gap: 24px; align-items: center; }
+.landing-nav-link {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--text-muted); text-decoration: none;
+  transition: color 0.2s;
+}
+.landing-nav-link:hover { color: var(--clay); }
+
 #view-landing {
   display: none; min-height: 100vh;
   align-items: center; justify-content: center;
@@ -675,6 +715,14 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 
 <!-- ── LANDING VIEW ── -->
 <div id="view-landing">
+  <nav class="landing-nav">
+    <a href="/" class="landing-nav-logo"><span style="font-weight:600">KAY'S</span>&nbsp;&nbsp;<span style="font-weight:500">WORKS</span></a>
+    <div class="landing-nav-links">
+      <a href="/" class="landing-nav-link">Home</a>
+      <a href="/apoti-olowe" class="landing-nav-link">Àpótí Ọlọ́wẹ̀</a>
+      <a href="/hall-of-fame" class="landing-nav-link">Hall of Fame</a>
+    </div>
+  </nav>
   <div class="landing-eyebrow">Private auction</div>
   <div class="landing-title" id="landing-title">Coming<br>Soon</div>
   <div class="landing-sub" id="landing-sub">An exclusive token-gated auction is being prepared. Check back soon.</div>
@@ -2480,6 +2528,57 @@ function _renderPresenceCounts(total, eligible) {
   }
 }
 
+</script>
+<!-- Custom cursor -->
+<div class="cursor" id="cursor" style="opacity:0;transition:opacity 0.3s;">
+  <div class="cursor-ring" id="cursorRing"></div>
+  <div class="cursor-dot"  id="cursorDot"></div>
+</div>
+
+<script>
+/* ── Custom cursor — auction.html ── */
+(function() {
+  const cursorEl = document.getElementById('cursor');
+  const ring     = document.getElementById('cursorRing');
+  const dot      = document.getElementById('cursorDot');
+  if (!cursorEl) return;
+
+  // Disable on touch devices and restore native cursor
+  const isTouch = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  if (isTouch()) {
+    cursorEl.style.display = 'none';
+    const s = document.createElement('style');
+    s.textContent = 'html, body, * { cursor: auto !important; }';
+    document.head.appendChild(s);
+    return;
+  }
+
+  let mx = 0, my = 0, rx = 0, ry = 0;
+
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    cursorEl.style.opacity = '1';
+  });
+
+  function animCursor() {
+    rx += (mx - rx) * 0.12;
+    ry += (my - ry) * 0.12;
+    dot.style.left  = mx + 'px'; dot.style.top  = my + 'px';
+    ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
+    requestAnimationFrame(animCursor);
+  }
+  animCursor();
+
+  // Expand ring on interactive elements
+  document.querySelectorAll('a, button, input, textarea, select, .btn-bid, .btn-sm, .react-btn-sm').forEach(el => {
+    el.addEventListener('mouseenter', () => { ring.style.width = '56px'; ring.style.height = '56px'; });
+    el.addEventListener('mouseleave', () => { ring.style.width = '36px'; ring.style.height = '36px'; });
+  });
+
+  // Hide when leaving window
+  document.addEventListener('mouseleave', () => { cursorEl.style.opacity = '0'; });
+  document.addEventListener('mouseenter', () => { cursorEl.style.opacity = '1'; });
+}());
 </script>
 </body>
 </html>
