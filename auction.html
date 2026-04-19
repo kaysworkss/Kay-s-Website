@@ -131,6 +131,23 @@ body {
 .chat-compose-input::placeholder { color:rgba(196,132,90,.3); }
 .chat-send-btn { font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.15em; text-transform:uppercase; background:var(--bark); color:var(--sand); border:none; border-radius:3px; padding:6px 11px; cursor:pointer; white-space:nowrap; }
 .chat-send-btn:disabled { opacity:.35; cursor:not-allowed; }
+
+/* ── Collector profile panel ── */
+.profile-panel { padding:10px 13px; border-top:1px solid var(--divider); background:var(--bg-alt); display:none; }
+.profile-panel.show { display:block; }
+.profile-toggle { width:100%; display:flex; align-items:center; justify-content:space-between; background:transparent; border:none; cursor:pointer; padding:0; margin-bottom:0; }
+.profile-toggle-label { font-family:'Cinzel',serif; font-size:0.48rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-muted); display:flex; align-items:center; gap:7px; }
+.profile-avatar-sm { width:18px; height:18px; border-radius:50%; object-fit:cover; border:1px solid var(--divider); }
+.profile-arrow { font-size:0.6rem; color:var(--text-muted); transition:transform .25s; }
+.profile-arrow.open { transform:rotate(180deg); }
+.profile-fields { margin-top:10px; display:none; }
+.profile-fields.open { display:block; }
+.profile-row { display:flex; gap:6px; margin-bottom:7px; }
+.profile-input { flex:1; background:var(--bg); border:1px solid var(--divider); border-radius:3px; color:var(--text); font-family:'Crimson Pro',serif; font-size:0.85rem; padding:6px 9px; outline:none; min-width:0; }
+.profile-input::placeholder { color:rgba(196,132,90,.3); }
+.profile-save-btn { font-family:'Cinzel',serif; font-size:0.46rem; letter-spacing:0.14em; text-transform:uppercase; background:var(--moss); color:var(--linen); border:none; border-radius:3px; padding:6px 11px; cursor:pointer; white-space:nowrap; }
+.profile-save-btn:disabled { opacity:.4; cursor:not-allowed; }
+.profile-hint { font-family:'Crimson Pro',serif; font-size:0.75rem; color:var(--text-muted); font-style:italic; }
 #gavel-panel { display:none; border-top:1px solid var(--divider); background:var(--bg-alt); padding:16px 20px; }
 #gavel-panel.show { display:block; }
 .gavel-title { font-family:'Cinzel',serif; font-size:0.56rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--clay); margin-bottom:10px; }
@@ -874,6 +891,29 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
         <div class="room-sub"><span class="live-dot"></span><span>Live</span></div>
       </div>
       <div class="chat-feed" id="chat-feed"></div>
+      <!-- Collector profile (shown when eligible) -->
+      <div class="profile-panel" id="profile-panel">
+        <button class="profile-toggle" onclick="_toggleProfileFields()">
+          <span class="profile-toggle-label">
+            <span id="profile-avatar-wrap">◈</span>
+            <span id="profile-toggle-name">Your collector profile</span>
+          </span>
+          <span class="profile-arrow" id="profile-arrow">▾</span>
+        </button>
+        <div class="profile-fields" id="profile-fields">
+          <div class="profile-row" style="margin-top:8px">
+            <input class="profile-input" id="profile-name" placeholder="Display name (e.g. Adebayo)" maxlength="40" />
+          </div>
+          <div class="profile-row">
+            <input class="profile-input" id="profile-avatar" placeholder="Avatar image URL (optional)" maxlength="300" />
+          </div>
+          <div class="profile-row">
+            <button class="profile-save-btn" id="profile-save-btn" onclick="_saveProfile()">Save profile</button>
+          </div>
+          <div class="profile-hint">Your name and avatar appear in the collector room and Hall of Fame.</div>
+        </div>
+      </div>
+
       <div class="chat-input-zone">
         <div class="slabel" style="margin-bottom:6px">React</div>
         <div class="react-row">
@@ -1232,7 +1272,9 @@ async function connectWallet() {
     if (auctionContract) {
       auctionContract = auctionContract.connect(signer);
       await checkEligibility();
+      await checkPendingReturn();
       onRoomEligibilityGranted();
+      await _loadMyProfile();
     }
 
   } catch(e) {
@@ -1384,6 +1426,8 @@ async function placeBid() {
     await refreshState();
     await checkEligibility();
     aucOnBid(_confirmedBid, true);
+    if (window._roomHookBid) window._roomHookBid(signerAddress, wei);
+    if (window._roomHookBid) window._roomHookBid(signerAddress, wei);
   } catch(e) {
     notify("err","Bid failed", e?.reason || e?.shortMessage || e?.message || "Transaction failed");
   } finally {
@@ -1396,32 +1440,17 @@ async function placeBid() {
 // ─── Bid history ─────────────────────────────────────────────────────────────
 
 async function loadBidHistory() {
-  // Load bid history from Supabase (already stored when bids are placed)
-  // This avoids eth_getLogs which is restricted on Alchemy's free tier
+  if (!auctionContract || !provider) return;
   bidHistory = [];
-  const auctionId = cfg.contractAddr || cfg.auctionId;
-  if (!auctionId) { renderHistory(); return; }
   try {
-    const rows = await _sb.select(
-      "collector_messages",
-      `auction_id=eq.${encodeURIComponent(auctionId)}&is_bid=eq.true&order=created_at.desc&limit=50`
-    );
-    if (!Array.isArray(rows)) { renderHistory(); return; }
-    for (const row of rows) {
-      // message is stored as "0.05 ETH" — parse back to BigInt wei
-      const ethVal = parseFloat(row.message);
-      if (isNaN(ethVal)) continue;
-      const amount    = ethers.parseEther(ethVal.toString());
-      const timestamp = row.created_at ? Math.floor(new Date(row.created_at).getTime() / 1000) : 0;
-      bidHistory.push({
-        bidder:    row.wallet_address || "0x0000",
-        amount,
-        timestamp,
-        txHash:    null,
-      });
+    const cur    = await provider.getBlockNumber();
+    const events = await auctionContract.queryFilter(auctionContract.filters.BidPlaced(), Math.max(0, cur - 50000), cur);
+    for (const e of events) {
+      const block = await provider.getBlock(e.blockNumber).catch(() => null);
+      bidHistory.unshift({ bidder: e.args[0], amount: e.args[1], timestamp: block?.timestamp ?? 0, txHash: e.transactionHash });
     }
     renderHistory();
-  } catch(e) { console.log("History error:", e); renderHistory(); }
+  } catch(e) { console.log("History:", e); }
 }
 
 function pushBid(bidder, amount, timestamp, txHash) {
@@ -1432,8 +1461,6 @@ function pushBid(bidder, amount, timestamp, txHash) {
   if (items[0]) { items[0].classList.remove("flash"); void items[0].offsetWidth; items[0].classList.add("flash"); }
   aucOnBid(bid, false);
   if (window._roomHookBid) window._roomHookBid(bidder, amount);
-  // Reload full history from Supabase after a short delay so new bid is included
-  setTimeout(loadBidHistory, 2000);
 }
 
 function renderHistory() {
@@ -1473,43 +1500,6 @@ function showSettled(winner, amount) {
     : `Won by ${shortAddr(winner)} for ${ethers.formatEther(amount)} ETH`;
   document.getElementById("bid-form").style.display = "none";
   aucOnWon(winner, amount);
-  // Persist result to hall of fame — only runs once, safe to call multiple times
-  _saveAuctionResult(winner, amount);
-}
-
-// ─── Hall of Fame — persist settled auction ───────────────────────────────────
-
-let _resultSaved = false;
-async function _saveAuctionResult(winner, amount) {
-  if (_resultSaved) return;          // guard — only write once per session
-  if (!cfg.contractAddr) return;
-  _resultSaved = true;
-  try {
-    const winningBid = parseFloat(ethers.formatEther(amount));
-    const record = {
-      auction_id:    cfg.contractAddr.toLowerCase(),
-      art_title:     cfg.artTitle    || "",
-      art_artist:    cfg.artArtist   || "",
-      art_image:     cfg.artImage    || "",
-      art_about:     cfg.artAbout    || "",
-      art_year:      cfg.artYear     || "",
-      art_medium:    cfg.artMedium   || "",
-      winner:        winner.toLowerCase(),
-      winning_bid:   winningBid,
-      bid_count:     bidHistory.length || 0,
-      contract_addr: cfg.contractAddr,
-      settled_at:    new Date().toISOString(),
-    };
-    // Upsert so re-running doesn't create duplicates
-    await fetch(`${SUPABASE_URL}/rest/v1/auction_results`, {
-      method:  "POST",
-      headers: { ..._sb.headers, "Prefer": "resolution=merge-duplicates" },
-      body:    JSON.stringify(record),
-    });
-    console.log("Auction result saved to hall of fame.");
-  } catch(e) {
-    console.warn("Could not save auction result:", e);
-  }
 }
 
 // ─── Notify ───────────────────────────────────────────────────────────────────
@@ -1896,6 +1886,78 @@ const GAVEL_CALLS = {
 };
 
 function _nowStr() { return new Date().toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }); }
+
+// ── Collector profiles ────────────────────────────────────────────────────────
+
+let _profileCache = {};  // wallet.toLowerCase() -> { display_name, avatar_url }
+
+async function _loadProfile(wallet) {
+  if (!wallet) return null;
+  const key = wallet.toLowerCase();
+  if (_profileCache[key]) return _profileCache[key];
+  try {
+    const rows = await _sb.select("collector_profiles", `wallet=eq.${encodeURIComponent(key)}&limit=1`);
+    if (Array.isArray(rows) && rows.length > 0) {
+      _profileCache[key] = rows[0];
+      return rows[0];
+    }
+  } catch(_) {}
+  return null;
+}
+
+async function _loadMyProfile() {
+  if (!signerAddress) return;
+  const profile = await _loadProfile(signerAddress);
+  if (profile) {
+    const nameEl = document.getElementById("profile-name");
+    const avatEl = document.getElementById("profile-avatar");
+    if (nameEl && profile.display_name) nameEl.value = profile.display_name;
+    if (avatEl && profile.avatar_url)   avatEl.value = profile.avatar_url;
+    _updateProfileToggleLabel(profile);
+  }
+}
+
+function _updateProfileToggleLabel(profile) {
+  const nameEl = document.getElementById("profile-toggle-name");
+  const wrapEl = document.getElementById("profile-avatar-wrap");
+  if (!nameEl || !wrapEl) return;
+  if (profile?.display_name) nameEl.textContent = profile.display_name;
+  if (profile?.avatar_url) {
+    wrapEl.innerHTML = `<img class="profile-avatar-sm" src="${profile.avatar_url}" onerror="this.style.display='none'">`;
+  }
+}
+
+function _toggleProfileFields() {
+  const fields = document.getElementById("profile-fields");
+  const arrow  = document.getElementById("profile-arrow");
+  const open   = fields.classList.toggle("open");
+  arrow.classList.toggle("open", open);
+}
+
+async function _saveProfile() {
+  if (!signerAddress) return;
+  const btn  = document.getElementById("profile-save-btn");
+  const name = document.getElementById("profile-name").value.trim().slice(0, 40);
+  const avat = document.getElementById("profile-avatar").value.trim().slice(0, 300);
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+  try {
+    const key    = signerAddress.toLowerCase();
+    const record = { wallet: key, display_name: name, avatar_url: avat, updated_at: new Date().toISOString() };
+    await fetch(`${SUPABASE_URL}/rest/v1/collector_profiles`, {
+      method:  "POST",
+      headers: { ..._sb.headers, "Prefer": "resolution=merge-duplicates" },
+      body:    JSON.stringify(record),
+    });
+    _profileCache[key] = record;
+    _updateProfileToggleLabel(record);
+    btn.textContent = "Saved ✓";
+    setTimeout(() => { btn.textContent = "Save profile"; btn.disabled = false; }, 2000);
+  } catch(e) {
+    btn.textContent = "Error — try again";
+    btn.disabled = false;
+  }
+}
 function _pickRoom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function _isKay() { return signerAddress && signerAddress.toLowerCase() === KAY_WALLET.toLowerCase(); }
 function _addrColor(addr) {
@@ -1931,15 +1993,35 @@ function _renderMsg(row) {
     if (existing) { const c = parseInt(existing.dataset.count||"1")+1; existing.dataset.count=c; existing.textContent=`${emoji} ${c}`; feed.scrollTop=feed.scrollHeight; return; }
     wrap.innerHTML = `<div class="reaction-line"><span class="react-pill" data-emoji="${emoji}" data-count="1">${emoji} 1</span></div>`;
   } else {
-    const addr  = row.wallet_address || "0x????";
-    const short = addr.slice(0,6)+"…"+addr.slice(-4);
-    const color = _addrColor(addr);
-    const init  = addr.slice(2,4).toUpperCase();
-    const isMe  = signerAddress && addr.toLowerCase() === signerAddress.toLowerCase();
+    const addr    = row.wallet_address || "0x????";
+    const short   = addr.slice(0,6)+"…"+addr.slice(-4);
+    const color   = _addrColor(addr);
+    const init    = addr.slice(2,4).toUpperCase();
+    const isMe    = signerAddress && addr.toLowerCase() === signerAddress.toLowerCase();
+    const profile = _profileCache[addr.toLowerCase()] || null;
+    const dispName = isMe ? "You" : (profile?.display_name || short);
+    const avatUrl  = profile?.avatar_url || null;
+    const avatHtml = avatUrl
+      ? `<img src="${avatUrl}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" onerror="this.outerHTML='<div class=\"chat-c-avatar\" style=\"background:${color}22;color:${color}\">${init}</div>'">`
+      : `<div class="chat-c-avatar" style="background:${color}22;color:${color}">${init}</div>`;
     const badge = row.is_bid ? `<span style="font-family:'Cinzel',serif;font-size:.46rem;letter-spacing:.12em;text-transform:uppercase;background:rgba(107,124,92,.15);border:1px solid rgba(107,124,92,.35);border-radius:3px;padding:1px 5px;color:#6b7c5c;margin-left:4px">Bid</span>` : "";
     const bStyle = row.is_bid ? "background:rgba(196,132,90,.08);border-color:rgba(196,132,90,.28);" : "";
     const tStyle = row.is_bid ? "color:var(--clay);font-weight:600;" : "";
-    wrap.innerHTML = `<div class="chat-bubble-collector" style="${isMe?"flex-direction:row-reverse":""}"><div class="chat-c-avatar" style="background:${color}22;color:${color}">${init}</div><div class="chat-c-bubble" style="${bStyle}${isMe?"text-align:right":""}"><div class="chat-c-name" style="color:${color}">${isMe?"You":short}${badge}</div><div class="chat-c-text" style="${tStyle}">${_esc(row.message)}</div><div class="chat-c-time">${ts}</div></div></div>`;
+    wrap.innerHTML = `<div class="chat-bubble-collector" style="${isMe?"flex-direction:row-reverse":""}">${avatHtml}<div class="chat-c-bubble" style="${bStyle}${isMe?"text-align:right":""}"><div class="chat-c-name" style="color:${color}">${_esc(dispName)}${badge}</div><div class="chat-c-text" style="${tStyle}">${_esc(row.message)}</div><div class="chat-c-time">${ts}</div></div></div>`;
+    // Async: fetch profile if not cached, then re-render this bubble
+    if (!profile && addr !== "0x????") {
+      _loadProfile(addr).then(p => {
+        if (!p) return;
+        const nameEl = wrap.querySelector(".chat-c-name");
+        const avatEl = wrap.querySelector(".chat-c-avatar, img");
+        if (nameEl && !isMe) nameEl.childNodes[0].textContent = p.display_name || short;
+        if (avatEl && p.avatar_url) {
+          const img = document.createElement("img");
+          img.src = p.avatar_url; img.style = "width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;";
+          img.onerror = () => {}; avatEl.replaceWith(img);
+        }
+      });
+    }
   }
 
   if (isDeletable) _attachDeleteGesture(wrap, row.id);
@@ -2053,15 +2135,18 @@ function _updateChatInputState() {
   const sendBtn = document.querySelector(".chat-send-btn");
   const locked  = document.getElementById("room-locked");
   const reacts  = document.querySelectorAll(".react-btn-sm");
+  const profilePanel = document.getElementById("profile-panel");
   if (_roomEligible) {
     if (input)   { input.disabled = false; input.placeholder = "Write as a collector…"; }
     if (sendBtn) sendBtn.disabled = false;
     if (locked)  locked.style.display = "none";
+    if (profilePanel) profilePanel.classList.add("show");
     reacts.forEach(b => b.disabled = false);
   } else {
     if (input)   { input.disabled = true; input.placeholder = "Connect eligible wallet to chat…"; }
     if (sendBtn) sendBtn.disabled = true;
     if (locked)  locked.style.display = "flex";
+    if (profilePanel) profilePanel.classList.remove("show");
     reacts.forEach(b => b.disabled = true);
   }
 }
@@ -2104,7 +2189,7 @@ window._roomHookBid = async function(bidder, amount) {
 };
 
 function initCollectorRoom() {
-  _auctionId = (cfg.contractAddr || cfg.auctionId || new Date().toISOString().slice(0,10)).toLowerCase();
+  _auctionId = cfg.contractAddr || cfg.auctionId || new Date().toISOString().slice(0,10);
   setMode("collector");
   _updateChatInputState();
   _loadHistory();
