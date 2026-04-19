@@ -2110,9 +2110,10 @@ function _renderMsg(row) {
     const aucName   = _aucProfile?.display_name || "Kay · Auctioneer";
     const aucAvatar = _aucProfile?.avatar_url   || null;
     const aucAvatHtml = aucAvatar
-      ? `<img src="${aucAvatar}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" onerror="this.outerHTML='<div class=\"chat-auc-avatar\">KA</div>'">`
+      ? `<img src="${aucAvatar}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" data-fallback="auc-avatar" onerror="_aucAvatFallback(this)">`
       : `<div class="chat-auc-avatar">KA</div>`;
-    wrap.innerHTML = `<div class="chat-bubble-auc">${aucAvatHtml}<div class="chat-auc-bubble"><div class="chat-auc-name">${_esc(aucName)}</div><div class="chat-c-text" style="color:#e8d5b0">${_esc(row.message)}</div><div class="chat-c-time">${ts}</div></div></div>`;
+    const aucRoleLabel = `<span style="font-family:'Cinzel',serif;font-size:0.42rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--clay);opacity:0.7;margin-left:5px">Auctioneer</span>`;
+    wrap.innerHTML = `<div class="chat-bubble-auc">${aucAvatHtml}<div class="chat-auc-bubble"><div class="chat-auc-name">${_esc(aucName)}${aucRoleLabel}</div><div class="chat-c-text" style="color:#e8d5b0">${_esc(row.message)}</div><div class="chat-c-time">${ts}</div></div></div>`;
   } else if (row.type === "reaction") {
     const emoji = row.message;
     const existing = feed.querySelector(`.react-pill[data-emoji="${emoji}"]`);

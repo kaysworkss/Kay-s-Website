@@ -372,17 +372,18 @@ async function loadMessages(auctionId, chatBody) {
       const avatUrl = isAuc ? (aucProf?.avatar_url || null) : (profile?.avatar_url || null);
       const avatHtml = isAuc
         ? (avatUrl
-            ? `<img src="${avatUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" onerror="this.outerHTML='<div class=\"chat-avatar auc\">${init}</div>'">`
+            ? `<img src="${avatUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" data-init="${init}" onerror="_hofAucAvatFallback(this)">`
             : `<div class="chat-avatar auc">${init}</div>`)
         : avatUrl
           ? `<img src="${avatUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" data-init="${init}" data-color="${color}" onerror="_avatarFallback(this)">`
           : `<div class="chat-avatar" style="background:${color}22;color:${color}">${init}</div>`;
-      const bidTag = isBid ? `<span class="bid-tag">Bid</span>` : "";
+      const bidTag  = isBid ? `<span class="bid-tag">Bid</span>` : "";
+      const roleTag = isAuc ? `<span style="font-family:'Cinzel',serif;font-size:0.4rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--clay);opacity:0.7;margin-left:5px">Auctioneer</span>` : "";
       rendered.push(`<div class="chat-item">
         ${avatHtml}
         <div class="chat-bubble">
           <div class="chat-meta">
-            <span class="chat-name ${isAuc?"auc":""}" ${isAuc?"":"style='color:"+color+"'"}>${esc(name)}</span>
+            <span class="chat-name ${isAuc?"auc":""}" ${isAuc?"":"style='color:"+color+"'"}>${esc(name)}${roleTag}</span>
             <span class="chat-time">${fmtTime(row.created_at)}</span>
           </div>
           <div class="chat-text ${isBid?"bid":""}">${esc(row.message)}${bidTag}</div>
