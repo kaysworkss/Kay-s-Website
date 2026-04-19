@@ -50,6 +50,23 @@ nav {
 .nav-link:hover { color:var(--clay); }
 .nav-link.active { color:var(--gold); }
 
+/* Hamburger */
+.nav-hamburger { display:none; flex-direction:column; justify-content:center; gap:5px; width:32px; height:32px; background:transparent; border:none; cursor:pointer; padding:4px; }
+.nav-hamburger span { display:block; width:100%; height:1.5px; background:var(--clay); border-radius:1px; transition:transform .25s ease, opacity .2s ease; transform-origin:center; }
+.nav-hamburger.open span:nth-child(1) { transform:translateY(6.5px) rotate(45deg); }
+.nav-hamburger.open span:nth-child(2) { opacity:0; transform:scaleX(0); }
+.nav-hamburger.open span:nth-child(3) { transform:translateY(-6.5px) rotate(-45deg); }
+
+/* Mobile drawer */
+.nav-drawer {
+  display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:99;
+  background:rgba(22,15,10,0.97); backdrop-filter:blur(16px);
+  flex-direction:column; align-items:center; justify-content:center; gap:36px;
+  opacity:0; transition:opacity .25s ease;
+}
+.nav-drawer.open { display:flex; opacity:1; }
+.nav-drawer .nav-link { font-size:0.7rem; letter-spacing:0.3em; }
+
 /* Hero */
 .hero { position:relative; z-index:1; padding:160px 40px 80px; text-align:center; border-bottom:1px solid var(--divider); }
 .hero-eyebrow { font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.35em; text-transform:uppercase; color:var(--gold); margin-bottom:20px; display:flex; align-items:center; justify-content:center; gap:14px; }
@@ -146,19 +163,32 @@ main { position:relative; z-index:1; max-width:1060px; margin:0 auto; padding:80
 .reaction-emoji { font-size:1rem; line-height:1; }
 .reaction-count { font-family:'Crimson Pro',serif; font-size:0.78rem; color:var(--text-muted); }
 
+/* Image shimmer */
+@keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
+.img-shimmer {
+  position:absolute; inset:0;
+  background:linear-gradient(90deg, var(--bg-alt) 25%, rgba(196,132,90,0.06) 50%, var(--bg-alt) 75%);
+  background-size:400px 100%;
+  animation:shimmer 1.4s ease-in-out infinite;
+  transition:opacity .4s ease;
+}
+.record-img { display:block; opacity:0; transition:opacity .4s ease; }
+.record-img.loaded { opacity:1; }
+
 /* Footer */
 footer { position:relative; z-index:1; text-align:center; padding:40px; border-top:1px solid var(--divider); font-family:'Crimson Pro',serif; font-size:0.85rem; color:var(--text-muted); font-style:italic; }
 footer a { color:var(--clay); text-decoration:none; }
 
 @media (max-width:680px) {
   nav { padding:16px 20px; }
-  .nav-links { gap:16px; }
+  .nav-links { display:none; }
+  .nav-hamburger { display:flex; }
   .hero { padding:120px 24px 56px; }
   .stats-bar { flex-wrap:wrap; }
   .stat-item { min-width:50%; border-right:none; border-bottom:1px solid var(--divider); }
   main { padding:40px 16px 80px; }
   .record-top { grid-template-columns:1fr; }
-  .record-img-wrap { max-height:200px; aspect-ratio:16/9; }
+  .record-img-wrap { max-height:220px; aspect-ratio:16/9; }
   .record-details { border-left:none; border-top:1px solid var(--divider); padding:20px; }
   .record-stats { grid-template-columns:1fr 1fr; }
   .chat-toggle,.chat-body { padding-left:16px; padding-right:16px; }
@@ -175,7 +205,18 @@ footer a { color:var(--clay); text-decoration:none; }
     <a href="/auction" class="nav-link">Auction</a>
     <a href="/hall-of-fame" class="nav-link active">Hall of Fame</a>
   </div>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu" onclick="_toggleMenu()">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+
+<!-- Mobile drawer -->
+<div class="nav-drawer" id="nav-drawer">
+  <a href="/" class="nav-link" onclick="_toggleMenu()">Home</a>
+  <a href="/apoti-olowe" class="nav-link" onclick="_toggleMenu()">Àpótí Ọlọ́wẹ̀</a>
+  <a href="/auction" class="nav-link" onclick="_toggleMenu()">Auction</a>
+  <a href="/hall-of-fame" class="nav-link active">Hall of Fame</a>
+</div>
 
 <div class="hero">
   <div class="hero-eyebrow">Àpótí Ọlọ́wẹ̀ Series</div>
@@ -205,7 +246,7 @@ footer a { color:var(--clay); text-decoration:none; }
 </main>
 
 <footer>
-  A record kept on-chain and in time. &nbsp;·&nbsp; <a href="https://kaysworks.com">kaysworks.com</a>
+  The bids are on-chain. The conversations are ours to keep. Both are permanent. &nbsp;·&nbsp; <a href="https://kaysworks.com">kaysworks.com</a>
 </footer>
 
 <script>
@@ -340,7 +381,7 @@ async function loadResults() {
       el.className   = "auction-record";
       el.style.animationDelay = `${i*0.1}s`;
       const imgUrl   = toHTTP(row.art_image);
-      const imgHtml  = imgUrl ? `<img class="record-img" src="${imgUrl}" alt="${esc(row.art_title||'')}" onload="this.style.display='block'" onerror="this.style.display='none'">` : "";
+      const imgHtml  = imgUrl ? `<div class="img-shimmer" id="shimmer-${i}"></div><img class="record-img" loading="lazy" src="${imgUrl}" alt="${esc(row.art_title||'')}" onload="this.classList.add('loaded');const s=document.getElementById('shimmer-${i}');if(s)s.style.opacity='0';" onerror="this.style.display='none'">` : "";
       const meta     = [row.art_year,row.art_medium].filter(Boolean).join(" · ");
       const etherEl  = row.contract_addr ? `<a class="etherscan-link" href="https://etherscan.io/address/${row.contract_addr}" target="_blank" rel="noopener">View contract ↗</a>` : "";
 
@@ -428,6 +469,23 @@ async function loadResults() {
 }
 
 loadResults();
+
+// ── Hamburger menu ──
+function _toggleMenu() {
+  const btn    = document.getElementById("nav-hamburger");
+  const drawer = document.getElementById("nav-drawer");
+  const open   = drawer.classList.toggle("open");
+  btn.classList.toggle("open", open);
+  document.body.style.overflow = open ? "hidden" : "";
+}
+
+// Close on escape key
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    const drawer = document.getElementById("nav-drawer");
+    if (drawer.classList.contains("open")) _toggleMenu();
+  }
+});
 </script>
 </body>
 </html>
