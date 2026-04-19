@@ -234,7 +234,7 @@ async function loadMessages(auctionId, chatBody) {
   chatBody.innerHTML = `<div class="chat-loading">Loading conversation…</div>`;
   try {
     const res  = await fetch(
-      `${SUPABASE_URL}/rest/v1/collector_messages?auction_id=eq.${encodeURIComponent(auctionId)}&order=created_at.asc&limit=200`,
+      `${SUPABASE_URL}/rest/v1/collector_messages?auction_id=ilike.${encodeURIComponent(auctionId)}&order=created_at.asc&limit=200`,
       { headers: SB }
     );
     const rows = await res.json();
@@ -375,7 +375,7 @@ async function loadResults() {
       const state    = { loaded: false };
 
       // Prefetch message count
-      fetch(`${SUPABASE_URL}/rest/v1/collector_messages?auction_id=eq.${encodeURIComponent(row.auction_id)}&select=id`,
+      fetch(`${SUPABASE_URL}/rest/v1/collector_messages?auction_id=ilike.${encodeURIComponent(row.auction_id)}&select=id`,
         { headers: { ...SB, "Prefer":"count=exact", "Range":"0-0" } }
       ).then(r => {
         const count = r.headers.get("Content-Range")?.split("/")?.[1];
