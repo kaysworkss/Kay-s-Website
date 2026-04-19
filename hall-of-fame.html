@@ -306,6 +306,15 @@ async function _getProfile(wallet) {
   return _profiles[key];
 }
 
+async function _loadAucProfile() {
+  if (_profiles["__auc__"] !== undefined) return;
+  try {
+    const res  = await fetch(`${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent("0x72a04d812494cf3f6880483c6269291ce5751a83")}&limit=1`, { headers: SB });
+    const rows = await res.json();
+    _profiles["__auc__"] = (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
+  } catch(_) { _profiles["__auc__"] = null; }
+}
+
 function shortAddr(a) { return (!a||a.length<10) ? (a||"—") : a.slice(0,6)+"…"+a.slice(-4); }
 function fmtDate(iso) { return iso ? new Date(iso).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}) : "—"; }
 function fmtTime(iso) { return iso ? new Date(iso).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}) : ""; }
@@ -339,9 +348,9 @@ async function loadMessages(auctionId, chatBody) {
     const reactCount={}, seenReact=new Set();
     rows.filter(r=>r.type==="reaction").forEach(r=>{ reactCount[r.message]=(reactCount[r.message]||0)+1; });
 
-    // Pre-fetch all unique collector profiles in one pass
+    // Pre-fetch all unique collector profiles + auctioneer profile
     const uniqueWallets = [...new Set(rows.filter(r=>r.type!=="reaction"&&r.type!=="auctioneer").map(r=>r.wallet_address).filter(Boolean))];
-    await Promise.all(uniqueWallets.map(w => _getProfile(w)));
+    await Promise.all([_loadAucProfile(), ...uniqueWallets.map(w => _getProfile(w))]);
 
     const rendered = [];
     for (const row of rows) {
@@ -356,12 +365,15 @@ async function loadMessages(auctionId, chatBody) {
       const isBid   = row.is_bid;
       const addr    = row.wallet_address||"";
       const color   = isAuc ? "var(--clay)" : addrColor(addr);
-      const init    = isAuc ? "KA" : addr.slice(2,4).toUpperCase();
+      const aucProf = _profiles["__auc__"] || null;
+      const init    = isAuc ? (aucProf?.display_name?.slice(0,2).toUpperCase() || "KA") : addr.slice(2,4).toUpperCase();
       const profile = isAuc ? null : (_profiles[addr.toLowerCase()] || null);
-      const name    = isAuc ? "Kay · Auctioneer" : (profile?.display_name || shortAddr(addr));
-      const avatUrl = profile?.avatar_url || null;
+      const name    = isAuc ? (aucProf?.display_name || "Kay · Auctioneer") : (profile?.display_name || shortAddr(addr));
+      const avatUrl = isAuc ? (aucProf?.avatar_url || null) : (profile?.avatar_url || null);
       const avatHtml = isAuc
-        ? `<div class="chat-avatar auc">${init}</div>`
+        ? (avatUrl
+            ? `<img src="${avatUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" onerror="this.outerHTML='<div class=\"chat-avatar auc\">${init}</div>'">`
+            : `<div class="chat-avatar auc">${init}</div>`)
         : avatUrl
           ? `<img src="${avatUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" data-init="${init}" data-color="${color}" onerror="_avatarFallback(this)">`
           : `<div class="chat-avatar" style="background:${color}22;color:${color}">${init}</div>`;

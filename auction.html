@@ -1934,6 +1934,14 @@ function _shake() {
 const SUPABASE_URL  = "https://haijshusgcbdexfueunr.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhaWpzaHVzZ2NiZGV4ZnVldW5yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NTIyNTgsImV4cCI6MjA5MTUyODI1OH0.og3RtGfKWMw5F00fU8ZfEopLy3x7k_k7DUhr6FPPiKg";
 const KAY_WALLET    = "0x72a04d812494cf3f6880483c6269291ce5751a83";
+let _aucProfile = null; // loaded from collector_profiles on init
+
+async function _loadAucProfile() {
+  try {
+    const rows = await _sb.select("collector_profiles", `wallet=eq.${encodeURIComponent(KAY_WALLET)}&limit=1`);
+    if (Array.isArray(rows) && rows.length > 0) _aucProfile = rows[0];
+  } catch(_) {}
+}
 
 const _sb = {
   headers: { "apikey": SUPABASE_ANON, "Authorization": "Bearer " + SUPABASE_ANON, "Content-Type": "application/json" },
@@ -2099,7 +2107,12 @@ function _renderMsg(row) {
   const isDeletable = isMyAuc || (isMyAddr && row.type === "collector");
 
   if (row.type === "auctioneer") {
-    wrap.innerHTML = `<div class="chat-bubble-auc"><div class="chat-auc-avatar">KA</div><div class="chat-auc-bubble"><div class="chat-auc-name">Kay · Auctioneer</div><div class="chat-c-text" style="color:#e8d5b0">${_esc(row.message)}</div><div class="chat-c-time">${ts}</div></div></div>`;
+    const aucName   = _aucProfile?.display_name || "Kay · Auctioneer";
+    const aucAvatar = _aucProfile?.avatar_url   || null;
+    const aucAvatHtml = aucAvatar
+      ? `<img src="${aucAvatar}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" onerror="this.outerHTML='<div class=\"chat-auc-avatar\">KA</div>'">`
+      : `<div class="chat-auc-avatar">KA</div>`;
+    wrap.innerHTML = `<div class="chat-bubble-auc">${aucAvatHtml}<div class="chat-auc-bubble"><div class="chat-auc-name">${_esc(aucName)}</div><div class="chat-c-text" style="color:#e8d5b0">${_esc(row.message)}</div><div class="chat-c-time">${ts}</div></div></div>`;
   } else if (row.type === "reaction") {
     const emoji = row.message;
     const existing = feed.querySelector(`.react-pill[data-emoji="${emoji}"]`);
@@ -2302,11 +2315,14 @@ window._roomHookBid = async function(bidder, amount) {
 };
 
 function initCollectorRoom() {
-  _auctionId = cfg.contractAddr || cfg.auctionId || new Date().toISOString().slice(0,10);
+  _auctionId = (cfg.contractAddr || cfg.auctionId || new Date().toISOString().slice(0,10)).toLowerCase();
   setMode("collector");
   _updateChatInputState();
-  _loadHistory();
-  _subscribeRoom();
+  // Load auctioneer profile first so messages render with correct name/avatar
+  _loadAucProfile().then(() => {
+    _loadHistory();
+    _subscribeRoom();
+  });
   _initPresence();
 }
 
