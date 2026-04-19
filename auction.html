@@ -1401,36 +1401,45 @@ async function loadBidHistory() {
   if (!auctionContract || !provider) return;
   bidHistory = [];
   try {
-    // BidPlaced(address,uint256) topic
-    const topic = ethers.id("BidPlaced(address,uint256)");
-    const cur   = await provider.getBlockNumber();
-    // Fetch in 2000-block chunks — stays within Alchemy free-tier limits
-    const CHUNK = 2000;
-    const from  = Math.max(0, cur - 50000);
-    let logs    = [];
+    const topic     = ethers.id("BidPlaced(address,uint256)");
+    const iface     = auctionContract.interface;
+    const cur       = await provider.getBlockNumber();
+    const CHUNK     = 2000;
+    const from      = Math.max(0, cur - 50000);
+    const addr      = await auctionContract.getAddress();
+    let   allLogs   = [];
+
+    console.log("loadBidHistory: scanning from", from, "to", cur, "contract:", addr);
 
     for (let start = from; start <= cur; start += CHUNK) {
       const end   = Math.min(start + CHUNK - 1, cur);
       const chunk = await provider.getLogs({
-        address:   cfg.contractAddr,
+        address:   addr,
         topics:    [topic],
         fromBlock: start,
         toBlock:   end,
-      }).catch(() => []);
-      logs = logs.concat(chunk);
+      }).catch((e) => { console.log("chunk error", start, e); return []; });
+      allLogs = allLogs.concat(chunk);
     }
 
-    for (const log of logs) {
-      // Decode: topics[1] is indexed bidder, data is amount
-      const bidder = ethers.getAddress("0x" + log.topics[1].slice(26));
-      const amount = BigInt(log.data);
-      const block  = await provider.getBlock(log.blockNumber).catch(() => null);
-      bidHistory.unshift({
-        bidder,
-        amount,
-        timestamp: block?.timestamp ?? 0,
-        txHash:    log.transactionHash,
-      });
+    console.log("loadBidHistory: found", allLogs.length, "logs");
+
+    // Sort oldest → newest so unshift gives newest-first
+    allLogs.sort((a, b) => a.blockNumber - b.blockNumber);
+
+    for (const log of allLogs) {
+      try {
+        const parsed = iface.parseLog(log);
+        const bidder = parsed.args[0];
+        const amount = parsed.args[1];
+        const block  = await provider.getBlock(log.blockNumber).catch(() => null);
+        bidHistory.unshift({
+          bidder,
+          amount,
+          timestamp: block?.timestamp ?? 0,
+          txHash:    log.transactionHash,
+        });
+      } catch(e) { console.log("log parse error:", e); }
     }
     renderHistory();
   } catch(e) { console.log("History error:", e); renderHistory(); }
