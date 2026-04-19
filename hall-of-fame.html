@@ -30,6 +30,23 @@
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
+
+/* ── Custom cursor ── */
+html, body, * { cursor: none !important; }
+.cursor { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999; }
+.cursor-dot {
+  width: 10px; height: 10px; background: var(--sand);
+  border-radius: 50%; position: absolute;
+  transform: translate(-50%, -50%);
+  transition: background 0.3s ease, transform 0.1s ease;
+}
+.cursor-ring {
+  width: 36px; height: 36px; border: 1.5px solid var(--sand);
+  border-radius: 50%; position: absolute;
+  transform: translate(-50%, -50%);
+  transition: width 0.25s, height 0.25s, border-color 0.3s ease;
+  opacity: 0.8;
+}
 body {
   background: var(--bg); color: var(--text);
   font-family: 'Crimson Pro', 'Cormorant Garamond', serif;
@@ -585,5 +602,52 @@ document.addEventListener("keydown", e => {
   <div class="lightbox-caption" id="lightbox-caption"></div>
 </div>
 
+<!-- Custom cursor -->
+<div class="cursor" id="cursor" style="opacity:0;transition:opacity 0.3s;">
+  <div class="cursor-ring" id="cursorRing"></div>
+  <div class="cursor-dot"  id="cursorDot"></div>
+</div>
+
+<script>
+(function() {
+  const cursorEl = document.getElementById('cursor');
+  const ring     = document.getElementById('cursorRing');
+  const dot      = document.getElementById('cursorDot');
+  if (!cursorEl) return;
+
+  const isTouch = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  if (isTouch()) {
+    cursorEl.style.display = 'none';
+    const s = document.createElement('style');
+    s.textContent = 'html, body, * { cursor: auto !important; }';
+    document.head.appendChild(s);
+    return;
+  }
+
+  let mx = 0, my = 0, rx = 0, ry = 0;
+
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    cursorEl.style.opacity = '1';
+  });
+
+  function animCursor() {
+    rx += (mx - rx) * 0.12;
+    ry += (my - ry) * 0.12;
+    dot.style.left  = mx + 'px'; dot.style.top  = my + 'px';
+    ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
+    requestAnimationFrame(animCursor);
+  }
+  animCursor();
+
+  document.querySelectorAll('a, button, input, .chat-toggle, .read-more-btn, .record-img-wrap').forEach(el => {
+    el.addEventListener('mouseenter', () => { ring.style.width = '56px'; ring.style.height = '56px'; });
+    el.addEventListener('mouseleave', () => { ring.style.width = '36px'; ring.style.height = '36px'; });
+  });
+
+  document.addEventListener('mouseleave', () => { cursorEl.style.opacity = '0'; });
+  document.addEventListener('mouseenter', () => { cursorEl.style.opacity = '1'; });
+}());
+</script>
 </body>
 </html>
