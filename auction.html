@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/images/kaysworkslogo.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="/images/kayslogo1.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/kayslog02.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/kayslogo3.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Auction</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
@@ -1885,6 +1889,17 @@ const GAVEL_CALLS = {
   sold:["SOLD! The gavel falls. Igbaradi has found its custodian. Kay salutes you.","And that is SOLD. History recorded on-chain. Congratulations to our winner.","SOLD at the current bid. A beautiful close to a beautiful auction. Kay is honoured."],
 };
 
+// ── Avatar fallback — avoids broken inline HTML injection ──
+function _avatarFallback(img) {
+  const init  = img.dataset.init  || "??";
+  const color = img.dataset.color || "var(--clay)";
+  const div   = document.createElement("div");
+  div.className = "chat-c-avatar";
+  div.style.cssText = `background:${color}22;color:${color}`;
+  div.textContent = init;
+  img.replaceWith(div);
+}
+
 function _nowStr() { return new Date().toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }); }
 
 // ── Collector profiles ────────────────────────────────────────────────────────
@@ -2002,7 +2017,7 @@ function _renderMsg(row) {
     const dispName = isMe ? "You" : (profile?.display_name || short);
     const avatUrl  = profile?.avatar_url || null;
     const avatHtml = avatUrl
-      ? `<img src="${avatUrl}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" onerror="this.outerHTML='<div class=\"chat-c-avatar\" style=\"background:${color}22;color:${color}\">${init}</div>'">`
+      ? `<img src="${avatUrl}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" data-init="${init}" data-color="${color}" onerror="_avatarFallback(this)">`
       : `<div class="chat-c-avatar" style="background:${color}22;color:${color}">${init}</div>`;
     const badge = row.is_bid ? `<span style="font-family:'Cinzel',serif;font-size:.46rem;letter-spacing:.12em;text-transform:uppercase;background:rgba(107,124,92,.15);border:1px solid rgba(107,124,92,.35);border-radius:3px;padding:1px 5px;color:#6b7c5c;margin-left:4px">Bid</span>` : "";
     const bStyle = row.is_bid ? "background:rgba(196,132,90,.08);border-color:rgba(196,132,90,.28);" : "";
