@@ -232,6 +232,19 @@ body {
   color: var(--clay); margin-bottom: 12px;
 }
 
+/* Hall of fame card */
+.hof-status { font-family:'Crimson Pro',serif; font-size:0.85rem; font-style:italic; color:var(--text-muted); margin-top:10px; min-height:1.4em; }
+.hof-status.ok  { color:var(--moss); }
+.hof-status.err { color:var(--clay); }
+.btn-hof {
+  font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.18em; text-transform:uppercase;
+  background:rgba(201,153,58,0.12); border:1px solid rgba(201,153,58,0.4);
+  color:var(--gold); border-radius:var(--r); padding:10px 18px;
+  cursor:pointer; transition:all .18s; width:100%; text-align:center;
+}
+.btn-hof:hover:not(:disabled) { background:rgba(201,153,58,0.22); border-color:var(--gold); }
+.btn-hof:disabled { opacity:0.45; cursor:not-allowed; }
+
 /* Main content hidden until authed */
 #main-content { display: none; }
 </style>
@@ -382,6 +395,23 @@ body {
         <div class="preview-url" id="preview-url"></div>
       </div>
       <a id="preview-link" href="https://www.kaysworks.com/auction" target="_blank" class="btn btn-outline" style="white-space:nowrap;text-decoration:none">Open →</a>
+    </div>
+
+    <!-- Hall of Fame -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-head">
+        <div class="card-title">Hall of Fame</div>
+        <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(201,153,58,0.12);color:var(--gold);border:1px solid rgba(201,153,58,0.3)">Permanent record</span>
+      </div>
+      <div class="card-body">
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:14px">
+          Save this auction's final result — winner, winning bid, bid count, and artwork details — to the public Hall of Fame. This reads the final state directly from the contract so the data is accurate.
+        </p>
+        <button class="btn-hof" id="hof-btn" onclick="saveToHallOfFame()">
+          ◇ &nbsp;Save auction to Hall of Fame
+        </button>
+        <div class="hof-status" id="hof-status"></div>
+      </div>
     </div>
 
     <!-- Danger zone -->
@@ -542,6 +572,123 @@ async function saveConfig() {
 }
 
 // ─── Clear ────────────────────────────────────────────────────────────────────
+
+// ─── Hall of Fame — manual save ──────────────────────────────────────────────
+
+const SUPABASE_URL  = "https://haijshusgcbdexfueunr.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhaWpzaHVzZ2NiZGV4ZnVldW5yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NTIyNTgsImV4cCI6MjA5MTUyODI1OH0.og3RtGfKWMw5F00fU8ZfEopLy3x7k_k7DUhr6FPPiKg";
+
+async function saveToHallOfFame() {
+  const btn      = document.getElementById("hof-btn");
+  const statusEl = document.getElementById("hof-status");
+  const cfg      = await (async () => {
+    try { const r = await apiFetch("GET"); return r.config || {}; } catch(e) { return {}; }
+  })();
+
+  const contractAddr = cfg.contractAddr || document.getElementById("contract-addr").value.trim();
+  const rpcUrl       = cfg.rpcUrl       || document.getElementById("rpc-url").value.trim();
+
+  if (!contractAddr) {
+    statusEl.className = "hof-status err";
+    statusEl.textContent = "No contract address found — fill in the auction configuration first.";
+    return;
+  }
+  if (!rpcUrl) {
+    statusEl.className = "hof-status err";
+    statusEl.textContent = "No RPC URL found — add one in the Network section so we can read the contract.";
+    return;
+  }
+
+  btn.disabled = true;
+  statusEl.className = "hof-status";
+  statusEl.textContent = "Reading final state from contract…";
+
+  try {
+    // Read auctionState() via raw JSON-RPC — no ethers needed
+    const payload = {
+      jsonrpc:"2.0", id:1, method:"eth_call",
+      params:[{ to:contractAddr, data:"0x7fb45099" },"latest"]
+    };
+    const rpcRes = await fetch(rpcUrl, {
+      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)
+    });
+    const rpcData = await rpcRes.json();
+
+    if (!rpcData.result || rpcData.result === "0x") {
+      throw new Error("Contract returned no data — is this the correct contract address?");
+    }
+
+    // Decode: started(bool), settled(bool), endTime(uint256), timeRemaining(uint256),
+    //         highestBidder(address), highestBid(uint256), minNextBid(uint256)
+    const hex    = rpcData.result.slice(2);
+    const settled       = parseInt(hex.slice(32, 64), 16) === 1;
+    const highestBidder = "0x" + hex.slice(64*4 + 24, 64*4 + 64);  // 5th word, last 20 bytes
+    const highestBidHex = hex.slice(64*5, 64*6);
+    const highestBid    = parseInt(highestBidHex, 16);
+    const winningBid    = highestBid / 1e18;
+
+    if (!settled) {
+      throw new Error("Auction is not yet settled — the contract has not been settled on-chain.");
+    }
+    if (!highestBidder || highestBidder === "0x0000000000000000000000000000000000000000") {
+      throw new Error("No winner found — the auction may not have received any bids.");
+    }
+
+    statusEl.textContent = `Winner confirmed: ${highestBidder.slice(0,6)}…${highestBidder.slice(-4)} · ${winningBid.toFixed(4)} ETH. Saving…`;
+
+    // Count bids from Supabase
+    let bidCount = 0;
+    try {
+      const sbRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/collector_messages?auction_id=eq.${encodeURIComponent(contractAddr.toLowerCase())}&is_bid=eq.true&select=id`,
+        { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON, "Prefer":"count=exact", "Range":"0-0" } }
+      );
+      const cr = sbRes.headers.get("Content-Range");
+      bidCount = parseInt(cr?.split("/")?.[1] || "0") || 0;
+    } catch(_) {}
+
+    const record = {
+      auction_id:    contractAddr.toLowerCase(),
+      art_title:     cfg.artTitle   || document.getElementById("art-title").value.trim()   || "",
+      art_artist:    cfg.artArtist  || document.getElementById("art-artist").value.trim()  || "",
+      art_image:     cfg.artImage   || document.getElementById("art-image").value.trim()   || "",
+      art_about:     cfg.artAbout   || document.getElementById("art-about").value.trim()   || "",
+      art_year:      cfg.artYear    || document.getElementById("art-year").value.trim()    || "",
+      art_medium:    cfg.artMedium  || document.getElementById("art-medium").value.trim()  || "",
+      winner:        highestBidder.toLowerCase(),
+      winning_bid:   winningBid,
+      bid_count:     bidCount,
+      contract_addr: contractAddr,
+      settled_at:    new Date().toISOString(),
+    };
+
+    const saveRes = await fetch(`${SUPABASE_URL}/rest/v1/auction_results`, {
+      method:"POST",
+      headers:{
+        apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
+        "Content-Type":"application/json",
+        "Prefer":"resolution=merge-duplicates,return=minimal"
+      },
+      body:JSON.stringify(record),
+    });
+
+    if (!saveRes.ok) {
+      const err = await saveRes.text();
+      throw new Error("Supabase save failed: " + err);
+    }
+
+    statusEl.className   = "hof-status ok";
+    statusEl.textContent = `✓ Saved — ${cfg.artTitle||"Auction"} · ${winningBid.toFixed(4)} ETH · Winner ${highestBidder.slice(0,6)}…${highestBidder.slice(-4)}`;
+    toast("ok", "Hall of Fame updated", "The auction result has been recorded.");
+
+  } catch(e) {
+    statusEl.className   = "hof-status err";
+    statusEl.textContent = "Error: " + (e.message || "Unknown error");
+    toast("err", "Save failed", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
 
 async function clearConfig() {
   if (!confirm("Clear all configuration? The collector page will reset to the landing state.")) return;
