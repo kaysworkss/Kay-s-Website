@@ -9,7 +9,7 @@
 <meta charset="UTF-8" />
 <meta name="google-site-verification" content="e9TWfxuPMB5PAQcZ0Hpa72H111jODvMsedDkePP2UVM" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn-cgi.cloudflare.com https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://formspree.io https://vitals.vercel-insights.com;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn-cgi.cloudflare.com https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://formspree.io https://vitals.vercel-insights.com https://eth-mainnet.g.alchemy.com;">
 <title>Kay's Works | Original Art, Prints & Commissions</title>
 
 <!-- Vercel Speed Insights -->
@@ -2709,11 +2709,9 @@
     try {
       const res  = await fetch(AUCTION_API);
       const json = await res.json();
-      console.log("[AuctionCheck] raw response:", JSON.stringify(json).slice(0, 300));
-      if (!json.ok) { console.warn("[AuctionCheck] json.ok is falsy — bailing"); return; }
+      if (!json.ok) return;
       const cfg = json.config || {};
       const status = cfg.status || "off";
-      console.log("[AuctionCheck] status:", status, "| endTime:", cfg.endTime, "| rpcUrl:", cfg.rpcUrl, "| contractAddr:", cfg.contractAddr);
 
       if (status === "live") {
         // Gold glowing button
