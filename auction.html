@@ -1385,7 +1385,6 @@ async function placeBid() {
     await checkEligibility();
     aucOnBid(_confirmedBid, true);
     if (window._roomHookBid) window._roomHookBid(signerAddress, wei);
-    if (window._roomHookBid) window._roomHookBid(signerAddress, wei);
   } catch(e) {
     notify("err","Bid failed", e?.reason || e?.shortMessage || e?.message || "Transaction failed");
   } finally {
@@ -1398,48 +1397,29 @@ async function placeBid() {
 // ─── Bid history ─────────────────────────────────────────────────────────────
 
 async function loadBidHistory() {
-  if (!auctionContract || !provider) return;
+  // Load bid history from Supabase (already stored when bids are placed)
+  // This avoids eth_getLogs which is restricted on Alchemy's free tier
   bidHistory = [];
+  const auctionId = cfg.contractAddr || cfg.auctionId;
+  if (!auctionId) { renderHistory(); return; }
   try {
-    const topic     = ethers.id("BidPlaced(address,uint256)");
-    const iface     = auctionContract.interface;
-    const cur       = await provider.getBlockNumber();
-    const CHUNK     = 2000;
-    const from      = Math.max(0, cur - 50000);
-    const addr      = await auctionContract.getAddress();
-    let   allLogs   = [];
-
-    console.log("loadBidHistory: scanning from", from, "to", cur, "contract:", addr);
-
-    for (let start = from; start <= cur; start += CHUNK) {
-      const end   = Math.min(start + CHUNK - 1, cur);
-      const chunk = await provider.getLogs({
-        address:   addr,
-        topics:    [topic],
-        fromBlock: start,
-        toBlock:   end,
-      }).catch((e) => { console.log("chunk error", start, e); return []; });
-      allLogs = allLogs.concat(chunk);
-    }
-
-    console.log("loadBidHistory: found", allLogs.length, "logs");
-
-    // Sort oldest → newest so unshift gives newest-first
-    allLogs.sort((a, b) => a.blockNumber - b.blockNumber);
-
-    for (const log of allLogs) {
-      try {
-        const parsed = iface.parseLog(log);
-        const bidder = parsed.args[0];
-        const amount = parsed.args[1];
-        const block  = await provider.getBlock(log.blockNumber).catch(() => null);
-        bidHistory.unshift({
-          bidder,
-          amount,
-          timestamp: block?.timestamp ?? 0,
-          txHash:    log.transactionHash,
-        });
-      } catch(e) { console.log("log parse error:", e); }
+    const rows = await _sb.select(
+      "collector_messages",
+      `auction_id=eq.${encodeURIComponent(auctionId)}&is_bid=eq.true&order=created_at.desc&limit=50`
+    );
+    if (!Array.isArray(rows)) { renderHistory(); return; }
+    for (const row of rows) {
+      // message is stored as "0.05 ETH" — parse back to BigInt wei
+      const ethVal = parseFloat(row.message);
+      if (isNaN(ethVal)) continue;
+      const amount    = ethers.parseEther(ethVal.toString());
+      const timestamp = row.created_at ? Math.floor(new Date(row.created_at).getTime() / 1000) : 0;
+      bidHistory.push({
+        bidder:    row.wallet_address || "0x0000",
+        amount,
+        timestamp,
+        txHash:    null,
+      });
     }
     renderHistory();
   } catch(e) { console.log("History error:", e); renderHistory(); }
@@ -1453,6 +1433,8 @@ function pushBid(bidder, amount, timestamp, txHash) {
   if (items[0]) { items[0].classList.remove("flash"); void items[0].offsetWidth; items[0].classList.add("flash"); }
   aucOnBid(bid, false);
   if (window._roomHookBid) window._roomHookBid(bidder, amount);
+  // Reload full history from Supabase after a short delay so new bid is included
+  setTimeout(loadBidHistory, 2000);
 }
 
 function renderHistory() {
