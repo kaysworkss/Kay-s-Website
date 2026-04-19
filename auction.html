@@ -1473,6 +1473,43 @@ function showSettled(winner, amount) {
     : `Won by ${shortAddr(winner)} for ${ethers.formatEther(amount)} ETH`;
   document.getElementById("bid-form").style.display = "none";
   aucOnWon(winner, amount);
+  // Persist result to hall of fame — only runs once, safe to call multiple times
+  _saveAuctionResult(winner, amount);
+}
+
+// ─── Hall of Fame — persist settled auction ───────────────────────────────────
+
+let _resultSaved = false;
+async function _saveAuctionResult(winner, amount) {
+  if (_resultSaved) return;          // guard — only write once per session
+  if (!cfg.contractAddr) return;
+  _resultSaved = true;
+  try {
+    const winningBid = parseFloat(ethers.formatEther(amount));
+    const record = {
+      auction_id:    cfg.contractAddr.toLowerCase(),
+      art_title:     cfg.artTitle    || "",
+      art_artist:    cfg.artArtist   || "",
+      art_image:     cfg.artImage    || "",
+      art_about:     cfg.artAbout    || "",
+      art_year:      cfg.artYear     || "",
+      art_medium:    cfg.artMedium   || "",
+      winner:        winner.toLowerCase(),
+      winning_bid:   winningBid,
+      bid_count:     bidHistory.length || 0,
+      contract_addr: cfg.contractAddr,
+      settled_at:    new Date().toISOString(),
+    };
+    // Upsert so re-running doesn't create duplicates
+    await fetch(`${SUPABASE_URL}/rest/v1/auction_results`, {
+      method:  "POST",
+      headers: { ..._sb.headers, "Prefer": "resolution=merge-duplicates" },
+      body:    JSON.stringify(record),
+    });
+    console.log("Auction result saved to hall of fame.");
+  } catch(e) {
+    console.warn("Could not save auction result:", e);
+  }
 }
 
 // ─── Notify ───────────────────────────────────────────────────────────────────
