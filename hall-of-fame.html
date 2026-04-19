@@ -180,6 +180,35 @@ main { position:relative; z-index:1; max-width:1060px; margin:0 auto; padding:80
 .record-img { display:block; opacity:0; transition:opacity .4s ease; }
 .record-img.loaded { opacity:1; }
 
+/* Lightbox */
+.lightbox {
+  display:none; position:fixed; inset:0; z-index:999;
+  background:rgba(14,9,5,0.96); backdrop-filter:blur(8px);
+  align-items:center; justify-content:center;
+  cursor:zoom-out;
+}
+.lightbox.open { display:flex; }
+.lightbox-img {
+  max-width:92vw; max-height:90vh;
+  object-fit:contain; border-radius:2px;
+  box-shadow:0 32px 80px rgba(0,0,0,.8);
+  animation:lbReveal .22s ease;
+}
+@keyframes lbReveal { from{opacity:0;transform:scale(.96)} to{opacity:1;transform:none} }
+.lightbox-close {
+  position:absolute; top:20px; right:24px;
+  font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.2em; text-transform:uppercase;
+  color:var(--text-muted); background:transparent; border:none; cursor:pointer;
+  transition:color .2s;
+}
+.lightbox-close:hover { color:var(--clay); }
+.lightbox-caption {
+  position:absolute; bottom:24px; left:50%; transform:translateX(-50%);
+  font-family:'Crimson Pro',serif; font-size:0.88rem; font-style:italic;
+  color:var(--text-muted); white-space:nowrap;
+}
+.record-img-wrap { cursor:zoom-in; }
+
 /* Footer */
 footer { position:relative; z-index:1; text-align:center; padding:40px; border-top:1px solid var(--divider); font-family:'Crimson Pro',serif; font-size:0.85rem; color:var(--text-muted); font-style:italic; }
 footer a { color:var(--clay); text-decoration:none; }
@@ -330,7 +359,7 @@ async function loadMessages(auctionId, chatBody) {
       const avatHtml = isAuc
         ? `<div class="chat-avatar auc">${init}</div>`
         : avatUrl
-          ? `<img src="${avatUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" onerror="this.outerHTML='<div class=\"chat-avatar\" style=\"background:${color}22;color:${color}\">${init}</div>'">`
+          ? `<img src="${avatUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" data-init="${init}" data-color="${color}" onerror="_avatarFallback(this)">`
           : `<div class="chat-avatar" style="background:${color}22;color:${color}">${init}</div>`;
       const bidTag = isBid ? `<span class="bid-tag">Bid</span>` : "";
       rendered.push(`<div class="chat-item">
@@ -386,7 +415,8 @@ async function loadResults() {
       el.className   = "auction-record";
       el.style.animationDelay = `${i*0.1}s`;
       const imgUrl   = toHTTP(row.art_image);
-      const imgHtml  = imgUrl ? `<div class="img-shimmer" id="shimmer-${i}"></div><img class="record-img" loading="lazy" src="${imgUrl}" alt="${esc(row.art_title||'')}" onload="this.classList.add('loaded');const s=document.getElementById('shimmer-${i}');if(s)s.style.opacity='0';const p=this.parentElement.querySelector('.record-img-placeholder');if(p)p.classList.add('hidden');" onerror="this.style.display='none'">` : "";
+      const imgTitle = esc(row.art_title||'');
+      const imgHtml  = imgUrl ? `<div class="img-shimmer" id="shimmer-${i}"></div><img class="record-img" loading="lazy" src="${imgUrl}" alt="${imgTitle}" onclick="event.stopPropagation();_openLightbox('${imgUrl}','${imgTitle}')" onload="this.classList.add('loaded');const s=document.getElementById('shimmer-${i}');if(s)s.style.opacity='0';const p=this.parentElement.querySelector('.record-img-placeholder');if(p)p.classList.add('hidden');" onerror="this.style.display='none'">` : "";
       const meta     = [row.art_year,row.art_medium].filter(Boolean).join(" · ");
       const etherEl  = row.contract_addr ? `<a class="etherscan-link" href="https://etherscan.io/address/${row.contract_addr}" target="_blank" rel="noopener">View contract ↗</a>` : "";
 
@@ -395,7 +425,7 @@ async function loadResults() {
       const winnerName    = row.winner_display_name || winnerProfile?.display_name || shortAddr(row.winner);
       const winnerAvatar  = row.winner_avatar_url   || winnerProfile?.avatar_url   || null;
       const winnerAvatHtml = winnerAvatar
-        ? `<img src="${winnerAvatar}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;" onerror="this.style.display='none'">`
+        ? `<img src="${winnerAvatar}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;flex-shrink:0;" onerror="_winnerAvatFallback(this)">`
         : `<span class="winner-dot"></span>`;
 
       el.innerHTML = `
@@ -410,7 +440,7 @@ async function loadResults() {
               <div class="record-series">Àpótí Ọlọ́wẹ̀ Series${meta?" · "+meta:""}</div>
               <div class="record-title">${esc(row.art_title||"Untitled")}</div>
               <div class="record-artist">${esc(row.art_artist||"Kayode Oyeniyi")}</div>
-              ${row.art_about?`<div class="record-about clamped" id="about-${i}">${esc(row.art_about)}</div><button class="read-more-btn" id="readmore-${i}" onclick="(function(){const a=document.getElementById('about-${i}');const b=document.getElementById('readmore-${i}');const expanded=a.classList.toggle('clamped');b.textContent=expanded?'Read less ↑':'Read more ↓';})()" >Read more ↓</button>`:""}
+              ${row.art_about?`<div class="record-about clamped" id="about-${i}">${esc(row.art_about)}</div><button class="read-more-btn" id="readmore-${i}" onclick="(function(){const a=document.getElementById('about-${i}');const b=document.getElementById('readmore-${i}');const nowClamped=a.classList.toggle('clamped');b.textContent=nowClamped?'Read more ↓':'Read less ↑';})()">Read more ↓</button>`:""}
             </div>
             <div>
               <div class="record-stats">
@@ -473,6 +503,43 @@ async function loadResults() {
   }
 }
 
+// ── Lightbox ──
+function _openLightbox(src, caption) {
+  document.getElementById("lightbox-img").src     = src;
+  document.getElementById("lightbox-caption").textContent = caption || "";
+  document.getElementById("lightbox").classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+function _closeLightbox() {
+  document.getElementById("lightbox").classList.remove("open");
+  document.getElementById("lightbox-img").src = "";
+  document.body.style.overflow = "";
+}
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    _closeLightbox();
+    // also close nav drawer if open
+    const drawer = document.getElementById("nav-drawer");
+    if (drawer?.classList.contains("open")) _toggleMenu();
+  }
+});
+
+// ── Avatar fallback helpers — avoids broken inline HTML injection ──
+function _avatarFallback(img) {
+  const init  = img.dataset.init  || "??";
+  const color = img.dataset.color || "var(--clay)";
+  const div   = document.createElement("div");
+  div.className = "chat-avatar";
+  div.style.cssText = `background:${color}22;color:${color}`;
+  div.textContent = init;
+  img.replaceWith(div);
+}
+function _winnerAvatFallback(img) {
+  const dot = document.createElement("span");
+  dot.className = "winner-dot";
+  img.replaceWith(dot);
+}
+
 loadResults();
 
 // ── Hamburger menu ──
@@ -492,5 +559,12 @@ document.addEventListener("keydown", e => {
   }
 });
 </script>
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="_closeLightbox()">
+  <button class="lightbox-close" onclick="_closeLightbox()">Close ✕</button>
+  <img class="lightbox-img" id="lightbox-img" src="" alt="">
+  <div class="lightbox-caption" id="lightbox-caption"></div>
+</div>
+
 </body>
 </html>

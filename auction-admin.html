@@ -245,6 +245,20 @@ body {
 .btn-hof:hover:not(:disabled) { background:rgba(201,153,58,0.22); border-color:var(--gold); }
 .btn-hof:disabled { opacity:0.45; cursor:not-allowed; }
 
+/* Collector profiles card */
+.profile-list { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+.profile-entry { display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:center; padding:10px 12px; background:var(--bg); border:1px solid var(--divider); border-radius:var(--r); }
+.profile-entry-addr { font-family:'Crimson Pro',serif; font-size:0.8rem; color:var(--clay); font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.profile-entry-name { font-family:'Crimson Pro',serif; font-size:0.88rem; color:var(--text); }
+.profile-entry-avatar { width:28px; height:28px; border-radius:50%; object-fit:cover; border:1px solid var(--divider); display:none; }
+.profile-entry-avatar.show { display:block; }
+.btn-profile-save { font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.14em; text-transform:uppercase; background:transparent; border:1px solid rgba(107,124,92,.4); color:var(--moss); border-radius:var(--r); padding:5px 10px; cursor:pointer; transition:all .18s; white-space:nowrap; }
+.btn-profile-save:hover { background:rgba(107,124,92,.15); }
+.profile-search-row { display:flex; gap:8px; }
+.profile-status { font-family:'Crimson Pro',serif; font-size:0.82rem; font-style:italic; color:var(--text-muted); margin-top:8px; min-height:1.2em; }
+.profile-status.ok { color:var(--moss); }
+.profile-status.err { color:var(--clay); }
+
 /* Main content hidden until authed */
 #main-content { display: none; }
 </style>
@@ -420,6 +434,49 @@ body {
           ◇ &nbsp;Save auction to Hall of Fame
         </button>
         <div class="hof-status" id="hof-status"></div>
+      </div>
+    </div>
+
+    <!-- Collector Profiles -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-head">
+        <div class="card-title">Collector Profiles</div>
+        <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(107,124,92,0.1);color:var(--moss);border:1px solid rgba(107,124,92,0.3)">Name &amp; Avatar</span>
+      </div>
+      <div class="card-body">
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:14px">
+          Assign a display name and avatar to any participating wallet. These appear in the Hall of Fame chat archive and the live collector room.
+        </p>
+        <div class="profile-search-row">
+          <input id="profile-wallet-input" style="flex:1;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:9px 12px;outline:none;transition:border-color .2s;" placeholder="0x… wallet address" onkeydown="if(event.key==='Enter')lookupProfile()" />
+          <button class="btn btn-outline" onclick="lookupProfile()" style="white-space:nowrap">Look up →</button>
+        </div>
+        <div class="profile-status" id="profile-lookup-status"></div>
+
+        <div id="profile-edit-form" style="display:none;margin-top:14px;padding:14px;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <img id="pef-avatar-preview" class="profile-entry-avatar" src="" alt="">
+            <div>
+              <div id="pef-addr" style="font-family:'Crimson Pro',serif;font-size:0.8rem;color:var(--clay);font-style:italic;"></div>
+              <div id="pef-existing" style="font-family:'Crimson Pro',serif;font-size:0.78rem;color:var(--text-muted);font-style:italic;"></div>
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:8px">
+            <label>Display name</label>
+            <input id="pef-name" placeholder="e.g. Adebayo" maxlength="40" style="width:100%;background:var(--bg-alt);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:8px 10px;outline:none;" />
+          </div>
+          <div class="field" style="margin-bottom:12px">
+            <label>Avatar URL</label>
+            <input id="pef-avatar" placeholder="https://…" maxlength="300" oninput="previewAvatar()" style="width:100%;background:var(--bg-alt);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:8px 10px;outline:none;" />
+          </div>
+          <button class="btn btn-outline" id="pef-save-btn" onclick="saveProfile()" style="width:100%;justify-content:center;">Save profile</button>
+          <div class="profile-status" id="pef-status"></div>
+        </div>
+
+        <div id="profile-list-wrap" style="margin-top:16px;display:none;">
+          <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Saved profiles</div>
+          <div class="profile-list" id="profile-list"></div>
+        </div>
       </div>
     </div>
 
@@ -737,6 +794,118 @@ async function saveToHallOfFame() {
     btn.disabled = false;
   }
 }
+
+// ─── Collector Profiles ──────────────────────────────────────────────────────
+
+let _currentProfileWallet = null;
+
+async function lookupProfile() {
+  const input    = document.getElementById("profile-wallet-input");
+  const statusEl = document.getElementById("profile-lookup-status");
+  const form     = document.getElementById("profile-edit-form");
+  const wallet   = input.value.trim().toLowerCase();
+  if (!wallet || wallet.length < 10) {
+    statusEl.className = "profile-status err";
+    statusEl.textContent = "Please enter a valid wallet address."; return;
+  }
+  statusEl.className = "profile-status"; statusEl.textContent = "Looking up…";
+  form.style.display = "none";
+  try {
+    const res  = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(wallet)}&limit=1`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const rows = await res.json();
+    const existing = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    _currentProfileWallet = wallet;
+    document.getElementById("pef-addr").textContent     = wallet.slice(0,8)+"…"+wallet.slice(-6);
+    document.getElementById("pef-existing").textContent = existing
+      ? "Existing: "+( existing.display_name || "no name") : "No profile yet — creating new";
+    document.getElementById("pef-name").value   = existing?.display_name || "";
+    document.getElementById("pef-avatar").value = existing?.avatar_url   || "";
+    previewAvatar();
+    form.style.display = "block";
+    statusEl.textContent = "";
+    loadAllProfiles();
+  } catch(e) {
+    statusEl.className = "profile-status err";
+    statusEl.textContent = "Error: "+e.message;
+  }
+}
+
+function previewAvatar() {
+  const url     = document.getElementById("pef-avatar").value.trim();
+  const preview = document.getElementById("pef-avatar-preview");
+  if (url) {
+    preview.src = url; preview.classList.add("show");
+    preview.onerror = () => preview.classList.remove("show");
+  } else { preview.classList.remove("show"); }
+}
+
+async function saveProfile() {
+  if (!_currentProfileWallet) return;
+  const btn      = document.getElementById("pef-save-btn");
+  const statusEl = document.getElementById("pef-status");
+  const name     = document.getElementById("pef-name").value.trim().slice(0,40);
+  const avatar   = document.getElementById("pef-avatar").value.trim().slice(0,300);
+  btn.disabled = true; btn.textContent = "Saving…";
+  statusEl.className = "profile-status"; statusEl.textContent = "";
+  try {
+    const checkRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(_currentProfileWallet)}&select=wallet`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const chk = await checkRes.json();
+    const exists = Array.isArray(chk) && chk.length > 0;
+    const record = { wallet:_currentProfileWallet, display_name:name, avatar_url:avatar, updated_at:new Date().toISOString() };
+    await fetch(
+      exists
+        ? `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(_currentProfileWallet)}`
+        : `${SUPABASE_URL}/rest/v1/collector_profiles`,
+      { method:exists?"PATCH":"POST",
+        headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
+          "Content-Type":"application/json", "Prefer":"return=minimal" },
+        body:JSON.stringify(record) }
+    );
+    statusEl.className = "profile-status ok";
+    statusEl.textContent = "✓ Saved — "+(name || _currentProfileWallet.slice(0,8)+"…");
+    document.getElementById("pef-existing").textContent = "Profile saved: "+(name||"no name");
+    btn.textContent = "Saved ✓";
+    setTimeout(() => { btn.textContent = "Save profile"; btn.disabled = false; }, 2000);
+    loadAllProfiles();
+    toast("ok","Profile saved", name ? name+" · "+_currentProfileWallet.slice(0,8)+"…" : "Profile updated");
+  } catch(e) {
+    statusEl.className = "profile-status err";
+    statusEl.textContent = "Error: "+e.message;
+    btn.textContent = "Save profile"; btn.disabled = false;
+  }
+}
+
+async function loadAllProfiles() {
+  const wrap = document.getElementById("profile-list-wrap");
+  const list = document.getElementById("profile-list");
+  try {
+    const res  = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?order=updated_at.desc&limit=50`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const rows = await res.json();
+    if (!Array.isArray(rows)||rows.length===0) { wrap.style.display="none"; return; }
+    wrap.style.display = "block";
+    list.innerHTML = rows.map(r => `
+      <div class="profile-entry">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+          ${r.avatar_url
+            ? `<img src="${r.avatar_url}" class="profile-entry-avatar show" onerror="this.style.display='none'">`
+            : `<div style="width:28px;height:28px;border-radius:50%;background:rgba(196,132,90,.1);border:1px solid var(--divider);flex-shrink:0;"></div>`}
+          <div class="profile-entry-addr" title="${r.wallet}">${r.wallet.slice(0,8)}…${r.wallet.slice(-6)}</div>
+        </div>
+        <div class="profile-entry-name">${r.display_name||'<span style="color:var(--text-muted);font-style:italic">No name</span>'}</div>
+        <button class="btn-profile-save" onclick="document.getElementById('profile-wallet-input').value='${r.wallet}';lookupProfile()">Edit</button>
+      </div>`).join("");
+  } catch(e) { wrap.style.display = "none"; }
+}
+
 
 async function clearConfig() {
   if (!confirm("Clear all configuration? The collector page will reset to the landing state.")) return;
