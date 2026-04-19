@@ -217,6 +217,51 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(158,79,46,0.5); }
     50%       { box-shadow: 0 0 0 8px rgba(158,79,46,0); }
   }
+  /* ── Live auction button state ── */
+  @keyframes pulseAucLive {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(201,153,58,0.7), 0 0 18px rgba(201,153,58,0.25); }
+    50%       { box-shadow: 0 0 0 10px rgba(201,153,58,0), 0 0 28px rgba(201,153,58,0.45); }
+  }
+  @keyframes aucLiveDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(0.85); }
+  }
+  .btn-mint.auction-live {
+    background: linear-gradient(135deg, #b8860b 0%, #c9993a 45%, #d4aa50 100%);
+    color: #1e1410;
+    border: 1px solid rgba(201,153,58,0.6);
+    animation: pulseAucLive 2s ease-in-out infinite;
+  }
+  .btn-mint.auction-live:hover {
+    background: linear-gradient(135deg, #c8960e 0%, #d4aa50 45%, #e0be6a 100%);
+    filter: brightness(1.12);
+    transform: translateY(-2px);
+    animation: none;
+    box-shadow: 0 6px 28px rgba(201,153,58,0.55);
+  }
+  .auc-live-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: #1e1410; margin-right: 7px; vertical-align: middle;
+    animation: aucLiveDot 1.4s ease-in-out infinite;
+  }
+  .auc-countdown-strip {
+    display: none; margin-top: 10px;
+    font-family: 'Cinzel', serif; font-size: 0.58rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--gold); text-align: center;
+  }
+  .auc-countdown-strip.show { display: block; }
+  .auc-cd-nums {
+    font-family: 'Cormorant Garamond', serif; font-size: 1.35rem;
+    font-weight: 600; letter-spacing: 0.06em; color: var(--sand);
+    margin-top: 3px;
+  }
+  .auc-upcoming-strip {
+    display: none; margin-top: 10px;
+    font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+    font-style: italic; color: var(--text-muted, #9a8070); text-align: center;
+  }
+  .auc-upcoming-strip.show { display: block; }
   @keyframes pulseBronze {
     0%, 100% { box-shadow: 0 0 0 0 rgba(176,120,50,0.55); }
     50%       { box-shadow: 0 0 0 8px rgba(176,120,50,0); }
@@ -1627,9 +1672,16 @@
       </div>
 
       <div style="margin-top:1rem;">
-        <a href="/auction" class="btn-mint" aria-label="Bid on the Àpótí Ọlọ́wẹ̀ auction" style="display:inline-block;cursor:pointer;">
+        <a href="/auction" id="idx-auction-btn" class="btn-mint" aria-label="Bid on the Àpótí Ọlọ́wẹ̀ auction" style="display:inline-block;cursor:pointer;">
           &#9670;&nbsp; Bid on the Auction
         </a>
+        <div class="auc-countdown-strip" id="idx-cd-strip">
+          <span>Auction ends in</span>
+          <div class="auc-cd-nums" id="idx-cd-nums">-- : -- : --</div>
+        </div>
+        <div class="auc-upcoming-strip" id="idx-upcoming-strip">
+          Auction opening soon
+        </div>
       </div>
 
 
@@ -2620,6 +2672,86 @@
     });
   }());
 
+</script>
+
+<script>
+/* ── Auction live indicator — index.html ── */
+(function() {
+  const AUCTION_API = "/api/auction-config";
+  const btn         = document.getElementById("idx-auction-btn");
+  const cdStrip     = document.getElementById("idx-cd-strip");
+  const cdNums      = document.getElementById("idx-cd-nums");
+  const upcomingStrip = document.getElementById("idx-upcoming-strip");
+  let _cdTimer = null;
+
+  function _fmt(s) {
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sc = s % 60;
+    if (d > 0) return `${d}d ${String(h).padStart(2,"0")}h ${String(m).padStart(2,"0")}m`;
+    return `${String(h).padStart(2,"0")} : ${String(m).padStart(2,"0")} : ${String(sc).padStart(2,"0")}`;
+  }
+
+  function _startCountdown(endTs) {
+    clearInterval(_cdTimer);
+    cdStrip.classList.add("show");
+    function tick() {
+      const diff = Math.max(0, endTs - Math.floor(Date.now() / 1000));
+      cdNums.textContent = _fmt(diff);
+      if (diff === 0) { clearInterval(_cdTimer); cdStrip.classList.remove("show"); }
+    }
+    tick();
+    _cdTimer = setInterval(tick, 1000);
+  }
+
+  async function _checkAuction() {
+    try {
+      const res  = await fetch(AUCTION_API);
+      const json = await res.json();
+      if (!json.ok) return;
+      const cfg = json.config || {};
+      const status = cfg.status || "off";
+
+      if (status === "live") {
+        // Gold glowing button
+        btn.classList.add("auction-live");
+        btn.innerHTML = '<span class="auc-live-dot"></span>Live Auction — Bid Now';
+        upcomingStrip.classList.remove("show");
+
+        // Pull endTime from contract if rpcUrl + contractAddr available
+        if (cfg.endTime) {
+          _startCountdown(Number(cfg.endTime));
+        } else if (cfg.rpcUrl && cfg.contractAddr && window.ethers) {
+          try {
+            const p  = new ethers.JsonRpcProvider(cfg.rpcUrl);
+            const c  = new ethers.Contract(cfg.contractAddr, [
+              "function auctionState() external view returns (bool,bool,uint256,uint256,address,uint256,uint256)"
+            ], p);
+            const s = await c.auctionState();
+            const endTime = Number(s[2]);
+            if (endTime > 0) _startCountdown(endTime);
+          } catch(_) {}
+        }
+
+      } else if (status === "upcoming") {
+        upcomingStrip.classList.add("show");
+        cdStrip.classList.remove("show");
+        btn.classList.remove("auction-live");
+        btn.innerHTML = '&#9670;&nbsp; Bid on the Auction';
+      } else {
+        btn.classList.remove("auction-live");
+        btn.innerHTML = '&#9670;&nbsp; Bid on the Auction';
+        cdStrip.classList.remove("show");
+        upcomingStrip.classList.remove("show");
+      }
+    } catch(_) {}
+  }
+
+  // Run on load, then re-check every 60s
+  _checkAuction();
+  setInterval(_checkAuction, 60000);
+}());
 </script>
 </body>
 </html>
