@@ -108,17 +108,22 @@ main { position:relative; z-index:1; max-width:1060px; margin:0 auto; padding:80
 
 /* Top: image + details */
 .record-top { display:grid; grid-template-columns:260px 1fr; }
-.record-img-wrap { position:relative; overflow:hidden; background:var(--bg-alt); aspect-ratio:1; max-height:260px; }
-.record-img { width:100%; height:100%; object-fit:cover; transition:transform .6s ease; display:none; }
+.record-img-wrap { position:relative; overflow:hidden; background:var(--bg-alt); aspect-ratio:1; max-height:260px; display:block; }
+.record-img { width:100%; height:100%; object-fit:cover; transition:transform .6s ease, opacity .4s ease; position:absolute; inset:0; opacity:0; }
+.record-img.loaded { opacity:1; }
 .auction-record:hover .record-img { transform:scale(1.04); }
-.record-img-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-family:'Cormorant Garamond',serif; font-size:3.5rem; color:var(--clay); opacity:.1; }
+.record-img-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-family:'Cormorant Garamond',serif; font-size:3.5rem; color:var(--clay); opacity:.1; transition:opacity .4s ease; }
+.record-img-placeholder.hidden { opacity:0; }
 .edition-badge { position:absolute; top:12px; left:12px; font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.18em; text-transform:uppercase; background:rgba(22,15,10,.82); color:var(--gold); border:1px solid rgba(201,153,58,.38); border-radius:2px; padding:4px 8px; backdrop-filter:blur(6px); }
 
 .record-details { padding:28px 32px; display:flex; flex-direction:column; justify-content:space-between; border-left:1px solid var(--divider); }
 .record-series { font-family:'Cinzel',serif; font-size:0.48rem; letter-spacing:0.24em; text-transform:uppercase; color:var(--clay); margin-bottom:8px; }
 .record-title { font-family:'Cormorant Garamond',serif; font-size:1.9rem; font-weight:600; line-height:1.1; color:var(--text); margin-bottom:3px; }
 .record-artist { font-family:'Crimson Pro',serif; font-size:0.92rem; color:var(--text-muted); font-style:italic; margin-bottom:14px; }
-.record-about { font-family:'Crimson Pro',serif; font-size:0.92rem; color:var(--text-muted); line-height:1.75; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; flex:1; }
+.record-about { font-family:'Crimson Pro',serif; font-size:0.92rem; color:var(--text-muted); line-height:1.75; flex:1; }
+.record-about.clamped { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.read-more-btn { font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--clay); background:transparent; border:none; cursor:pointer; padding:6px 0 0; display:block; transition:color .2s; }
+.read-more-btn:hover { color:var(--sand); }
 
 .record-stats { margin-top:22px; padding-top:20px; border-top:1px solid var(--divider); display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
 .rs-label { font-family:'Cinzel',serif; font-size:0.46rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px; }
@@ -381,7 +386,7 @@ async function loadResults() {
       el.className   = "auction-record";
       el.style.animationDelay = `${i*0.1}s`;
       const imgUrl   = toHTTP(row.art_image);
-      const imgHtml  = imgUrl ? `<div class="img-shimmer" id="shimmer-${i}"></div><img class="record-img" loading="lazy" src="${imgUrl}" alt="${esc(row.art_title||'')}" onload="this.classList.add('loaded');const s=document.getElementById('shimmer-${i}');if(s)s.style.opacity='0';" onerror="this.style.display='none'">` : "";
+      const imgHtml  = imgUrl ? `<div class="img-shimmer" id="shimmer-${i}"></div><img class="record-img" loading="lazy" src="${imgUrl}" alt="${esc(row.art_title||'')}" onload="this.classList.add('loaded');const s=document.getElementById('shimmer-${i}');if(s)s.style.opacity='0';const p=this.parentElement.querySelector('.record-img-placeholder');if(p)p.classList.add('hidden');" onerror="this.style.display='none'">` : "";
       const meta     = [row.art_year,row.art_medium].filter(Boolean).join(" · ");
       const etherEl  = row.contract_addr ? `<a class="etherscan-link" href="https://etherscan.io/address/${row.contract_addr}" target="_blank" rel="noopener">View contract ↗</a>` : "";
 
@@ -405,7 +410,7 @@ async function loadResults() {
               <div class="record-series">Àpótí Ọlọ́wẹ̀ Series${meta?" · "+meta:""}</div>
               <div class="record-title">${esc(row.art_title||"Untitled")}</div>
               <div class="record-artist">${esc(row.art_artist||"Kayode Oyeniyi")}</div>
-              ${row.art_about?`<div class="record-about">${esc(row.art_about)}</div>`:""}
+              ${row.art_about?`<div class="record-about clamped" id="about-${i}">${esc(row.art_about)}</div><button class="read-more-btn" id="readmore-${i}" onclick="(function(){const a=document.getElementById('about-${i}');const b=document.getElementById('readmore-${i}');const expanded=a.classList.toggle('clamped');b.textContent=expanded?'Read less ↑':'Read more ↓';})()" >Read more ↓</button>`:""}
             </div>
             <div>
               <div class="record-stats">
