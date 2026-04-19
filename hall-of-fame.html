@@ -213,6 +213,20 @@ const SUPABASE_URL  = "https://haijshusgcbdexfueunr.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhaWpzaHVzZ2NiZGV4ZnVldW5yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NTIyNTgsImV4cCI6MjA5MTUyODI1OH0.og3RtGfKWMw5F00fU8ZfEopLy3x7k_k7DUhr6FPPiKg";
 const SB            = { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON };
 
+// ── Profile cache ──
+const _profiles = {};
+async function _getProfile(wallet) {
+  if (!wallet) return null;
+  const key = wallet.toLowerCase();
+  if (_profiles[key] !== undefined) return _profiles[key];
+  try {
+    const res  = await fetch(`${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(key)}&limit=1`, { headers: SB });
+    const rows = await res.json();
+    _profiles[key] = (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
+  } catch(_) { _profiles[key] = null; }
+  return _profiles[key];
+}
+
 function shortAddr(a) { return (!a||a.length<10) ? (a||"—") : a.slice(0,6)+"…"+a.slice(-4); }
 function fmtDate(iso) { return iso ? new Date(iso).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}) : "—"; }
 function fmtTime(iso) { return iso ? new Date(iso).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}) : ""; }
@@ -246,23 +260,35 @@ async function loadMessages(auctionId, chatBody) {
     const reactCount={}, seenReact=new Set();
     rows.filter(r=>r.type==="reaction").forEach(r=>{ reactCount[r.message]=(reactCount[r.message]||0)+1; });
 
-    chatBody.innerHTML = rows.map(row => {
+    // Pre-fetch all unique collector profiles in one pass
+    const uniqueWallets = [...new Set(rows.filter(r=>r.type!=="reaction"&&r.type!=="auctioneer").map(r=>r.wallet_address).filter(Boolean))];
+    await Promise.all(uniqueWallets.map(w => _getProfile(w)));
+
+    const rendered = [];
+    for (const row of rows) {
       if (row.type==="reaction") {
-        if (seenReact.has(row.message)) return "";
+        if (seenReact.has(row.message)) continue;
         seenReact.add(row.message);
         const c=reactCount[row.message]||1;
-        return `<div class="reaction-item"><span class="reaction-emoji">${esc(row.message)}</span>${c>1?`<span class="reaction-count">× ${c}</span>`:""}</div>`;
+        rendered.push(`<div class="reaction-item"><span class="reaction-emoji">${esc(row.message)}</span>${c>1?`<span class="reaction-count">× ${c}</span>`:""}</div>`);
+        continue;
       }
-      const isAuc  = row.type==="auctioneer";
-      const isBid  = row.is_bid;
-      const addr   = row.wallet_address||"";
-      const color  = isAuc ? "var(--clay)" : addrColor(addr);
-      const init   = isAuc ? "KA" : addr.slice(2,4).toUpperCase();
-      const name   = isAuc ? "Kay · Auctioneer" : shortAddr(addr);
+      const isAuc   = row.type==="auctioneer";
+      const isBid   = row.is_bid;
+      const addr    = row.wallet_address||"";
+      const color   = isAuc ? "var(--clay)" : addrColor(addr);
+      const init    = isAuc ? "KA" : addr.slice(2,4).toUpperCase();
+      const profile = isAuc ? null : (_profiles[addr.toLowerCase()] || null);
+      const name    = isAuc ? "Kay · Auctioneer" : (profile?.display_name || shortAddr(addr));
+      const avatUrl = profile?.avatar_url || null;
+      const avatHtml = isAuc
+        ? `<div class="chat-avatar auc">${init}</div>`
+        : avatUrl
+          ? `<img src="${avatUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" onerror="this.outerHTML='<div class=\"chat-avatar\" style=\"background:${color}22;color:${color}\">${init}</div>'">`
+          : `<div class="chat-avatar" style="background:${color}22;color:${color}">${init}</div>`;
       const bidTag = isBid ? `<span class="bid-tag">Bid</span>` : "";
-      const avatarStyle = isAuc ? "" : `style="background:${color}22;color:${color}"`;
-      return `<div class="chat-item">
-        <div class="chat-avatar ${isAuc?"auc":""}" ${avatarStyle}>${init}</div>
+      rendered.push(`<div class="chat-item">
+        ${avatHtml}
         <div class="chat-bubble">
           <div class="chat-meta">
             <span class="chat-name ${isAuc?"auc":""}" ${isAuc?"":"style='color:"+color+"'"}>${esc(name)}</span>
@@ -270,8 +296,9 @@ async function loadMessages(auctionId, chatBody) {
           </div>
           <div class="chat-text ${isBid?"bid":""}">${esc(row.message)}${bidTag}</div>
         </div>
-      </div>`;
-    }).join("");
+      </div>`);
+    }
+    chatBody.innerHTML = rendered.join("");
   } catch(e) {
     chatBody.innerHTML=`<div class="chat-empty">Could not load messages.</div>`;
   }
@@ -308,7 +335,7 @@ async function loadResults() {
     const list = document.getElementById("results-list");
     list.classList.add("show");
 
-    rows.forEach((row, i) => {
+    for (let i = 0; i < rows.length; i++) { const row = rows[i];
       const el       = document.createElement("div");
       el.className   = "auction-record";
       el.style.animationDelay = `${i*0.1}s`;
@@ -316,6 +343,14 @@ async function loadResults() {
       const imgHtml  = imgUrl ? `<img class="record-img" src="${imgUrl}" alt="${esc(row.art_title||'')}" onload="this.style.display='block'" onerror="this.style.display='none'">` : "";
       const meta     = [row.art_year,row.art_medium].filter(Boolean).join(" · ");
       const etherEl  = row.contract_addr ? `<a class="etherscan-link" href="https://etherscan.io/address/${row.contract_addr}" target="_blank" rel="noopener">View contract ↗</a>` : "";
+
+      // Resolve winner — admin override takes priority, then profile, then address
+      const winnerProfile = await _getProfile(row.winner);
+      const winnerName    = row.winner_display_name || winnerProfile?.display_name || shortAddr(row.winner);
+      const winnerAvatar  = row.winner_avatar_url   || winnerProfile?.avatar_url   || null;
+      const winnerAvatHtml = winnerAvatar
+        ? `<img src="${winnerAvatar}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;" onerror="this.style.display='none'">`
+        : `<span class="winner-dot"></span>`;
 
       el.innerHTML = `
         <div class="record-top">
@@ -349,7 +384,7 @@ async function loadResults() {
                 </div>
               </div>
               <div class="record-footer">
-                <div class="winner-pill"><span class="winner-dot"></span>Collector · ${shortAddr(row.winner)}</div>
+                <div class="winner-pill">${winnerAvatHtml}${esc(winnerName)}</div>
                 ${etherEl}
               </div>
             </div>
@@ -383,7 +418,7 @@ async function loadResults() {
       }).catch(()=>{ pill.textContent="view"; });
 
       btn.addEventListener("click", () => toggleChat(btn, chatBody, row.auction_id, state));
-    });
+    }
 
   } catch(e) {
     console.error("Hall of fame error:", e);
