@@ -641,6 +641,29 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 }
 
 /* Spinner */
+/* Buy now button */
+@keyframes pulseBuyNow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201,153,58,0.5); }
+  50%       { box-shadow: 0 0 0 8px rgba(201,153,58,0); }
+}
+.btn-buynow {
+  width: 100%;
+  font-family: 'Cinzel', serif; font-size: 0.7rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  background: linear-gradient(135deg, #c9993a 0%, #a97430 60%, #c9993a 100%);
+  color: var(--linen); border: none; border-radius: 4px;
+  padding: 0.9rem 2rem; cursor: pointer;
+  transition: filter 0.2s, transform 0.15s;
+  animation: pulseBuyNow 2.4s ease-in-out infinite;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-buynow:hover:not(:disabled) {
+  filter: brightness(1.18); transform: translateY(-2px);
+  animation: none;
+  box-shadow: 0 4px 22px rgba(201,153,58,0.45);
+}
+.btn-buynow:disabled { opacity: .35; cursor: not-allowed; animation: none; }
+
 .spin {
   width: 13px; height: 13px;
   border: 1.5px solid rgba(245,237,224,.2);
@@ -968,6 +991,21 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             <button class="btn-sm" onclick="refreshState()" style="width:100%;margin-top:8px;justify-content:center">↻ Refresh</button>
           </div>
 
+          <!-- Buy now section -->
+          <div id="buynow-section" style="display:none;margin-bottom:24px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+              <div style="flex:1;height:1px;background:var(--divider)"></div>
+              <span style="font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted)">or</span>
+              <div style="flex:1;height:1px;background:var(--divider)"></div>
+            </div>
+            <button class="btn-buynow" id="buynow-btn" onclick="executeBuyNow()">
+              Buy Now · <span id="buynow-price-label">—</span> ETH
+            </button>
+            <div style="font-family:'Crimson Pro',serif;font-size:0.78rem;color:var(--text-muted);font-style:italic;margin-top:8px;text-align:center">
+              Claim instantly · Available until the first bid is placed
+            </div>
+          </div>
+
           <!-- Bid history -->
           <div id="history-section" style="display:none">
             <hr>
@@ -1089,17 +1127,20 @@ async function loadConfig() {
 const AUCTION_ABI = [
   // Core actions
   "function bid() external payable",
+  "function buyNow() external payable",
   "function settle() external",
   "function cancel() external",
   "function startAuction() external",
   // Eligibility & state
   "function isEligible(address wallet) external view returns (bool)",
-  "function auctionState() external view returns (bool _deposited, bool _live, bool _settled, uint256 _endTime, uint256 _timeRemaining, address _highestBidder, uint256 _highestBid, uint256 _minNextBid, uint8 _mode, bool _isOpen)",
+  "function auctionState() external view returns (bool _deposited, bool _live, bool _settled, uint256 _endTime, uint256 _timeRemaining, address _highestBidder, uint256 _highestBid, uint256 _minNextBid, uint8 _mode, bool _isOpen, uint256 _buyNowPrice, bool _buyNowAvailable)",
+  "function buyNowAvailable() external view returns (bool)",
   // Read-only
   "function reservePrice() external view returns (uint256)",
   "function nftContract() external view returns (address)",
   "function nftTokenId() external view returns (uint256)",
   "function auctionMode() external view returns (uint8)",
+  "function buyNowPrice() external view returns (uint256)",
   "function deposited() external view returns (bool)",
   "function scheduledStart() external view returns (uint256)",
   // Events
@@ -1109,6 +1150,7 @@ const AUCTION_ABI = [
   "event AuctionStarted(uint256 endTime)",
   "event AuctionCancelled()",
   "event ReserveActivated(address indexed firstBidder, uint256 amount, uint256 endTime)",
+  "event BuyNowExecuted(address indexed buyer, uint256 price)",
 ];
 
 const ERC721_ABI = [
@@ -1231,6 +1273,20 @@ async function initLive() {
   auctionContract.on("BidPlaced",       (bidder, amount, e) => { pushBid(bidder, amount, null, e.log?.transactionHash); refreshState(); });
   auctionContract.on("AuctionExtended", (newEnd)            => { endTimestamp = Number(newEnd); notify("info","Auction extended","A last-minute bid extended the deadline."); });
   auctionContract.on("AuctionSettled",  (winner, amount)    => { showSettled(winner, amount); clearInterval(countdownTimer); clearInterval(pollTimer); });
+  auctionContract.on("ReserveActivated",(firstBidder, amount, endTime) => {
+    endTimestamp = Number(endTime);
+    isLive = true;
+    notify("info", "Reserve met — auction is live!", `First bid of ${ethers.formatEther(amount)} ETH started the countdown.`);
+    refreshState();
+  });
+  auctionContract.on("BuyNowExecuted",  (buyer, price) => {
+    document.getElementById("buynow-section").style.display = "none";
+    const isMine = signerAddress && buyer.toLowerCase() === signerAddress.toLowerCase();
+    if (!isMine) notify("info", "Sold via Buy Now", `${shortAddr(buyer)} purchased at ${ethers.formatEther(price)} ETH.`);
+    showSettled(buyer, price);
+    clearInterval(countdownTimer);
+    clearInterval(pollTimer);
+  });
 }
 
 // ─── About panel ──────────────────────────────────────────────────────────────
@@ -1438,6 +1494,8 @@ function disconnectWallet() {
   document.getElementById("disconnect-btn").style.display = "none";
   document.getElementById("eligibility").className = "eligibility";
   document.getElementById("bid-btn").disabled = true;
+  const bn = document.getElementById("buynow-btn");
+  if (bn) bn.disabled = true;
   onRoomEligibilityRevoked();
 
   if (auctionContract && provider) auctionContract = auctionContract.connect(provider);
@@ -1459,8 +1517,10 @@ async function refreshState() {
     const highestBidder = s[5];
     const highestBid    = s[6];
     const mnb           = s[7];
-    const mode          = Number(s[8]); // 0 = open/manual, 1 = reserve-activated
-    const isOpen        = s[9];         // true when bids are being accepted
+    const mode          = Number(s[8]);
+    const isOpen        = s[9];
+    const buyNowPriceWei = s[10];
+    const buyNowAvail    = s[11];
 
     endTimestamp = Number(endTime);
     minNextBid   = mnb;
@@ -1504,11 +1564,24 @@ async function refreshState() {
     if (deposited) document.getElementById("history-section").style.display = "block";
     if (settled)   showSettled(highestBidder, highestBid);
 
-    // Settle button — only for auctioneer when ended but not yet settled
+    // Settle / cancel buttons
     const settleBtn = document.getElementById("settle-btn");
     const cancelBtn = document.getElementById("cancel-btn");
     if (settleBtn) settleBtn.style.display = (_isKay() && !live && !settled && !noBids) ? "block" : "none";
     if (cancelBtn) cancelBtn.style.display = (_isKay() && !settled && noBids && deposited) ? "block" : "none";
+
+    // Buy now — show when available (deposited, no bids, not settled, price set)
+    const buyNowSection = document.getElementById("buynow-section");
+    const buyNowBtn     = document.getElementById("buynow-btn");
+    if (buyNowAvail && !settled) {
+      document.getElementById("buynow-price-label").textContent = ethers.formatEther(buyNowPriceWei);
+      buyNowSection.style.display = "block";
+      const eligible = document.getElementById("eligibility").classList.contains("yes");
+      buyNowBtn.disabled = !eligible;
+      buyNowBtn.dataset.price = buyNowPriceWei.toString();
+    } else {
+      buyNowSection.style.display = "none";
+    }
 
   } catch(e) { console.error("refreshState:", e); }
 }
@@ -1594,6 +1667,44 @@ async function placeBid() {
     btn.disabled = false;
     btn.innerHTML = "Place bid";
     onBidInput();
+  }
+}
+
+// ─── Buy now ─────────────────────────────────────────────────────────────────
+
+async function executeBuyNow() {
+  if (!signer || !auctionContract) { notify("err","Not connected","Connect your wallet first"); return; }
+
+  const btn = document.getElementById("buynow-btn");
+  const priceWei = BigInt(btn.dataset.price || "0");
+  if (priceWei === 0n) { notify("err","Buy now unavailable","No buy now price set"); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spin"></div> Confirming…`;
+
+  try {
+    const tx = await auctionContract.connect(signer).buyNow({ value: priceWei });
+    notify("info", "Buy now submitted", `Tx: ${tx.hash.slice(0,12)}…`);
+    await tx.wait();
+    notify("ok", "Purchase confirmed!", `You now own this piece. ${ethers.formatEther(priceWei)} ETH sent to seller.`);
+    document.getElementById("buynow-section").style.display = "none";
+    showSettled(signerAddress, priceWei);
+    await refreshState();
+  } catch(e) {
+    const msg = e?.reason || e?.shortMessage || e?.message || "Transaction failed";
+    if (msg.includes("BuyNowUnavailable")) {
+      notify("err", "Buy now locked", "A bid has already been placed — buy now is no longer available.");
+    } else if (msg.includes("BuyNowDisabled")) {
+      notify("err", "Buy now disabled", "This auction does not have a buy now price.");
+    } else if (msg.includes("NotEligible")) {
+      notify("err", "Not eligible", "You don't hold the required gate token.");
+    } else {
+      notify("err", "Buy now failed", msg);
+    }
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `Buy Now · ${ethers.formatEther(priceWei)} ETH`;
+    await refreshState();
   }
 }
 
