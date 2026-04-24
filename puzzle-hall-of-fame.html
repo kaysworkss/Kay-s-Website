@@ -278,6 +278,23 @@ main {
   font-size: 1rem; color: var(--text);
 }
 
+/* Player avatar in leaderboard */
+.lb-avatar {
+  width: 26px; height: 26px; border-radius: 50%;
+  object-fit: cover; border: 1px solid var(--border);
+  background: var(--surface2);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: .85rem; vertical-align: middle;
+  margin-right: .5rem; flex-shrink: 0;
+  overflow: hidden;
+}
+.lb-avatar img {
+  width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+}
+.player-name-cell {
+  display: flex; align-items: center;
+}
+
 /* Time column */
 .time-val {
   font-family: 'JetBrains Mono', monospace;
@@ -433,9 +450,12 @@ function buildCard(ch) {
         const medalHtml = i < 3
           ? `<span class="medal">${medals[i]}</span>`
           : `<span style="font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--text-dim)">${i+1}</span>`;
+        const avatarHtml = e.avatar_url
+          ? `<span class="lb-avatar"><img src="${escHtml(e.avatar_url)}" alt="" loading="lazy"></span>`
+          : `<span class="lb-avatar">👤</span>`;
         return `<tr>
           <td class="rank ${rankCls}">${medalHtml}</td>
-          <td class="player-name">${escHtml(e.player_name)}</td>
+          <td class="player-name"><div class="player-name-cell">${avatarHtml}${escHtml(e.player_name)}</div></td>
           <td class="time-val">${fmtTime(e.time_seconds)}</td>
           <td class="hints-val">${e.hints_used > 0 ? `${e.hints_used} hint${e.hints_used>1?'s':''}` : '—'}</td>
         </tr>`;
