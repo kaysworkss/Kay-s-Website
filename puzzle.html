@@ -579,6 +579,52 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
   pointer-events:none;transition:all .3s ease;
 }
 
+
+/* ── PROFILE MODAL ── */
+#profile-modal{
+  display:none;position:fixed;inset:0;z-index:400;
+  background:rgba(0,0,0,.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  align-items:center;justify-content:center;padding:1rem;
+}
+#profile-modal.show{display:flex}
+#profile-modal .pm-card{
+  background:var(--surface);border:1px solid var(--border-bright);border-radius:14px;
+  padding:2rem 2.2rem;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;
+  box-shadow:0 0 0 1px rgba(201,150,58,.06),0 8px 48px rgba(0,0,0,.5);
+  position:relative;
+}
+.pm-close{
+  position:absolute;top:.8rem;right:.8rem;background:none;border:none;
+  color:var(--text-muted);font-size:1.1rem;cursor:pointer;line-height:1;
+  padding:.2rem .4rem;transition:color .15s;
+}
+.pm-close:hover{color:var(--gold)}
+.pm-title{
+  font-family:'Cinzel',serif;font-size:.78rem;letter-spacing:.16em;
+  color:var(--gold);text-transform:uppercase;margin-bottom:1.5rem;text-align:center;
+}
+.pm-avatar-wrap{
+  display:flex;flex-direction:column;align-items:center;gap:.75rem;margin-bottom:1.5rem;
+}
+.pm-avatar{
+  width:88px;height:88px;border-radius:50%;object-fit:cover;
+  border:2px solid var(--border-bright);background:var(--surface2);
+  cursor:pointer;transition:border-color .2s;display:flex;align-items:center;justify-content:center;
+  font-size:2.2rem;overflow:hidden;
+}
+.pm-avatar:hover{border-color:var(--gold)}
+.pm-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.pm-avatar-hint{font-size:.65rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.06em}
+.pm-stats{display:flex;gap:.5rem;margin-bottom:1.5rem;}
+.pm-stat{
+  flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:.6rem .5rem;text-align:center;
+}
+.pm-stat-val{font-family:'Cinzel',serif;font-size:1.1rem;color:var(--gold-light)}
+.pm-stat-lbl{font-size:.58rem;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;font-family:'Cinzel',serif;margin-top:.15rem}
+.pm-divider{height:1px;background:var(--border);margin:1rem 0}
+.pm-msg{font-size:.82rem;text-align:center;margin-top:.75rem;min-height:1.2em}
+
 </style>
 </head>
 <body>
@@ -701,11 +747,17 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
     <div class="logo-rule"><div class="logo-rule-diamond"></div></div>
 
     <!-- Logged-in player badge -->
-    <div id="player-badge" style="display:flex;align-items:center;justify-content:space-between;background:rgba(201,150,58,.1);border:1px solid rgba(201,150,58,.3);border-radius:var(--radius);padding:.5rem .85rem;margin-bottom:1rem">
-      <div style="text-align:left">
-        <div style="font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:.08em;color:var(--gold-light)" id="badge-name">—</div>
-        <div style="font-size:.68rem;color:var(--text-muted);margin-top:.1rem" id="badge-wallet"></div>
+    <div id="player-badge" style="display:flex;align-items:center;gap:.75rem;background:rgba(201,150,58,.1);border:1px solid rgba(201,150,58,.3);border-radius:var(--radius);padding:.5rem .85rem;margin-bottom:1rem">
+      <div id="badge-avatar" onclick="openProfileModal()" title="Edit profile" style="width:38px;height:38px;border-radius:50%;border:1.5px solid var(--border-bright);background:var(--surface2);flex-shrink:0;cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.2rem;transition:border-color .2s">&#x1F464;</div>
+      <div style="flex:1;min-width:0;text-align:left">
+        <div style="font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:.08em;color:var(--gold-light)" id="badge-name">&#x2014;</div>
+        <div style="font-size:.68rem;color:var(--text-muted);margin-top:.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="badge-wallet"></div>
       </div>
+      <div style="display:flex;gap:.4rem;flex-shrink:0">
+        <button onclick="openProfileModal()" style="background:none;border:1px solid var(--border);color:var(--text-muted);font-size:.6rem;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.06em;padding:.25rem .55rem;border-radius:6px;transition:all .15s">Edit</button>
+        <button onclick="logoutPlayer()" style="background:none;border:none;color:var(--text-muted);font-size:.65rem;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.06em;padding:.2rem .4rem">Sign out</button>
+      </div>
+    </div>
       <button onclick="logoutPlayer()" style="background:none;border:none;color:var(--text-muted);font-size:.65rem;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.06em;padding:.2rem .4rem">Sign out</button>
     </div>
 
@@ -732,6 +784,72 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
     <div style="margin-top:1rem;text-align:right">
       <button onclick="showAdminLogin()" style="background:none;border:none;color:var(--text-muted);font-size:.75rem;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.05em">Admin ↗</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══ PROFILE MODAL ═══ -->
+<div id="profile-modal" onclick="if(event.target===this)closeProfileModal()">
+  <div class="pm-card">
+    <button class="pm-close" onclick="closeProfileModal()" title="Close">&#x2715;</button>
+    <div class="pm-title">Your Profile</div>
+
+    <!-- Avatar -->
+    <div class="pm-avatar-wrap">
+      <div class="pm-avatar" id="pm-avatar-display" onclick="document.getElementById('pm-avatar-input').click()" title="Click to change photo">
+        <span id="pm-avatar-emoji">&#x1F464;</span>
+      </div>
+      <input type="file" id="pm-avatar-input" accept="image/*" style="display:none">
+      <div class="pm-avatar-hint">Tap photo to change</div>
+    </div>
+
+    <!-- Stats -->
+    <div class="pm-stats">
+      <div class="pm-stat">
+        <div class="pm-stat-val" id="pm-stat-solved">&#x2014;</div>
+        <div class="pm-stat-lbl">Solved</div>
+      </div>
+      <div class="pm-stat">
+        <div class="pm-stat-val" id="pm-stat-best">&#x2014;</div>
+        <div class="pm-stat-lbl">Best Time</div>
+      </div>
+      <div class="pm-stat">
+        <div class="pm-stat-val" id="pm-stat-hints">&#x2014;</div>
+        <div class="pm-stat-lbl">Hints Used</div>
+      </div>
+    </div>
+
+    <div class="pm-divider"></div>
+
+    <!-- Edit fields -->
+    <div class="field">
+      <label>Display Name</label>
+      <input type="text" id="pm-name" maxlength="28" placeholder="Your name">
+    </div>
+    <div class="field">
+      <label>Wallet Address <span style="font-family:'Crimson Text',serif;font-size:.75rem;text-transform:none;color:var(--text-muted)">(optional)</span></label>
+      <input type="text" id="pm-wallet" maxlength="100" placeholder="0x... or your wallet address" autocomplete="off" spellcheck="false">
+    </div>
+
+    <div class="pm-divider"></div>
+
+    <!-- Change PIN -->
+    <div style="margin-bottom:.75rem">
+      <div style="font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.12em;color:var(--text-muted);text-transform:uppercase;margin-bottom:.75rem">Change PIN</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div class="field" style="margin-bottom:0">
+          <label>New PIN</label>
+          <input type="password" id="pm-pin" maxlength="4" inputmode="numeric" pattern="\d{4}" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;" autocomplete="new-password">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Confirm PIN</label>
+          <input type="password" id="pm-pin2" maxlength="4" inputmode="numeric" pattern="\d{4}" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;" autocomplete="new-password">
+        </div>
+      </div>
+      <div style="font-size:.68rem;color:var(--text-muted);margin-top:.4rem;font-family:'Cinzel',serif;letter-spacing:.04em">Leave blank to keep your current PIN</div>
+    </div>
+
+    <p class="pm-msg" id="pm-msg"></p>
+    <button class="btn btn-solid" style="width:100%;margin-top:.25rem" onclick="saveProfile()">Save Changes</button>
   </div>
 </div>
 
@@ -1066,6 +1184,7 @@ let TAB = 0, SNAP = 16;
 let timerInterval = null, countdownInterval = null, startTime = 0;
 let playerName = 'Anonymous';
 let playerWallet = '';
+let playerAvatar = '';
 let playerId = null;
 let playerToken = null;
 let adminToken = null;
@@ -1131,6 +1250,7 @@ async function boot() {
       playerId     = saved.player_id;
       playerName   = saved.name;
       playerWallet = saved.wallet_address || '';
+      playerAvatar = saved.avatar_url     || '';
       showEntryScreen();
     } else {
       showAuthScreen();
@@ -1289,6 +1409,162 @@ function logoutPlayer() {
   hideAll(); show('loading-screen'); boot();
 }
 
+// ═══════════════════════════════════════════════
+//  PROFILE MODAL
+// ═══════════════════════════════════════════════
+// playerAvatar declared in STATE section above
+
+function _updateBadgeAvatar() {
+  const el = document.getElementById('badge-avatar');
+  if (!el) return;
+  if (playerAvatar) {
+    el.innerHTML = `<img src="${playerAvatar}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } else {
+    el.innerHTML = '&#x1F464;';
+  }
+}
+
+async function openProfileModal() {
+  // Pre-fill fields from current session
+  document.getElementById('pm-name').value   = playerName;
+  document.getElementById('pm-wallet').value = playerWallet;
+  document.getElementById('pm-pin').value    = '';
+  document.getElementById('pm-pin2').value   = '';
+  document.getElementById('pm-msg').textContent = '';
+  document.getElementById('pm-msg').className = 'pm-msg';
+
+  // Show current avatar
+  const avatarEl = document.getElementById('pm-avatar-display');
+  if (playerAvatar) {
+    avatarEl.innerHTML = `<img src="${playerAvatar}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } else {
+    avatarEl.innerHTML = '&#x1F464;';
+  }
+
+  // Load stats from server
+  document.getElementById('pm-stat-solved').textContent = '…';
+  document.getElementById('pm-stat-best').textContent   = '…';
+  document.getElementById('pm-stat-hints').textContent  = '…';
+  if (playerToken) {
+    try {
+      const res  = await fetch(`${API}/player?action=stats`, {
+        headers: { Authorization: `Bearer ${playerToken}` }
+      });
+      if (res.ok) {
+        const d = await res.json();
+        document.getElementById('pm-stat-solved').textContent = d.solved ?? 0;
+        document.getElementById('pm-stat-best').textContent   = d.best_time ? fmtTime(d.best_time) : '—';
+        document.getElementById('pm-stat-hints').textContent  = d.hints_used ?? 0;
+      }
+    } catch {}
+  }
+
+  document.getElementById('profile-modal').classList.add('show');
+}
+
+function closeProfileModal() {
+  document.getElementById('profile-modal').classList.remove('show');
+}
+
+// Avatar file input handler
+window.addEventListener('DOMContentLoaded', () => {
+  const avatarInput = document.getElementById('pm-avatar-input');
+  if (avatarInput) {
+    avatarInput.addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file || !file.type.startsWith('image/')) return;
+      // Preview immediately
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const avatarEl = document.getElementById('pm-avatar-display');
+        avatarEl.innerHTML = `<img src="${ev.target.result}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+});
+
+async function saveProfile() {
+  const msgEl  = document.getElementById('pm-msg');
+  const name   = document.getElementById('pm-name').value.trim();
+  const wallet = document.getElementById('pm-wallet').value.trim();
+  const pin    = document.getElementById('pm-pin').value.trim();
+  const pin2   = document.getElementById('pm-pin2').value.trim();
+
+  msgEl.textContent = ''; msgEl.className = 'pm-msg';
+
+  if (!name) { msgEl.textContent = 'Name cannot be empty.'; msgEl.className = 'pm-msg err'; return; }
+  if (pin && !/^\d{4}$/.test(pin)) { msgEl.textContent = 'PIN must be exactly 4 digits.'; msgEl.className = 'pm-msg err'; return; }
+  if (pin && pin !== pin2) { msgEl.textContent = 'PINs do not match.'; msgEl.className = 'pm-msg err'; return; }
+
+  const btn = document.querySelector('#profile-modal .btn-solid');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  try {
+    // Upload avatar if a new file was selected
+    let avatarUrl = playerAvatar;
+    const avatarFile = document.getElementById('pm-avatar-input').files[0];
+    if (avatarFile) {
+      const base64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload  = () => res(r.result.split(',')[1]);
+        r.onerror = rej;
+        r.readAsDataURL(avatarFile);
+      });
+      const upRes = await fetch(`${API}/player?action=upload-avatar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${playerToken}` },
+        body: JSON.stringify({ filename: avatarFile.name, base64, mime_type: avatarFile.type }),
+      });
+      if (upRes.ok) {
+        const upData = await upRes.json();
+        avatarUrl = upData.url;
+      }
+    }
+
+    // Save profile
+    const res = await fetch(`${API}/player?action=update-profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${playerToken}` },
+      body: JSON.stringify({
+        name,
+        wallet_address: wallet || null,
+        new_pin: pin || null,
+        avatar_url: avatarUrl || null,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Save failed.');
+
+    // Update local state
+    playerName   = data.name;
+    playerWallet = data.wallet_address || '';
+    playerAvatar = data.avatar_url     || '';
+
+    // Update session storage
+    const sess = _loadSession();
+    if (sess) _saveSession({ ...sess, name: playerName, wallet_address: playerWallet, avatar_url: playerAvatar });
+
+    // Refresh badge
+    document.getElementById('badge-name').textContent = playerName;
+    const walletEl = document.getElementById('badge-wallet');
+    if (playerWallet) {
+      const short = playerWallet.length > 18 ? playerWallet.slice(0,8) + '…' + playerWallet.slice(-6) : playerWallet;
+      walletEl.textContent = short; walletEl.style.display = 'block';
+    } else { walletEl.style.display = 'none'; }
+    _updateBadgeAvatar();
+
+    msgEl.textContent = 'Profile saved!'; msgEl.className = 'pm-msg ok';
+    setTimeout(closeProfileModal, 1200);
+  } catch(e) {
+    msgEl.textContent = e.message; msgEl.className = 'pm-msg err';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Changes';
+  }
+}
+
+
+
 function showEntryScreen() {
   // Populate player badge
   document.getElementById('badge-name').textContent = playerName;
@@ -1300,6 +1576,7 @@ function showEntryScreen() {
   } else {
     walletEl.style.display = 'none';
   }
+  _updateBadgeAvatar();
 
   const picker = document.getElementById('challenge-picker');
   picker.innerHTML = '';
