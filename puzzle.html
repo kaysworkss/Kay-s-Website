@@ -155,58 +155,75 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
   line-height:1.6;
 }
 
-/* ── PLAYER ENTRY ── */
-#entry-screen{
-  display:none;min-height:100vh;
+/* ── AUTH + ENTRY SCREENS ── */
+#auth-screen,#entry-screen{
+  display:none;min-height:100vh;min-height:100dvh;
   align-items:center;justify-content:center;flex-direction:column;
   background:radial-gradient(ellipse at 50% 30%,var(--bg-grad1) 0%,var(--bg-grad2) 70%);
-  padding:1.25rem;
+  padding:1.5rem;
 }
-#entry-screen .card{max-width:580px;width:100%;text-align:center}
+#auth-screen .card{ max-width:460px;width:100%;text-align:center }
+#entry-screen .card{ max-width:560px;width:100%;text-align:center }
 
-/* Mobile: make the whole screen scroll so nothing is ever cut off */
+/* ── DESKTOP: compact, everything visible without scroll ── */
+@media(min-width:601px){
+  #auth-screen .card,
+  #entry-screen .card{ padding:2rem 2.5rem; }
+  .logo{ font-size:clamp(1.6rem,4vw,2.6rem); }
+  .logo-kw{ font-size:.6rem; letter-spacing:.32em; }
+  .logo-sub{ font-size:.62rem; margin-bottom:.8rem; }
+  .logo-rule{ margin:.4rem auto .9rem; }
+  .field{ margin-bottom:.9rem; }
+  #challenge-picker{ gap:.5rem; margin-top:.5rem; }
+}
+
+/* ── MOBILE: comfortable negative space, scrollable ── */
 @media(max-width:600px){
-  #entry-screen{
+  #auth-screen,#entry-screen{
     justify-content:flex-start;
-    padding:.5rem .6rem;
+    padding:.75rem;
     overflow-y:auto;
-    min-height:100dvh; /* use dynamic viewport height on mobile */
   }
+  #auth-screen .card,
   #entry-screen .card{
-    padding:1rem 1rem 1.2rem;
-    border-radius:10px;
-    margin:auto 0; /* vertically centre when content fits, scroll when it doesn't */
+    padding:1.4rem 1.2rem 1.6rem;
+    border-radius:12px;
+    margin:auto 0;
     width:100%;
   }
-  /* Shrink logo significantly on mobile */
-  .logo{ font-size:clamp(1.4rem,7vw,2rem); }
-  .logo-kw{ font-size:.55rem; letter-spacing:.28em; margin-top:.2rem; }
-  .logo-sub{ font-size:.6rem; margin-bottom:.6rem; }
-  /* Tighten decorative rule */
-  .logo-rule{ margin:.4rem auto .8rem; }
-  /* Challenge cards — compact */
-  #challenge-picker{ gap:.45rem; margin-top:.6rem; }
-  .ch-card{ padding:.6rem .75rem; gap:.5rem; }
-  .ch-card-title{ font-size:.72rem; }
-  .ch-card-meta{ font-size:.62rem; }
-  .ch-card-pieces{ font-size:.58rem; }
-  /* Countdown tighter */
-  #countdown-wrap{ margin-top:.5rem; }
+  /* Logo — readable but not dominating */
+  .logo{ font-size:clamp(1.5rem,8vw,2.1rem); }
+  .logo-kw{ font-size:.56rem; letter-spacing:.3em; margin-top:.25rem; }
+  .logo-sub{ font-size:.58rem; margin-bottom:.7rem; }
+  .logo-rule{ margin:.5rem auto .9rem; }
+  /* Fields — comfortable tap targets */
+  .field{ margin-bottom:.85rem; }
+  label{ font-size:.62rem; margin-bottom:.3rem; }
+  input{ padding:.6rem .9rem; font-size:.95rem; }
+  /* Challenge cards */
+  #challenge-picker{ gap:.5rem; margin-top:.65rem; }
+  .ch-card{ padding:.7rem .85rem; gap:.55rem; }
+  .ch-card-title{ font-size:.74rem; }
+  .ch-card-meta{ font-size:.63rem; }
+  .ch-card-pieces{ font-size:.6rem; }
+  /* Countdown */
+  #countdown-wrap{ margin-top:.6rem; }
   .countdown-label{ font-size:.68rem; }
-  /* Name field */
-  .field{ margin-bottom:.65rem; }
-  label{ font-size:.6rem; margin-bottom:.2rem; }
-  input{ padding:.45rem .75rem; font-size:.9rem; }
   /* Resume banner */
-  #resume-banner{ padding:.45rem .75rem; font-size:.75rem; margin-top:.5rem; }
-  /* Action buttons always visible */
-  #entry-screen .card > div[style*="flex"]{
-    margin-top:.6rem !important;
-  }
-  /* Reduce gap between back link and admin */
-  #entry-screen .card > div[style*="text-align:center"]{ margin-top:.5rem !important; }
-  #entry-screen .card > div[style*="text-align:right"]{ margin-top:.5rem !important; }
+  #resume-banner{ padding:.55rem .9rem; font-size:.78rem; margin-top:.6rem; }
+  /* Auth tab switcher */
+  #auth-screen .card > div:first-of-type button{ font-size:.68rem; padding:.55rem; }
 }
+
+/* ── SMALL PHONES (≤380px) ── */
+@media(max-width:380px){
+  #auth-screen .card,
+  #entry-screen .card{ padding:1.1rem .95rem 1.3rem; }
+  .logo{ font-size:clamp(1.3rem,9vw,1.8rem); }
+  .field{ margin-bottom:.7rem; }
+  input{ padding:.55rem .75rem; font-size:.9rem; }
+}
+
 @media(max-width:480px){
   .challenge-meta{ gap:.5rem; margin:0.75rem 0 1rem; }
   .meta-badge{ padding:.3rem .65rem; font-size:.75rem; }
@@ -696,11 +713,11 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
     <!-- LOGIN PANEL -->
     <div id="auth-login-panel">
       <div class="field" style="text-align:left">
-        <label>Your Name</label>
+        <label for="login-name">Your Name</label>
         <input type="text" id="login-name" placeholder="The name you registered with" maxlength="28" autocomplete="username">
       </div>
       <div class="field" style="text-align:left">
-        <label>4-Digit PIN</label>
+        <label for="login-pin">4-Digit PIN</label>
         <input type="password" id="login-pin" placeholder="••••" maxlength="4" inputmode="numeric" pattern="\d{4}" autocomplete="current-password">
       </div>
       <p class="err" id="login-err" style="display:none;text-align:left"></p>
@@ -710,19 +727,19 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
     <!-- REGISTER PANEL -->
     <div id="auth-register-panel" style="display:none">
       <div class="field" style="text-align:left">
-        <label>Choose a Name <span style="font-family:'Crimson Text',serif;font-size:.75rem;text-transform:none;color:var(--text-muted)">(shown on leaderboard)</span></label>
+        <label for="reg-name">Choose a Name <span style="font-family:'Crimson Text',serif;font-size:.75rem;text-transform:none;color:var(--text-muted)">(shown on leaderboard)</span></label>
         <input type="text" id="reg-name" placeholder="e.g. Tunde, PuzzleMaster…" maxlength="28" autocomplete="username">
       </div>
       <div class="field" style="text-align:left">
-        <label>Choose a 4-Digit PIN <span style="font-family:'Crimson Text',serif;font-size:.75rem;text-transform:none;color:var(--text-muted)">(to log in on any device)</span></label>
+        <label for="reg-pin">Choose a 4-Digit PIN <span style="font-family:'Crimson Text',serif;font-size:.75rem;text-transform:none;color:var(--text-muted)">(to log in on any device)</span></label>
         <input type="password" id="reg-pin" placeholder="••••" maxlength="4" inputmode="numeric" pattern="\d{4}" autocomplete="new-password">
       </div>
       <div class="field" style="text-align:left">
-        <label>Confirm PIN</label>
+        <label for="reg-pin2">Confirm PIN</label>
         <input type="password" id="reg-pin2" placeholder="••••" maxlength="4" inputmode="numeric" pattern="\d{4}" autocomplete="new-password">
       </div>
       <div class="field" style="text-align:left">
-        <label>Wallet Address <span style="font-family:'Crimson Text',serif;font-size:.75rem;text-transform:none;color:var(--text-muted)">(optional — for rewards)</span></label>
+        <label for="reg-wallet">Wallet Address <span style="font-family:'Crimson Text',serif;font-size:.75rem;text-transform:none;color:var(--text-muted)">(optional — for rewards)</span></label>
         <input type="text" id="reg-wallet" placeholder="0x… or your wallet address" maxlength="100" autocomplete="off" spellcheck="false">
       </div>
       <p class="err" id="reg-err" style="display:none;text-align:left"></p>
@@ -822,11 +839,11 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 
     <!-- Edit fields -->
     <div class="field">
-      <label>Display Name</label>
+      <label for="pm-name">Display Name</label>
       <input type="text" id="pm-name" maxlength="28" placeholder="Your name">
     </div>
     <div class="field">
-      <label>Wallet Address <span style="font-family:'Crimson Text',serif;font-size:.75rem;text-transform:none;color:var(--text-muted)">(optional)</span></label>
+      <label for="pm-wallet">Wallet Address <span style="font-family:'Crimson Text',serif;font-size:.75rem;text-transform:none;color:var(--text-muted)">(optional)</span></label>
       <input type="text" id="pm-wallet" maxlength="100" placeholder="0x... or your wallet address" autocomplete="off" spellcheck="false">
     </div>
 
@@ -837,11 +854,11 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
       <div style="font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.12em;color:var(--text-muted);text-transform:uppercase;margin-bottom:.75rem">Change PIN</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
         <div class="field" style="margin-bottom:0">
-          <label>New PIN</label>
+          <label for="pm-pin">New PIN</label>
           <input type="password" id="pm-pin" maxlength="4" inputmode="numeric" pattern="\d{4}" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;" autocomplete="new-password">
         </div>
         <div class="field" style="margin-bottom:0">
-          <label>Confirm PIN</label>
+          <label for="pm-pin2">Confirm PIN</label>
           <input type="password" id="pm-pin2" maxlength="4" inputmode="numeric" pattern="\d{4}" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;" autocomplete="new-password">
         </div>
       </div>
@@ -975,7 +992,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
   <div class="card">
     <h2>Admin Access</h2>
     <div class="field">
-      <label>Password</label>
+      <label for="admin-pass">Password</label>
       <input type="password" id="admin-pass" placeholder="Enter admin password">
     </div>
     <div style="display:flex;gap:.75rem;justify-content:center">
@@ -1005,19 +1022,19 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
       <h2>Create New Puzzle Challenge</h2>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
         <div class="field">
-          <label>Challenge Title</label>
+          <label for="ch-title">Challenge Title</label>
           <input type="text" id="ch-title" placeholder="e.g. Week 12 — Ọlọwẹ's Vision">
         </div>
         <div class="field">
-          <label>Starts At</label>
+          <label for="ch-starts">Starts At</label>
           <input type="datetime-local" id="ch-starts">
         </div>
         <div class="field">
-          <label>Ends At (7 days later by default)</label>
+          <label for="ch-ends">Ends At (7 days later by default)</label>
           <input type="datetime-local" id="ch-ends">
         </div>
         <div class="field">
-          <label>Difficulty Level</label>
+          <label for="ch-pieces">Difficulty Level</label>
           <select id="ch-pieces">
             <option value="24">Demo — ~24 pieces</option>
             <option value="150">Easy — ~150 pieces</option>
@@ -1027,7 +1044,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
           </select>
         </div>
         <div class="field">
-          <label>Upload Challenge Image</label>
+          <label for="admin-file-input">Upload Challenge Image</label>
           <div class="upload-zone" id="admin-drop-zone">
             <p>Drag & drop or <span>click to browse</span></p>
             <p style="font-size:.75rem;margin-top:.25rem">PNG/JPG/WEBP — min 1200×800px recommended</p>
