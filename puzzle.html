@@ -360,6 +360,10 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
   border-bottom:1px solid var(--border)}
 .lb-rank{font-family:'Cinzel',serif;font-size:.62rem;color:var(--text-muted);width:20px;flex-shrink:0}
 .lb-rank.top{color:var(--gold)}
+.lb-avatar-sm{width:20px;height:20px;border-radius:50%;overflow:hidden;flex-shrink:0;
+  background:var(--surface2);border:1px solid var(--border);
+  display:inline-flex;align-items:center;justify-content:center;font-size:.65rem}
+.lb-avatar-sm img{width:100%;height:100%;object-fit:cover;border-radius:50%}
 .lb-name{flex:1;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lb-time{font-family:'Cinzel',serif;font-size:.7rem;color:var(--gold-light)}
 .lb-empty{color:var(--text-muted);font-size:.76rem;font-style:italic}
@@ -3879,12 +3883,17 @@ function renderLeaderboard(scores) {
       <span style="font-family:'Cinzel',serif;font-size:.55rem;color:var(--text-muted)">~${pc}pc</span>
     </div>`;
 
-  const rows = top10.map((s, i) => `
-    <div class="lb-row">
+  const rows = top10.map((s, i) => {
+    const av = s.avatar_url
+      ? `<span class="lb-avatar-sm"><img src="${esc(s.avatar_url)}" alt="" loading="lazy"></span>`
+      : `<span class="lb-avatar-sm">👤</span>`;
+    return `<div class="lb-row">
       <span class="lb-rank ${i<3?'top':''}">${medals[i]||(i+1)+'.'}</span>
+      ${av}
       <span class="lb-name">${esc(s.player_name)}</span>
       <span class="lb-time">${fmtTime(s.time_seconds)}</span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   list.innerHTML = header + rows;
 }
