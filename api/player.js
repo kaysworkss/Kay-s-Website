@@ -167,6 +167,106 @@ async function handleProgressLoad(req, res, supabase, player) {
   });
 }
 
+
+// ── POST /api/player?action=update-profile ────────────────────────────────────
+async function handleUpdateProfile(req, res, supabase, player) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { name, wallet_address, new_pin, avatar_url } = req.body || {};
+
+  if (!name || typeof name !== 'string' || name.trim().length < 1 || name.trim().length > 28) {
+    return res.status(400).json({ error: 'Name must be 1-28 characters.' });
+  }
+  if (new_pin && !/^\d{4}$/.test(String(new_pin))) {
+    return res.status(400).json({ error: 'PIN must be exactly 4 digits.' });
+  }
+
+  const cleanName   = name.trim();
+  const cleanWallet = wallet_address && String(wallet_address).trim().length > 0
+    ? String(wallet_address).trim().slice(0, 100) : null;
+  const cleanAvatar = avatar_url && String(avatar_url).trim().length > 0
+    ? String(avatar_url).trim().slice(0, 500) : null;
+
+  // Check if new name is taken by someone else
+  if (cleanName.toLowerCase() !== player.name.toLowerCase()) {
+    const { data: existing } = await supabase
+      .from('players')
+      .select('id')
+      .ilike('name', cleanName)
+      .maybeSingle();
+    if (existing && existing.id !== player.id) {
+      return res.status(409).json({ error: 'That name is already taken.' });
+    }
+  }
+
+  const updates = {
+    name:           cleanName,
+    wallet_address: cleanWallet,
+    avatar_url:     cleanAvatar,
+  };
+  if (new_pin) updates.pin_hash = hashPin(new_pin);
+
+  const { data, error } = await supabase
+    .from('players')
+    .update(updates)
+    .eq('id', player.id)
+    .select('id, name, wallet_address, avatar_url')
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  return res.status(200).json({
+    player_id:      data.id,
+    name:           data.name,
+    wallet_address: data.wallet_address,
+    avatar_url:     data.avatar_url,
+  });
+}
+
+// ── POST /api/player?action=upload-avatar ─────────────────────────────────────
+async function handleUploadAvatar(req, res, supabase, player) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { filename, base64, mime_type } = req.body || {};
+  if (!filename || !base64 || !mime_type) {
+    return res.status(400).json({ error: 'Missing filename, base64, or mime_type.' });
+  }
+
+  const crypto = require('crypto');
+  const buffer = Buffer.from(base64, 'base64');
+  const ext    = filename.split('.').pop() || 'jpg';
+  const path   = `avatars/${player.id}-${Date.now()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from('puzzle-images')
+    .upload(path, buffer, { contentType: mime_type, upsert: true });
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  const { data: urlData } = supabase.storage.from('puzzle-images').getPublicUrl(path);
+  return res.status(200).json({ url: urlData.publicUrl });
+}
+
+// ── GET /api/player?action=stats ──────────────────────────────────────────────
+async function handleStats(req, res, supabase, player) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { data, error } = await supabase
+    .from('scores')
+    .select('time_seconds, hints_used, piece_count')
+    .eq('player_name', player.name)
+    .order('time_seconds', { ascending: true });
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  const scores     = data || [];
+  const solved     = scores.length;
+  const best_time  = solved > 0 ? scores[0].time_seconds : null;
+  const hints_used = scores.reduce((sum, s) => sum + (s.hints_used || 0), 0);
+
+  return res.status(200).json({ solved, best_time, hints_used });
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 module.exports = async (req, res) => {
@@ -195,8 +295,11 @@ module.exports = async (req, res) => {
   if (!player) return res.status(401).json({ error: 'Invalid or expired session. Please log in again.' });
 
   switch (action) {
-    case 'progress-save': return handleProgressSave(req, res, supabase, player);
-    case 'progress-load': return handleProgressLoad(req, res, supabase, player);
+    case 'progress-save':   return handleProgressSave(req, res, supabase, player);
+    case 'progress-load':   return handleProgressLoad(req, res, supabase, player);
+    case 'update-profile':  return handleUpdateProfile(req, res, supabase, player);
+    case 'upload-avatar':   return handleUploadAvatar(req, res, supabase, player);
+    case 'stats':           return handleStats(req, res, supabase, player);
     default:
       return res.status(404).json({ error: `Unknown player action: ${action}` });
   }
