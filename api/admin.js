@@ -131,6 +131,23 @@ async function handleGetWallets(req, res, supabase) {
   })));
 }
 
+
+// ── PATCH /api/admin?action=challenge (extend end date) ──────────────────────
+async function handleExtendChallenge(req, res, supabase) {
+  if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
+  const { id, ends_at } = req.body || {};
+  if (!id || !ends_at) return res.status(400).json({ error: 'id and ends_at are required.' });
+  if (new Date(ends_at) <= new Date()) {
+    return res.status(400).json({ error: 'New end date must be in the future.' });
+  }
+  const { error } = await supabase
+    .from('challenges')
+    .update({ ends_at })
+    .eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json({ ok: true });
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 module.exports = async (req, res) => {
@@ -162,8 +179,8 @@ module.exports = async (req, res) => {
 
   switch (action) {
     case 'challenges':   return handleGetChallenges(req, res, supabase);
-    case 'challenge':    return req.method === 'DELETE'
-                           ? handleDeleteChallenge(req, res, supabase)
+    case 'challenge':    return req.method === 'DELETE' ? handleDeleteChallenge(req, res, supabase)
+                           : req.method === 'PATCH'  ? handleExtendChallenge(req, res, supabase)
                            : handleCreateChallenge(req, res, supabase);
     case 'upload-image': return handleUploadImage(req, res, supabase);
     case 'wallets':      return handleGetWallets(req, res, supabase);
