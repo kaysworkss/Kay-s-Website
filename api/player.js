@@ -26,7 +26,7 @@ async function getPlayerFromToken(supabase, token) {
   if (!token) return null;
   const { data, error } = await supabase
     .from('players')
-    .select('id, name, wallet_address')
+    .select('id, name, wallet_address, avatar_url')
     .eq('session_token', token)
     .gt('token_expires_at', new Date().toISOString())
     .maybeSingle();
@@ -68,12 +68,12 @@ async function handleRegister(req, res, supabase) {
   const { data: player, error } = await supabase
     .from('players')
     .insert({ name: cleanName, wallet_address: cleanWallet, pin_hash: pinHash, session_token: token, token_expires_at: tokenExpiry })
-    .select('id, name, wallet_address')
+    .select('id, name, wallet_address, avatar_url')
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
 
-  return res.status(201).json({ player_id: player.id, name: player.name, wallet_address: player.wallet_address, token });
+  return res.status(201).json({ player_id: player.id, name: player.name, wallet_address: player.wallet_address, avatar_url: player.avatar_url || null, token });
 }
 
 // ── POST /api/player?action=login ─────────────────────────────────────────────
@@ -88,7 +88,7 @@ async function handleLogin(req, res, supabase) {
 
   const { data: player, error } = await supabase
     .from('players')
-    .select('id, name, wallet_address, pin_hash')
+    .select('id, name, wallet_address, avatar_url, pin_hash')
     .ilike('name', name.trim())
     .maybeSingle();
 
@@ -110,7 +110,7 @@ async function handleLogin(req, res, supabase) {
     .update({ session_token: token, token_expires_at: tokenExpiry })
     .eq('id', player.id);
 
-  return res.status(200).json({ player_id: player.id, name: player.name, wallet_address: player.wallet_address, token });
+  return res.status(200).json({ player_id: player.id, name: player.name, wallet_address: player.wallet_address, avatar_url: player.avatar_url || null, token });
 }
 
 // ── POST /api/player?action=progress-save ────────────────────────────────────
