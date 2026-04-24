@@ -16,11 +16,11 @@ const { getSupabase, cors, handleOptions } = require('./_lib');
 
 // ── Difficulty tiers ──────────────────────────────────────────────────────────
 const DIFF_TIERS = [
-  { label: 'Demo',   cls: 'demo',   range: [1,    48]   },
-  { label: 'Easy',   cls: 'easy',   range: [49,   250]  },
-  { label: 'Medium', cls: 'medium', range: [251,  600]  },
-  { label: 'Hard',   cls: 'hard',   range: [601,  1200] },
-  { label: 'Expert', cls: 'expert', range: [1201, Infinity] },
+  { label: 'Cowrie',   cls: 'demo',   range: [1,    48]   },
+  { label: 'Coral',    cls: 'easy',   range: [49,   250]  },
+  { label: 'Jade',     cls: 'medium', range: [251,  600]  },
+  { label: 'Sapphire', cls: 'hard',   range: [601,  1200] },
+  { label: 'Gold',     cls: 'expert', range: [1201, Infinity] },
 ];
 function tierForCount(n) {
   return DIFF_TIERS.find(t => n >= t.range[0] && n <= t.range[1]) || DIFF_TIERS[1];
