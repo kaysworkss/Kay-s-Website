@@ -3915,18 +3915,27 @@ async function fetchAdminChallenges(){
         <div class="ch-info" style="flex:1;min-width:0">
           <div class="ch-title">${esc(ch.title)}</div>
           <div class="ch-dates">${fmtDate(s)} → ${fmtDate(e)} · ${ch.piece_count} pieces · <span style="color:var(--gold-light)">${status}</span></div>
-          <!-- Extend row — hidden until extend clicked -->
-          <div id="extend-${ch.id}" style="display:none;margin-top:.55rem;display:none;align-items:center;gap:.5rem;flex-wrap:wrap">
-            <span style="font-size:.68rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.05em">New end date:</span>
-            <input type="datetime-local" id="extend-dt-${ch.id}" value="${endsLocal}"
-              style="font-size:.72rem;padding:.3rem .55rem;width:auto;flex:1;min-width:160px">
-            <button class="btn btn-sm btn-solid" onclick="confirmExtend('${ch.id}')">Save</button>
-            <button class="btn btn-sm" onclick="cancelExtend('${ch.id}')">Cancel</button>
-            <span id="extend-msg-${ch.id}" style="font-size:.72rem;margin-left:.2rem"></span>
+          <!-- Edit row — hidden until Extend or Rename clicked -->
+          <div id="extend-${ch.id}" style="display:none;margin-top:.6rem;flex-direction:column;gap:.45rem">
+            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+              <span style="font-size:.68rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.05em;white-space:nowrap">Title:</span>
+              <input type="text" id="extend-title-${ch.id}" value="${esc(ch.title)}" maxlength="80"
+                style="font-size:.78rem;padding:.32rem .6rem;flex:1;min-width:180px">
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+              <span style="font-size:.68rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.05em;white-space:nowrap">End date:</span>
+              <input type="datetime-local" id="extend-dt-${ch.id}" value="${endsLocal}"
+                style="font-size:.72rem;padding:.32rem .6rem;flex:1;min-width:180px">
+            </div>
+            <div style="display:flex;gap:.4rem;align-items:center">
+              <button class="btn btn-sm btn-solid" onclick="confirmExtend('${ch.id}')">Save</button>
+              <button class="btn btn-sm" onclick="cancelExtend('${ch.id}')">Cancel</button>
+              <span id="extend-msg-${ch.id}" style="font-size:.72rem;margin-left:.1rem"></span>
+            </div>
           </div>
         </div>
         <div style="display:flex;gap:.4rem;flex-shrink:0">
-          <button class="btn btn-sm" onclick="showExtend('${ch.id}')">Extend</button>
+          <button class="btn btn-sm" onclick="showExtend('${ch.id}')">Edit</button>
           <button class="btn btn-sm btn-danger" onclick="deleteChallenge('${ch.id}')">Delete</button>
         </div>
       </div>`;
@@ -3947,13 +3956,14 @@ function cancelExtend(id) {
 }
 
 async function confirmExtend(id) {
-  const newEnd = document.getElementById(`extend-dt-${id}`)?.value;
-  const msgEl  = document.getElementById(`extend-msg-${id}`);
-  if (!newEnd) { if(msgEl){msgEl.textContent='Pick a date first.';msgEl.style.color='#e07070'} return; }
+  const newEnd   = document.getElementById(`extend-dt-${id}`)?.value;
+  const newTitle = document.getElementById(`extend-title-${id}`)?.value.trim();
+  const msgEl    = document.getElementById(`extend-msg-${id}`);
 
-  // Must be in the future
+  if (!newTitle) { if(msgEl){msgEl.textContent='Title cannot be empty.';msgEl.style.color='#e07070'} return; }
+  if (!newEnd)   { if(msgEl){msgEl.textContent='Pick a date first.';msgEl.style.color='#e07070'} return; }
   if (new Date(newEnd) <= new Date()) {
-    if(msgEl){msgEl.textContent='Date must be in the future.';msgEl.style.color='#e07070'} return;
+    if(msgEl){msgEl.textContent='End date must be in the future.';msgEl.style.color='#e07070'} return;
   }
 
   if(msgEl){msgEl.textContent='Saving…';msgEl.style.color='var(--text-muted)'}
@@ -3961,10 +3971,10 @@ async function confirmExtend(id) {
     const res = await fetch(`${API}/admin/challenge`,{
       method:'PATCH',
       headers:{'Content-Type':'application/json','x-admin-token':adminToken},
-      body:JSON.stringify({id, ends_at: new Date(newEnd).toISOString()})
+      body:JSON.stringify({id, title: newTitle, ends_at: new Date(newEnd).toISOString()})
     });
     if(!res.ok) throw new Error((await res.json()).error||'Failed');
-    if(msgEl){msgEl.textContent='✓ Extended!';msgEl.style.color='#6abf6a'}
+    if(msgEl){msgEl.textContent='✓ Saved!';msgEl.style.color='#6abf6a'}
     setTimeout(()=>{ fetchAdminChallenges(); }, 900);
   } catch(e) {
     if(msgEl){msgEl.textContent=e.message;msgEl.style.color='#e07070'}
