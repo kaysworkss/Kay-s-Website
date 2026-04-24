@@ -63,7 +63,8 @@ body {
   font-family: 'Crimson Pro', 'Cormorant Garamond', serif;
   font-size: 15px;
   line-height: 1.7;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* ════════════════════════════════
@@ -122,14 +123,42 @@ body {
 ════════════════════════════════ */
 #view-upcoming { display: none; min-height: 100vh; }
 #view-upcoming.show { display: block; }
-.upcoming-layout { display: grid; grid-template-columns: 1fr 420px; min-height: 100vh; }
+.upcoming-layout { display: grid; grid-template-columns: 1fr 420px; flex: 1; min-height: 0; height: 100%; }
 
 /* ════════════════════════════════
    LIVE VIEW
 ════════════════════════════════ */
-#view-live { display: none; min-height: 100vh; flex-direction: column; }
+#view-live { display: none; height: 100vh; flex-direction: column; overflow: hidden; }
 #view-live.show { display: flex; }
-.live-layout { display: grid; grid-template-columns: 1fr 400px; flex: 1; }
+/* CSS var updated by JS when bars render — fallback covers topbar+modebar+strip */
+:root { --bars-h: 116px; }
+.live-layout { display: grid; grid-template-columns: 3fr 360px; flex: 1; min-height: 0; overflow: hidden; height: 100%; }
+
+/* ── Piece selector strip ── */
+.piece-selector { display:none; border-bottom:1px solid var(--divider); background:var(--bg-alt); padding:0 28px; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.piece-selector::-webkit-scrollbar { display:none; }
+.piece-selector.show { display:flex; gap:4px; align-items:stretch; }
+.piece-tab {
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 16px; border:none; background:transparent;
+  font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.16em; text-transform:uppercase;
+  color:var(--text-muted); cursor:pointer; border-bottom:2px solid transparent;
+  transition:color .2s, border-color .2s; white-space:nowrap; flex-shrink:0;
+}
+.piece-tab:hover { color:var(--clay); }
+.piece-tab.active { color:var(--sand); border-bottom-color:var(--clay); }
+.piece-tab-thumb {
+  width:28px; height:28px; border-radius:2px; object-fit:cover;
+  border:1px solid var(--divider); background:var(--bg); flex-shrink:0;
+}
+.piece-tab-bid {
+  font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-weight:600;
+  color:var(--clay); letter-spacing:0; text-transform:none;
+}
+.piece-tab-live-dot {
+  width:5px; height:5px; border-radius:50%; background:var(--moss);
+  animation:live-blink 1.4s ease-in-out infinite; flex-shrink:0;
+}
 
 /* ── Mode toggle ── */
 .mode-toggle-bar { display:flex; align-items:center; justify-content:space-between; padding:8px 28px; border-bottom:1px solid var(--divider); background:var(--bg-alt); }
@@ -141,12 +170,12 @@ body {
 .live-dot { width:6px; height:6px; border-radius:50%; background:var(--moss); animation:live-blink 1.4s ease-in-out infinite; }
 @keyframes live-blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 /* ── Collector room ── */
-#collector-room { display:none; flex-direction:column; border-left:1px solid var(--divider); background:var(--bg); width:300px; flex-shrink:0; }
+#collector-room { display:none; flex-direction:column; border-left:1px solid var(--divider); background:var(--bg); width:320px; flex-shrink:0; overflow:hidden; height:100%; }
 #collector-room.show { display:flex; }
-.room-header { padding:12px 16px; border-bottom:1px solid var(--divider); background:var(--bg-alt); }
+.room-header { padding:12px 16px; border-bottom:1px solid var(--divider); background:var(--bg-alt); flex-shrink:0; }
 .room-title { font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--clay); margin-bottom:2px; }
 .room-sub { font-family:'Crimson Pro',serif; font-size:0.8rem; color:var(--text-muted); font-style:italic; display:flex; align-items:center; gap:6px; }
-.chat-feed { flex:1; overflow-y:auto; padding:10px 13px; display:flex; flex-direction:column; gap:6px; max-height:400px; min-height:180px; }
+.chat-feed { flex:1; overflow-y:auto; padding:10px 13px; display:flex; flex-direction:column; gap:6px; min-height:0; }
 .chat-msg-wrap { animation:chatFadeUp .22s ease; position:relative; }
 .chat-msg-wrap.deleting { opacity:0; transform:translateX(20px); transition:opacity .25s ease, transform .25s ease; }
 .delete-confirm { position:absolute; top:50%; right:0; transform:translateY(-50%); display:flex; align-items:center; gap:5px; background:var(--bark); border:1px solid rgba(196,132,90,0.3); border-radius:3px; padding:4px 8px; z-index:10; animation:chatFadeUp .15s ease; }
@@ -166,7 +195,7 @@ body {
 .chat-auc-name { font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--clay); margin-bottom:3px; }
 .reaction-line { display:flex; align-items:center; gap:4px; flex-wrap:wrap; padding:2px 4px; }
 .react-pill { background:rgba(196,132,90,.14); border:1px solid var(--divider); border-radius:10px; padding:2px 8px; font-family:'Crimson Pro',serif; font-size:0.8rem; color:var(--clay); cursor:pointer; }
-.chat-input-zone { padding:11px 13px; border-top:1px solid var(--divider); background:var(--bg-alt); }
+.chat-input-zone { padding:11px 13px; border-top:1px solid var(--divider); background:var(--bg-alt); flex-shrink:0; }
 .react-row { display:flex; gap:5px; margin-bottom:8px; flex-wrap:wrap; }
 .react-btn-sm { font-size:15px; background:transparent; border:1px solid var(--divider); border-radius:3px; padding:3px 8px; cursor:pointer; line-height:1.2; }
 .react-btn-sm:disabled { opacity:.3; cursor:not-allowed; }
@@ -177,7 +206,7 @@ body {
 .chat-send-btn:disabled { opacity:.35; cursor:not-allowed; }
 
 /* ── Collector profile panel ── */
-.profile-panel { padding:10px 13px; border-top:1px solid var(--divider); background:var(--bg-alt); display:none; }
+.profile-panel { padding:10px 13px; border-top:1px solid var(--divider); background:var(--bg-alt); display:none; flex-shrink:0; }
 .profile-panel.show { display:block; }
 .profile-toggle { width:100%; display:flex; align-items:center; justify-content:space-between; background:transparent; border:none; cursor:pointer; padding:0; margin-bottom:0; }
 .profile-toggle-label { font-family:'Cinzel',serif; font-size:0.48rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-muted); display:flex; align-items:center; gap:7px; }
@@ -207,11 +236,10 @@ body {
 
 /* ── Shared: art column ── */
 .art-col {
-  position: sticky; top: 0; height: 100vh;
   display: flex; flex-direction: column;
   border-right: 1px solid var(--divider);
   background: var(--bg-alt); overflow: hidden;
-  isolation: isolate;
+  isolation: isolate; height: 100%;
 }
 
 .art-frame {
@@ -301,8 +329,8 @@ body {
 }
 
 /* ── Right bid column ── */
-.bid-col { overflow-y: auto; display: flex; flex-direction: column; background: var(--bg); }
-.bid-inner { padding: 36px 28px 64px; flex: 1; }
+.bid-col { overflow-y: auto; display: flex; flex-direction: column; background: var(--bg); height: 100%; min-height: 0; }
+.bid-inner { padding: 28px 24px 48px; flex: 1; }
 
 /* Wallet row */
 .wallet-row {
@@ -672,33 +700,118 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Responsive */
+/* ── Responsive / Mobile ── */
 @media (max-width: 760px) {
-  .live-layout, .upcoming-layout { grid-template-columns: 1fr; }
-  .art-col { position: relative; height: auto; min-height: 280px; }
-  .art-frame { padding: 32px; min-height: 220px; }
-  .count-num { font-size: 1.7rem; }
-  .bid-inner { padding: 24px 18px 48px; }
 
-  /* Mode toggle bar */
-  .mode-toggle-bar { padding: 8px 16px; }
+  /* Unlock page scroll on mobile — layout stacks vertically */
+  html, body { height: auto; overflow: auto; overflow-x: hidden; }
+  #view-live { height: auto; overflow: visible; }
+  #live-flex-wrap { height: auto !important; overflow: visible !important; }
+  .live-layout { overflow: visible; }
+  .bid-col { height: auto; overflow-y: visible; }
+  #collector-room { position: relative; height: auto; }
 
-  /* Stack live layout + collector room vertically on mobile */
-  #view-live > div[style*="display:flex"] { flex-direction: column; }
-  #view-live > div { flex-direction: column; }
+  /* ── Piece selector strip — smaller tabs, horizontal scroll ── */
+  .piece-selector { padding: 0 12px; }
+  .piece-tab { padding: 8px 10px; font-size: 0.46rem; gap: 5px; }
+  .piece-tab-thumb { width: 20px; height: 20px; }
+  .piece-tab-bid { font-size: 0.72rem; }
 
-  /* Collector room full width below bid panel */
-  #collector-room { width: 100%; border-left: none; border-top: 1px solid var(--divider); }
-  #collector-room.show { display: flex; }
+  /* ── Mode toggle bar ── */
+  .mode-toggle-bar { padding: 6px 14px; }
+  .mode-tab { font-size: 0.5rem; padding: 6px 10px; }
+  .online-pill { font-size: 0.5rem; }
 
-  /* Chat feed shorter on mobile */
-  .chat-feed { max-height: 260px; }
-
-  /* Reaction buttons slightly larger touch targets */
-  .react-btn-sm { padding: 5px 10px; }
-  /* Stack panels vertically */
+  /* ── Main live layout: stack vertically ── */
   #live-flex-wrap { flex-direction: column; }
-  .live-layout { min-height: auto; }
+  .live-layout { grid-template-columns: 1fr; min-height: auto; height: auto; }
+
+  /* ── Art column ── */
+  .art-col { height: auto; min-height: auto; }
+  .art-frame {
+    min-height: 200px;
+    max-height: 52vw;
+    padding: 16px;
+    border-radius: 0;
+    border-left: none; border-right: none;
+  }
+  .art-eyebrow { font-size: 0.46rem; }
+  .live-art-title { font-size: 1.3rem; }
+
+  /* ── Bid column — no fixed height, scrolls with page ── */
+  .bid-col { overflow-y: visible; max-height: none; }
+  .bid-inner { padding: 18px 16px 36px; }
+
+  /* ── Countdown ── */
+  .count-num { font-size: 1.6rem; }
+  .count-label { font-size: 0.52rem; }
+
+  /* ── Stats grid ── */
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat-val { font-size: 1rem; }
+  .stat-val.hi { font-size: 1.1rem; }
+
+  /* ── Bid form ── */
+  .bid-input { font-size: 1rem; padding: 10px 12px; }
+  .btn-bid { padding: 12px; font-size: 0.6rem; }
+  .btn-sm { font-size: 0.52rem; padding: 7px 10px; }
+
+  /* ── Collector room — full width below bid panel ── */
+  #collector-room {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--divider);
+    max-height: none;
+  }
+  #collector-room.show { display: flex; }
+  .chat-feed { max-height: 280px; min-height: 180px; }
+  .room-header { padding: 10px 14px; }
+  .react-row { gap: 5px; }
+  .react-btn-sm { padding: 7px 11px; font-size: 1rem; min-width: 38px; min-height: 38px; }
+  .chat-compose-input { font-size: 0.88rem; padding: 9px 10px; }
+  .chat-send-btn { padding: 9px 13px; font-size: 0.52rem; }
+
+  /* ── Profile panel ── */
+  .profile-panel { padding: 10px 14px; }
+
+  /* ── About panel overlay ── */
+  .about-panel { border-radius: 0; }
+  .about-toggle { padding: 10px 14px; min-height: 44px; }
+
+  /* ── Auctioneer gavel panel ── */
+  .gavel-btns { grid-template-columns: 1fr 1fr; gap: 5px; }
+  .gavel-btn { padding: 9px 8px; font-size: 0.52rem; min-height: 40px; }
+
+  /* ── Wallet row ── */
+  .wallet-row { flex-wrap: wrap; gap: 8px; }
+  .wallet-btns { flex-wrap: wrap; gap: 5px; }
+
+  /* ── Upcoming view ── */
+  .upcoming-layout { grid-template-columns: 1fr; }
+  .bid-inner.upcoming { padding: 18px 16px 48px; }
+
+  /* ── Landing nav ── */
+  .landing-nav { padding: 14px 18px; }
+  .landing-nav-logo { font-size: 0.85rem; }
+  .landing-nav-links { gap: 14px; }
+  .landing-nav-link { font-size: 0.48rem; }
+
+  /* ── Landing view ── */
+  .landing-title { font-size: 2.2rem; }
+  .landing-sub { font-size: 0.88rem; max-width: 90vw; }
+  .btn-honour { padding: 0.65rem 1.2rem; font-size: 0.52rem; }
+
+  /* ── Notif toast ── */
+  .notif { max-width: calc(100vw - 32px); left: 16px; right: 16px; bottom: 16px; }
+}
+
+/* Extra small — sub 380px (small iPhones) */
+@media (max-width: 380px) {
+  .landing-title { font-size: 1.8rem; }
+  .piece-tab-bid { display: none; }
+  .count-num { font-size: 1.3rem; }
+  .bid-inner { padding: 14px 12px 28px; }
+  .landing-nav-links { gap: 10px; }
 }
 /* Loading view */
 #view-loading {
@@ -884,7 +997,10 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
     <div class="online-pill"><span class="live-dot"></span><span id="online-count">Live</span><span id="eligible-count" style="display:none;margin-left:4px;padding:1px 7px;background:rgba(107,124,92,.15);border:1px solid rgba(107,124,92,.3);border-radius:10px;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:.12em;text-transform:uppercase;color:var(--moss)"></span></div>
   </div>
 
-  <div id="live-flex-wrap" style="display:flex;flex:1">
+  <!-- Piece selector — only shown when multiple auctions are configured -->
+  <div class="piece-selector" id="piece-selector"></div>
+
+  <div id="live-flex-wrap" style="display:flex;flex:1;min-height:0;overflow:hidden;">
     <div class="live-layout" style="flex:1">
 
       <!-- Left: artwork -->
@@ -927,6 +1043,17 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             </div>
           </div>
 
+          <!-- Outbid notifications — shown after wallet connects -->
+          <div id="notif-optin" style="display:none;margin-bottom:20px;padding:13px 15px;background:var(--bg-alt);border:1px solid var(--divider);border-radius:3px">
+            <div class="slabel" style="margin-bottom:6px">Outbid notifications</div>
+            <div style="font-family:'Crimson Pro',serif;font-size:0.85rem;color:var(--text-muted);font-style:italic;margin-bottom:9px">Get emailed if someone outbids you.</div>
+            <div style="display:flex;gap:6px;margin-bottom:7px">
+              <input id="notif-email" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--divider);border-radius:3px;color:var(--text);font-family:'Crimson Pro',serif;font-size:0.88rem;padding:7px 10px;outline:none;min-width:0"/>
+              <button onclick="registerNotifications()" style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;background:var(--moss);color:var(--linen);border:none;border-radius:3px;padding:7px 12px;cursor:pointer;white-space:nowrap">Notify me</button>
+            </div>
+            <div id="notif-optin-status" style="font-family:'Crimson Pro',serif;font-size:0.8rem;font-style:italic;color:var(--text-muted)"></div>
+          </div>
+
           <!-- Settled banner -->
           <div class="settled-banner" id="settled-banner">
             <div class="settled-title">Auction Settled</div>
@@ -966,17 +1093,6 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
               <div id="elig-text">You are eligible to bid</div>
               <div class="eligibility-detail" id="elig-detail"></div>
             </div>
-          </div>
-
-          <!-- Outbid notification opt-in -->
-          <div id="notif-optin" style="display:none;margin-bottom:18px;padding:14px 16px;background:var(--bg-alt);border:1px solid var(--divider);border-radius:3px">
-            <div class="slabel" style="margin-bottom:8px">Outbid notifications</div>
-            <div style="font-family:'Crimson Pro',serif;font-size:0.88rem;color:var(--text-muted);font-style:italic;margin-bottom:10px">Get notified by email and browser alert if someone outbids you.</div>
-            <div style="display:flex;gap:6px;margin-bottom:8px">
-              <input id="notif-email" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--divider);border-radius:3px;color:var(--text);font-family:'Crimson Pro',serif;font-size:0.9rem;padding:7px 10px;outline:none;min-width:0"/>
-              <button onclick="registerNotifications()" style="font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;background:var(--moss);color:var(--linen);border:none;border-radius:3px;padding:7px 13px;cursor:pointer;white-space:nowrap">Notify me</button>
-            </div>
-            <div id="notif-optin-status" style="font-family:'Crimson Pro',serif;font-size:0.8rem;font-style:italic;color:var(--text-muted)"></div>
           </div>
 
           <!-- Bid form -->
@@ -1160,7 +1276,10 @@ const ERC721_ABI = [
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-let cfg = {};
+let cfg        = {};          // full config from API
+let _auctions  = [];          // array of auction slot configs
+let _activeIdx = 0;           // which auction slot is currently displayed
+
 let provider = null, signer = null, signerAddress = null;
 let auctionContract = null;
 let endTimestamp = 0, isLive = false, minNextBid = 0n;
@@ -1171,15 +1290,31 @@ let notifTimer = null;
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 window.addEventListener("load", async () => {
-  // Show a subtle loading state while we fetch config from the API
   document.getElementById("view-loading").classList.add("show");
 
   cfg = await loadConfig();
   const status = cfg.status || "off";
 
+  // Normalise auctions array — supports both single and multi-auction configs
+  if (Array.isArray(cfg.auctions) && cfg.auctions.length > 0) {
+    _auctions = cfg.auctions;
+  } else if (cfg.contractAddr) {
+    // Single-auction legacy config — wrap into array
+    _auctions = [{
+      contractAddr: cfg.contractAddr,
+      artTitle:     cfg.artTitle,
+      artArtist:    cfg.artArtist,
+      artAbout:     cfg.artAbout,
+      artYear:      cfg.artYear,
+      artMedium:    cfg.artMedium,
+      artImage:     cfg.artImage,
+      gateName:     cfg.gateName,
+      gateLink:     cfg.gateLink,
+    }];
+  }
+
   document.getElementById("view-loading").classList.remove("show");
 
-  // Show correct view
   if (status === "live") {
     document.getElementById("view-live").classList.add("show");
     await initLive();
@@ -1190,36 +1325,94 @@ window.addEventListener("load", async () => {
     initUpcoming();
   } else {
     document.getElementById("view-landing").classList.add("show");
-    if (cfg.artTitle) document.getElementById("landing-title").textContent = cfg.artTitle;
+    if (cfg.artTitle || (_auctions[0]?.artTitle)) {
+      document.getElementById("landing-title").textContent = cfg.artTitle || _auctions[0]?.artTitle;
+    }
   }
 });
+
+// ── Return the active auction slot config ──
+function _activeCfg() {
+  return _auctions[_activeIdx] || _auctions[0] || cfg;
+}
 
 // ─── UPCOMING INIT ────────────────────────────────────────────────────────────
 
 function initUpcoming() {
-  // Artwork info
-  if (cfg.artTitle)  document.getElementById("upcoming-art-name").textContent   = cfg.artTitle;
-  if (cfg.artArtist) document.getElementById("upcoming-art-artist").textContent = cfg.artArtist;
+  // If multiple pieces, show a piece selector strip on the upcoming view too
+  _buildUpcomingPieceSelector();
 
-  // About panel
-  populateAbout("upcoming");
+  // Load first piece into view
+  _loadUpcomingPiece(0);
 
-  // Gate info
-  if (cfg.gateName) document.getElementById("upcoming-gate-name").textContent = cfg.gateName;
-  if (cfg.gateName) document.getElementById("upcoming-gate-detail").textContent = "You must hold this token to participate in the auction.";
-  if (cfg.gateLink) {
-    const link = document.getElementById("upcoming-gate-link");
-    link.href = cfg.gateLink.startsWith("http") ? cfg.gateLink : "#";
-    link.textContent = cfg.gateLink.startsWith("http") ? "Acquire gate token →" : cfg.gateLink;
-    link.style.display = "block";
-  }
-
-  // Launch date countdown
+  // Launch date countdown (shared across all pieces)
   if (cfg.launchDate) {
     const launch = new Date(cfg.launchDate).getTime();
     document.getElementById("upcoming-launch-date").textContent = new Date(cfg.launchDate).toLocaleString();
     upcomingTimer = setInterval(() => tickUpcoming(launch), 1000);
     tickUpcoming(launch);
+  }
+}
+
+function _buildUpcomingPieceSelector() {
+  // Reuse the piece-selector strip (it sits above both live and upcoming views)
+  const strip = document.getElementById("piece-selector");
+  strip.innerHTML = "";
+  if (_auctions.length <= 1) { strip.classList.remove("show"); return; }
+  strip.classList.add("show");
+  _auctions.forEach((slot, i) => {
+    const btn = document.createElement("button");
+    btn.className = "piece-tab" + (i === 0 ? " active" : "");
+    btn.dataset.idx = i;
+    const thumbHtml = slot.artImage
+      ? `<img class="piece-tab-thumb" src="${toHTTP(slot.artImage)}" alt="" onerror="this.style.display='none'">`
+      : "";
+    btn.innerHTML = `${thumbHtml}<span>${slot.artTitle || "Piece " + (i+1)}</span>`;
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".piece-tab").forEach((b,j) => b.classList.toggle("active", j===i));
+      _loadUpcomingPiece(i);
+    });
+    strip.appendChild(btn);
+  });
+}
+
+function _loadUpcomingPiece(idx) {
+  const slot = _auctions[idx] || _auctions[0] || {};
+
+  // Sync cfg fields so populateAbout / loadStaticImage work correctly
+  cfg.artTitle  = slot.artTitle  || cfg.artTitle  || "";
+  cfg.artArtist = slot.artArtist || cfg.artArtist || "";
+  cfg.artAbout  = slot.artAbout  || cfg.artAbout  || "";
+  cfg.artYear   = slot.artYear   || cfg.artYear   || "";
+  cfg.artMedium = slot.artMedium || cfg.artMedium || "";
+  cfg.artImage  = slot.artImage  || cfg.artImage  || "";
+  cfg.gateName  = slot.gateName  || cfg.gateName  || "";
+  cfg.gateLink  = slot.gateLink  || cfg.gateLink  || "";
+
+  // Artwork info
+  if (cfg.artTitle)  document.getElementById("upcoming-art-name").textContent   = cfg.artTitle;
+  if (cfg.artArtist) document.getElementById("upcoming-art-artist").textContent = cfg.artArtist;
+
+  // Reset and repopulate the about panel
+  ["upcoming-about-title","upcoming-about-meta","upcoming-about-body"].forEach(id => {
+    const el = document.getElementById(id); if(el) el.textContent = "";
+  });
+  const tog = document.getElementById("upcoming-about-toggle");
+  if(tog) tog.style.display = "none";
+  const panel = document.getElementById("upcoming-about-panel");
+  if(panel) panel.classList.remove("open");
+  populateAbout("upcoming");
+
+  // Gate info
+  if (cfg.gateName) {
+    document.getElementById("upcoming-gate-name").textContent = cfg.gateName;
+    document.getElementById("upcoming-gate-detail").textContent = "You must hold this token to participate in the auction.";
+  }
+  if (cfg.gateLink) {
+    const link = document.getElementById("upcoming-gate-link");
+    link.href = cfg.gateLink.startsWith("http") ? cfg.gateLink : "#";
+    link.textContent = cfg.gateLink.startsWith("http") ? "Acquire gate token →" : cfg.gateLink;
+    link.style.display = "block";
   }
 
   // Image
@@ -1240,14 +1433,11 @@ function tickUpcoming(launchMs) {
 
 // ─── LIVE INIT ────────────────────────────────────────────────────────────────
 
-async function initLive() {
-  // Artwork info from config
-  if (cfg.artTitle)  document.getElementById("live-art-name").textContent   = cfg.artTitle;
-  if (cfg.artArtist) document.getElementById("live-art-artist").textContent = cfg.artArtist;
-  populateAbout("live");
-  loadStaticImage("live");
+// Cache of per-auction contracts keyed by contractAddr
+const _contractCache = {};
 
-  // Connect read-only provider
+async function initLive() {
+  // Connect provider once
   if (!provider) {
     if (cfg.rpcUrl) {
       try { provider = new ethers.JsonRpcProvider(cfg.rpcUrl); } catch(_) {}
@@ -1255,27 +1445,124 @@ async function initLive() {
       provider = new ethers.BrowserProvider(window.ethereum);
     }
   }
+  if (!provider) return;
 
-  if (!provider || !cfg.contractAddr || !ethers.isAddress(cfg.contractAddr)) return;
+  // Build piece selector if multiple auctions
+  await _buildPieceSelector();
 
-  auctionContract = new ethers.Contract(cfg.contractAddr, AUCTION_ABI, provider);
+  // Load the first (active) auction
+  await _switchAuction(0);
+}
+
+async function _buildPieceSelector() {
+  const strip = document.getElementById("piece-selector");
+  strip.innerHTML = "";
+  if (_auctions.length <= 1) { strip.classList.remove("show"); return; }
+
+  strip.classList.add("show");
+
+  for (let i = 0; i < _auctions.length; i++) {
+    const slot = _auctions[i];
+    const btn  = document.createElement("button");
+    btn.className = "piece-tab" + (i === 0 ? " active" : "");
+    btn.dataset.idx = i;
+
+    // Thumb
+    const thumbHtml = slot.artImage
+      ? `<img class="piece-tab-thumb" src="${toHTTP(slot.artImage)}" alt="" onerror="this.style.display='none'">`
+      : "";
+
+    btn.innerHTML = `
+      ${thumbHtml}
+      <span>${slot.artTitle || "Piece " + (i + 1)}</span>
+      <span class="piece-tab-bid" id="tab-bid-${i}">—</span>
+      <span class="piece-tab-live-dot"></span>`;
+
+    btn.addEventListener("click", () => _switchAuction(i));
+    strip.appendChild(btn);
+  }
+
+  // Poll all tab bids every 20s
+  _pollAllTabBids();
+  setInterval(_pollAllTabBids, 20000);
+}
+
+async function _pollAllTabBids() {
+  for (let i = 0; i < _auctions.length; i++) {
+    const slot = _auctions[i];
+    if (!slot.contractAddr || !ethers.isAddress(slot.contractAddr)) continue;
+    try {
+      let c = _contractCache[slot.contractAddr];
+      if (!c) { c = new ethers.Contract(slot.contractAddr, AUCTION_ABI, provider); _contractCache[slot.contractAddr] = c; }
+      const s   = await c.auctionState();
+      const bid = s[6]; // _highestBid
+      const el  = document.getElementById("tab-bid-" + i);
+      if (el) el.textContent = bid > 0n ? ethers.formatEther(bid) + " ETH" : "—";
+    } catch(_) {}
+  }
+}
+
+async function _switchAuction(idx) {
+  if (idx < 0 || idx >= _auctions.length) return;
+  _activeIdx = idx;
+
+  // Update tab UI
+  document.querySelectorAll(".piece-tab").forEach((btn, i) => {
+    btn.classList.toggle("active", i === idx);
+  });
+
+  const slot = _activeCfg();
+
+  // Reset visual state
+  clearInterval(countdownTimer);
+  clearInterval(pollTimer);
+  if (auctionContract) { try { auctionContract.removeAllListeners(); } catch(_) {} }
+  bidHistory = [];
+  endTimestamp = 0; isLive = false; minNextBid = 0n;
+
+  // Update artwork panel
+  document.getElementById("live-art-name").textContent   = slot.artTitle  || "—";
+  document.getElementById("live-art-artist").textContent = slot.artArtist || "";
+  document.getElementById("live-placeholder").textContent = "Token artwork";
+  document.getElementById("live-img").style.display = "none";
+  document.getElementById("live-img").src = "";
+
+  // Temporarily point cfg fields at this slot for populateAbout / loadStaticImage
+  cfg.artTitle  = slot.artTitle;
+  cfg.artArtist = slot.artArtist;
+  cfg.artAbout  = slot.artAbout;
+  cfg.artYear   = slot.artYear;
+  cfg.artMedium = slot.artMedium;
+  cfg.artImage  = slot.artImage;
+  cfg.gateName  = slot.gateName;
+  cfg.gateLink  = slot.gateLink;
+  cfg.contractAddr = slot.contractAddr;
+
+  populateAbout("live");
+  loadStaticImage("live");
+
+  if (!slot.contractAddr || !ethers.isAddress(slot.contractAddr)) return;
+
+  // Get or create contract
+  if (!_contractCache[slot.contractAddr]) {
+    _contractCache[slot.contractAddr] = new ethers.Contract(slot.contractAddr, AUCTION_ABI, provider);
+  }
+  auctionContract = _contractCache[slot.contractAddr];
+  if (signer) auctionContract = auctionContract.connect(signer);
 
   await refreshState();
   await loadBidHistory();
-  if (cfg.contractAddr) await loadNFTMeta();
+  if (slot.contractAddr) await loadNFTMeta();
 
-  clearInterval(countdownTimer);
-  clearInterval(pollTimer);
   countdownTimer = setInterval(tickCountdown, 1000);
   pollTimer      = setInterval(refreshState, 15000);
 
   auctionContract.removeAllListeners();
-  auctionContract.on("BidPlaced",       (bidder, amount, e) => { pushBid(bidder, amount, null, e.log?.transactionHash); refreshState(); });
+  auctionContract.on("BidPlaced",       (bidder, amount, e) => { pushBid(bidder, amount, null, e.log?.transactionHash); refreshState(); _pollAllTabBids(); });
   auctionContract.on("AuctionExtended", (newEnd)            => { endTimestamp = Number(newEnd); notify("info","Auction extended","A last-minute bid extended the deadline."); });
-  auctionContract.on("AuctionSettled",  (winner, amount)    => { showSettled(winner, amount); clearInterval(countdownTimer); clearInterval(pollTimer); });
+  auctionContract.on("AuctionSettled",  (winner, amount)    => { showSettled(winner, amount); clearInterval(countdownTimer); clearInterval(pollTimer); _pollAllTabBids(); });
   auctionContract.on("ReserveActivated",(firstBidder, amount, endTime) => {
-    endTimestamp = Number(endTime);
-    isLive = true;
+    endTimestamp = Number(endTime); isLive = true;
     notify("info", "Reserve met — auction is live!", `First bid of ${ethers.formatEther(amount)} ETH started the countdown.`);
     refreshState();
   });
@@ -1284,9 +1571,20 @@ async function initLive() {
     const isMine = signerAddress && buyer.toLowerCase() === signerAddress.toLowerCase();
     if (!isMine) notify("info", "Sold via Buy Now", `${shortAddr(buyer)} purchased at ${ethers.formatEther(price)} ETH.`);
     showSettled(buyer, price);
-    clearInterval(countdownTimer);
-    clearInterval(pollTimer);
+    clearInterval(countdownTimer); clearInterval(pollTimer);
   });
+
+  // Re-wire collector room to this auction's contract address
+  if (_auctionId !== slot.contractAddr.toLowerCase()) {
+    _auctionId = slot.contractAddr.toLowerCase();
+    _seenMsgIds = new Set();
+    document.getElementById("chat-feed").innerHTML = "";
+    if (_realtimeWS) { try { _realtimeWS.close(); } catch(_) {} }
+    _loadAucProfile().then(() => { _loadHistory(); _subscribeRoom(); });
+  }
+
+  // Re-check eligibility with new contract
+  if (signerAddress) { await checkEligibility(); }
 }
 
 // ─── About panel ──────────────────────────────────────────────────────────────
@@ -1463,6 +1761,10 @@ async function connectWallet() {
     window.ethereum.on("accountsChanged", () => location.reload());
 
     if (auctionContract) {
+      // Reconnect all cached contracts with signer
+      Object.keys(_contractCache).forEach(addr => {
+        _contractCache[addr] = _contractCache[addr].connect(signer);
+      });
       auctionContract = auctionContract.connect(signer);
       await checkEligibility();
       await checkPendingReturn();
@@ -2531,10 +2833,10 @@ window._roomHookBid = async function(bidder, amount) {
 };
 
 function initCollectorRoom() {
-  _auctionId = (cfg.contractAddr || cfg.auctionId || new Date().toISOString().slice(0,10)).toLowerCase();
+  const addr = (_activeCfg().contractAddr || cfg.contractAddr || cfg.auctionId || new Date().toISOString().slice(0,10)).toLowerCase();
+  _auctionId = addr;
   setMode("collector");
   _updateChatInputState();
-  // Load auctioneer profile first so messages render with correct name/avatar
   _loadAucProfile().then(() => {
     _loadHistory();
     _subscribeRoom();
