@@ -158,11 +158,26 @@ async function handleLeaderboard(req, res, supabase) {
 
   // Deduplicate: keep best per player
   const seen = new Set();
-  const best = scores.filter(s => {
+  const deduped = scores.filter(s => {
     const key = s.player_name.trim().toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key); return true;
   }).slice(0, 10);
+
+  // Fetch avatars
+  const names = deduped.map(s => s.player_name.trim());
+  const { data: players } = await supabase
+    .from('players')
+    .select('name, avatar_url')
+    .in('name', names);
+
+  const avatarMap = {};
+  (players || []).forEach(p => { avatarMap[p.name.trim().toLowerCase()] = p.avatar_url || null; });
+
+  const best = deduped.map(s => ({
+    ...s,
+    avatar_url: avatarMap[s.player_name.trim().toLowerCase()] || null,
+  }));
 
   return res.status(200).json(best);
 }
@@ -192,11 +207,26 @@ async function handleHallOfFame(req, res, supabase) {
       if (sErr || !scores) return { ...ch, entries: [] };
 
       const seen = new Set();
-      const best = scores.filter(s => {
+      const deduped = scores.filter(s => {
         const key = s.player_name.trim().toLowerCase();
         if (seen.has(key)) return false;
         seen.add(key); return true;
       }).slice(0, 10);
+
+      // Look up avatar_url for each unique player name
+      const names = deduped.map(s => s.player_name.trim());
+      const { data: players } = await supabase
+        .from('players')
+        .select('name, avatar_url')
+        .in('name', names);
+
+      const avatarMap = {};
+      (players || []).forEach(p => { avatarMap[p.name.trim().toLowerCase()] = p.avatar_url || null; });
+
+      const best = deduped.map(s => ({
+        ...s,
+        avatar_url: avatarMap[s.player_name.trim().toLowerCase()] || null,
+      }));
 
       const tier   = tierForCount(ch.piece_count);
       const ended  = new Date(ch.ends_at) < new Date(now);
