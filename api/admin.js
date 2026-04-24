@@ -2,54 +2,55 @@
  * /api/admin
  *
  * Single consolidated file replacing:
- *   api/admin/challenge/login.js       → POST   /api/admin/login
- *   api/admin/challenge/challenges.js  → GET    /api/admin/challenges
- *   api/admin/challenge/challenge.js   → POST   /api/admin/challenge
- *   api/admin/challenge/[id].js        → DELETE /api/admin/challenge/:id
- *   api/admin/challenge/upload-image.js→ POST   /api/admin/upload-image
- *   api/admin/challenge/wallets.js     → GET    /api/admin/wallets
- *
- * All routes require x-admin-token header except /login.
- * Routing is done via the `action` query param or URL path segment.
- *
- * URL scheme (keep identical to existing calls in puzzle.html):
- *   POST   /api/admin?action=login
- *   GET    /api/admin?action=challenges
- *   POST   /api/admin?action=challenge
- *   DELETE /api/admin?action=challenge&id=<uuid>
- *   POST   /api/admin?action=upload-image
- *   GET    /api/admin?action=wallets[&challenge_id=<uuid>]
+ *   api/admin/challenge/login.js        → POST   /api/admin/login
+ *   api/admin/challenge/challenges.js   → GET    /api/admin/challenges
+ *   api/admin/challenge/challenge.js    → POST   /api/admin/challenge
+ *   api/admin/challenge/[id].js         → DELETE /api/admin/challenge/:id
+ *   api/admin/challenge/upload-image.js → POST   /api/admin/upload-image
+ *   api/admin/challenge/wallets.js      → GET    /api/admin/wallets
  */
 
 const { getSupabase, cors, handleOptions } = require('./_lib');
 const crypto = require('crypto');
 
 // ── Auth helpers ─────────────────────────────────────────────────────────────
+// Signed token: HMAC-SHA256(randomId, ADMIN_TOKEN)
+// Stateless — no storage needed. Any request can be verified by re-deriving the HMAC.
 
 function generateToken() {
-  return crypto.randomBytes(32).toString('hex');
+  const id     = crypto.randomBytes(16).toString('hex');
+  const secret = process.env.ADMIN_TOKEN || 'fallback-secret-change-me';
+  const sig    = crypto.createHmac('sha256', secret).update(id).digest('hex');
+  return `${id}.${sig}`;
 }
 
 function checkToken(req) {
   const token = req.headers['x-admin-token'];
-  return token && token === process.env.ADMIN_TOKEN;
+  if (!token) return false;
+  const parts = token.split('.');
+  if (parts.length !== 2) return false;
+  const [id, sig] = parts;
+  const secret   = process.env.ADMIN_TOKEN || 'fallback-secret-change-me';
+  const expected = crypto.createHmac('sha256', secret).update(id).digest('hex');
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(sig,      'hex'),
+      Buffer.from(expected, 'hex')
+    );
+  } catch { return false; }
 }
 
-// ── Route handlers ────────────────────────────────────────────────────────────
-
-// POST /api/admin?action=login
+// ── POST /api/admin?action=login ─────────────────────────────────────────────
 async function handleLogin(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { password } = req.body || {};
   if (!password || password !== process.env.ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Incorrect password' });
   }
-  // Return a token derived from ADMIN_TOKEN env var (or generate one)
-  const token = process.env.ADMIN_TOKEN || generateToken();
-  return res.status(200).json({ token });
+  return res.status(200).json({ token: generateToken() });
 }
 
-// GET /api/admin?action=challenges
+// ── GET /api/admin?action=challenges ─────────────────────────────────────────
 async function handleGetChallenges(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const { data, error } = await supabase
@@ -60,7 +61,7 @@ async function handleGetChallenges(req, res, supabase) {
   return res.status(200).json(data || []);
 }
 
-// POST /api/admin?action=challenge
+// ── POST /api/admin?action=challenge ─────────────────────────────────────────
 async function handleCreateChallenge(req, res, supabase) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { title, starts_at, ends_at, piece_count, image_url } = req.body || {};
@@ -76,12 +77,11 @@ async function handleCreateChallenge(req, res, supabase) {
   return res.status(201).json({ id: data.id });
 }
 
-// DELETE /api/admin?action=challenge&id=<uuid>
+// ── DELETE /api/admin?action=challenge&id=<uuid> ──────────────────────────────
 async function handleDeleteChallenge(req, res, supabase) {
   if (req.method !== 'DELETE') return res.status(405).json({ error: 'Method not allowed' });
   const id = req.query.id;
   if (!id) return res.status(400).json({ error: 'id is required.' });
-  // Delete scores first (cascade may handle this, but explicit is safer)
   await supabase.from('scores').delete().eq('challenge_id', id);
   await supabase.from('progress').delete().eq('challenge_id', id);
   const { error } = await supabase.from('challenges').delete().eq('id', id);
@@ -89,17 +89,16 @@ async function handleDeleteChallenge(req, res, supabase) {
   return res.status(200).json({ ok: true });
 }
 
-// POST /api/admin?action=upload-image
+// ── POST /api/admin?action=upload-image ──────────────────────────────────────
 async function handleUploadImage(req, res, supabase) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { filename, base64, mime_type } = req.body || {};
   if (!filename || !base64 || !mime_type) {
     return res.status(400).json({ error: 'Missing filename, base64, or mime_type.' });
   }
-  // Decode base64 and upload to Supabase Storage bucket "puzzle-images"
   const buffer = Buffer.from(base64, 'base64');
   const ext    = filename.split('.').pop() || 'jpg';
-  const path   = `challenges/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const path   = `challenges/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
   const { error } = await supabase.storage
     .from('puzzle-images')
     .upload(path, buffer, { contentType: mime_type, upsert: false });
@@ -108,7 +107,7 @@ async function handleUploadImage(req, res, supabase) {
   return res.status(200).json({ url: urlData.publicUrl });
 }
 
-// GET /api/admin?action=wallets[&challenge_id=uuid]
+// ── GET /api/admin?action=wallets ─────────────────────────────────────────────
 async function handleGetWallets(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const { challenge_id } = req.query;
@@ -120,7 +119,7 @@ async function handleGetWallets(req, res, supabase) {
   if (challenge_id) query = query.eq('challenge_id', challenge_id);
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  const result = (data || []).map(s => ({
+  return res.status(200).json((data || []).map(s => ({
     player_name:     s.player_name,
     wallet_address:  s.wallet_address,
     time_seconds:    s.time_seconds,
@@ -129,8 +128,7 @@ async function handleGetWallets(req, res, supabase) {
     created_at:      s.created_at,
     challenge_id:    s.challenge_id,
     challenge_title: s.challenges?.title || '',
-  }));
-  return res.status(200).json(result);
+  })));
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
@@ -139,8 +137,6 @@ module.exports = async (req, res) => {
   cors(res);
   if (handleOptions(req, res)) return;
 
-  // Extract action — supports both ?action=xxx and path-based calls
-  // e.g. /api/admin?action=login  OR  /api/admin/login (Vercel rewrites)
   const urlPath = req.url || '';
   let action = req.query.action || '';
 
@@ -150,7 +146,7 @@ module.exports = async (req, res) => {
     if (match) action = match[1];
   }
 
-  // Extract id from URL path for /admin/challenge/:id
+  // Extract id from path for /admin/challenge/:id
   if (!req.query.id) {
     const idMatch = urlPath.match(/\/admin\/challenge\/([^/?]+)/);
     if (idMatch && idMatch[1] !== 'undefined') req.query.id = idMatch[1];
@@ -159,18 +155,18 @@ module.exports = async (req, res) => {
   // Login doesn't need a token
   if (action === 'login') return handleLogin(req, res);
 
-  // All other routes require admin token
+  // All other routes require a valid signed token
   if (!checkToken(req)) return res.status(401).json({ error: 'Unauthorized' });
 
   const supabase = getSupabase();
 
   switch (action) {
-    case 'challenges':    return handleGetChallenges(req, res, supabase);
-    case 'challenge':     return req.method === 'DELETE'
-                            ? handleDeleteChallenge(req, res, supabase)
-                            : handleCreateChallenge(req, res, supabase);
-    case 'upload-image':  return handleUploadImage(req, res, supabase);
-    case 'wallets':       return handleGetWallets(req, res, supabase);
+    case 'challenges':   return handleGetChallenges(req, res, supabase);
+    case 'challenge':    return req.method === 'DELETE'
+                           ? handleDeleteChallenge(req, res, supabase)
+                           : handleCreateChallenge(req, res, supabase);
+    case 'upload-image': return handleUploadImage(req, res, supabase);
+    case 'wallets':      return handleGetWallets(req, res, supabase);
     default:
       return res.status(404).json({ error: `Unknown admin action: ${action}` });
   }
