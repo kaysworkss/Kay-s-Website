@@ -3909,16 +3909,66 @@ async function fetchAdminChallenges(){
     list.innerHTML=data.map(ch=>{
       const s=new Date(ch.starts_at), e=new Date(ch.ends_at);
       const status=now<s?'upcoming':now>e?'expired':'active';
-      return `<div class="challenge-row">
+      const endsLocal=toLocal(e);
+      return `<div class="challenge-row" id="crow-${ch.id}">
         <div class="ch-status ${status}"></div>
-        <div class="ch-info">
+        <div class="ch-info" style="flex:1;min-width:0">
           <div class="ch-title">${esc(ch.title)}</div>
           <div class="ch-dates">${fmtDate(s)} → ${fmtDate(e)} · ${ch.piece_count} pieces · <span style="color:var(--gold-light)">${status}</span></div>
+          <!-- Extend row — hidden until extend clicked -->
+          <div id="extend-${ch.id}" style="display:none;margin-top:.55rem;display:none;align-items:center;gap:.5rem;flex-wrap:wrap">
+            <span style="font-size:.68rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.05em">New end date:</span>
+            <input type="datetime-local" id="extend-dt-${ch.id}" value="${endsLocal}"
+              style="font-size:.72rem;padding:.3rem .55rem;width:auto;flex:1;min-width:160px">
+            <button class="btn btn-sm btn-solid" onclick="confirmExtend('${ch.id}')">Save</button>
+            <button class="btn btn-sm" onclick="cancelExtend('${ch.id}')">Cancel</button>
+            <span id="extend-msg-${ch.id}" style="font-size:.72rem;margin-left:.2rem"></span>
+          </div>
         </div>
-        <button class="btn btn-sm btn-danger" onclick="deleteChallenge('${ch.id}')">Delete</button>
+        <div style="display:flex;gap:.4rem;flex-shrink:0">
+          <button class="btn btn-sm" onclick="showExtend('${ch.id}')">Extend</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteChallenge('${ch.id}')">Delete</button>
+        </div>
       </div>`;
     }).join('');
   } catch { list.innerHTML='<p style="color:var(--text-muted)">Failed to load.</p>'; }
+}
+
+function showExtend(id) {
+  const row = document.getElementById(`extend-${id}`);
+  if (!row) return;
+  row.style.display = 'flex';
+  document.getElementById(`extend-dt-${id}`)?.focus();
+}
+
+function cancelExtend(id) {
+  const row = document.getElementById(`extend-${id}`);
+  if (row) row.style.display = 'none';
+}
+
+async function confirmExtend(id) {
+  const newEnd = document.getElementById(`extend-dt-${id}`)?.value;
+  const msgEl  = document.getElementById(`extend-msg-${id}`);
+  if (!newEnd) { if(msgEl){msgEl.textContent='Pick a date first.';msgEl.style.color='#e07070'} return; }
+
+  // Must be in the future
+  if (new Date(newEnd) <= new Date()) {
+    if(msgEl){msgEl.textContent='Date must be in the future.';msgEl.style.color='#e07070'} return;
+  }
+
+  if(msgEl){msgEl.textContent='Saving…';msgEl.style.color='var(--text-muted)'}
+  try {
+    const res = await fetch(`${API}/admin/challenge`,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json','x-admin-token':adminToken},
+      body:JSON.stringify({id, ends_at: new Date(newEnd).toISOString()})
+    });
+    if(!res.ok) throw new Error((await res.json()).error||'Failed');
+    if(msgEl){msgEl.textContent='✓ Extended!';msgEl.style.color='#6abf6a'}
+    setTimeout(()=>{ fetchAdminChallenges(); }, 900);
+  } catch(e) {
+    if(msgEl){msgEl.textContent=e.message;msgEl.style.color='#e07070'}
+  }
 }
 
 async function deleteChallenge(id){
