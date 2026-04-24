@@ -648,6 +648,10 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
       <label>Your Name</label>
       <input type="text" id="player-name" placeholder="Enter your name for the leaderboard" maxlength="28">
     </div>
+    <div class="field" style="text-align:left">
+      <label>Wallet Address <span style="font-family:'Crimson Text',serif;font-size:.75rem;letter-spacing:.01em;text-transform:none;color:var(--text-muted);font-weight:400">(optional — for rewards)</span></label>
+      <input type="text" id="player-wallet" placeholder="0x… or your wallet address" maxlength="100" autocomplete="off" spellcheck="false">
+    </div>
     <div id="resume-banner" style="display:none;background:rgba(201,150,58,.14);border:1px solid rgba(201,150,58,.45);border-radius:var(--radius);padding:.6rem 1rem;margin-top:.75rem;font-size:.82rem;color:var(--gold-light);text-align:left">
       <span id="resume-info">Saved progress found</span>
       <div style="margin-top:.35rem;font-size:.72rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.04em">Progress is saved on this device only. Clearing your browser data will erase it.</div>
@@ -821,10 +825,6 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
           <input type="text" id="ch-title" placeholder="e.g. Week 12 — Ọlọwẹ's Vision">
         </div>
         <div class="field">
-          <label>Reward URL (shown to winners)</label>
-          <input type="text" id="ch-reward" placeholder="https://kaysworks.com/reward/week12">
-        </div>
-        <div class="field">
           <label>Starts At</label>
           <input type="datetime-local" id="ch-starts">
         </div>
@@ -865,6 +865,23 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
     <div class="admin-card" style="grid-column:1/-1">
       <h2>Scheduled Challenges</h2>
       <div id="challenges-list"><p style="color:var(--text-muted);font-size:.85rem">Loading…</p></div>
+    </div>
+
+    <!-- Wallet Addresses -->
+    <div class="admin-card" style="grid-column:1/-1">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem">
+        <h2 style="margin:0">Player Wallet Addresses</h2>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
+          <select id="wallet-challenge-filter" style="font-size:.75rem;padding:.35rem .65rem;min-width:160px" onchange="fetchWallets()">
+            <option value="">— All Challenges —</option>
+          </select>
+          <button class="btn btn-sm" onclick="fetchWallets()">↻ Refresh</button>
+          <button class="btn btn-sm btn-solid" onclick="exportWalletsCSV()">⬇ Export CSV</button>
+        </div>
+      </div>
+      <div id="wallets-list">
+        <p style="color:var(--text-muted);font-size:.85rem">Click Refresh to load wallet addresses.</p>
+      </div>
     </div>
   </div>
 </div>
@@ -982,6 +999,7 @@ let hEdges = [], vEdges = [];
 let TAB = 0, SNAP = 16;
 let timerInterval = null, countdownInterval = null, startTime = 0;
 let playerName = 'Anonymous';
+let playerWallet = '';
 let adminToken = null;
 let adminImageUrl = null;
 let drag = null;       // {pieces, offsets:[{dx,dy}], wx, wy}
@@ -1131,6 +1149,7 @@ function selectChallenge(ch, cardEl) {
     document.getElementById('resume-banner').style.display = 'block';
     document.getElementById('resume-btn').style.display = 'block';
     if (saved.playerName) document.getElementById('player-name').value = saved.playerName;
+    if (saved.playerWallet) document.getElementById('player-wallet').value = saved.playerWallet;
   }
 }
 
@@ -1158,6 +1177,7 @@ function updateCountdown() {
 // ═══════════════════════════════════════════════
 async function startGame(resume = false) {
   playerName = (document.getElementById('player-name').value.trim()) || 'Anonymous';
+  playerWallet = (document.getElementById('player-wallet').value.trim()) || '';
   document.getElementById('start-btn').disabled = true;
   document.getElementById('resume-btn').disabled = true;
   document.getElementById('start-btn').textContent = 'Loading image…';
@@ -1283,6 +1303,7 @@ function autoSave() {
     const data = {
       challengeId: challenge.id,
       playerName,
+      playerWallet,
       elapsed: Math.floor((Date.now() - startTime) / 1000),
       placed: pieces.filter(p => p.placed).length,
       total: totalPieces,
@@ -2399,7 +2420,7 @@ async function checkWin() {
   try {
     const res = await fetch(`${API}/score`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ challenge_id: challenge.id, player_name: playerName, time_seconds: secs, piece_count: totalPieces, hints_used: HINT_MAX - hintsLeft })
+      body: JSON.stringify({ challenge_id: challenge.id, player_name: playerName, wallet_address: playerWallet, time_seconds: secs, piece_count: totalPieces, hints_used: HINT_MAX - hintsLeft })
     });
     const data = await res.json();
     if (data.rank) document.getElementById('win-rank').textContent = `You ranked #${data.rank} on the leaderboard!`;
@@ -3213,12 +3234,98 @@ document.getElementById('admin-pass').addEventListener('keydown',e=>{if(e.key===
 function cancelAdmin(){hideAll();show('loading-screen');boot()}
 function adminLogout(){adminToken=null;hideAll();show('loading-screen');boot()}
 
+// ── WALLET ADDRESS VIEWER ──
+let _walletData = [];
+
+async function fetchWallets() {
+  const listEl = document.getElementById('wallets-list');
+  const filterId = document.getElementById('wallet-challenge-filter').value;
+  listEl.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem">Loading…</p>';
+  try {
+    const url = filterId
+      ? `${API}/admin/wallets?challenge_id=${encodeURIComponent(filterId)}`
+      : `${API}/admin/wallets`;
+    const res = await fetch(url, { headers: { 'x-admin-token': adminToken } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    _walletData = await res.json();
+    renderWallets(_walletData);
+  } catch(e) {
+    listEl.innerHTML = `<p style="color:#e07070;font-size:.85rem">Failed to load: ${esc(e.message)}</p>`;
+  }
+}
+
+function renderWallets(data) {
+  const listEl = document.getElementById('wallets-list');
+  if (!data.length) {
+    listEl.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem">No wallet addresses submitted yet.</p>';
+    return;
+  }
+  const rows = data.map((s, i) => `
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:.45rem .6rem;font-size:.78rem;color:var(--text-muted)">${i+1}</td>
+      <td style="padding:.45rem .6rem;font-size:.82rem;font-family:'Cinzel',serif;color:var(--gold-light)">${esc(s.player_name)}</td>
+      <td style="padding:.45rem .6rem;font-size:.75rem;color:var(--text);font-family:monospace;word-break:break-all">${s.wallet_address ? esc(s.wallet_address) : '<span style="color:var(--text-muted);font-style:italic">—</span>'}</td>
+      <td style="padding:.45rem .6rem;font-size:.75rem;color:var(--text-muted)">${esc(s.challenge_title||'')}</td>
+      <td style="padding:.45rem .6rem;font-size:.75rem;color:var(--text-muted)">${fmtTime(s.time_seconds)}</td>
+      <td style="padding:.45rem .6rem;font-size:.72rem;color:var(--text-muted)">${s.created_at ? new Date(s.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : ''}</td>
+    </tr>`).join('');
+  listEl.innerHTML = `
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border-bright)">
+            <th style="padding:.4rem .6rem;font-size:.65rem;letter-spacing:.1em;color:var(--text-muted);font-family:'Cinzel',serif;text-align:left">#</th>
+            <th style="padding:.4rem .6rem;font-size:.65rem;letter-spacing:.1em;color:var(--text-muted);font-family:'Cinzel',serif;text-align:left">Player</th>
+            <th style="padding:.4rem .6rem;font-size:.65rem;letter-spacing:.1em;color:var(--text-muted);font-family:'Cinzel',serif;text-align:left">Wallet Address</th>
+            <th style="padding:.4rem .6rem;font-size:.65rem;letter-spacing:.1em;color:var(--text-muted);font-family:'Cinzel',serif;text-align:left">Challenge</th>
+            <th style="padding:.4rem .6rem;font-size:.65rem;letter-spacing:.1em;color:var(--text-muted);font-family:'Cinzel',serif;text-align:left">Time</th>
+            <th style="padding:.4rem .6rem;font-size:.65rem;letter-spacing:.1em;color:var(--text-muted);font-family:'Cinzel',serif;text-align:left">Date</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <p style="margin-top:.6rem;font-size:.72rem;color:var(--text-muted)">${data.length} record${data.length!==1?'s':''} · only players who provided a wallet address are shown</p>`;
+}
+
+function exportWalletsCSV() {
+  if (!_walletData.length) { alert('No data to export. Click Refresh first.'); return; }
+  const header = ['#','Player Name','Wallet Address','Challenge','Time (s)','Date'];
+  const rows = _walletData.map((s, i) => [
+    i+1,
+    `"${(s.player_name||'').replace(/"/g,'""')}"`,
+    `"${(s.wallet_address||'').replace(/"/g,'""')}"`,
+    `"${(s.challenge_title||'').replace(/"/g,'""')}"`,
+    s.time_seconds,
+    s.created_at ? new Date(s.created_at).toISOString().slice(0,10) : ''
+  ]);
+  const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='apoti-wallets.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Populate challenge filter dropdown in wallet panel
+function _populateWalletFilter(challenges) {
+  const sel = document.getElementById('wallet-challenge-filter');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— All Challenges —</option>';
+  challenges.forEach(ch => {
+    const opt = document.createElement('option');
+    opt.value = ch.id; opt.textContent = ch.title;
+    sel.appendChild(opt);
+  });
+}
+
 async function fetchAdminChallenges(){
   const list=document.getElementById('challenges-list');
   try {
     const res=await fetch(`${API}/admin/challenges`,{headers:{'x-admin-token':adminToken}});
     const data=await res.json();
     if(!data.length){list.innerHTML='<p style="color:var(--text-muted);font-size:.85rem">No challenges yet.</p>';return}
+    _populateWalletFilter(data);
     const now=new Date();
     list.innerHTML=data.map(ch=>{
       const s=new Date(ch.starts_at), e=new Date(ch.ends_at);
@@ -3244,28 +3351,26 @@ async function deleteChallenge(id){
 async function createChallenge(){
   const msgEl=document.getElementById('create-msg');
   const title=document.getElementById('ch-title').value.trim();
-  const reward=document.getElementById('ch-reward').value.trim();
   const starts=document.getElementById('ch-starts').value;
   const ends=document.getElementById('ch-ends').value;
   const pieces=document.getElementById('ch-pieces').value;
   const imageUrl=document.getElementById('ch-image-url').value;
 
   msgEl.className='admin-msg'; msgEl.style.display='none';
-  if(!title||!reward||!starts||!ends||!imageUrl){
+  if(!title||!starts||!ends||!imageUrl){
     msgEl.textContent='Please fill all fields and upload an image.';
     msgEl.className='admin-msg err'; return;
   }
   try {
     const res=await fetch(`${API}/admin/challenge`,{
       method:'POST',headers:{'Content-Type':'application/json','x-admin-token':adminToken},
-      body:JSON.stringify({title,reward_url:reward,starts_at:starts,ends_at:ends,piece_count:parseInt(pieces),image_url:imageUrl})
+      body:JSON.stringify({title,starts_at:starts,ends_at:ends,piece_count:parseInt(pieces),image_url:imageUrl})
     });
     if(!res.ok) throw new Error((await res.json()).error);
     msgEl.textContent='Challenge published successfully!';
     msgEl.className='admin-msg ok';
     // reset form
     document.getElementById('ch-title').value='';
-    document.getElementById('ch-reward').value='';
     document.getElementById('ch-image-url').value='';
     document.getElementById('admin-preview').style.display='none';
     adminImageUrl=null;
