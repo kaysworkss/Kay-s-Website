@@ -627,13 +627,87 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
   </div>
 </div>
 
-<!-- ═══ ENTRY SCREEN ═══ -->
+<!-- ═══ AUTH SCREEN (Register / Login) ═══ -->
+<div id="auth-screen" style="display:none;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(ellipse at 50% 30%,var(--bg-grad1) 0%,var(--bg-grad2) 70%);padding:1.25rem">
+  <div class="card" style="max-width:460px;width:100%;text-align:center">
+    <div class="logo" style="margin-bottom:.2rem">ÀPÓTÍ <em>ỌLỌ́WẸ̀</em></div>
+    <div class="logo-kw" style="margin-bottom:.3rem">Kaysworks</div>
+    <div class="logo-sub">Puzzle Challenge</div>
+    <div class="logo-rule"><div class="logo-rule-diamond"></div></div>
+
+    <!-- Tab switcher -->
+    <div style="display:flex;border:1px solid var(--border-bright);border-radius:var(--radius);overflow:hidden;margin-bottom:1.5rem">
+      <button id="auth-tab-login" onclick="switchAuthTab('login')"
+        style="flex:1;padding:.55rem;font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:.1em;border:none;cursor:pointer;transition:all .2s;background:var(--gold);color:var(--btn-txt)">
+        Log In
+      </button>
+      <button id="auth-tab-register" onclick="switchAuthTab('register')"
+        style="flex:1;padding:.55rem;font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:.1em;border:none;cursor:pointer;transition:all .2s;background:transparent;color:var(--gold)">
+        New Player
+      </button>
+    </div>
+
+    <!-- LOGIN PANEL -->
+    <div id="auth-login-panel">
+      <div class="field" style="text-align:left">
+        <label>Your Name</label>
+        <input type="text" id="login-name" placeholder="The name you registered with" maxlength="28" autocomplete="username">
+      </div>
+      <div class="field" style="text-align:left">
+        <label>4-Digit PIN</label>
+        <input type="password" id="login-pin" placeholder="••••" maxlength="4" inputmode="numeric" pattern="\d{4}" autocomplete="current-password">
+      </div>
+      <p class="err" id="login-err" style="display:none;text-align:left"></p>
+      <button class="btn btn-solid" style="width:100%;margin-top:.25rem" onclick="doPlayerLogin()">Enter the Challenge →</button>
+    </div>
+
+    <!-- REGISTER PANEL -->
+    <div id="auth-register-panel" style="display:none">
+      <div class="field" style="text-align:left">
+        <label>Choose a Name <span style="font-family:'Crimson Text',serif;font-size:.75rem;text-transform:none;color:var(--text-muted)">(shown on leaderboard)</span></label>
+        <input type="text" id="reg-name" placeholder="e.g. Tunde, PuzzleMaster…" maxlength="28" autocomplete="username">
+      </div>
+      <div class="field" style="text-align:left">
+        <label>Choose a 4-Digit PIN <span style="font-family:'Crimson Text',serif;font-size:.75rem;text-transform:none;color:var(--text-muted)">(to log in on any device)</span></label>
+        <input type="password" id="reg-pin" placeholder="••••" maxlength="4" inputmode="numeric" pattern="\d{4}" autocomplete="new-password">
+      </div>
+      <div class="field" style="text-align:left">
+        <label>Confirm PIN</label>
+        <input type="password" id="reg-pin2" placeholder="••••" maxlength="4" inputmode="numeric" pattern="\d{4}" autocomplete="new-password">
+      </div>
+      <div class="field" style="text-align:left">
+        <label>Wallet Address <span style="font-family:'Crimson Text',serif;font-size:.75rem;text-transform:none;color:var(--text-muted)">(optional — for rewards)</span></label>
+        <input type="text" id="reg-wallet" placeholder="0x… or your wallet address" maxlength="100" autocomplete="off" spellcheck="false">
+      </div>
+      <p class="err" id="reg-err" style="display:none;text-align:left"></p>
+      <button class="btn btn-solid" style="width:100%;margin-top:.25rem" onclick="doPlayerRegister()">Create Profile & Play →</button>
+    </div>
+
+    <div style="margin-top:1.25rem;text-align:center">
+      <a href="https://www.kaysworks.com/apoti-olowe" style="font-family:'Cinzel',serif;font-size:.68rem;letter-spacing:.08em;color:var(--text-muted);text-decoration:none;transition:color .15s" onmouseover="this.style.color='#c9993a'" onmouseout="this.style.color='var(--text-muted)'">← Back to the Series</a>
+    </div>
+    <div style="margin-top:.75rem;text-align:right">
+      <button onclick="showAdminLogin()" style="background:none;border:none;color:var(--text-muted);font-size:.75rem;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.05em">Admin ↗</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ENTRY SCREEN (challenge picker — shown after auth) ═══ -->
 <div id="entry-screen">
   <div class="card">
     <div class="logo" style="margin-bottom:.2rem">ÀPÓTÍ <em>ỌLỌ́WẸ̀</em></div>
     <div class="logo-kw" style="margin-bottom:.3rem">Kaysworks</div>
     <div class="logo-sub">Puzzle Challenge</div>
     <div class="logo-rule"><div class="logo-rule-diamond"></div></div>
+
+    <!-- Logged-in player badge -->
+    <div id="player-badge" style="display:flex;align-items:center;justify-content:space-between;background:rgba(201,150,58,.1);border:1px solid rgba(201,150,58,.3);border-radius:var(--radius);padding:.5rem .85rem;margin-bottom:1rem">
+      <div style="text-align:left">
+        <div style="font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:.08em;color:var(--gold-light)" id="badge-name">—</div>
+        <div style="font-size:.68rem;color:var(--text-muted);margin-top:.1rem" id="badge-wallet"></div>
+      </div>
+      <button onclick="logoutPlayer()" style="background:none;border:none;color:var(--text-muted);font-size:.65rem;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.06em;padding:.2rem .4rem">Sign out</button>
+    </div>
 
     <!-- Challenge picker — populated by JS -->
     <div id="challenge-picker"></div>
@@ -644,17 +718,9 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
       <div class="countdown-label" id="countdown-label">Loading…</div>
     </div>
 
-    <div class="field" style="margin-top:1rem;text-align:left">
-      <label>Your Name</label>
-      <input type="text" id="player-name" placeholder="Enter your name for the leaderboard" maxlength="28">
-    </div>
-    <div class="field" style="text-align:left">
-      <label>Wallet Address <span style="font-family:'Crimson Text',serif;font-size:.75rem;letter-spacing:.01em;text-transform:none;color:var(--text-muted);font-weight:400">(optional — for rewards)</span></label>
-      <input type="text" id="player-wallet" placeholder="0x… or your wallet address" maxlength="100" autocomplete="off" spellcheck="false">
-    </div>
     <div id="resume-banner" style="display:none;background:rgba(201,150,58,.14);border:1px solid rgba(201,150,58,.45);border-radius:var(--radius);padding:.6rem 1rem;margin-top:.75rem;font-size:.82rem;color:var(--gold-light);text-align:left">
       <span id="resume-info">Saved progress found</span>
-      <div style="margin-top:.35rem;font-size:.72rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.04em">Progress is saved on this device only. Clearing your browser data will erase it.</div>
+      <div style="margin-top:.35rem;font-size:.72rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.04em" id="resume-sub">Progress synced across your devices.</div>
     </div>
     <div style="display:flex;gap:.6rem;margin-top:.75rem">
       <button class="btn btn-solid" id="start-btn" style="flex:1" onclick="startGame(false)" disabled>Select a challenge</button>
@@ -1000,6 +1066,8 @@ let TAB = 0, SNAP = 16;
 let timerInterval = null, countdownInterval = null, startTime = 0;
 let playerName = 'Anonymous';
 let playerWallet = '';
+let playerId = null;
+let playerToken = null;
 let adminToken = null;
 let adminImageUrl = null;
 let drag = null;       // {pieces, offsets:[{dx,dy}], wx, wy}
@@ -1055,7 +1123,18 @@ async function boot() {
     if (!res.ok) throw new Error(await res.text());
     challenges = await res.json();
     if (!challenges.length) throw new Error('No active challenge at this time.');
-    showEntryScreen();
+
+    // Try to restore session from localStorage
+    const saved = _loadSession();
+    if (saved) {
+      playerToken  = saved.token;
+      playerId     = saved.player_id;
+      playerName   = saved.name;
+      playerWallet = saved.wallet_address || '';
+      showEntryScreen();
+    } else {
+      showAuthScreen();
+    }
   } catch(e) {
     const msg = e.message.includes('No active') ? e.message : 'Could not connect to challenge server.';
     document.getElementById('no-challenge-msg').textContent = msg;
@@ -1084,7 +1163,144 @@ function diffForCount(n) {
 // Alias used by leaderboard render
 const diffTierForCount = diffForCount;
 
+// ═══════════════════════════════════════════════
+//  AUTH — Register / Login / Session
+// ═══════════════════════════════════════════════
+const SESSION_KEY = 'apoti_player_session';
+
+function _saveSession(data) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(data)); } catch {}
+}
+function _loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (!d || !d.token || !d.name) return null;
+    return d;
+  } catch { return null; }
+}
+function _clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch {}
+}
+
+function showAuthScreen() {
+  hideAll();
+  show('auth-screen');
+  hide('loading-screen');
+  switchAuthTab('login');
+}
+
+function switchAuthTab(tab) {
+  const isLogin = tab === 'login';
+  document.getElementById('auth-login-panel').style.display    = isLogin ? 'block' : 'none';
+  document.getElementById('auth-register-panel').style.display = isLogin ? 'none'  : 'block';
+  document.getElementById('auth-tab-login').style.background    = isLogin ? 'var(--gold)' : 'transparent';
+  document.getElementById('auth-tab-login').style.color         = isLogin ? 'var(--btn-txt)' : 'var(--gold)';
+  document.getElementById('auth-tab-register').style.background = isLogin ? 'transparent' : 'var(--gold)';
+  document.getElementById('auth-tab-register').style.color      = isLogin ? 'var(--gold)' : 'var(--btn-txt)';
+  // Clear errors
+  document.getElementById('login-err').style.display = 'none';
+  document.getElementById('reg-err').style.display   = 'none';
+}
+
+async function doPlayerLogin() {
+  const name = document.getElementById('login-name').value.trim();
+  const pin  = document.getElementById('login-pin').value.trim();
+  const errEl = document.getElementById('login-err');
+  errEl.style.display = 'none';
+
+  if (!name) { errEl.textContent = 'Please enter your name.'; errEl.style.display = 'block'; return; }
+  if (!/^\d{4}$/.test(pin)) { errEl.textContent = 'PIN must be exactly 4 digits.'; errEl.style.display = 'block'; return; }
+
+  const btn = document.querySelector('#auth-login-panel .btn-solid');
+  btn.disabled = true; btn.textContent = 'Checking…';
+
+  try {
+    const res  = await fetch(`${API}/player/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, pin }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed.');
+
+    playerToken  = data.token;
+    playerId     = data.player_id;
+    playerName   = data.name;
+    playerWallet = data.wallet_address || '';
+    _saveSession({ token: data.token, player_id: data.player_id, name: data.name, wallet_address: data.wallet_address });
+    showEntryScreen();
+  } catch(e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Enter the Challenge →';
+  }
+}
+
+async function doPlayerRegister() {
+  const name    = document.getElementById('reg-name').value.trim();
+  const pin     = document.getElementById('reg-pin').value.trim();
+  const pin2    = document.getElementById('reg-pin2').value.trim();
+  const wallet  = document.getElementById('reg-wallet').value.trim();
+  const errEl   = document.getElementById('reg-err');
+  errEl.style.display = 'none';
+
+  if (!name)              { errEl.textContent = 'Please choose a name.'; errEl.style.display = 'block'; return; }
+  if (!/^\d{4}$/.test(pin))  { errEl.textContent = 'PIN must be exactly 4 digits.'; errEl.style.display = 'block'; return; }
+  if (pin !== pin2)           { errEl.textContent = 'PINs do not match.'; errEl.style.display = 'block'; return; }
+
+  const btn = document.querySelector('#auth-register-panel .btn-solid');
+  btn.disabled = true; btn.textContent = 'Creating profile…';
+
+  try {
+    const res  = await fetch(`${API}/player/register`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, pin, wallet_address: wallet || null }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Registration failed.');
+
+    playerToken  = data.token;
+    playerId     = data.player_id;
+    playerName   = data.name;
+    playerWallet = data.wallet_address || '';
+    _saveSession({ token: data.token, player_id: data.player_id, name: data.name, wallet_address: data.wallet_address });
+    showEntryScreen();
+  } catch(e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Create Profile & Play →';
+  }
+}
+
+// Enter on PIN fields triggers submit
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('login-pin')?.addEventListener('keydown', e => { if (e.key === 'Enter') doPlayerLogin(); });
+  document.getElementById('login-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') doPlayerLogin(); });
+  document.getElementById('reg-pin2')?.addEventListener('keydown', e => { if (e.key === 'Enter') doPlayerRegister(); });
+});
+
+function logoutPlayer() {
+  _clearSession();
+  playerToken = null; playerId = null;
+  playerName = 'Anonymous'; playerWallet = '';
+  hideAll(); show('loading-screen'); boot();
+}
+
 function showEntryScreen() {
+  // Populate player badge
+  document.getElementById('badge-name').textContent = playerName;
+  const walletEl = document.getElementById('badge-wallet');
+  if (playerWallet) {
+    const short = playerWallet.length > 18 ? playerWallet.slice(0,8) + '…' + playerWallet.slice(-6) : playerWallet;
+    walletEl.textContent = short;
+    walletEl.style.display = 'block';
+  } else {
+    walletEl.style.display = 'none';
+  }
+
   const picker = document.getElementById('challenge-picker');
   picker.innerHTML = '';
 
@@ -1108,12 +1324,8 @@ function showEntryScreen() {
     picker.appendChild(card);
   });
 
-  // Auto-select if only one challenge, or if a saved session matches one
-  const savedMatch = sorted.find(ch => {
-    const key = `apoti_puzzle_save_${ch.id}`;
-    try { const d = JSON.parse(localStorage.getItem(key)); return d && d.placed < d.total; } catch { return false; }
-  });
-  const autoSelect = savedMatch || (sorted.length === 1 ? sorted[0] : null);
+  // Auto-select single challenge
+  const autoSelect = sorted.length === 1 ? sorted[0] : null;
   if (autoSelect) {
     const card = picker.querySelector(`[data-id="${autoSelect.id}"]`);
     if (card) selectChallenge(autoSelect, card);
@@ -1135,21 +1347,61 @@ function selectChallenge(ch, cardEl) {
   updateCountdown();
   countdownInterval = setInterval(updateCountdown, 1000);
 
-  // Check for saved progress for this specific challenge
+  // Reset resume UI
   document.getElementById('resume-banner').style.display = 'none';
   document.getElementById('resume-btn').style.display = 'none';
   document.getElementById('start-btn').disabled = false;
   document.getElementById('start-btn').textContent = 'Start Fresh';
 
-  const saved = loadProgress();
-  if (saved) {
-    const pct = Math.round(saved.placed / saved.total * 100);
-    const t = fmtTime(saved.elapsed);
-    document.getElementById('resume-info').textContent = `${pct}% complete · ${t} elapsed — pick up where you left off`;
-    document.getElementById('resume-banner').style.display = 'block';
-    document.getElementById('resume-btn').style.display = 'block';
-    if (saved.playerName) document.getElementById('player-name').value = saved.playerName;
-    if (saved.playerWallet) document.getElementById('player-wallet').value = saved.playerWallet;
+  // Check server for saved progress (cross-device)
+  if (playerToken) {
+    fetch(`${API}/player/progress-load?challenge_id=${encodeURIComponent(ch.id)}`, {
+      headers: { 'Authorization': `Bearer ${playerToken}` }
+    })
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (!data || !data.piece_state) return;
+      const pct = data.total > 0 ? Math.round(data.placed / data.total * 100) : 0;
+      const t   = fmtTime(data.elapsed);
+      document.getElementById('resume-info').textContent = `${pct}% complete · ${t} elapsed — pick up where you left off`;
+      document.getElementById('resume-sub').textContent  = 'Progress synced — resume on any device.';
+      document.getElementById('resume-banner').style.display = 'block';
+      document.getElementById('resume-btn').style.display    = 'block';
+      // Cache server progress locally so restoreProgress() can use it
+      try {
+        localStorage.setItem(saveKey(), JSON.stringify({
+          challengeId: ch.id,
+          playerName:  data.player_name || playerName,
+          playerWallet: data.wallet_address || playerWallet,
+          elapsed:     data.elapsed,
+          placed:      data.placed,
+          total:       data.total,
+          hintsLeft:   data.hints_left,
+          pieceState:  data.piece_state,
+          savedAt:     Date.now(),
+        }));
+      } catch {}
+    })
+    .catch(() => {
+      // Fall back to localStorage silently
+      const saved = loadProgress();
+      if (saved) {
+        const pct = Math.round(saved.placed / saved.total * 100);
+        document.getElementById('resume-info').textContent = `${pct}% complete · ${fmtTime(saved.elapsed)} elapsed`;
+        document.getElementById('resume-sub').textContent  = 'Progress saved on this device.';
+        document.getElementById('resume-banner').style.display = 'block';
+        document.getElementById('resume-btn').style.display    = 'block';
+      }
+    });
+  } else {
+    // No token — fall back to localStorage
+    const saved = loadProgress();
+    if (saved) {
+      const pct = Math.round(saved.placed / saved.total * 100);
+      document.getElementById('resume-info').textContent = `${pct}% complete · ${fmtTime(saved.elapsed)} elapsed`;
+      document.getElementById('resume-banner').style.display = 'block';
+      document.getElementById('resume-btn').style.display    = 'block';
+    }
   }
 }
 
@@ -1176,8 +1428,7 @@ function updateCountdown() {
 //  GAME INIT
 // ═══════════════════════════════════════════════
 async function startGame(resume = false) {
-  playerName = (document.getElementById('player-name').value.trim()) || 'Anonymous';
-  playerWallet = (document.getElementById('player-wallet').value.trim()) || '';
+  // playerName and playerWallet are already set from auth session
   document.getElementById('start-btn').disabled = true;
   document.getElementById('resume-btn').disabled = true;
   document.getElementById('start-btn').textContent = 'Loading image…';
@@ -1299,28 +1550,41 @@ function saveKey() { return challenge ? `apoti_puzzle_save_${challenge.id}` : nu
 
 function autoSave() {
   if (!challenge || !pieces.length || !window._asm) return;
-  try {
-    const data = {
-      challengeId: challenge.id,
-      playerName,
-      playerWallet,
-      elapsed: Math.floor((Date.now() - startTime) / 1000),
-      placed: pieces.filter(p => p.placed).length,
-      total: totalPieces,
-      savedAt: Date.now(),
-      hintsLeft,
-      // Store positions as fractions of canvas so they survive resize/reload
-      pieceState: pieces.map(p => ({
-        id: p.id,
-        xf: p.x / CW,  // fractional x
-        yf: p.y / CH,  // fractional y
-        placed: p.placed,
-        groupId: p.groupId
-      })),
-      // Rebuild groups from piece state on restore
-    };
-    localStorage.setItem(saveKey(), JSON.stringify(data));
-  } catch(e) { /* storage full or unavailable — silent fail */ }
+  const pieceState = pieces.map(p => ({
+    id: p.id,
+    xf: p.x / CW,
+    yf: p.y / CH,
+    placed: p.placed,
+    groupId: p.groupId
+  }));
+  const saveData = {
+    challengeId: challenge.id,
+    playerName,
+    playerWallet,
+    elapsed: Math.floor((Date.now() - startTime) / 1000),
+    placed: pieces.filter(p => p.placed).length,
+    total: totalPieces,
+    savedAt: Date.now(),
+    hintsLeft,
+    pieceState,
+  };
+  // Always save to localStorage as fast local cache
+  try { localStorage.setItem(saveKey(), JSON.stringify(saveData)); } catch {}
+  // Push to server for cross-device sync
+  if (playerToken) {
+    fetch(`${API}/player/progress-save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${playerToken}` },
+      body: JSON.stringify({
+        challenge_id: challenge.id,
+        piece_state:  pieceState,
+        placed:       saveData.placed,
+        total:        saveData.total,
+        elapsed:      saveData.elapsed,
+        hints_left:   hintsLeft,
+      }),
+    }).catch(() => {}); // silent fail — localStorage is the fallback
+  }
 }
 
 function loadProgress() {
@@ -1365,6 +1629,21 @@ function restoreProgress() {
 function clearSavedProgress() {
   const key = saveKey();
   if (key) { try { localStorage.removeItem(key); } catch {} }
+  // Clear server progress too — a completed or restarted game shouldn't be resumable
+  if (playerToken && challenge) {
+    fetch(`${API}/player/progress-save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${playerToken}` },
+      body: JSON.stringify({
+        challenge_id: challenge.id,
+        piece_state:  [],
+        placed:       totalPieces, // marks as done
+        total:        totalPieces,
+        elapsed:      0,
+        hints_left:   0,
+      }),
+    }).catch(() => {});
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -3435,9 +3714,9 @@ async function handleAdminFile(file){
 function fmtTime(s){return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`}
 function fmtDate(d){return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-function show(id){document.getElementById(id).style.display=['game-screen','admin-screen','entry-screen','no-challenge-screen','admin-login'].includes(id)?'flex':'block'}
+function show(id){document.getElementById(id).style.display=['game-screen','admin-screen','entry-screen','no-challenge-screen','admin-login','auth-screen'].includes(id)?'flex':'block'}
 function hide(id){document.getElementById(id).style.display='none'}
-function hideAll(){['loading-screen','entry-screen','game-screen','no-challenge-screen','admin-login','admin-screen'].forEach(hide)}
+function hideAll(){['loading-screen','entry-screen','game-screen','no-challenge-screen','admin-login','admin-screen','auth-screen'].forEach(hide)}
 
 // ── IMAGE PREVIEW MODAL — zoomable ──
 let _mz = 1, _mpx = 0, _mpy = 0, _mdrag = null, _mTouches = {};
