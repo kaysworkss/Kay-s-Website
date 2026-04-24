@@ -128,9 +128,17 @@ main { position:relative; z-index:1; max-width:1060px; margin:0 auto; padding:80
 .auction-record:hover { border-color:rgba(196,132,90,.28); }
 
 /* Top: image + details */
-.record-top { display:grid; grid-template-columns:260px 1fr; }
-.record-img-wrap { position:relative; overflow:hidden; background:var(--bg-alt); aspect-ratio:1; max-height:260px; display:block; }
-.record-img { width:100%; height:100%; object-fit:cover; transition:transform .6s ease, opacity .4s ease; position:absolute; inset:0; opacity:0; }
+.record-top { display:grid; grid-template-columns:280px 1fr; align-items:stretch; }
+.record-img-wrap {
+  position:relative; overflow:hidden; background:var(--bg-alt);
+  /* Fill the full height of the details column — no fixed ratio or max-height */
+  display:block; min-height:260px;
+}
+.record-img {
+  width:100%; height:100%; object-fit:cover;
+  transition:transform .6s ease, opacity .4s ease;
+  position:absolute; inset:0; opacity:0;
+}
 .record-img.loaded { opacity:1; }
 .auction-record:hover .record-img { transform:scale(1.04); }
 .record-img-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-family:'Cormorant Garamond',serif; font-size:3.5rem; color:var(--clay); opacity:.1; transition:opacity .4s ease; }
@@ -154,9 +162,22 @@ main { position:relative; z-index:1; max-width:1060px; margin:0 auto; padding:80
 .rs-val.gold { color:var(--gold); }
 .rs-sub { font-family:'Crimson Pro',serif; font-size:0.78rem; color:var(--text-muted); font-style:italic; margin-top:2px; }
 
-.record-footer { margin-top:16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-.winner-pill { display:inline-flex; align-items:center; gap:6px; font-family:'Cinzel',serif; font-size:0.46rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--moss); background:rgba(107,124,92,.1); border:1px solid rgba(107,124,92,.28); border-radius:2px; padding:5px 10px; }
-.winner-dot { width:5px; height:5px; border-radius:50%; background:var(--moss); flex-shrink:0; }
+.record-footer { margin-top:20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+/* ── Winner celebration ── */
+.winner-pill {
+  display:inline-flex; align-items:center; gap:8px;
+  font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.18em; text-transform:uppercase;
+  color:#d4c080;
+  background:linear-gradient(135deg, rgba(201,153,58,0.18) 0%, rgba(201,153,58,0.06) 100%);
+  border:1px solid rgba(201,153,58,0.45);
+  border-radius:3px; padding:7px 13px;
+  box-shadow:0 0 14px rgba(201,153,58,0.12);
+}
+.winner-pill::before {
+  content:'✦';
+  font-size:0.55rem; color:var(--gold); opacity:0.85; flex-shrink:0;
+}
+.winner-dot { width:6px; height:6px; border-radius:50%; background:var(--gold); flex-shrink:0; box-shadow:0 0 6px rgba(201,153,58,0.6); }
 .etherscan-link { display:inline-flex; align-items:center; gap:4px; font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); text-decoration:none; border:1px solid var(--divider); border-radius:2px; padding:5px 10px; transition:color .2s,border-color .2s; }
 .etherscan-link:hover { color:var(--clay); border-color:var(--clay); }
 
@@ -245,10 +266,17 @@ footer a { color:var(--clay); text-decoration:none; }
   .stat-item { min-width:50%; border-right:none; border-bottom:1px solid var(--divider); }
   main { padding:40px 16px 80px; }
   .record-top { grid-template-columns:1fr; }
-  .record-img-wrap { max-height:220px; aspect-ratio:16/9; }
+  /* Portrait: tall enough to show art clearly */
+  .record-img-wrap { min-height:0; aspect-ratio:4/3; max-height:60vw; }
   .record-details { border-left:none; border-top:1px solid var(--divider); padding:20px; }
   .record-stats { grid-template-columns:1fr 1fr; }
   .chat-toggle,.chat-body { padding-left:16px; padding-right:16px; }
+}
+
+/* Landscape mobile — wider viewport, shorter height */
+@media (max-width:900px) and (orientation:landscape) and (max-height:500px) {
+  .record-top { grid-template-columns:220px 1fr; }
+  .record-img-wrap { min-height:180px; aspect-ratio:unset; max-height:none; }
 }
 </style>
 </head>
@@ -496,8 +524,13 @@ async function loadResults() {
                 </div>
               </div>
               <div class="record-footer">
-                <div class="winner-pill">${winnerAvatHtml}${esc(winnerName)}</div>
-                ${etherEl}
+                <div style="width:100%;margin-bottom:6px;">
+                  <div style="font-family:'Cinzel',serif;font-size:0.44rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Collector</div>
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <div class="winner-pill">${winnerAvatHtml}${esc(winnerName)}</div>
+                    ${etherEl}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
