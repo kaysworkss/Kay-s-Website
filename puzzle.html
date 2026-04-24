@@ -1560,6 +1560,7 @@ async function boot() {
       playerName   = saved.name;
       playerWallet = saved.wallet_address || '';
       playerAvatar = saved.avatar_url     || '';
+      // Challenges were loaded on boot before this point — go straight to entry
       showEntryScreen();
     } else {
       showAuthScreen();
@@ -1684,6 +1685,8 @@ function _loadSession() {
     if (!raw) return null;
     const d = JSON.parse(raw);
     if (!d || !d.token || !d.name) return null;
+    // Ensure avatar_url always present (may be missing in older sessions)
+    if (!d.avatar_url) d.avatar_url = null;
     return d;
   } catch { return null; }
 }
@@ -1735,7 +1738,10 @@ async function doPlayerLogin() {
     playerId     = data.player_id;
     playerName   = data.name;
     playerWallet = data.wallet_address || '';
-    _saveSession({ token: data.token, player_id: data.player_id, name: data.name, wallet_address: data.wallet_address });
+    playerAvatar = data.avatar_url     || '';
+    _saveSession({ token: data.token, player_id: data.player_id, name: data.name, wallet_address: data.wallet_address || null, avatar_url: data.avatar_url || null });
+    // Fetch challenges if not already loaded, then show entry screen
+    await _ensureChallengesLoaded();
     showEntryScreen();
   } catch(e) {
     errEl.textContent = e.message;
@@ -1772,7 +1778,10 @@ async function doPlayerRegister() {
     playerId     = data.player_id;
     playerName   = data.name;
     playerWallet = data.wallet_address || '';
-    _saveSession({ token: data.token, player_id: data.player_id, name: data.name, wallet_address: data.wallet_address });
+    playerAvatar = data.avatar_url     || '';
+    _saveSession({ token: data.token, player_id: data.player_id, name: data.name, wallet_address: data.wallet_address || null, avatar_url: data.avatar_url || null });
+    // Fetch challenges then go straight to game
+    await _ensureChallengesLoaded();
     showEntryScreen();
   } catch(e) {
     errEl.textContent = e.message;
@@ -1792,8 +1801,20 @@ window.addEventListener('DOMContentLoaded', () => {
 function logoutPlayer() {
   _clearSession();
   playerToken = null; playerId = null;
-  playerName = 'Anonymous'; playerWallet = '';
+  playerName = 'Anonymous'; playerWallet = ''; playerAvatar = '';
   hideAll(); show('loading-screen'); boot();
+}
+
+// Fetch challenges if not already loaded (called after login/register)
+async function _ensureChallengesLoaded() {
+  if (challenges && challenges.length) return; // already loaded
+  try {
+    const res = await fetch(`${API}/challenges`);
+    if (!res.ok) throw new Error('fetch failed');
+    challenges = await res.json();
+  } catch {
+    challenges = [];
+  }
 }
 
 // ═══════════════════════════════════════════════
