@@ -278,7 +278,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
   .field{ margin-bottom:.75rem; }
   label{ font-size:.6rem; margin-bottom:.25rem; }
   input{ padding:.58rem .85rem; font-size:.93rem; }
-  #player-badge{ padding:.48rem .75rem; margin-bottom:.8rem; }
+  .player-badge-card{ padding:.48rem .75rem; margin-bottom:.8rem; }
   #challenge-picker{ gap:.42rem; margin-top:.55rem; }
   .ch-card{ padding:.65rem .8rem; gap:.5rem; }
   .ch-card-title{ font-size:.73rem; }
@@ -793,6 +793,68 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 }
 
 
+/* ── PLAYER BADGE CARD ── */
+.player-badge-card{
+  display:flex;align-items:center;gap:.7rem;
+  background:linear-gradient(135deg,#1e1608,#2a1e0c,#1e1608);
+  border:1px solid rgba(201,150,58,.45);
+  border-radius:var(--radius);
+  padding:.55rem .9rem;
+  margin-bottom:.85rem;
+  box-shadow:0 2px 12px rgba(0,0,0,.35),inset 0 1px 0 rgba(201,150,58,.1);
+}
+[data-theme="light"] .player-badge-card{
+  background:linear-gradient(135deg,#1e1608,#2a1e0c,#1e1608);
+  border:1px solid rgba(201,150,58,.5);
+  box-shadow:0 2px 14px rgba(0,0,0,.25),inset 0 1px 0 rgba(201,150,58,.12);
+}
+.badge-avatar-circle{
+  width:36px;height:36px;border-radius:50%;
+  border:1.5px solid rgba(201,150,58,.6);
+  background:rgba(201,150,58,.15);
+  flex-shrink:0;cursor:pointer;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;transition:border-color .2s,box-shadow .2s;
+}
+.badge-avatar-circle:hover{
+  border-color:var(--gold-light);
+  box-shadow:0 0 8px rgba(201,150,58,.4);
+}
+.badge-name{
+  font-family:'Cinzel',serif;font-size:.74rem;
+  letter-spacing:.09em;color:#f0e8d0;font-weight:600;
+}
+.badge-wallet{
+  font-size:.66rem;color:rgba(240,232,208,.55);
+  margin-top:.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+/* Edit button — gold gradient */
+.badge-btn{
+  font-family:'Cinzel',serif;font-size:.58rem;letter-spacing:.07em;
+  cursor:pointer;border-radius:6px;transition:all .18s;
+  padding:.28rem .6rem;
+}
+.badge-btn-edit{
+  background:linear-gradient(135deg,#8a5a08,#c9963a,#a07020);
+  color:#0e0a04;border:none;font-weight:700;
+  box-shadow:0 1px 6px rgba(201,150,58,.35);
+}
+.badge-btn-edit:hover{
+  background:linear-gradient(135deg,#c9963a,#e8b840,#c9963a);
+  box-shadow:0 2px 10px rgba(201,150,58,.5);
+  transform:translateY(-1px);
+}
+/* Sign out button — subtle dark */
+.badge-btn-signout{
+  background:rgba(255,255,255,.06);
+  color:rgba(240,232,208,.7);
+  border:1px solid rgba(240,232,208,.18);
+}
+.badge-btn-signout:hover{
+  background:rgba(255,255,255,.12);
+  color:#f0e8d0;border-color:rgba(240,232,208,.38);
+}
+
 /* ── PROFILE MODAL ── */
 #profile-modal{
   display:none;position:fixed;inset:0;z-index:400;
@@ -992,15 +1054,15 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
     <div class="logo-rule" style="margin:.3rem auto .65rem"><div class="logo-rule-diamond"></div></div>
 
     <!-- Logged-in player badge -->
-    <div id="player-badge" style="display:flex;align-items:center;gap:.7rem;background:rgba(201,150,58,.1);border:1px solid rgba(201,150,58,.3);border-radius:var(--radius);padding:.5rem .85rem;margin-bottom:.85rem">
-      <div id="badge-avatar" onclick="openProfileModal()" title="Edit profile" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border-bright);background:var(--surface2);flex-shrink:0;cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.1rem;transition:border-color .2s">&#x1F464;</div>
+    <div id="player-badge" class="player-badge-card">
+      <div id="badge-avatar" onclick="openProfileModal()" title="Edit profile" class="badge-avatar-circle">&#x1F464;</div>
       <div style="flex:1;min-width:0;text-align:left">
-        <div style="font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:.08em;color:var(--gold-light)" id="badge-name">&#x2014;</div>
-        <div style="font-size:.67rem;color:var(--text-muted);margin-top:.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="badge-wallet"></div>
+        <div class="badge-name" id="badge-name">&#x2014;</div>
+        <div class="badge-wallet" id="badge-wallet"></div>
       </div>
-      <div style="display:flex;gap:.35rem;flex-shrink:0">
-        <button onclick="openProfileModal()" style="background:none;border:1px solid var(--border);color:var(--text-muted);font-size:.58rem;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.06em;padding:.22rem .5rem;border-radius:6px;transition:all .15s">Edit</button>
-        <button onclick="logoutPlayer()" style="background:none;border:none;color:var(--text-muted);font-size:.6rem;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.05em;padding:.2rem .35rem">Sign out</button>
+      <div style="display:flex;gap:.4rem;flex-shrink:0">
+        <button onclick="openProfileModal()" class="badge-btn badge-btn-edit">Edit</button>
+        <button onclick="logoutPlayer()" class="badge-btn badge-btn-signout">Sign out</button>
       </div>
     </div>
 
