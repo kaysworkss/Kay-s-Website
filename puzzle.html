@@ -647,6 +647,31 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 .pm-divider{height:1px;background:var(--border);margin:1rem 0}
 .pm-msg{font-size:.82rem;text-align:center;margin-top:.75rem;min-height:1.2em}
 
+/* ── UPCOMING CHALLENGES ── */
+.upcoming-item{
+  display:flex;align-items:center;gap:.75rem;
+  padding:.65rem .85rem;margin-bottom:.5rem;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius);
+}
+.upcoming-item:last-child{ margin-bottom:0 }
+.upcoming-dot{
+  width:8px;height:8px;border-radius:50%;flex-shrink:0;
+  background:var(--gold);opacity:.6;
+}
+.upcoming-info{ flex:1;min-width:0;text-align:left }
+.upcoming-title{
+  font-family:'Cinzel',serif;font-size:.75rem;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.upcoming-date{
+  font-size:.66rem;color:var(--text-muted);margin-top:.18rem;
+}
+.upcoming-countdown{
+  font-family:'Cinzel',serif;font-size:.65rem;color:var(--gold-light);
+  white-space:nowrap;flex-shrink:0;letter-spacing:.04em;
+}
+
 </style>
 </head>
 <body>
@@ -687,8 +712,16 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
     <div class="logo-rule"><div class="logo-rule-diamond"></div></div>
     <h2>No Active Challenge</h2>
     <p id="no-challenge-msg">There's no puzzle running right now. Check back soon for the next weekly challenge.</p>
-    <div style="margin-top:2rem;display:flex;gap:1rem;flex-wrap:wrap;justify-content:center">
-      <button class="btn btn-sm" onclick="location.reload()">Refresh</button>
+
+    <!-- Upcoming challenges -->
+    <div id="upcoming-wrap" style="display:none;margin-top:1.5rem;text-align:left">
+      <div style="font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.16em;color:var(--gold);text-transform:uppercase;margin-bottom:.75rem;text-align:center">Coming Up</div>
+      <div id="upcoming-list"></div>
+    </div>
+
+    <div style="margin-top:1.75rem;display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center">
+      <button class="btn btn-sm" onclick="location.reload()">↻ Refresh</button>
+      <a class="btn btn-sm" href="/puzzle-hall-of-fame.html" target="_blank">🏛 Puzzle Hall of Fame</a>
       <a class="btn btn-sm btn-series" href="https://www.kaysworks.com/apoti-olowe">Explore the Series ↗</a>
       <button class="btn btn-sm" onclick="showAdminLogin()">Admin</button>
     </div>
@@ -1283,10 +1316,88 @@ async function boot() {
     document.getElementById('no-challenge-msg').textContent = msg;
     show('no-challenge-screen');
     hide('loading-screen');
+    loadUpcomingChallenges();
   }
 }
 
 window.addEventListener('load', boot);
+
+// ═══════════════════════════════════════════════
+//  UPCOMING CHALLENGES
+// ═══════════════════════════════════════════════
+let _upcomingTimer = null;
+
+async function loadUpcomingChallenges() {
+  try {
+    const res  = await fetch(`${API}/game?action=upcoming`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || !data.length) return;
+
+    const wrap = document.getElementById('upcoming-wrap');
+    const list = document.getElementById('upcoming-list');
+    if (!wrap || !list) return;
+
+    wrap.style.display = 'block';
+    renderUpcoming(data);
+
+    // Live countdown — tick every second
+    if (_upcomingTimer) clearInterval(_upcomingTimer);
+    _upcomingTimer = setInterval(() => renderUpcoming(data), 1000);
+  } catch {}
+}
+
+function renderUpcoming(challenges) {
+  const list = document.getElementById('upcoming-list');
+  if (!list) return;
+  const now = Date.now();
+
+  list.innerHTML = challenges.map(ch => {
+    const starts   = new Date(ch.starts_at).getTime();
+    const diff     = Math.max(0, Math.floor((starts - now) / 1000));
+    const d = Math.floor(diff / 86400);
+    const h = Math.floor((diff % 86400) / 3600);
+    const m = Math.floor((diff % 3600) / 60);
+    const s = diff % 60;
+
+    let countdown = '';
+    if (diff <= 0) {
+      countdown = 'Starting now…';
+    } else if (d > 0) {
+      countdown = `in ${d}d ${h}h ${m}m`;
+    } else if (h > 0) {
+      countdown = `in ${h}h ${m}m ${s}s`;
+    } else {
+      countdown = `in ${m}m ${s}s`;
+    }
+
+    const dateStr = new Date(ch.starts_at).toLocaleDateString('en-GB', {
+      weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'
+    });
+
+    const diff2 = diffTierForCount ? diffTierForCount(ch.piece_count) : null;
+    const tierBadge = diff2
+      ? `<span style="font-size:.6rem;color:var(--text-muted);margin-left:.35rem">${diff2.label} · ~${ch.piece_count}pc</span>`
+      : `<span style="font-size:.6rem;color:var(--text-muted);margin-left:.35rem">~${ch.piece_count}pc</span>`;
+
+    return `<div class="upcoming-item">
+      <div class="upcoming-dot"></div>
+      <div class="upcoming-info">
+        <div class="upcoming-title">${esc(ch.title)}${tierBadge}</div>
+        <div class="upcoming-date">Starts ${dateStr}</div>
+      </div>
+      <div class="upcoming-countdown">${countdown}</div>
+    </div>`;
+  }).join('');
+
+  // If a challenge just went live, reload
+  if (challenges.some(ch => new Date(ch.starts_at) <= new Date())) {
+    clearInterval(_upcomingTimer);
+    setTimeout(() => { hideAll(); show('loading-screen'); boot(); }, 2000);
+  }
+}
+
+
 
 // ═══════════════════════════════════════════════
 //  DIFFICULTY TIERS — single source of truth used by
