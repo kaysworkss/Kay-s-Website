@@ -1,6 +1,6 @@
 // POST /api/score
 // Submit a completed puzzle score.
-// Body: { challenge_id, player_name, time_seconds, piece_count?, hints_used?, ghost_used? }
+// Body: { challenge_id, player_name, wallet_address?, time_seconds, piece_count?, hints_used?, ghost_used? }
 const { getSupabase, cors, handleOptions } = require('./_lib');
 
 module.exports = async (req, res) => {
@@ -8,7 +8,7 @@ module.exports = async (req, res) => {
   if (handleOptions(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { challenge_id, player_name, time_seconds, piece_count, hints_used, ghost_used } = req.body;
+  const { challenge_id, player_name, wallet_address, time_seconds, piece_count, hints_used, ghost_used } = req.body;
 
   // Validation
   if (!challenge_id || !player_name || !time_seconds) {
@@ -21,6 +21,11 @@ module.exports = async (req, res) => {
   if (name.length < 1 || name.length > 28) {
     return res.status(400).json({ error: 'player_name must be 1–28 characters.' });
   }
+
+  // Sanitise wallet address — store null if empty/missing
+  const wallet = wallet_address && String(wallet_address).trim().length > 0
+    ? String(wallet_address).trim().slice(0, 100)
+    : null;
 
   const supabase = getSupabase();
   const now = new Date().toISOString();
@@ -43,11 +48,12 @@ module.exports = async (req, res) => {
     .from('scores')
     .insert({
       challenge_id,
-      player_name:  name,
+      player_name:    name,
+      wallet_address: wallet,
       time_seconds,
-      piece_count:  piece_count || null,
-      hints_used:   Number.isInteger(hints_used) ? hints_used : null,
-      ghost_used:   Number.isInteger(ghost_used)  ? ghost_used  : null,
+      piece_count:    piece_count || null,
+      hints_used:     Number.isInteger(hints_used) ? hints_used : null,
+      ghost_used:     Number.isInteger(ghost_used)  ? ghost_used  : null,
     })
     .select('id')
     .single();
