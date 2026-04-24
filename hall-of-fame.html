@@ -128,20 +128,40 @@ main { position:relative; z-index:1; max-width:1060px; margin:0 auto; padding:80
 .auction-record:hover { border-color:rgba(196,132,90,.28); }
 
 /* Top: image + details */
-.record-top { display:grid; grid-template-columns:280px 1fr; align-items:stretch; }
+.record-top {
+  display:grid;
+  grid-template-columns:320px 1fr;
+  align-items:stretch;
+}
+/* Portrait images get a narrower column; landscape images get a wider one.
+   JS adds .img-portrait / .img-landscape to .record-top after load. */
+.record-top.img-portrait { grid-template-columns:260px 1fr; }
+.record-top.img-landscape { grid-template-columns:420px 1fr; }
+
 .record-img-wrap {
-  position:relative; overflow:hidden; background:var(--bg-alt);
-  /* Fill the full height of the details column — no fixed ratio or max-height */
-  display:block; min-height:260px;
+  position:relative; overflow:hidden;
+  background:#0f0a06;          /* near-black — neutral mat for any image */
+  display:flex; align-items:center; justify-content:center;
+  min-height:280px;
 }
 .record-img {
-  width:100%; height:100%; object-fit:cover;
-  transition:transform .6s ease, opacity .4s ease;
-  position:absolute; inset:0; opacity:0;
+  /* contain: never crop, always show the full image */
+  width:100%; height:100%;
+  object-fit:contain;
+  object-position:center;
+  position:absolute; inset:0;
+  opacity:0;
+  transition:opacity .4s ease, transform .6s ease;
 }
 .record-img.loaded { opacity:1; }
-.auction-record:hover .record-img { transform:scale(1.04); }
-.record-img-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-family:'Cormorant Garamond',serif; font-size:3.5rem; color:var(--clay); opacity:.1; transition:opacity .4s ease; }
+/* Subtle zoom on hover — gentler since we're not cropping */
+.auction-record:hover .record-img { transform:scale(1.025); }
+.record-img-placeholder {
+  width:100%; height:100%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Cormorant Garamond',serif; font-size:3.5rem;
+  color:var(--clay); opacity:.1; transition:opacity .4s ease;
+}
 .record-img-placeholder.hidden { opacity:0; }
 .edition-badge { position:absolute; top:12px; left:12px; font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.18em; text-transform:uppercase; background:rgba(22,15,10,.82); color:var(--gold); border:1px solid rgba(201,153,58,.38); border-radius:2px; padding:4px 8px; backdrop-filter:blur(6px); }
 
@@ -265,18 +285,30 @@ footer a { color:var(--clay); text-decoration:none; }
   .stats-bar { flex-wrap:wrap; }
   .stat-item { min-width:50%; border-right:none; border-bottom:1px solid var(--divider); }
   main { padding:40px 16px 80px; }
-  .record-top { grid-template-columns:1fr; }
-  /* Portrait: tall enough to show art clearly */
-  .record-img-wrap { min-height:0; aspect-ratio:4/3; max-height:60vw; }
+
+  /* Stack: image above details */
+  .record-top,
+  .record-top.img-portrait,
+  .record-top.img-landscape { grid-template-columns:1fr; }
+
+  /* Image fills width; height adapts to orientation class */
+  .record-img-wrap { min-height:0; }
+  .record-top.img-portrait  .record-img-wrap { aspect-ratio:3/4; max-height:72vw; }
+  .record-top.img-landscape .record-img-wrap { aspect-ratio:4/3; max-height:56vw; }
+  /* Fallback if orientation hasn't been detected yet */
+  .record-top:not(.img-portrait):not(.img-landscape) .record-img-wrap { aspect-ratio:4/3; max-height:56vw; }
+
   .record-details { border-left:none; border-top:1px solid var(--divider); padding:20px; }
   .record-stats { grid-template-columns:1fr 1fr; }
   .chat-toggle,.chat-body { padding-left:16px; padding-right:16px; }
 }
 
-/* Landscape mobile — wider viewport, shorter height */
+/* Landscape mobile phone — keep side-by-side but shorter */
 @media (max-width:900px) and (orientation:landscape) and (max-height:500px) {
-  .record-top { grid-template-columns:220px 1fr; }
-  .record-img-wrap { min-height:180px; aspect-ratio:unset; max-height:none; }
+  .record-top,
+  .record-top.img-portrait,
+  .record-top.img-landscape { grid-template-columns:200px 1fr; }
+  .record-img-wrap { min-height:160px; aspect-ratio:unset; max-height:none; }
 }
 </style>
 </head>
@@ -480,7 +512,7 @@ async function loadResults() {
       el.style.animationDelay = `${i*0.1}s`;
       const imgUrl   = toHTTP(row.art_image);
       const imgTitle = esc(row.art_title||'');
-      const imgHtml  = imgUrl ? `<div class="img-shimmer" id="shimmer-${i}"></div><img class="record-img" loading="lazy" src="${imgUrl}" alt="${imgTitle}" onclick="event.stopPropagation();_openLightbox('${imgUrl}','${imgTitle}')" onload="this.classList.add('loaded');const s=document.getElementById('shimmer-${i}');if(s)s.style.opacity='0';const p=this.parentElement.querySelector('.record-img-placeholder');if(p)p.classList.add('hidden');" onerror="this.style.display='none'">` : "";
+      const imgHtml  = imgUrl ? `<div class="img-shimmer" id="shimmer-${i}"></div><img class="record-img" loading="lazy" src="${imgUrl}" alt="${imgTitle}" onclick="event.stopPropagation();_openLightbox('${imgUrl}','${imgTitle}')" onload="this.classList.add('loaded');const s=document.getElementById('shimmer-${i}');if(s)s.style.opacity='0';const p=this.parentElement.querySelector('.record-img-placeholder');if(p)p.classList.add('hidden');const rt=this.closest('.record-top');if(rt){rt.classList.remove('img-portrait','img-landscape');rt.classList.add(this.naturalWidth>=this.naturalHeight?'img-landscape':'img-portrait');}" onerror="this.style.display='none'">` : "";
       const meta     = [row.art_year,row.art_medium].filter(Boolean).join(" · ");
       const etherEl  = row.contract_addr ? `<a class="etherscan-link" href="https://etherscan.io/address/${row.contract_addr}" target="_blank" rel="noopener">View contract ↗</a>` : "";
 
