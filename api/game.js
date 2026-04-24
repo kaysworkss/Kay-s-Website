@@ -41,6 +41,21 @@ async function handleChallenges(req, res, supabase) {
   return res.status(200).json(data || []);
 }
 
+
+// ── GET /api/game?action=upcoming ────────────────────────────────────────────
+// Returns all future challenges (starts_at > now), ordered soonest first
+async function handleUpcoming(req, res, supabase) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('challenges')
+    .select('id, title, image_url, piece_count, starts_at, ends_at')
+    .gt('starts_at', now)
+    .order('starts_at', { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data || []);
+}
+
 // ── GET /api/game?action=challenge&id=<uuid> ──────────────────────────────────
 async function handleChallenge(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -358,6 +373,7 @@ module.exports = async (req, res) => {
 
   switch (action) {
     case 'challenges':    return handleChallenges(req, res, supabase);
+    case 'upcoming':      return handleUpcoming(req, res, supabase);
     case 'challenge':     return handleChallenge(req, res, supabase);
     case 'score':         return handleScore(req, res, supabase);
     case 'leaderboard':   return handleLeaderboard(req, res, supabase);
