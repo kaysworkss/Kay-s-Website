@@ -132,17 +132,21 @@ async function handleGetWallets(req, res, supabase) {
 }
 
 
-// ── PATCH /api/admin?action=challenge (extend end date) ──────────────────────
+// ── PATCH /api/admin?action=challenge (rename + extend end date) ─────────────
 async function handleExtendChallenge(req, res, supabase) {
   if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
-  const { id, ends_at } = req.body || {};
-  if (!id || !ends_at) return res.status(400).json({ error: 'id and ends_at are required.' });
-  if (new Date(ends_at) <= new Date()) {
+  const { id, title, ends_at } = req.body || {};
+  if (!id) return res.status(400).json({ error: 'id is required.' });
+  if (!title && !ends_at) return res.status(400).json({ error: 'Provide at least a title or ends_at.' });
+  if (ends_at && new Date(ends_at) <= new Date()) {
     return res.status(400).json({ error: 'New end date must be in the future.' });
   }
+  const updates = {};
+  if (title  && title.trim().length > 0) updates.title   = title.trim().slice(0, 200);
+  if (ends_at) updates.ends_at = ends_at;
   const { error } = await supabase
     .from('challenges')
-    .update({ ends_at })
+    .update(updates)
     .eq('id', id);
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json({ ok: true });
