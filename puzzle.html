@@ -4214,8 +4214,14 @@ function restartPuzzle() {
     p.groupId = gid;
     groups.set(gid, new Set([p.id]));
   });
-  // Reset start time and hints
+  // Reset timer fully
+  clearInterval(timerInterval);
+  pausedElapsed = 0;
   startTime = Date.now();
+  document.getElementById('timer-disp').textContent = '00:00';
+  timerInterval = setInterval(() => {
+    document.getElementById('timer-disp').textContent = fmtTime(Math.floor((Date.now() - startTime) / 1000));
+  }, 500);
   clearSavedProgress();
   resetHintGhost();
   zoom = 1; panX = 0; panY = 0;
