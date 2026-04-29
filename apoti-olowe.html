@@ -1030,6 +1030,9 @@
     .ao-chapter-date, .ao-precursor-date, .ao-post-date { display: none; }
     .lb-img-wrap img { max-width: 88vw; max-height: 65vh; }
     .token-grid { grid-template-columns: 1fr; }
+
+    #ijokoo-stage { width: 98% !important; }
+    #ijokoo-hint { font-size: 0.5rem !important; }
     .ao-footer { padding: 2rem 1.5rem; flex-direction: column; align-items: flex-start; gap: 1rem; }
   }
 </style>
@@ -1185,6 +1188,239 @@
       <p class="ao-post-date">Oct &ndash; Nov</p>
     </div>
   </section>
+
+
+  <!-- IJOKOO TEASER -->
+  <section class="ao-section reveal" id="ijokoo">
+    <p class="ao-section-label">Upcoming auction &nbsp;&middot;&nbsp; The Ìjòkòó Set</p>
+
+    <div style="max-width:680px;margin-bottom:2.2rem;">
+      <p style="font-family:'Cormorant Garamond',serif;font-size:clamp(1rem,2.2vw,1.22rem);font-weight:300;line-height:1.85;color:var(--text-soft);transition:color 0.35s;">
+        Before the six chapters open, one carved object steps into the light. <em style="color:var(--gold-light);">The Ìjòkòó Set</em> — stools of power and presence, drawn from the Bamileke tradition of the Cameroon Grassfields — is the first piece to enter the auction arena. These are objects that hold rank, memory, and lineage in their form.
+      </p>
+      <p style="font-family:'Cormorant Garamond',serif;font-size:clamp(1rem,2.2vw,1.22rem);font-weight:300;line-height:1.85;color:var(--text-soft);margin-top:1.2rem;transition:color 0.35s;">
+        Hover or touch to reveal what is hidden. Triple-tap to unveil the full work.
+      </p>
+    </div>
+
+    <!-- Hidden image data stores -->
+    <input type="hidden" id="ijokoo-src-grey" value="images/IjokoT.png">
+    <input type="hidden" id="ijokoo-src-dark" value="images/IjokooB.png">
+
+    <!-- Ijokoo interactive stage -->
+    <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
+
+      <h2 style="font-family:'Cinzel',serif;font-size:clamp(1rem,3vw,1.65rem);font-weight:400;letter-spacing:0.22em;color:var(--text);transition:color 0.35s;margin-bottom:1.2rem;text-align:center;">The Ijokoo Set</h2>
+
+      <div id="ijokoo-stage" style="position:relative;width:min(94%,820px);aspect-ratio:2471/1390;cursor:none;user-select:none;-webkit-user-select:none;border:1px solid rgba(201,153,58,0.18);border-radius:2px;">
+        <!-- Corner accents matching site's gold palette -->
+        <div style="position:absolute;top:3px;left:3px;width:14px;height:14px;border-top:1px solid var(--gold);border-left:1px solid var(--gold);opacity:0.45;pointer-events:none;z-index:11;"></div>
+        <div style="position:absolute;top:3px;right:3px;width:14px;height:14px;border-top:1px solid var(--gold);border-right:1px solid var(--gold);opacity:0.45;pointer-events:none;z-index:11;"></div>
+        <div style="position:absolute;bottom:3px;left:3px;width:14px;height:14px;border-bottom:1px solid var(--gold);border-left:1px solid var(--gold);opacity:0.45;pointer-events:none;z-index:11;"></div>
+        <div style="position:absolute;bottom:3px;right:3px;width:14px;height:14px;border-bottom:1px solid var(--gold);border-right:1px solid var(--gold);opacity:0.45;pointer-events:none;z-index:11;"></div>
+
+        <img id="ijokoo-imgDark" alt="Ìjòkòó — Carved stools of power" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:1;">
+        <canvas id="ijokoo-canvas" style="position:absolute;inset:0;width:100%;height:100%;z-index:2;display:block;"></canvas>
+        <div id="ijokoo-fullReveal" style="position:absolute;inset:0;z-index:3;opacity:0;transition:opacity .7s ease;pointer-events:none;">
+          <img id="ijokoo-imgReveal" alt="Full reveal — The Ìjòkòó Set" style="width:100%;height:100%;object-fit:fill;display:block;">
+        </div>
+        <div id="ijokoo-interactor" style="position:absolute;inset:0;z-index:4;cursor:none;"></div>
+      </div>
+
+      <!-- Title & subtitle -->
+      <div style="margin-top:1.4rem;text-align:center;">
+        <h2 style="font-family:'Cinzel',serif;font-size:clamp(1rem,3vw,1.65rem);font-weight:400;letter-spacing:0.22em;color:var(--text);transition:color 0.35s;">I J Ò K Ò Ó</h2>
+        <p style="font-family:'Cormorant Garamond',serif;font-size:clamp(0.75rem,1.5vw,0.95rem);color:var(--text-muted);font-style:italic;letter-spacing:0.1em;margin-top:0.35rem;transition:color 0.35s;">Carved stools of power &amp; presence</p>
+      </div>
+
+      <!-- Interaction hint -->
+      <p id="ijokoo-hint" style="margin-top:0.8rem;font-family:'Cinzel',serif;font-size:clamp(0.5rem,1.1vw,0.62rem);letter-spacing:0.22em;color:var(--gold);opacity:0.4;text-align:center;text-transform:uppercase;transition:opacity 0.4s;">Triple-tap to unveil &nbsp;&middot;&nbsp; Touch or hover to explore</p>
+
+      <!-- Custom cursor dot (gold-tinted to match site) -->
+      <div id="ijokoo-cursor" style="position:fixed;width:7px;height:7px;background:var(--gold);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);display:none;"></div>
+
+    </div>
+
+    <!-- Teaser note -->
+    <div style="margin-top:2rem;background:rgba(201,153,58,0.06);border:1px solid rgba(201,153,58,0.2);border-radius:4px;padding:1rem 1.25rem;display:flex;gap:0.75rem;align-items:flex-start;">
+      <span style="font-size:14px;flex-shrink:0;margin-top:1px;opacity:0.65;color:var(--gold);">&#9672;</span>
+      <p style="font-size:0.9rem;color:var(--text-muted);line-height:1.6;transition:color 0.35s;font-family:'Crimson Pro',serif;">
+        <strong style="color:var(--text-soft);font-weight:400;transition:color 0.35s;">The Ìjòkòó Set auction opens with Chapter One — May 1, 2026.</strong> Holding an Entry Token gives you access to bid. Acquire yours before the auction.
+      </p>
+    </div>
+
+  </section>
+
+  <script>
+  /* ── Ìjòkòó Interactive Preview ── */
+  (function() {
+    // ── Images ──────────────────────────────────────────────────────────────────
+const SRC_GREY = document.getElementById("ijokoo-src-grey").value;
+const SRC_DARK = document.getElementById("ijokoo-src-dark").value;
+const ijokooImgDark   = document.getElementById('ijokoo-imgDark');
+const ijokooImgReveal = document.getElementById('ijokoo-imgReveal');
+
+ijokooImgDark.src = SRC_DARK;
+ijokooImgReveal.src = SRC_DARK;
+
+const imgGrey = new Image();
+imgGrey.src = SRC_GREY;
+
+// ── Elements ────────────────────────────────────────────────────────────────
+const stage      = document.getElementById('ijokoo-stage');
+const canvas     = document.getElementById('ijokoo-canvas');
+const ctx        = canvas.getContext('2d');
+const interactor = document.getElementById('ijokoo-interactor');
+const fullReveal = document.getElementById('ijokoo-fullReveal');
+const cursorDot  = document.getElementById('ijokoo-cursor');
+
+// ── State ───────────────────────────────────────────────────────────────────
+let W = 0, H = 0;
+let mouse = { x: -999, y: -999, on: false };
+
+// Current circle position & radius (lerped smoothly)
+let cx = 0, cy = 0, cr = 0;
+
+// Autonomous wander
+const SCULPT_X = [.095, .265, .43, .595, .755, .90];
+let hotspot = 0, htimer = 0, hdwell = 110;
+let wx = 0, wy = 0, wvx = 0, wvy = 0, frame = 0;
+
+// Triple-click
+let clicks = 0, clickT = null, revealActive = false;
+
+// ── Resize ──────────────────────────────────────────────────────────────────
+function resize() {
+  const r = stage.getBoundingClientRect();
+  W = r.width; H = r.height;
+  canvas.width  = Math.round(W);
+  canvas.height = Math.round(H);
+  wx = W * SCULPT_X[hotspot];
+  wy = H * .62;
+  cx = wx; cy = wy;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ── Input ───────────────────────────────────────────────────────────────────
+function stagePos(e) {
+  const r  = stage.getBoundingClientRect();
+  const cl = e.touches ? e.touches[0].clientX : e.clientX;
+  const ct = e.touches ? e.touches[0].clientY : e.clientY;
+  return { x: cl - r.left, y: ct - r.top };
+}
+
+interactor.addEventListener('mousemove', e => {
+  const p = stagePos(e);
+  mouse.x = p.x; mouse.y = p.y; mouse.on = true;
+  cursorDot.style.left = e.clientX + 'px';
+  cursorDot.style.top  = e.clientY + 'px';
+});
+interactor.addEventListener('mouseleave', () => { mouse.on = false; });
+interactor.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const p = stagePos(e);
+  mouse.x = p.x; mouse.y = p.y; mouse.on = true;
+}, { passive: false });
+interactor.addEventListener('touchend', () => { mouse.on = false; });
+
+function handleClick() {
+  if (revealActive) return;
+  clicks++;
+  clearTimeout(clickT);
+  if (clicks >= 3) { doReveal(); clicks = 0; }
+  else clickT = setTimeout(() => { clicks = 0; }, 1400);
+}
+interactor.addEventListener('click', handleClick);
+interactor.addEventListener('touchstart', e => { e.preventDefault(); handleClick(); }, { passive: false });
+
+function doReveal() {
+  revealActive = true;
+  fullReveal.classList.add('on');
+  setTimeout(() => {
+    fullReveal.classList.remove('on');
+    setTimeout(() => { revealActive = false; }, 700);
+  }, 3200);
+}
+
+// ── Wander ──────────────────────────────────────────────────────────────────
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function wanderUpdate() {
+  frame++; htimer++;
+  if (htimer > hdwell) {
+    htimer = 0;
+    hdwell = 90 + Math.random() * 140;
+    hotspot = (hotspot + (Math.random() < .5 ? 1 : -1) + SCULPT_X.length) % SCULPT_X.length;
+  }
+  const tx = W * SCULPT_X[hotspot];
+  const ty = H * (.62 + Math.sin(frame * .013) * .045);
+  const noise = Math.sin(frame * .031) * 9 + Math.cos(frame * .019) * 6;
+  const dx = tx + noise - wx;
+  const dy = ty - wy;
+  wvx += dx * .02; wvy += dy * .02;
+  wvx *= .87;      wvy *= .87;
+  wx  += wvx;      wy  += wvy;
+  // Shrink circle while travelling, expand when settled
+  return Math.sqrt(dx * dx + dy * dy) < 55 ? 72 : 26;
+}
+
+// ── Draw ─────────────────────────────────────────────────────────────────────
+// Strategy:
+//   1. Draw grey image filling entire canvas  (source-over)
+//   2. Erase a feathered circle               (destination-out)
+//   → the erased region is transparent → dark image beneath shows through
+
+function draw() {
+  if (!W || !imgGrey.complete) return;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Step 1 — grey image fills canvas completely
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(imgGrey, 0, 0, W, H);
+
+  // Step 2 — punch a soft-edged hole
+  const r = cr;
+  const grad = ctx.createRadialGradient(cx, cy, r * .2, cx, cy, r);
+  grad.addColorStop(0,   'rgba(0,0,0,1)');
+  grad.addColorStop(.6,  'rgba(0,0,0,.95)');
+  grad.addColorStop(.85, 'rgba(0,0,0,.5)');
+  grad.addColorStop(1,   'rgba(0,0,0,0)');
+
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 1.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+// ── Loop ─────────────────────────────────────────────────────────────────────
+function loop() {
+  requestAnimationFrame(loop);
+  if (!W) return;
+
+  let tx, ty, tr;
+  if (mouse.on) {
+    tx = mouse.x; ty = mouse.y; tr = 95;
+  } else {
+    tr = wanderUpdate();
+    tx = wx; ty = wy;
+  }
+
+  cx = lerp(cx, tx, .09);
+  cy = lerp(cy, ty, .09);
+  cr = lerp(cr, tr, .07);
+
+  draw();
+}
+
+imgGrey.onload = () => loop();
+if (imgGrey.complete) loop();
+  })();
+  </script>
 
   <!-- TOKENS -->
   <section class="ao-section reveal" id="tokens">
