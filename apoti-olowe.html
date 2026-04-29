@@ -1212,17 +1212,17 @@
 
       <h2 style="font-family:'Cinzel',serif;font-size:clamp(1rem,3vw,1.65rem);font-weight:400;letter-spacing:0.22em;color:var(--text);transition:color 0.35s;margin-bottom:1.2rem;text-align:center;">The Ijokoo Set</h2>
 
-      <div id="ijokoo-stage" style="position:relative;width:min(94%,820px);aspect-ratio:2471/1390;cursor:none;user-select:none;-webkit-user-select:none;border:1px solid rgba(201,153,58,0.18);border-radius:2px;">
+      <div id="ijokoo-stage" style="position:relative;width:min(94%,900px);aspect-ratio:731/217;cursor:none;user-select:none;-webkit-user-select:none;border:1px solid rgba(201,153,58,0.18);border-radius:2px;overflow:hidden;">
         <!-- Corner accents matching site's gold palette -->
         <div style="position:absolute;top:3px;left:3px;width:14px;height:14px;border-top:1px solid var(--gold);border-left:1px solid var(--gold);opacity:0.45;pointer-events:none;z-index:11;"></div>
         <div style="position:absolute;top:3px;right:3px;width:14px;height:14px;border-top:1px solid var(--gold);border-right:1px solid var(--gold);opacity:0.45;pointer-events:none;z-index:11;"></div>
         <div style="position:absolute;bottom:3px;left:3px;width:14px;height:14px;border-bottom:1px solid var(--gold);border-left:1px solid var(--gold);opacity:0.45;pointer-events:none;z-index:11;"></div>
         <div style="position:absolute;bottom:3px;right:3px;width:14px;height:14px;border-bottom:1px solid var(--gold);border-right:1px solid var(--gold);opacity:0.45;pointer-events:none;z-index:11;"></div>
 
-        <img id="ijokoo-imgDark" alt="Ìjòkòó — Carved stools of power" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:1;">
+        <img id="ijokoo-imgDark" alt="Ìjòkòó — Carved stools of power" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center bottom;display:block;z-index:1;">
         <canvas id="ijokoo-canvas" style="position:absolute;inset:0;width:100%;height:100%;z-index:2;display:block;"></canvas>
         <div id="ijokoo-fullReveal" style="position:absolute;inset:0;z-index:3;opacity:0;transition:opacity .7s ease;pointer-events:none;">
-          <img id="ijokoo-imgReveal" alt="Full reveal — The Ìjòkòó Set" style="width:100%;height:100%;object-fit:fill;display:block;">
+          <img id="ijokoo-imgReveal" alt="Full reveal — The Ìjòkòó Set" style="width:100%;height:100%;object-fit:cover;object-position:center bottom;display:block;">
         </div>
         <div id="ijokoo-interactor" style="position:absolute;inset:0;z-index:4;cursor:none;"></div>
       </div>
@@ -1376,9 +1376,14 @@ function draw() {
 
   ctx.clearRect(0, 0, W, H);
 
-  // Step 1 — grey image fills canvas completely
+  // Step 1 — grey image fills canvas with a bottom-aligned cover crop
   ctx.globalCompositeOperation = 'source-over';
-  ctx.drawImage(imgGrey, 0, 0, W, H);
+  const scale = Math.max(W / imgGrey.naturalWidth, H / imgGrey.naturalHeight);
+  const dw = imgGrey.naturalWidth * scale;
+  const dh = imgGrey.naturalHeight * scale;
+  const dx = (W - dw) / 2;
+  const dy = H - dh;
+  ctx.drawImage(imgGrey, dx, dy, dw, dh);
 
   // Step 2 — punch a soft-edged hole
   const r = cr;
