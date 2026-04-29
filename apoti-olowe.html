@@ -1278,7 +1278,14 @@ let mouse = { x: -999, y: -999, on: false };
 let cx = 0, cy = 0, cr = 0;
 
 // Autonomous wander
-const SCULPT_X = [.095, .265, .43, .595, .755, .90];
+const SCULPT_POINTS = [
+  { x: .108, y: .50 },
+  { x: .270, y: .50 },
+  { x: .430, y: .50 },
+  { x: .595, y: .50 },
+  { x: .755, y: .49 },
+  { x: .902, y: .49 }
+];
 let hotspot = 0, htimer = 0, hdwell = 110;
 let wx = 0, wy = 0, wvx = 0, wvy = 0, frame = 0;
 
@@ -1291,8 +1298,8 @@ function resize() {
   W = r.width; H = r.height;
   canvas.width  = Math.round(W);
   canvas.height = Math.round(H);
-  wx = W * SCULPT_X[hotspot];
-  wy = H * .62;
+  wx = W * SCULPT_POINTS[hotspot].x;
+  wy = H * SCULPT_POINTS[hotspot].y;
   cx = wx; cy = wy;
 }
 window.addEventListener('resize', resize);
@@ -1347,12 +1354,12 @@ function wanderUpdate() {
   if (htimer > hdwell) {
     htimer = 0;
     hdwell = 120;
-    hotspot = (hotspot + 1) % SCULPT_X.length;
+    hotspot = (hotspot + 1) % SCULPT_POINTS.length;
   }
-  const tx = W * SCULPT_X[hotspot];
-  const ty = H * (.62 + Math.sin(frame * .013) * .045);
-  const noise = Math.sin(frame * .031) * 9 + Math.cos(frame * .019) * 6;
-  const dx = tx + noise - wx;
+  const target = SCULPT_POINTS[hotspot];
+  const tx = W * target.x;
+  const ty = H * target.y;
+  const dx = tx - wx;
   const dy = ty - wy;
   wvx += dx * .02; wvy += dy * .02;
   wvx *= .87;      wvy *= .87;
