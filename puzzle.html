@@ -654,13 +654,45 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 }
 
 /* ── ADMIN ── */
-#admin-screen{display:none;min-height:100vh;background:var(--bg);padding:2rem}
-.admin-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;flex-wrap:wrap;gap:1rem}
-.admin-header h1{font-family:'Cinzel',serif;color:var(--gold);font-size:1.2rem;letter-spacing:.15em}
+#admin-screen{display:none;min-height:100vh;background:var(--bg);padding:2rem;box-sizing:border-box;overflow-x:hidden;width:100%}
+
+/* Header */
+.admin-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;flex-wrap:wrap;gap:.75rem;width:100%}
+.admin-header-title{min-width:0;flex:1}
+.admin-logo{font-family:'Cinzel',serif;font-size:.95rem;color:var(--gold);letter-spacing:.06em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.admin-logo em{font-family:'Cinzel',serif;font-style:normal;color:var(--gold-light)}
+.admin-logo-sub{font-size:.65rem;color:var(--text-muted);letter-spacing:.06em;margin-top:.2rem;text-transform:uppercase}
+.admin-header-actions{display:flex;gap:.5rem;flex-shrink:0}
+
+/* Grid */
 .admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
 @media(max-width:700px){.admin-grid{grid-template-columns:1fr}}
+
+/* Card */
 .admin-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem}
 .admin-card h2{font-family:'Cinzel',serif;font-size:.85rem;letter-spacing:.1em;color:var(--gold-light);margin-bottom:1.25rem;text-transform:uppercase}
+
+/* Card header row (title + badge/controls) */
+.admin-card-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem}
+
+/* Form grid — 2-col on desktop, 1-col on mobile */
+.admin-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.admin-form-grid--mb{margin-bottom:1rem}
+
+/* Button rows */
+.admin-btn-row{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-top:.5rem}
+
+/* Subbox (steps / personal messages box) */
+.admin-subbox{background:rgba(201,150,58,.05);border:1px solid rgba(201,150,58,.18);border-radius:8px;padding:.85rem 1rem}
+
+/* Toggle row */
+.admin-toggle-row{display:flex;align-items:center;gap:.75rem;margin-bottom:.65rem}
+
+/* Wallet controls */
+.admin-wallet-controls{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
+.admin-wallet-controls select{font-size:.75rem;padding:.35rem .65rem;min-width:160px}
+
+/* Challenge rows */
 .challenge-row{display:flex;align-items:center;gap:.75rem;padding:.75rem 0;border-bottom:1px solid var(--border)}
 .challenge-row:last-child{border-bottom:none}
 .ch-status{width:8px;height:8px;border-radius:50%;flex-shrink:0}
@@ -670,79 +702,90 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 .ch-info{flex:1;min-width:0}
 .ch-title{font-size:.9rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ch-dates{font-size:.75rem;color:var(--text-muted);margin-top:.15rem}
+
+/* Upload */
 .upload-zone{border:2px dashed var(--border-bright);border-radius:var(--radius);padding:2rem;cursor:pointer;transition:all .2s;background:var(--surface2);text-align:center}
 .upload-zone:hover,.upload-zone.drag{border-color:var(--gold);background:#1e1a0e}
 .upload-zone p{color:var(--text-muted);font-size:.85rem}
 .upload-zone span{color:var(--gold)}
 .preview-thumb{max-width:100%;max-height:160px;border-radius:var(--radius);margin-top:.75rem;border:1px solid var(--border);display:none}
+
+/* Messages */
 .admin-msg{padding:.6rem 1rem;border-radius:var(--radius);font-size:.85rem;margin-top:.75rem;display:none}
 .admin-msg.ok{background:rgba(90,191,90,.1);border:1px solid rgba(90,191,90,.3);color:#6abf6a;display:block}
 .admin-msg.err{background:rgba(192,64,64,.1);border:1px solid rgba(192,64,64,.3);color:#e07070;display:block}
 
-/* ── MOBILE ADMIN OPTIMISATION ── */
+/* ── MOBILE ADMIN ── */
 @media(max-width:600px){
-  #admin-screen{padding:1rem .75rem}
-  .admin-header{margin-bottom:1.25rem;gap:.6rem}
-  .admin-header .logo{font-size:.85rem!important}
-  .admin-header > div:last-child{width:100%;display:flex;gap:.5rem}
-  .admin-header > div:last-child .btn{flex:1;text-align:center;font-size:.7rem;padding:.45rem .5rem}
-  .admin-grid{gap:1rem}
-  .admin-card{padding:1rem .9rem}
-  .admin-card h2{font-size:.75rem;margin-bottom:.9rem}
+  #admin-screen{padding:.85rem .75rem}
 
-  /* Create challenge form — stack 2-col grids to 1-col */
-  .admin-form-grid,
-  .admin-card > div[style*="grid-template-columns:1fr 1fr"],
-  .admin-card > div[style*="grid-template-columns: 1fr 1fr"]{
-    display:flex!important;flex-direction:column!important;gap:.65rem!important
-  }
+  /* Header — keep logo + buttons in one row, never overflow */
+  .admin-header{margin-bottom:1rem;gap:.5rem;flex-wrap:nowrap;align-items:flex-start}
+  .admin-logo{font-size:.78rem;letter-spacing:.04em;white-space:normal;word-break:break-word}
+  .admin-logo-sub{font-size:.58rem;letter-spacing:.04em}
+  .admin-header-actions{flex-direction:column;gap:.4rem;flex-shrink:0}
+  .admin-header-actions .btn{font-size:.7rem;padding:.4rem .65rem;white-space:nowrap}
 
-  /* Winner panel admin header row */
-  #admin-screen .wp-visibility-badge{font-size:.58rem;padding:.25rem .55rem}
+  /* Grid gaps */
+  .admin-grid{gap:.85rem}
+  .admin-card{padding:.9rem .85rem}
+  .admin-card h2{font-size:.75rem;margin-bottom:.85rem}
 
-  /* Winner entry rows — stack inputs vertically on mobile */
-  .wp-winner-entry{flex-direction:column!important;align-items:stretch!important;gap:.35rem!important;padding:.6rem .7rem}
-  .wp-winner-entry span{width:auto!important;font-size:.72rem}
-  .wp-winner-entry input{min-width:0!important;max-width:none!important;width:100%!important;font-size:.8rem!important}
-  .wp-winner-entry .btn-sm{width:100%!important;font-size:.68rem!important;text-align:center}
+  /* Form grid → single column */
+  .admin-form-grid{grid-template-columns:1fr;gap:.65rem}
+
+  /* Card header rows → stack */
+  .admin-card-header{flex-direction:column;align-items:flex-start;gap:.5rem}
+
+  /* Wallet controls → stack full width */
+  .admin-wallet-controls{flex-direction:column;align-items:stretch}
+  .admin-wallet-controls select{width:100%;min-width:0;font-size:.82rem;padding:.5rem .65rem}
+  .admin-wallet-controls .btn{width:100%;text-align:center;padding:.5rem}
+
+  /* Button rows — primary action full width, secondary wraps naturally */
+  .admin-btn-row{flex-direction:column;align-items:stretch;gap:.45rem}
+  .admin-btn-row .btn-solid{width:100%;text-align:center;padding:.65rem}
+  .admin-btn-row .btn-sm{width:100%;text-align:center;padding:.5rem;font-size:.78rem}
+  .admin-btn-row .btn-danger{width:100%;text-align:center}
+
+  /* Subboxes — tighter padding */
+  .admin-subbox{padding:.7rem .75rem}
+
+  /* Winner entry rows — stack vertically */
+  .wp-winner-entry{flex-direction:column!important;align-items:stretch!important;gap:.4rem!important;padding:.65rem .7rem}
+  .wp-winner-entry > span{font-size:.75rem}
+  .wp-winner-entry input{width:100%!important;min-width:0!important;max-width:none!important;font-size:.82rem!important;box-sizing:border-box}
+  .wp-winner-entry .btn-sm{width:100%;text-align:center;font-size:.72rem!important;padding:.45rem!important}
 
   /* Instruction step rows */
-  #wp-steps-builder > div{flex-wrap:wrap;gap:.35rem}
-  #wp-steps-builder input[type=text]{min-width:0;flex:1 1 100%}
+  #wp-steps-builder > div{flex-wrap:wrap;gap:.4rem}
+  #wp-steps-builder > div .wp-step-num{flex-shrink:0}
+  #wp-steps-builder > div input[type=text]{flex:1 1 100%;min-width:0;box-sizing:border-box}
+  #wp-steps-builder > div button{width:100%;text-align:center}
 
   /* Personal message rows */
   #wp-personal-msgs-builder > div{flex-direction:column!important}
   #wp-personal-msgs-builder input,
-  #wp-personal-msgs-builder textarea{min-width:0!important;width:100%!important}
+  #wp-personal-msgs-builder textarea{width:100%!important;min-width:0!important;box-sizing:border-box;font-size:.82rem}
+  #wp-personal-msgs-builder button{width:100%;text-align:center}
 
-  /* Challenge label 2-col inline grid fix */
-  div[style*="grid-template-columns:1fr 1fr"]{
-    display:flex!important;flex-direction:column!important;gap:.65rem!important
-  }
-
-  /* Challenge row action buttons */
+  /* Challenge rows — wrap actions below */
   .challenge-row{flex-wrap:wrap;gap:.5rem}
+  .ch-info{width:100%;flex:unset}
   .challenge-row > div:last-child{width:100%;display:flex;gap:.4rem;flex-wrap:wrap}
-  .challenge-row > div:last-child .btn{flex:1;min-width:60px;font-size:.65rem;padding:.35rem .4rem;text-align:center}
+  .challenge-row > div:last-child .btn{flex:1;min-width:0;font-size:.68rem;padding:.4rem .35rem;text-align:center}
 
-  /* Wallet list filter row */
-  #admin-screen div[style*="display:flex"][style*="flex-wrap:wrap"]{gap:.45rem}
-  #wallet-challenge-filter{width:100%!important;min-width:0!important;font-size:.78rem}
-
-  /* Publish / action buttons row */
-  div[style*="display:flex;gap:.75rem;flex-wrap:wrap"]{gap:.5rem!important}
-  #admin-screen .btn-solid{width:100%;text-align:center}
-
-  /* Upload zone — compact on mobile */
+  /* Upload zone */
   .upload-zone{padding:1.25rem .75rem}
   .upload-zone p{font-size:.78rem}
 
-  /* Wallet table scrollable */
+  /* Wallet table */
   #wallets-list{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  #wallets-list table{min-width:500px;font-size:.72rem}
+  #wallets-list table{min-width:480px;font-size:.72rem}
+  #wallets-list th,#wallets-list td{padding:.35rem .45rem!important}
 
-  /* Winner panel header visibility badge */
-  #admin-screen > div > div[style*="grid-column"]:nth-child(2) > div:first-child{flex-direction:column!important;align-items:flex-start!important;gap:.5rem}
+  /* Toggle row */
+  .admin-toggle-row{gap:.5rem}
 }
 
 /* Admin login */
@@ -1137,9 +1180,12 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
   padding:.5rem .65rem;background:var(--surface2);border-radius:8px;
   border:1px solid var(--border);margin-bottom:.5rem;
 }
-.wp-winner-entry input{flex:1;min-width:100px;font-size:.78rem;padding:.4rem .65rem}
-.wp-winner-entry .prize-input{max-width:130px}
-.wp-winner-entry .btn-sm{padding:.35rem .7rem;font-size:.65rem}
+.wp-winner-entry input{font-size:.78rem;padding:.4rem .65rem;min-width:0;box-sizing:border-box}
+.wp-winner-entry .wp-name-input{flex:2;min-width:110px}
+.wp-winner-entry .wp-time-input{flex:1;min-width:70px;max-width:90px}
+.wp-winner-entry .wp-prize-input{flex:1;min-width:110px}
+.wp-winner-entry .wp-wallet-input{flex:2;min-width:130px}
+.wp-winner-entry .btn-sm{padding:.35rem .7rem;font-size:.65rem;flex-shrink:0}
 #wp-winners-builder{margin-bottom:.75rem}
 .wp-visibility-badge{
   display:inline-flex;align-items:center;gap:.4rem;
@@ -1742,11 +1788,11 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 <!-- ═══ ADMIN DASHBOARD ═══ -->
 <div id="admin-screen">
   <div class="admin-header">
-    <div>
-      <div class="logo" style="text-align:left;font-size:1rem">ÀPÓTÍ <em>ỌLỌ́WẸ̀</em> — Admin</div>
-      <div style="font-size:.7rem;color:var(--text-muted);letter-spacing:.1em;margin-top:.25rem">PUZZLE CHALLENGE MANAGER · KAYSWORKS</div>
+    <div class="admin-header-title">
+      <div class="admin-logo">ÀPÓTÍ <em>ỌLỌ́WẸ̀</em> — Admin</div>
+      <div class="admin-logo-sub">Puzzle Challenge Manager · Kaysworks</div>
     </div>
-    <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+    <div class="admin-header-actions">
       <button class="btn btn-sm" onclick="fetchAdminChallenges()">↻ Refresh</button>
       <button class="btn btn-sm btn-danger" onclick="adminLogout()">Logout</button>
     </div>
@@ -1756,7 +1802,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
     <!-- Create new challenge -->
     <div class="admin-card" style="grid-column:1/-1">
       <h2>Create New Puzzle Challenge</h2>
-      <div class="admin-form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div class="admin-form-grid">
         <div class="field">
           <label for="ch-title">Challenge Title</label>
           <input type="text" id="ch-title" placeholder="e.g. Week 12 — Ọlọwẹ's Vision">
@@ -1791,7 +1837,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
         </div>
       </div>
       <input type="hidden" id="ch-image-url">
-      <div style="margin-top:.5rem;display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
+      <div class="admin-btn-row">
         <button class="btn btn-solid" onclick="createChallenge()">Publish Challenge</button>
         <button class="btn btn-sm" onclick="prefillWeekly()">Auto-fill next 7 days</button>
       </div>
@@ -1800,7 +1846,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 
     <!-- ══ WINNER ANNOUNCEMENT PANEL ══ -->
     <div class="admin-card" style="grid-column:1/-1">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem">
+      <div class="admin-card-header">
         <h2 style="margin:0">🏆 Weekly Winner Announcement</h2>
         <span class="wp-visibility-badge off" id="wp-admin-visibility-badge">● Hidden from players</span>
       </div>
@@ -1809,7 +1855,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
       </p>
 
       <!-- Challenge label -->
-      <div class="admin-form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
+      <div class="admin-form-grid admin-form-grid--mb">
         <div class="field" style="margin:0">
           <label for="wp-admin-challenge-label">Challenge Title / Label</label>
           <input type="text" id="wp-admin-challenge-label" placeholder="e.g. Week 12 — Ọlọwẹ's Vision">
@@ -1829,12 +1875,11 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 
       <!-- Show reward instructions toggle + editor -->
       <div style="margin-top:1rem">
-        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.65rem">
+        <div class="admin-toggle-row">
           <input type="checkbox" id="wp-show-instructions" checked style="width:auto;cursor:pointer;accent-color:var(--gold)">
           <label for="wp-show-instructions" style="margin:0;cursor:pointer;text-transform:none;font-size:.82rem;color:var(--text);font-family:'Crimson Text',serif">Show reward claim instructions to players</label>
         </div>
-        <!-- Editable instruction steps -->
-        <div id="wp-instructions-editor" style="background:rgba(201,150,58,.05);border:1px solid rgba(201,150,58,.18);border-radius:8px;padding:.85rem 1rem">
+        <div id="wp-instructions-editor" class="admin-subbox">
           <div style="font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.14em;color:var(--gold);text-transform:uppercase;margin-bottom:.65rem">Edit Instruction Steps</div>
           <div id="wp-steps-builder"></div>
           <button class="btn btn-sm" onclick="wpAddStepRow()" style="margin-top:.35rem;font-size:.65rem">+ Add Step</button>
@@ -1842,14 +1887,14 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
       </div>
 
       <!-- Personal message per winner -->
-      <div style="margin-top:1rem;background:rgba(201,150,58,.05);border:1px solid rgba(201,150,58,.18);border-radius:8px;padding:.85rem 1rem">
+      <div class="admin-subbox" style="margin-top:1rem">
         <div style="font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.14em;color:var(--gold);text-transform:uppercase;margin-bottom:.5rem">Personal Messages for Winners <span style="font-size:.55rem;color:var(--text-muted);text-transform:none;font-family:'Crimson Text',serif;letter-spacing:0">(shown only when their name matches their profile name)</span></div>
         <div id="wp-personal-msgs-builder"></div>
         <button class="btn btn-sm" onclick="wpAddPersonalMsgRow()" style="margin-top:.35rem;font-size:.65rem">+ Add Personal Message</button>
       </div>
 
       <div class="admin-msg" id="wp-admin-msg"></div>
-      <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1rem">
+      <div class="admin-btn-row" style="margin-top:1rem">
         <button class="btn btn-solid btn-start" onclick="wpPublish()">🏆 Publish Winners</button>
         <button class="btn btn-sm btn-danger" onclick="wpHide()">Hide Panel</button>
         <button class="btn btn-sm" onclick="wpPreview()">Preview</button>
@@ -1864,10 +1909,10 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 
     <!-- Wallet Addresses -->
     <div class="admin-card" style="grid-column:1/-1">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem">
+      <div class="admin-card-header">
         <h2 style="margin:0">Player Wallet Addresses</h2>
-        <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
-          <select id="wallet-challenge-filter" style="font-size:.75rem;padding:.35rem .65rem;min-width:160px" onchange="fetchWallets()">
+        <div class="admin-wallet-controls">
+          <select id="wallet-challenge-filter" onchange="fetchWallets()">
             <option value="">— All Challenges —</option>
           </select>
           <button class="btn btn-sm" onclick="fetchWallets()">↻ Refresh</button>
@@ -4044,1519 +4089,4 @@ function startConfetti() {
     spin: (Math.random() - 0.5) * 0.2,
     w: 7 + Math.random() * 10,
     h: 4 + Math.random() * 6,
-    color: COLORS[Math.floor(Math.random() * COLORS.length)],
-    shape: Math.random() < 0.4 ? 'circle' : Math.random() < 0.5 ? 'rect' : 'ribbon',
-    alpha: 0.9 + Math.random() * 0.1,
-    wobble: Math.random() * Math.PI * 2,
-    wobbleSpeed: 0.05 + Math.random() * 0.08,
-    delay: i * 12 // stagger launch
-  }));
-
-  const START = performance.now();
-  const LIFETIME = 5000;
-
-  function frame(now) {
-    const elapsed = now - START;
-    ctx.clearRect(0, 0, cc.width, cc.height);
-
-    let alive = 0;
-    for (const p of particles) {
-      if (elapsed < p.delay) { alive++; continue; }
-      p.wobble += p.wobbleSpeed;
-      p.x += p.vx + Math.sin(p.wobble) * 0.8;
-      p.y += p.vy;
-      p.vy += 0.06; // gravity
-      p.angle += p.spin;
-
-      // fade out near end
-      const lifeLeft = LIFETIME - elapsed;
-      p.alpha = Math.min(1, lifeLeft / 800) * 0.95;
-
-      if (p.y > cc.height + 30) { alive++; continue; }
-      alive++;
-
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, p.alpha);
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.angle);
-      ctx.fillStyle = p.color;
-
-      if (p.shape === 'circle') {
-        ctx.beginPath();
-        ctx.ellipse(0, 0, p.w / 2, p.h / 2, 0, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (p.shape === 'ribbon') {
-        ctx.beginPath();
-        ctx.moveTo(-p.w / 2, 0);
-        ctx.quadraticCurveTo(0, -p.h, p.w / 2, 0);
-        ctx.quadraticCurveTo(0, p.h, -p.w / 2, 0);
-        ctx.fill();
-      } else {
-        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-      }
-      ctx.restore();
-    }
-
-    if (elapsed < LIFETIME) {
-      _confettiRAF = requestAnimationFrame(frame);
-    } else {
-      ctx.clearRect(0, 0, cc.width, cc.height);
-      cc.style.display = 'none';
-    }
-  }
-  _confettiRAF = requestAnimationFrame(frame);
-}
-
-function stopConfetti() {
-  if (_confettiRAF) { cancelAnimationFrame(_confettiRAF); _confettiRAF = null; }
-  const cc = document.getElementById('confetti-canvas');
-  if (cc) { cc.getContext('2d').clearRect(0, 0, cc.width, cc.height); cc.style.display = 'none'; }
-}
-
-function closeWin() {
-  stopConfetti();
-  document.getElementById('win-screen').classList.remove('show');
-  // Reset display so stale time is never visible if a new game starts
-  document.getElementById('timer-disp').textContent = '00:00';
-}
-
-// ═══════════════════════════════════════════════
-//  TOOL DEMO — first-use onboarding for mobile
-// ═══════════════════════════════════════════════
-const TOOL_STEPS = [
-  // ── Gestures ──
-  { sel: null, icon:'👆', title:'Moving Around',
-    desc:'Drag any empty space to pan. Pinch with two fingers to zoom in or out — you can also pan while pinching. Drag a piece to move it.' },
-  // ── Row 2 ──
-  { sel:'#tb-row2 button:nth-child(1)', icon:'🖼', title:'Reference Image',
-    desc:'Shows the full puzzle image. Drag and pinch to zoom inside the preview. Tap outside the image to close it.' },
-  { sel:'#hint-btn', icon:'💡', title:'Hint (×3)',
-    desc:'Highlights an unplaced piece in blue and its target slot in gold, then pans the camera to show both. Corners and edges are prioritised.' },
-  { sel:'#ghost-btn', icon:'👁', title:'Ghost Overlay',
-    desc:'Fades the reference image over the board so you can see exactly where pieces belong. Tap again to hide it. Unlimited uses.' },
-  { sel:'#tb-row2 button:nth-child(4)', icon:'🔍', title:'Reset Zoom',
-    desc:'Snaps the view back to the default zoom and centres the board — useful after zooming in deeply.' },
-  { sel:'#tb-row2 button:nth-child(5)', icon:'🏆', title:'Leaderboard',
-    desc:'Opens the top-10 scores for this challenge. Scores are recorded when you complete the puzzle.' },
-  { sel:'#pause-btn', icon:'⏸', title:'Pause',
-    desc:'Freezes the timer and auto-saves your progress. Tap Resume or press Escape to continue.' },
-  // ── Row 3 ──
-  { sel:'#tb-row3 button:nth-child(1)', icon:'↺', title:'Restart',
-    desc:'Rescatters all pieces and resets the timer to zero. Your saved progress for this puzzle is cleared.' },
-  { sel:'#tb-row3 button:nth-child(2)', icon:'🔀', title:'Scatter',
-    desc:'Randomly redistributes all unplaced pieces around the canvas — handy when they pile up.' },
-  { sel:'#tb-row3 button:nth-child(3)', icon:'⊞', title:'Arrange',
-    desc:'Neatly lines up all unplaced pieces around the board — above and below on mobile, all four sides on desktop.' },
-  { sel:'#rectify-btn', icon:'⚙', title:'Fix',
-    desc:'Scans all placed pieces and snaps any that are slightly misaligned back to their exact position. Use this if the ghost overlay looks off.' },
-  { sel:'#bg-palette-btn', icon:'🎨', title:'Background',
-    desc:'The 🎨 button at the top-left opens a palette of 18 textures — dark woods, light woods, and solid tones. Your choice is saved between sessions.' },
-];
-let _demoStep = 0;
-
-function startToolDemo() {
-  _demoStep = 0;
-  document.getElementById('tool-demo').classList.add('show');
-  _renderDemoStep();
-}
-
-function _renderDemoStep() {
-  const step = TOOL_STEPS[_demoStep];
-  if (!step) { skipToolDemo(); return; }
-
-  document.getElementById('tool-demo-icon').textContent  = step.icon;
-  document.getElementById('tool-demo-title').textContent = step.title;
-  document.getElementById('tool-demo-desc').textContent  = step.desc;
-
-  // Progress dots
-  const prog = document.getElementById('tool-demo-progress');
-  prog.innerHTML = TOOL_STEPS.map((_, i) =>
-    `<div class="tdp-dot${i === _demoStep ? ' active' : ''}"></div>`).join('');
-
-  // Update button label on last step
-  const nextBtn = document.querySelector('#tool-demo-actions .btn-solid');
-  if (nextBtn) nextBtn.textContent = _demoStep === TOOL_STEPS.length - 1 ? 'Done ✓' : 'Next →';
-
-  // Highlight target element
-  const target = document.querySelector(step.sel);
-  const hl = document.getElementById('tool-demo-highlight');
-  if (target) {
-    const r = target.getBoundingClientRect();
-    const pad = 6;
-    hl.style.cssText = `
-      position:fixed;
-      left:${r.left - pad}px; top:${r.top - pad}px;
-      width:${r.width + pad*2}px; height:${r.height + pad*2}px;
-      border:2px solid var(--gold); border-radius:8px;
-      box-shadow:0 0 0 2000px rgba(0,0,0,.55),0 0 20px rgba(201,150,58,.4);
-      pointer-events:none; transition:all .3s ease;
-    `;
-    hl.style.display = 'block';
-  } else {
-    hl.style.display = 'none';
-  }
-}
-
-function nextToolStep() {
-  _demoStep++;
-  if (_demoStep >= TOOL_STEPS.length) { skipToolDemo(); return; }
-  _renderDemoStep();
-}
-
-function skipToolDemo() {
-  document.getElementById('tool-demo').classList.remove('show');
-  document.getElementById('tool-demo-highlight').style.display = 'none';
-  try { localStorage.setItem('apoti_demo_done', '1'); } catch {}
-}
-
-function confirmQuit() {
-  if (!confirm('Quit this puzzle? Progress will be saved — you can resume next time.')) return;
-  autoSave(); // save current state before quitting
-  _wellness.stop();
-  isPaused = false;
-  document.getElementById('pause-overlay').classList.remove('show');
-  clearInterval(timerInterval); if (window._saveInterval) clearInterval(window._saveInterval); drag = null; selState = null; selectedIds.clear();
-  zoom = 1; panX = 0; panY = 0;
-  stopConfetti();
-  document.getElementById('game-screen').style.display = 'none';
-  document.body.classList.remove('game-active');
-  document.getElementById('win-screen').classList.remove('show');
-  document.getElementById('ref-thumb').style.display = 'none';
-  document.getElementById('bg-palette-btn').style.display = 'none';
-  document.getElementById('lb-panel').classList.remove('open');
-  img = null; pieces = []; groups = new Map(); window._asm = null;
-  hideAll(); show('loading-screen'); boot();
-}
-
-// ═══════════════════════════════════════════════
-//  RETURN TO SLOT — lift a placed piece back off the board
-// ═══════════════════════════════════════════════
-function returnPieceToSlot(p) {
-  if (!p || !p.placed || !window._asm) return;
-  const { x: asmX, y: asmY, w: asmW, h: asmH, scale } = window._asm;
-  const sPW = Math.round(pieceW * scale), sPH = Math.round(pieceH * scale);
-  const tabPx = Math.round(TAB * scale);
-  const PAD = Math.max(8, Math.round(SNAP * 1.6));
-  const margin = Math.round(Math.min(sPW, sPH) * 0.15 + 6);
-
-  // Unplace the piece and give it its own group
-  p.placed = false;
-  const newGid = nextGid++;
-  const oldSet = groups.get(p.groupId);
-  if (oldSet) { oldSet.delete(p.id); if (oldSet.size === 0) groups.delete(p.groupId); }
-  p.groupId = newGid;
-  groups.set(newGid, new Set([p.id]));
-
-  // Place it in the nearest clear border region with jitter
-  const rng = mkRng(Date.now() % 99991);
-  const regions = [
-    { x0: tabPx,               y0: tabPx, x1: asmX - margin,       y1: CH - tabPx },
-    { x0: asmX + asmW + margin, y0: tabPx, x1: CW - tabPx,          y1: CH - tabPx },
-    { x0: asmX - margin,        y0: tabPx, x1: asmX + asmW + margin, y1: asmY - margin },
-    { x0: asmX - margin,        y0: asmY + asmH + margin, x1: asmX + asmW + margin, y1: CH - tabPx },
-  ].filter(r => r.x1 - r.x0 > sPW && r.y1 - r.y0 > sPH);
-
-  const reg = regions[Math.floor(rng() * regions.length)] || regions[0];
-  if (reg) {
-    const jMax = Math.round(Math.min(sPW, sPH) * 0.3);
-    p.x = Math.round(Math.max(tabPx, Math.min(CW - sPW - tabPx,
-      reg.x0 + PAD + rng() * (reg.x1 - reg.x0 - sPW - PAD * 2) + (rng() - 0.5) * 2 * jMax)));
-    p.y = Math.round(Math.max(tabPx, Math.min(CH - sPH - tabPx,
-      reg.y0 + PAD + rng() * (reg.y1 - reg.y0 - sPH - PAD * 2) + (rng() - 0.5) * 2 * jMax)));
-  }
-
-  lastTouchedPiece = p;
-  autoSave();
-  renderAll(); updateStats();
-  _showFeatureToast('Piece returned to border — drag it back when ready');
-}
-function restartPuzzle() {
-  if (!confirm('Restart? All pieces will be rescattered. Progress will be lost.')) return;
-  // Rebuild all groups and unplace everything
-  groups = new Map(); nextGid = 0;
-  pieces.forEach(p => {
-    p.placed = false; p.x = 0; p.y = 0;
-    const gid = nextGid++;
-    p.groupId = gid;
-    groups.set(gid, new Set([p.id]));
-  });
-  // Reset timer fully
-  clearInterval(timerInterval);
-  pausedElapsed = 0;
-  startTime = Date.now();
-  document.getElementById('timer-disp').textContent = '00:00';
-  timerInterval = setInterval(() => {
-    document.getElementById('timer-disp').textContent = fmtTime(Math.floor((Date.now() - startTime) / 1000));
-  }, 500);
-  clearSavedProgress();
-  resetHintGhost();
-  zoom = 1; panX = 0; panY = 0;
-  sizeCanvas(); // rescatter + render
-  updateStats();
-}
-
-// ═══════════════════════════════════════════════
-//  BACKGROUND SWATCHES
-// ═══════════════════════════════════════════════
-const BG_SWATCHES = [
-  // ── Dark wood tones ──
-  { label:'Dark Wood',    type:'wood',  colors:['#2b1f14','#3a2918','#2e2012'] },
-  { label:'Mahogany',     type:'wood',  colors:['#3d1a0e','#5a2812','#3a1a0a'] },
-  { label:'Ash',          type:'wood',  colors:['#2e2820','#3d3428','#2a2418'] },
-  { label:'Ebony',        type:'wood',  colors:['#141210','#1e1a16','#111008'] },
-  // ── Dark solids ──
-  { label:'Midnight',     type:'solid', colors:['#0a0a0f','#0a0a0f','#0a0a0f'] },
-  { label:'Charcoal',     type:'solid', colors:['#1a1a1a','#1a1a1a','#1a1a1a'] },
-  { label:'Deep Teal',    type:'solid', colors:['#0a1a18','#0a1a18','#0a1a18'] },
-  { label:'Deep Navy',    type:'solid', colors:['#0a0e1a','#0a0e1a','#0a0e1a'] },
-  // ── Light wood tones ──
-  { label:'Birch',        type:'wood',  colors:['#e8dcc8','#d4c5a8','#e0d4bc'] },
-  { label:'Pine',         type:'wood',  colors:['#d4b896','#c4a878','#cdb08a'] },
-  { label:'Oak',          type:'wood',  colors:['#c8a870','#b89858','#c0a068'] },
-  { label:'Maple',        type:'wood',  colors:['#e4c898','#d4b880','#dcc090'] },
-  // ── Light solids ──
-  { label:'Parchment',    type:'solid', colors:['#f5efe0','#f5efe0','#f5efe0'] },
-  { label:'Cream',        type:'solid', colors:['#faf4e8','#faf4e8','#faf4e8'] },
-  { label:'Sand',         type:'solid', colors:['#e8dcc0','#e8dcc0','#e8dcc0'] },
-  { label:'Stone',        type:'solid', colors:['#d8d4cc','#d8d4cc','#d8d4cc'] },
-  { label:'Sage',         type:'solid', colors:['#ccd8cc','#ccd8cc','#ccd8cc'] },
-  { label:'Soft Blue',    type:'solid', colors:['#ccd4e0','#ccd4e0','#ccd4e0'] },
-];
-let _activeBgIdx = 0;
-
-function initBgPalette() {
-  const palette = document.getElementById('bg-palette');
-  const btn = document.getElementById('bg-palette-btn');
-  palette.innerHTML = '';
-  BG_SWATCHES.forEach((sw, i) => {
-    const s = document.createElement('div');
-    s.className = 'bg-swatch' + (i === _activeBgIdx ? ' active' : '');
-    s.title = sw.label;
-    s.style.background = sw.type === 'wood'
-      ? `linear-gradient(135deg, ${sw.colors[0]}, ${sw.colors[1]}, ${sw.colors[2]})`
-      : sw.colors[0];
-    s.addEventListener('click', () => {
-      _activeBgIdx = i;
-      palette.querySelectorAll('.bg-swatch').forEach((el,j) => el.classList.toggle('active', j===i));
-      _woodCanvas = null; _jigsawOverlay = null; // regenerate with new colours
-      renderAll();
-      // Persist choice
-      try { localStorage.setItem('apoti_bg', i); } catch {}
-    });
-    palette.appendChild(s);
-  });
-
-  // Toggle palette open/close
-  btn.addEventListener('click', e => {
-    e.stopPropagation();
-    palette.classList.toggle('open');
-  });
-  document.addEventListener('click', () => palette.classList.remove('open'));
-
-  // Restore saved choice
-  try {
-    const saved = parseInt(localStorage.getItem('apoti_bg'));
-    if (!isNaN(saved) && saved < BG_SWATCHES.length) _activeBgIdx = saved;
-  } catch {}
-}
-
-// getWoodCanvas — returns a tiling-ready texture canvas.
-// Called with the visible world size (slightly larger than screen / zoom).
-// Cache by rounded size bucket to avoid regenerating on every tiny zoom change.
-function getWoodCanvas(w, h) {
-  // Bucket to nearest 64px so small zoom changes don't bust the cache
-  const bw = Math.ceil(w / 64) * 64, bh = Math.ceil(h / 64) * 64;
-  if (_woodCanvas && _woodCanvas.width === bw && _woodCanvas.height === bh) return _woodCanvas;
-  const sw = BG_SWATCHES[_activeBgIdx];
-  const wc = document.createElement('canvas');
-  wc.width = bw; wc.height = bh;
-  const ctx = wc.getContext('2d');
-
-  if (sw.type === 'solid') {
-    ctx.fillStyle = sw.colors[0];
-    ctx.fillRect(0, 0, bw, bh);
-  } else {
-    // Wood gradient using swatch colours
-    const g = ctx.createLinearGradient(0, 0, bw * 0.4, bh);
-    g.addColorStop(0,   sw.colors[0]);
-    g.addColorStop(0.4, sw.colors[1]);
-    g.addColorStop(1,   sw.colors[2]);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, bw, bh);
-    // Grain
-    const rng = (() => { let s = 0xdeadbeef; return () => { s ^= s<<13; s ^= s>>17; s ^= s<<5; return (s>>>0)/4294967296; }; })();
-    const numGrains = Math.floor(bh / 4);
-    for (let i = 0; i < numGrains; i++) {
-      const y0 = rng()*bh, amp = 2+rng()*8, freq = .003+rng()*.012, phase = rng()*Math.PI*2, lt = rng();
-      const alpha = .022+rng()*.055;
-      const col = lt>.7 ? `rgba(180,110,60,${alpha})` : lt>.4 ? `rgba(40,20,8,${alpha*1.4})` : `rgba(220,160,80,${alpha*.6})`;
-      ctx.beginPath(); ctx.moveTo(0, y0);
-      for (let x = 1; x <= bw; x += 3) ctx.lineTo(x, y0 + Math.sin(x*freq+phase)*amp);
-      ctx.strokeStyle = col; ctx.lineWidth = .5+rng()*1.5; ctx.stroke();
-    }
-    ctx.save(); ctx.globalAlpha = .03;
-    for (let i = 0; i < 300; i++) {
-      const x = rng()*bw, y = rng()*bh, len = 4+rng()*20;
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+len*(rng()-.5)*.3, y+len);
-      ctx.strokeStyle = rng()>.5 ? '#c89050' : '#1a0f08'; ctx.lineWidth = .4+rng(); ctx.stroke();
-    }
-    ctx.restore();
-  }
-  // Vignette on all types
-  const vg = ctx.createRadialGradient(bw/2,bh/2,0,bw/2,bh/2,Math.max(bw,bh)*.72);
-  const isLightTheme = document.documentElement.getAttribute('data-theme') === 'light';
-  const vigAmt = isLightTheme ? 0.12 : 0.45;
-  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,`rgba(0,0,0,${vigAmt})`);
-  ctx.fillStyle = vg; ctx.fillRect(0,0,bw,bh);
-  _woodCanvas = wc; return wc;
-}
-
-function pauseGame() {
-  if (isPaused) return;
-  isPaused = true;
-  // Freeze timer — record elapsed ms up to this moment
-  pausedElapsed = Date.now() - startTime;
-  clearInterval(timerInterval);
-  if (window._saveInterval) clearInterval(window._saveInterval);
-  // Drop any active drag
-  drag = null; selState = null;
-  // Auto-save on pause
-  autoSave();
-  dismissWellness(); // hide toast — pause overlay takes over the screen
-  // Show pause overlay
-  document.getElementById('pause-time-disp').textContent = fmtTime(Math.floor(pausedElapsed / 1000));
-  document.getElementById('pause-overlay').classList.add('show');
-  document.getElementById('pause-btn').textContent = '▶';
-  document.getElementById('pause-btn').title = 'Resume';
-  document.getElementById('pause-btn').onclick = resumeGame;
-}
-
-function resumeGame() {
-  if (!isPaused) return;
-  isPaused = false;
-  // Shift startTime forward so elapsed stays correct
-  startTime = Date.now() - pausedElapsed;
-  // Restart timers
-  timerInterval = setInterval(() => {
-    document.getElementById('timer-disp').textContent = fmtTime(Math.floor((Date.now() - startTime) / 1000));
-  }, 500);
-  window._saveInterval = setInterval(autoSave, 30000);
-  document.getElementById('pause-overlay').classList.remove('show');
-  document.getElementById('pause-btn').textContent = '⏸';
-  document.getElementById('pause-btn').title = 'Pause';
-  document.getElementById('pause-btn').onclick = pauseGame;
-  renderAll();
-}
-
-// ═══════════════════════════════════════════════
-//  HINT & GHOST MODE
-// ═══════════════════════════════════════════════
-function useHint() {
-  if (isPaused || hintsLeft <= 0) return;
-
-  // ── Pick the best piece ──
-  // Priority: lastTouched > a corner piece > an edge piece > any unplaced piece
-  let target = null;
-  if (lastTouchedPiece && !lastTouchedPiece.placed) {
-    target = lastTouchedPiece;
-  } else {
-    // Pick strategically — corner first, then edge, then any
-    const unplaced = pieces.filter(p => !p.placed);
-    const isCorner = p => (p.col === 0 || p.col === cols - 1) && (p.row === 0 || p.row === rows - 1);
-    const isEdge   = p => p.col === 0 || p.col === cols - 1 || p.row === 0 || p.row === rows - 1;
-    target = unplaced.find(isCorner) || unplaced.find(isEdge) || unplaced[0] || null;
-  }
-  if (!target) return;
-
-  hintsLeft--;
-  hintPiece = target;
-  hintExpiry = performance.now() + 4500; // longer so player can find both locations
-  updateHintGhostUI();
-
-  // ── Pan/zoom so both piece and target are visible ──
-  _panToShowHint(target);
-
-  // Animate
-  const animHint = () => {
-    if (performance.now() < hintExpiry) { renderAll(); requestAnimationFrame(animHint); }
-    else { hintPiece = null; hintExpiry = 0; renderAll(); }
-  };
-  requestAnimationFrame(animHint);
-
-  _showFeatureToast(
-    hintsLeft === 0
-      ? `Last hint — piece and target are highlighted! 💪`
-      : `Piece + target highlighted · ${hintsLeft} remaining`
-  );
-}
-
-// Pan/zoom so the hinted piece AND its target slot are both visible
-function _panToShowHint(p) {
-  if (!window._asm) return;
-  const { sPW, sPH } = window._asm;
-  // Both locations in world coords
-  const px = p.x + sPW / 2, py = p.y + sPH / 2;         // piece centre
-  const tx = p.targetX + sPW / 2, ty = p.targetY + sPH / 2; // target centre
-  // Centre of the two points
-  const cx = (px + tx) / 2, cy = (py + ty) / 2;
-  // Required view extent to fit both with padding
-  const spread = Math.max(Math.abs(px - tx), Math.abs(py - ty)) + sPW * 2;
-  const neededZoom = Math.min(CW / spread, CH / spread, zoom, 1.5);
-  const newZoom = Math.max(0.35, neededZoom);
-  // Pan so centre point lands at canvas centre
-  panX = CW / 2 - cx * newZoom;
-  panY = CH / 2 - cy * newZoom;
-  zoom = newZoom;
-  clampPan();
-}
-
-function useGhost() {
-  if (isPaused) return;
-  // Toggle: if ghost is active, turn it off; otherwise turn it on persistently
-  if (ghostExpiry === Infinity) {
-    ghostExpiry = 0;
-    if (ghostRAF) { cancelAnimationFrame(ghostRAF); ghostRAF = null; }
-    document.getElementById('ghost-btn').classList.remove('ghost-on');
-    renderAll();
-    _showFeatureToast('Ghost off');
-  } else {
-    ghostExpiry = Infinity; // stays on until toggled off
-    document.getElementById('ghost-btn').classList.add('ghost-on');
-    _showFeatureToast('Ghost on — tap 👁 again to hide');
-    if (ghostRAF) cancelAnimationFrame(ghostRAF);
-    const animGhost = () => {
-      if (ghostExpiry === Infinity) { renderAll(); ghostRAF = requestAnimationFrame(animGhost); }
-      else { ghostRAF = null; }
-    };
-    ghostRAF = requestAnimationFrame(animGhost);
-  }
-}
-
-function updateHintGhostUI() {
-  const hBtn = document.getElementById('hint-btn');
-  const gBtn = document.getElementById('ghost-btn');
-  const hCount = document.getElementById('hint-count');
-  if (hBtn) {
-    hCount.textContent = `×${hintsLeft}`;
-    hBtn.classList.toggle('depleted', hintsLeft <= 0);
-    hBtn.title = hintsLeft > 0 ? `Hint — shows where a piece belongs (${hintsLeft} left)` : 'No hints remaining';
-  }
-  if (gBtn) {
-    gBtn.classList.remove('depleted');
-    gBtn.title = 'Ghost — overlays the full image for 4s (unlimited)';
-  }
-}
-
-function resetHintGhost() {
-  hintsLeft = HINT_MAX;
-  hintPiece = null; hintExpiry = 0; ghostExpiry = 0;
-  lastTouchedPiece = null;
-  if (ghostRAF) { cancelAnimationFrame(ghostRAF); ghostRAF = null; }
-  const gBtn = document.getElementById('ghost-btn');
-  if (gBtn) gBtn.classList.remove('ghost-on');
-  updateHintGhostUI();
-}
-
-// Tiny transient toast for feature feedback (separate from wellness toast)
-let _ftTimeout = null;
-function _showFeatureToast(msg) {
-  let ft = document.getElementById('feature-toast');
-  if (!ft) {
-    ft = document.createElement('div');
-    ft.id = 'feature-toast';
-    ft.style.cssText = `position:fixed;bottom:calc(var(--bar-h) + 14px);right:1rem;z-index:190;
-      background:var(--surface);border:1px solid var(--border-bright);border-radius:8px;
-      padding:.45rem .85rem;font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.06em;
-      color:var(--gold-light);opacity:0;transition:opacity .25s;pointer-events:none;
-      max-width:min(90vw,300px);text-align:right;`;
-    document.body.appendChild(ft);
-  }
-  ft.textContent = msg;
-  ft.style.opacity = '1';
-  clearTimeout(_ftTimeout);
-  _ftTimeout = setTimeout(() => { ft.style.opacity = '0'; }, 3000);
-}
-
-// ═══════════════════════════════════════════════
-//  WELLNESS REMINDERS — hourly nudges
-// ═══════════════════════════════════════════════
-const _wellness = {
-  interval: null,
-  tick: 0,   // increments each hour; alternates water/grass
-
-  water: [
-    { icon:'💧', title:'Hydration check', msg:'Ayo would pause to drink. The chisel stays sharp when the hand is steady.', sub:'One hour in — grab some water.' },
-    { icon:'🫗', title:'Drink up', msg:'The great carvers of Ise knew: dry hands crack wood. Dry throats crack focus.', sub:'Another hour gone. Water first, puzzle second.' },
-    { icon:'💦', title:'From the workshop', msg:'No craftsman worth his tools skips water. Not even you, master puzzler.', sub:'You\'ve been at this a while — hydrate.' },
-    { icon:'🌊', title:'A gentle word', msg:'The River Niger did not carve the valley in one sitting. Neither will you. Drink something.', sub:'Hourly reminder from someone who cares.' },
-    { icon:'☕', title:'Refresh yourself', msg:'Tea, water, a cold drink — whatever moves you. The puzzle will hold its shape, we promise.', sub:'Time check: you\'ve earned a sip.' },
-  ],
-
-  grass: [
-    { icon:'🌿', title:'Touch grass (literally)', msg:'The forest gave Olowe his wood. Step outside and honour that. Five minutes. Go.', sub:'You\'ve been indoors with this puzzle for an hour.' },
-    { icon:'🌤', title:'Sun check', msg:'There is a whole sky out there. It is not going anywhere. Neither is this puzzle.', sub:'Step out, breathe, come back stronger.' },
-    { icon:'🦋', title:'A short walk', msg:'The Yoruba say the traveller who does not rest misses the most beautiful baobab. Stand up.', sub:'Stretch your legs — your pieces will wait.' },
-    { icon:'🌳', title:'From the carver\'s bench', msg:'Even the most stubborn knot in iroko wood yields to a rested hand. Go rest yours.', sub:'Outside for five minutes. Doctor\'s orders (ours).' },
-    { icon:'🐦', title:'Bird check', msg:'How many birds have sung past your window while you\'ve been here? Go find out.', sub:'Hourly wellness — you deserve a breath of air.' },
-  ],
-
-  show() {
-    if (isPaused || document.getElementById('win-screen').classList.contains('show')) return;
-    const pool = this.tick % 2 === 0 ? this.water : this.grass;
-    const msg = pool[Math.floor(this.tick / 2) % pool.length];
-    this.tick++;
-    document.getElementById('wt-icon').textContent = msg.icon;
-    document.getElementById('wt-title').textContent = msg.title;
-    document.getElementById('wt-msg').textContent = msg.msg;
-    document.getElementById('wt-sub').textContent = msg.sub;
-    const toast = document.getElementById('wellness-toast');
-    toast.classList.add('show');
-    // Auto-dismiss after 18 seconds if not manually closed
-    clearTimeout(this._autoHide);
-    this._autoHide = setTimeout(() => dismissWellness(), 18000);
-  },
-
-  start() {
-    this.stop();
-    this.tick = 0;
-    this.interval = setInterval(() => this.show(), 60 * 60 * 1000); // every hour
-  },
-
-  stop() {
-    clearInterval(this.interval);
-    clearTimeout(this._autoHide);
-    this.interval = null;
-    dismissWellness();
-  }
-};
-
-function dismissWellness() {
-  const toast = document.getElementById('wellness-toast');
-  toast.classList.remove('show');
-}
-
-// ═══════════════════════════════════════════════
-//  LEADERBOARD — grouped by difficulty
-// ═══════════════════════════════════════════════
-
-// Difficulty tiers — label and approximate piece count ranges
-
-async function fetchLeaderboard(){
-  if(!challenge) return;
-  const list=document.getElementById('lb-list');
-  list.innerHTML='<p class="lb-empty">Loading…</p>';
-  try {
-    const res=await fetch(`${API}/leaderboard/${challenge.id}`);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const scores=await res.json();
-    if(!Array.isArray(scores)||!scores.length){
-      list.innerHTML='<p class="lb-empty">No scores yet — be the first!</p>';
-      return;
-    }
-    renderLeaderboard(scores);
-  } catch(err) {
-    console.error('Leaderboard fetch error:', err);
-    list.innerHTML='<p class="lb-empty">Could not load scores</p>';
-  }
-}
-
-function renderLeaderboard(scores) {
-  const list = document.getElementById('lb-list');
-  // Use the challenge's own piece_count for tier labelling
-  // (scores from the API may not carry piece_count)
-  const pc = (challenge && challenge.piece_count) ? challenge.piece_count : totalPieces;
-  const tier = diffTierForCount(pc);
-
-  const medals = ['🥇','🥈','🥉'];
-  const top10 = scores.slice(0, 10);
-
-  const header = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)">
-      <span style="font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.12em;color:var(--gold);text-transform:uppercase">${tier.label}</span>
-      <span style="font-family:'Cinzel',serif;font-size:.55rem;color:var(--text-muted)">~${pc}pc</span>
-    </div>`;
-
-  const rows = top10.map((s, i) => {
-    const av = s.avatar_url
-      ? `<span class="lb-avatar-sm"><img src="${esc(s.avatar_url)}" alt="" loading="lazy"></span>`
-      : `<span class="lb-avatar-sm">👤</span>`;
-    return `<div class="lb-row">
-      <span class="lb-rank ${i<3?'top':''}">${medals[i]||(i+1)+'.'}</span>
-      ${av}
-      <span class="lb-name">${esc(s.player_name)}</span>
-      <span class="lb-time">${fmtTime(s.time_seconds)}</span>
-    </div>`;
-  }).join('');
-
-  list.innerHTML = header + rows;
-}
-
-
-function toggleLeaderboard(){
-  const panel=document.getElementById('lb-panel');
-  const open=panel.classList.toggle('open');
-  if(open) fetchLeaderboard();
-}
-
-// ═══════════════════════════════════════════════
-//  ADMIN
-// ═══════════════════════════════════════════════
-function showAdminLogin(){
-  hideAll(); show('admin-login');
-  setTimeout(()=>document.getElementById('admin-pass').focus(),100);
-}
-
-async function doAdminLogin(){
-  const pw=document.getElementById('admin-pass').value;
-  const errEl=document.getElementById('login-err');
-  errEl.style.display='none';
-  try {
-    const res=await fetch(`${API}/admin/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
-    if(!res.ok) throw new Error();
-    const data=await res.json();
-    adminToken=data.token;
-    hideAll(); show('admin-screen');
-    prefillWeekly();
-    fetchAdminChallenges();
-    wpInitAdmin();
-  } catch { errEl.textContent='Incorrect password'; errEl.style.display='block'; }
-}
-
-document.getElementById('admin-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doAdminLogin()});
-
-function cancelAdmin(){hideAll();show('loading-screen');boot()}
-function adminLogout(){adminToken=null;hideAll();show('loading-screen');boot()}
-
-// ── WALLET ADDRESS VIEWER ──
-let _walletData = [];
-
-async function fetchWallets() {
-  const listEl = document.getElementById('wallets-list');
-  const filterId = document.getElementById('wallet-challenge-filter').value;
-  listEl.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem">Loading…</p>';
-  try {
-    const url = filterId
-      ? `${API}/admin/wallets?challenge_id=${encodeURIComponent(filterId)}`
-      : `${API}/admin/wallets`;
-    const res = await fetch(url, { headers: { 'x-admin-token': adminToken } });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    _walletData = await res.json();
-    renderWallets(_walletData);
-  } catch(e) {
-    listEl.innerHTML = `<p style="color:#e07070;font-size:.85rem">Failed to load: ${esc(e.message)}</p>`;
-  }
-}
-
-function renderWallets(data) {
-  const listEl = document.getElementById('wallets-list');
-  if (!data.length) {
-    listEl.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem">No wallet addresses submitted yet.</p>';
-    return;
-  }
-  const rows = data.map((s, i) => `
-    <tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:.45rem .6rem;font-size:.78rem;color:var(--text-muted)">${i+1}</td>
-      <td style="padding:.45rem .6rem;font-size:.82rem;font-family:'Cinzel',serif;color:var(--gold-light)">${esc(s.player_name)}</td>
-      <td style="padding:.45rem .6rem;font-size:.75rem;color:var(--text);font-family:monospace;word-break:break-all">${s.wallet_address ? esc(s.wallet_address) : '<span style="color:var(--text-muted);font-style:italic">—</span>'}</td>
-      <td style="padding:.45rem .6rem;font-size:.75rem;color:var(--text-muted)">${esc(s.challenge_title||'')}</td>
-      <td style="padding:.45rem .6rem;font-size:.75rem;color:var(--text-muted)">${fmtTime(s.time_seconds)}</td>
-      <td style="padding:.45rem .6rem;font-size:.72rem;color:var(--text-muted)">${s.created_at ? new Date(s.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : ''}</td>
-    </tr>`).join('');
-  listEl.innerHTML = `
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr style="border-bottom:1px solid var(--border-bright)">
-            <th style="padding:.4rem .6rem;font-size:.65rem;letter-spacing:.1em;color:var(--text-muted);font-family:'Cinzel',serif;text-align:left">#</th>
-            <th style="padding:.4rem .6rem;font-size:.65rem;letter-spacing:.1em;color:var(--text-muted);font-family:'Cinzel',serif;text-align:left">Player</th>
-            <th style="padding:.4rem .6rem;font-size:.65rem;letter-spacing:.1em;color:var(--text-muted);font-family:'Cinzel',serif;text-align:left">Wallet Address</th>
-            <th style="padding:.4rem .6rem;font-size:.65rem;letter-spacing:.1em;color:var(--text-muted);font-family:'Cinzel',serif;text-align:left">Challenge</th>
-            <th style="padding:.4rem .6rem;font-size:.65rem;letter-spacing:.1em;color:var(--text-muted);font-family:'Cinzel',serif;text-align:left">Time</th>
-            <th style="padding:.4rem .6rem;font-size:.65rem;letter-spacing:.1em;color:var(--text-muted);font-family:'Cinzel',serif;text-align:left">Date</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-    <p style="margin-top:.6rem;font-size:.72rem;color:var(--text-muted)">${data.length} record${data.length!==1?'s':''} · only players who provided a wallet address are shown</p>`;
-}
-
-function exportWalletsCSV() {
-  if (!_walletData.length) { alert('No data to export. Click Refresh first.'); return; }
-  const header = ['#','Player Name','Wallet Address','Challenge','Time (s)','Date'];
-  const rows = _walletData.map((s, i) => [
-    i+1,
-    `"${(s.player_name||'').replace(/"/g,'""')}"`,
-    `"${(s.wallet_address||'').replace(/"/g,'""')}"`,
-    `"${(s.challenge_title||'').replace(/"/g,'""')}"`,
-    s.time_seconds,
-    s.created_at ? new Date(s.created_at).toISOString().slice(0,10) : ''
-  ]);
-  const csv = [header, ...rows].map(r => r.join(',')).join('\n');
-  const blob = new Blob([csv], {type:'text/csv'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download='apoti-wallets.csv';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-// Populate challenge filter dropdown in wallet panel
-function _populateWalletFilter(challenges) {
-  const sel = document.getElementById('wallet-challenge-filter');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">— All Challenges —</option>';
-  challenges.forEach(ch => {
-    const opt = document.createElement('option');
-    opt.value = ch.id; opt.textContent = ch.title;
-    sel.appendChild(opt);
-  });
-}
-
-async function fetchAdminChallenges(){
-  const list=document.getElementById('challenges-list');
-  try {
-    const res=await fetch(`${API}/admin/challenges`,{headers:{'x-admin-token':adminToken}});
-    const data=await res.json();
-    if(!data.length){list.innerHTML='<p style="color:var(--text-muted);font-size:.85rem">No challenges yet.</p>';return}
-    _populateWalletFilter(data);
-    const now=new Date();
-    list.innerHTML=data.map(ch=>{
-      const s=new Date(ch.starts_at), e=new Date(ch.ends_at);
-      const status=now<s?'upcoming':now>e?'expired':'active';
-      const endsLocal=toLocal(e);
-      return `<div class="challenge-row" id="crow-${ch.id}">
-        <div class="ch-status ${status}"></div>
-        <div class="ch-info" style="flex:1;min-width:0">
-          <div class="ch-title">${esc(ch.title)}</div>
-          <div class="ch-dates">${fmtDate(s)} → ${fmtDate(e)} · ${ch.piece_count} pieces · <span style="color:var(--gold-light)">${status}</span></div>
-          <!-- Edit row — hidden until Extend or Rename clicked -->
-          <div id="extend-${ch.id}" style="display:none;margin-top:.6rem;flex-direction:column;gap:.45rem">
-            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-              <span style="font-size:.68rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.05em;white-space:nowrap">Title:</span>
-              <input type="text" id="extend-title-${ch.id}" value="${esc(ch.title)}" maxlength="80"
-                style="font-size:.78rem;padding:.32rem .6rem;flex:1;min-width:180px">
-            </div>
-            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-              <span style="font-size:.68rem;color:var(--text-muted);font-family:'Cinzel',serif;letter-spacing:.05em;white-space:nowrap">End date:</span>
-              <input type="datetime-local" id="extend-dt-${ch.id}" value="${endsLocal}"
-                style="font-size:.72rem;padding:.32rem .6rem;flex:1;min-width:180px">
-            </div>
-            <div style="display:flex;gap:.4rem;align-items:center">
-              <button class="btn btn-sm btn-solid" onclick="confirmExtend('${ch.id}')">Save</button>
-              <button class="btn btn-sm" onclick="cancelExtend('${ch.id}')">Cancel</button>
-              <span id="extend-msg-${ch.id}" style="font-size:.72rem;margin-left:.1rem"></span>
-            </div>
-          </div>
-        </div>
-        <div style="display:flex;gap:.4rem;flex-shrink:0">
-          <button class="btn btn-sm" onclick="showExtend('${ch.id}')">Edit</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteChallenge('${ch.id}')">Delete</button>
-        </div>
-      </div>`;
-    }).join('');
-  } catch { list.innerHTML='<p style="color:var(--text-muted)">Failed to load.</p>'; }
-}
-
-function showExtend(id) {
-  const row = document.getElementById(`extend-${id}`);
-  if (!row) return;
-  row.style.display = 'flex';
-  document.getElementById(`extend-dt-${id}`)?.focus();
-}
-
-function cancelExtend(id) {
-  const row = document.getElementById(`extend-${id}`);
-  if (row) row.style.display = 'none';
-}
-
-async function confirmExtend(id) {
-  const newEnd   = document.getElementById(`extend-dt-${id}`)?.value;
-  const newTitle = document.getElementById(`extend-title-${id}`)?.value.trim();
-  const msgEl    = document.getElementById(`extend-msg-${id}`);
-
-  if (!newTitle) { if(msgEl){msgEl.textContent='Title cannot be empty.';msgEl.style.color='#e07070'} return; }
-  if (!newEnd)   { if(msgEl){msgEl.textContent='Pick a date first.';msgEl.style.color='#e07070'} return; }
-  if (new Date(newEnd) <= new Date()) {
-    if(msgEl){msgEl.textContent='End date must be in the future.';msgEl.style.color='#e07070'} return;
-  }
-
-  if(msgEl){msgEl.textContent='Saving…';msgEl.style.color='var(--text-muted)'}
-  try {
-    const res = await fetch(`${API}/admin/challenge`,{
-      method:'PATCH',
-      headers:{'Content-Type':'application/json','x-admin-token':adminToken},
-      body:JSON.stringify({id, title: newTitle, ends_at: new Date(newEnd).toISOString()})
-    });
-    if(!res.ok) throw new Error((await res.json()).error||'Failed');
-    if(msgEl){msgEl.textContent='✓ Saved!';msgEl.style.color='#6abf6a'}
-    setTimeout(()=>{ fetchAdminChallenges(); }, 900);
-  } catch(e) {
-    if(msgEl){msgEl.textContent=e.message;msgEl.style.color='#e07070'}
-  }
-}
-
-async function deleteChallenge(id){
-  if(!confirm('Delete this challenge? All scores will be removed too.')) return;
-  await fetch(`${API}/admin/challenge/${id}`,{method:'DELETE',headers:{'x-admin-token':adminToken}});
-  fetchAdminChallenges();
-}
-
-async function createChallenge(){
-  const msgEl=document.getElementById('create-msg');
-  const title=document.getElementById('ch-title').value.trim();
-  const starts=document.getElementById('ch-starts').value;
-  const ends=document.getElementById('ch-ends').value;
-  const pieces=document.getElementById('ch-pieces').value;
-  const imageUrl=document.getElementById('ch-image-url').value;
-
-  msgEl.className='admin-msg'; msgEl.style.display='none';
-  if(!title||!starts||!ends||!imageUrl){
-    msgEl.textContent='Please fill all fields and upload an image.';
-    msgEl.className='admin-msg err'; return;
-  }
-  try {
-    const res=await fetch(`${API}/admin/challenge`,{
-      method:'POST',headers:{'Content-Type':'application/json','x-admin-token':adminToken},
-      body:JSON.stringify({title,starts_at:starts,ends_at:ends,piece_count:parseInt(pieces),image_url:imageUrl})
-    });
-    if(!res.ok) throw new Error((await res.json()).error);
-    msgEl.textContent='Challenge published successfully!';
-    msgEl.className='admin-msg ok';
-    // reset form
-    document.getElementById('ch-title').value='';
-    document.getElementById('ch-image-url').value='';
-    document.getElementById('admin-preview').style.display='none';
-    adminImageUrl=null;
-    fetchAdminChallenges();
-  } catch(e) {
-    msgEl.textContent='Error: '+e.message;
-    msgEl.className='admin-msg err';
-  }
-}
-
-function prefillWeekly(){
-  const now=new Date();
-  const start=new Date(now);
-  start.setHours(9,0,0,0);
-  if(start<=now) start.setDate(start.getDate()+1);
-  const end=new Date(start); end.setDate(end.getDate()+7);
-  document.getElementById('ch-starts').value=toLocal(start);
-  document.getElementById('ch-ends').value=toLocal(end);
-}
-
-function toLocal(d){
-  const pad=n=>String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-// Admin image upload
-const adminDrop=document.getElementById('admin-drop-zone');
-const adminFileInput=document.getElementById('admin-file-input');
-adminDrop.addEventListener('click',()=>adminFileInput.click());
-adminDrop.addEventListener('dragover',e=>{e.preventDefault();adminDrop.classList.add('drag')});
-adminDrop.addEventListener('dragleave',()=>adminDrop.classList.remove('drag'));
-adminDrop.addEventListener('drop',e=>{e.preventDefault();adminDrop.classList.remove('drag');handleAdminFile(e.dataTransfer.files[0])});
-adminFileInput.addEventListener('change',e=>handleAdminFile(e.target.files[0]));
-
-async function handleAdminFile(file){
-  if(!file||!file.type.startsWith('image/')) return;
-  const prev=document.getElementById('admin-preview');
-  const prog=document.getElementById('upload-progress');
-  prog.style.display='block';
-  const reader=new FileReader();
-  reader.onload=async ev=>{
-    prev.src=ev.target.result; prev.style.display='block';
-    const base64=ev.target.result.split(',')[1];
-    try {
-      const res=await fetch(`${API}/admin/upload-image`,{
-        method:'POST',headers:{'Content-Type':'application/json','x-admin-token':adminToken},
-        body:JSON.stringify({filename:file.name,base64,mime_type:file.type})
-      });
-      if(!res.ok) throw new Error((await res.json()).error);
-      const data=await res.json();
-      document.getElementById('ch-image-url').value=data.url;
-      adminImageUrl=data.url;
-      prog.textContent='Image uploaded ✓';
-    } catch(e) { prog.textContent='Upload failed: '+e.message; prog.style.color='#e07070'; }
-  };
-  reader.readAsDataURL(file);
-}
-
-// ═══════════════════════════════════════════════
-//  WINNER ANNOUNCEMENT PANEL
-// ═══════════════════════════════════════════════
-
-const WP_KEY = 'apoti_winner_panel';
-const WP_GREETING_KEY = 'apoti_wp_greeted'; // tracks if player already saw greeting this session
-
-const WP_DEFAULT_STEPS = [
-  'Confirm your wallet address is saved in your profile — click your name badge to check.',
-  'Your trophy NFT will be sent directly to your registered wallet address. No action needed if your wallet is already saved.',
-  'ETH prizes are distributed within 48 hours of the challenge closing. Check your wallet on the network used for the challenge.',
-  'New to wallets? Contact us via the Kaysworks series page for assistance setting up your first wallet.',
-];
-
-function wpLoad() {
-  try { return JSON.parse(localStorage.getItem(WP_KEY) || 'null'); } catch { return null; }
-}
-function wpSave(state) {
-  try { localStorage.setItem(WP_KEY, JSON.stringify(state)); } catch {}
-}
-
-// ── RANK HELPERS ──
-function wpRankDisplay(rank) {
-  if (rank === 1) return { icon: '🥇', cls: 'wp-rank-1', medal: '🥇', rankCls: 'rank-gold',   label: '1st Place — Gold' };
-  if (rank === 2) return { icon: '🥈', cls: 'wp-rank-2', medal: '🥈', rankCls: 'rank-silver', label: '2nd Place — Silver' };
-  if (rank === 3) return { icon: '🥉', cls: 'wp-rank-3', medal: '🥉', rankCls: 'rank-bronze', label: '3rd Place — Bronze' };
-  return { icon: `#${rank}`, cls: 'wp-rank-other', medal: '🏅', rankCls: 'rank-other', label: `#${rank} Place` };
-}
-
-function wpBadgeClass(rank) {
-  if (rank === 1) return 'badge-winner-gold';
-  if (rank === 2) return 'badge-winner-silver';
-  if (rank === 3) return 'badge-winner-bronze';
-  return '';
-}
-
-// ── RENDER PLAYER-FACING PANEL ──
-function wpRenderPanel(state) {
-  if (!state || !state.visible) return;
-
-  document.getElementById('wp-heading').textContent = 'Weekly Winners';
-  document.getElementById('wp-challenge-label').textContent = state.challengeLabel || 'Puzzle Challenge — Results';
-
-  // Custom message
-  const msgEl = document.getElementById('wp-admin-message');
-  if (state.customMessage) {
-    msgEl.textContent = state.customMessage;
-    msgEl.style.display = 'block';
-  } else {
-    msgEl.style.display = 'none';
-  }
-
-  // Winners list with medal themes
-  const listEl = document.getElementById('wp-winners-list');
-  const winners = state.winners || [];
-  if (!winners.length) {
-    listEl.innerHTML = '<li style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:.5rem 0">Results will appear here once announced.</li>';
-  } else {
-    listEl.innerHTML = winners.map((w, i) => {
-      const rd = wpRankDisplay(i + 1);
-      const shortWallet = w.wallet
-        ? (w.wallet.length > 16 ? w.wallet.slice(0,8) + '…' + w.wallet.slice(-6) : w.wallet)
-        : '';
-      const rankBorderMap = { 'rank-gold':'rgba(255,215,0,.35)', 'rank-silver':'rgba(192,192,192,.25)', 'rank-bronze':'rgba(205,127,50,.3)' };
-      const rankBorder = rankBorderMap[rd.rankCls] || 'var(--border)';
-      const rankGlow   = { 'rank-gold':'rgba(255,215,0,.08)', 'rank-silver':'rgba(192,192,192,.06)', 'rank-bronze':'rgba(205,127,50,.07)' }[rd.rankCls] || '';
-      return `<li class="wp-winner-item" style="${rankGlow?`background:${rankGlow};`:''} border-color:${rankBorder}">
-        <div class="wp-rank ${rd.cls}">${rd.icon}</div>
-        <div class="wp-winner-info">
-          <div class="wp-winner-name">${esc(w.name || 'Player')}</div>
-          ${w.time ? `<div class="wp-winner-time">⏱ ${esc(w.time)}</div>` : ''}
-          ${shortWallet ? `<div class="wp-winner-wallet">🔑 ${esc(shortWallet)}</div>` : ''}
-        </div>
-        ${w.prize ? `<div class="wp-prize">${esc(w.prize)}</div>` : ''}
-      </li>`;
-    }).join('');
-  }
-
-  // Reward instructions (from saved steps or defaults)
-  const rewardBox = document.getElementById('wp-reward-box');
-  rewardBox.style.display = state.showInstructions !== false ? 'block' : 'none';
-  if (state.showInstructions !== false) {
-    const steps = (state.instructionSteps && state.instructionSteps.length)
-      ? state.instructionSteps
-      : WP_DEFAULT_STEPS;
-    document.getElementById('wp-reward-steps-list').innerHTML =
-      steps.map((s, i) =>
-        `<li><span class="wp-step-num">${i+1}</span><span>${esc(s)}</span></li>`
-      ).join('');
-  }
-
-  // Show floating trophy button
-  document.getElementById('winner-panel-btn').style.display = 'flex';
-
-  // Apply medal theme to badge if current player is a winner
-  wpApplyBadgeTheme(state);
-
-  // Show greeting if player is a winner and hasn't been greeted yet this session
-  wpMaybeGreetWinner(state);
-}
-
-// ── BADGE MEDAL THEME ──
-function wpApplyBadgeTheme(state) {
-  const badgeCard = document.querySelector('.player-badge-card');
-  if (!badgeCard) return;
-
-  // Clear any existing winner classes
-  badgeCard.classList.remove('badge-winner-gold','badge-winner-silver','badge-winner-bronze');
-  const existingCrown = badgeCard.querySelector('.badge-winner-crown');
-  if (existingCrown) existingCrown.remove();
-
-  const winners = state ? (state.winners || []) : [];
-  const rank = winners.findIndex(w =>
-    w.name && playerName && w.name.trim().toLowerCase() === playerName.trim().toLowerCase()
-  );
-  if (rank === -1) return;
-
-  const cls = wpBadgeClass(rank + 1);
-  if (cls) {
-    badgeCard.classList.add(cls);
-    // Add crown icon above avatar
-    const avatarEl = document.getElementById('badge-avatar');
-    if (avatarEl) {
-      const crown = document.createElement('span');
-      crown.className = 'badge-winner-crown';
-      const crowns = ['👑','🥈','🥉'];
-      crown.textContent = crowns[rank] || '🏅';
-      avatarEl.style.position = 'relative';
-      avatarEl.appendChild(crown);
-    }
-  }
-}
-
-// ── WINNER GREETING MODAL ──
-function wpMaybeGreetWinner(state) {
-  if (!state || !state.winners || !playerName) return;
-  // Only show once per session per announcement
-  const greetedKey = WP_GREETING_KEY + '_' + (state.challengeLabel || '');
-  if (sessionStorage.getItem(greetedKey)) return;
-
-  const rank = state.winners.findIndex(w =>
-    w.name && playerName && w.name.trim().toLowerCase() === playerName.trim().toLowerCase()
-  );
-  if (rank === -1) return;
-
-  const winner = state.winners[rank];
-  const rd = wpRankDisplay(rank + 1);
-
-  // Mark as greeted
-  sessionStorage.setItem(greetedKey, '1');
-
-  // Populate modal
-  const inner = document.getElementById('winner-greeting-inner');
-  inner.className = rd.rankCls;
-
-  document.getElementById('wg-medal').textContent = rd.medal;
-  const nameEl = document.getElementById('wg-name');
-  nameEl.textContent = winner.name || playerName;
-  nameEl.className = `wg-name ${rd.rankCls}`;
-
-  const rankLbl = document.getElementById('wg-rank-label');
-  rankLbl.textContent = rd.label;
-  rankLbl.className = `wg-rank-label ${rd.rankCls}`;
-
-  // Personal message (find from personalMessages array)
-  const personalMsgs = state.personalMessages || [];
-  const pm = personalMsgs.find(m =>
-    m.name && winner.name && m.name.trim().toLowerCase() === winner.name.trim().toLowerCase()
-  );
-  const pmEl = document.getElementById('wg-personal-msg');
-  if (pm && pm.message) {
-    pmEl.textContent = pm.message;
-    pmEl.className = `wg-personal-msg ${rd.rankCls}`;
-    pmEl.style.display = 'block';
-  } else {
-    pmEl.style.display = 'none';
-  }
-
-  // Prize chip
-  const prizeEl = document.getElementById('wg-prize-chip');
-  if (winner.prize) {
-    prizeEl.textContent = winner.prize;
-    prizeEl.className = `wg-prize-chip ${rd.rankCls}`;
-    prizeEl.style.display = 'inline-block';
-  } else {
-    prizeEl.style.display = 'none';
-  }
-
-  // Confetti
-  _spawnConfetti(inner, rd.rankCls);
-
-  // Show after a brief delay so entry screen has settled
-  setTimeout(() => {
-    document.getElementById('winner-greeting-modal').classList.add('show');
-  }, 800);
-}
-
-function _spawnConfetti(container, rankCls) {
-  const colors = {
-    'rank-gold':   ['#FFD700','#FFF176','#F0A500','#FFFDE7'],
-    'rank-silver': ['#C0C0C0','#E8E8E8','#A0A0A0','#F5F5F5'],
-    'rank-bronze': ['#CD7F32','#E8A060','#A05828','#F0C090'],
-  }[rankCls] || ['#c9963a','#e8b85c','#f5e4b8'];
-
-  // Remove old confetti
-  container.querySelectorAll('.wg-confetti-piece').forEach(e => e.remove());
-
-  for (let i = 0; i < 28; i++) {
-    const piece = document.createElement('div');
-    piece.className = 'wg-confetti-piece';
-    piece.style.cssText = `
-      left:${Math.random()*100}%;
-      top:${Math.random()*30}%;
-      background:${colors[Math.floor(Math.random()*colors.length)]};
-      animation-delay:${Math.random()*0.8}s;
-      animation-duration:${1.4 + Math.random()*0.8}s;
-      transform:rotate(${Math.random()*360}deg);
-      width:${5+Math.random()*5}px;
-      height:${5+Math.random()*5}px;
-    `;
-    container.appendChild(piece);
-  }
-}
-
-function closeWinnerGreeting() {
-  document.getElementById('winner-greeting-modal').classList.remove('show');
-}
-
-function openWinnerPanel() {
-  document.getElementById('winner-panel').classList.add('show');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeWinnerPanel() {
-  document.getElementById('winner-panel').classList.remove('show');
-  document.body.style.overflow = '';
-}
-
-function wpCheck() {
-  const state = wpLoad();
-  if (state && state.visible) wpRenderPanel(state);
-}
-
-// ── ADMIN: winner rows ──
-function wpAddWinnerRow(winner = {}) {
-  const builder = document.getElementById('wp-winners-builder');
-  const idx = builder.children.length + 1;
-  const medalMap = {1:'🥇 ',2:'🥈 ',3:'🥉 '};
-  const medal = medalMap[idx] || `#${idx} `;
-  const div = document.createElement('div');
-  div.className = 'wp-winner-entry';
-  div.innerHTML = `
-    <span style="font-family:'Cinzel',serif;font-size:.8rem;width:28px;flex-shrink:0">${medal}</span>
-    <input type="text" placeholder="Player name" value="${esc(winner.name||'')}" class="wp-name-input" style="flex:2;min-width:110px">
-    <input type="text" placeholder="Time (e.g. 12:34)" value="${esc(winner.time||'')}" class="wp-time-input" style="flex:1;max-width:90px">
-    <input type="text" placeholder="Prize (e.g. 0.05 ETH + 🏆)" value="${esc(winner.prize||'')}" class="wp-prize-input" style="flex:1;min-width:120px">
-    <input type="text" placeholder="Wallet (optional)" value="${esc(winner.wallet||'')}" class="wp-wallet-input" style="flex:2;min-width:130px">
-    <button class="btn btn-sm btn-danger" onclick="this.parentElement.remove();wpRenumberRows()" title="Remove">✕</button>`;
-  builder.appendChild(div);
-}
-
-function wpRenumberRows() {
-  const medalMap = {0:'🥇 ',1:'🥈 ',2:'🥉 '};
-  document.querySelectorAll('#wp-winners-builder .wp-winner-entry').forEach((row, i) => {
-    const numEl = row.querySelector('span');
-    if (numEl) numEl.textContent = medalMap[i] || `#${i+1} `;
-  });
-}
-
-// ── ADMIN: instruction step rows ──
-function wpAddStepRow(text = '') {
-  const builder = document.getElementById('wp-steps-builder');
-  const div = document.createElement('div');
-  div.style.cssText = 'display:flex;gap:.4rem;align-items:center;margin-bottom:.4rem';
-  div.innerHTML = `
-    <span class="wp-step-num" style="flex-shrink:0">${builder.children.length + 1}</span>
-    <input type="text" value="${esc(text)}" placeholder="Instruction step…" style="flex:1;font-size:.78rem;padding:.38rem .65rem">
-    <button class="btn btn-sm btn-danger" style="padding:.3rem .55rem;font-size:.65rem" onclick="this.parentElement.remove();wpRenumberSteps()">✕</button>`;
-  builder.appendChild(div);
-}
-
-function wpRenumberSteps() {
-  document.querySelectorAll('#wp-steps-builder .wp-step-num').forEach((el, i) => {
-    el.textContent = i + 1;
-  });
-}
-
-// ── ADMIN: personal message rows ──
-function wpAddPersonalMsgRow(entry = {}) {
-  const builder = document.getElementById('wp-personal-msgs-builder');
-  const div = document.createElement('div');
-  div.style.cssText = 'display:flex;gap:.4rem;align-items:flex-start;margin-bottom:.5rem;flex-wrap:wrap';
-  div.innerHTML = `
-    <input type="text" value="${esc(entry.name||'')}" placeholder="Winner name (must match exactly)" style="flex:1;min-width:140px;font-size:.78rem;padding:.38rem .65rem">
-    <textarea placeholder="Personal message for this winner…" style="flex:2;min-width:200px;font-size:.78rem;padding:.38rem .65rem;min-height:58px;resize:vertical">${esc(entry.message||'')}</textarea>
-    <button class="btn btn-sm btn-danger" style="padding:.3rem .55rem;font-size:.65rem;margin-top:.1rem" onclick="this.parentElement.remove()">✕</button>`;
-  builder.appendChild(div);
-}
-
-function wpCollectState() {
-  const label     = document.getElementById('wp-admin-challenge-label').value.trim();
-  const msg       = document.getElementById('wp-admin-custom-message').value.trim();
-  const showInstr = document.getElementById('wp-show-instructions').checked;
-
-  // Winners
-  const winners = Array.from(document.querySelectorAll('#wp-winners-builder .wp-winner-entry')).map(row => ({
-    name:   row.querySelector('.wp-name-input')?.value.trim()  || '',
-    time:   row.querySelector('.wp-time-input')?.value.trim()  || '',
-    prize:  row.querySelector('.wp-prize-input')?.value.trim() || '',
-    wallet: row.querySelector('.wp-wallet-input')?.value.trim()|| '',
-  })).filter(w => w.name);
-
-  // Instruction steps
-  const instructionSteps = Array.from(document.querySelectorAll('#wp-steps-builder input[type=text]'))
-    .map(i => i.value.trim()).filter(Boolean);
-
-  // Personal messages
-  const personalMessages = Array.from(document.querySelectorAll('#wp-personal-msgs-builder > div')).map(row => ({
-    name:    row.querySelector('input[type=text]')?.value.trim()  || '',
-    message: row.querySelector('textarea')?.value.trim()          || '',
-  })).filter(m => m.name && m.message);
-
-  return { visible: true, challengeLabel: label, customMessage: msg,
-           showInstructions: showInstr, instructionSteps, winners, personalMessages };
-}
-
-function wpPublish() {
-  const state = wpCollectState();
-  if (!state.winners.length && !state.challengeLabel) {
-    document.getElementById('wp-admin-msg').innerHTML = '<span style="color:#e07070">Please add at least a challenge label or one winner before publishing.</span>';
-    return;
-  }
-  wpSave(state);
-  wpRenderPanel(state);
-  _wpUpdateAdminBadge(true);
-  document.getElementById('wp-admin-msg').innerHTML = '<span style="color:#6abf6a">✓ Winners panel is LIVE — the 🏆 button is now visible. Winners will see their medal greeting on next login.</span>';
-  setTimeout(() => document.getElementById('wp-admin-msg').textContent = '', 5000);
-}
-
-function wpHide() {
-  const state = wpLoad() || {};
-  state.visible = false;
-  wpSave(state);
-  document.getElementById('winner-panel-btn').style.display = 'none';
-  document.getElementById('winner-panel').classList.remove('show');
-  // Remove medal themes
-  const badgeCard = document.querySelector('.player-badge-card');
-  if (badgeCard) badgeCard.classList.remove('badge-winner-gold','badge-winner-silver','badge-winner-bronze');
-  _wpUpdateAdminBadge(false);
-  document.getElementById('wp-admin-msg').innerHTML = '<span style="color:var(--text-muted)">Panel hidden from players.</span>';
-  setTimeout(() => document.getElementById('wp-admin-msg').textContent = '', 4000);
-}
-
-function wpPreview() {
-  const state = wpCollectState();
-  state.visible = true;
-  wpRenderPanel(state);
-  openWinnerPanel();
-}
-
-function _wpUpdateAdminBadge(visible) {
-  const badge = document.getElementById('wp-admin-visibility-badge');
-  if (!badge) return;
-  badge.className = 'wp-visibility-badge ' + (visible ? 'on' : 'off');
-  badge.textContent = visible ? '● Live — visible to players' : '● Hidden from players';
-}
-
-function wpInitAdmin() {
-  const state = wpLoad();
-  // Always seed default steps if none exist yet
-  const steps = (state && state.instructionSteps && state.instructionSteps.length)
-    ? state.instructionSteps : WP_DEFAULT_STEPS;
-
-  if (!state) {
-    // Fresh admin — seed default instruction steps
-    const builder = document.getElementById('wp-steps-builder');
-    if (builder && !builder.children.length) steps.forEach(s => wpAddStepRow(s));
-    return;
-  }
-
-  _wpUpdateAdminBadge(state.visible);
-  if (state.challengeLabel) document.getElementById('wp-admin-challenge-label').value = state.challengeLabel;
-  if (state.customMessage)  document.getElementById('wp-admin-custom-message').value  = state.customMessage;
-  if (state.showInstructions === false) document.getElementById('wp-show-instructions').checked = false;
-
-  // Winners
-  const builder = document.getElementById('wp-winners-builder');
-  builder.innerHTML = '';
-  (state.winners || []).forEach(w => wpAddWinnerRow(w));
-
-  // Instruction steps
-  const stepsBuilder = document.getElementById('wp-steps-builder');
-  stepsBuilder.innerHTML = '';
-  steps.forEach(s => wpAddStepRow(s));
-
-  // Personal messages
-  const pmBuilder = document.getElementById('wp-personal-msgs-builder');
-  pmBuilder.innerHTML = '';
-  (state.personalMessages || []).forEach(m => wpAddPersonalMsgRow(m));
-}
-
-// Keyboard close
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeWinnerPanel(); closeWinnerGreeting(); }
-});
-
-// ── Re-apply badge theme when entry screen is shown ──
-const _origShowEntryScreen = window.showEntryScreen;
-// Patched after DOM load (see DOMContentLoaded hook below)
-
-window.addEventListener('DOMContentLoaded', () => {
-  // Patch showEntryScreen to re-apply badge theme after render
-  const _origSES = window.showEntryScreen;
-  if (_origSES) {
-    window.showEntryScreen = function() {
-      _origSES.apply(this, arguments);
-      const state = wpLoad();
-      if (state && state.visible) {
-        setTimeout(() => wpApplyBadgeTheme(state), 100);
-      }
-    };
-  }
-});
-
-// ═══════════════════════════════════════════════
-//  UTILS
-// ═══════════════════════════════════════════════
-function fmtTime(s){return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`}
-function fmtDate(d){return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-function show(id){document.getElementById(id).style.display=['game-screen','admin-screen','entry-screen','no-challenge-screen','admin-login','auth-screen'].includes(id)?'flex':'block'}
-function hide(id){document.getElementById(id).style.display='none'}
-function hideAll(){['loading-screen','entry-screen','game-screen','no-challenge-screen','admin-login','admin-screen','auth-screen'].forEach(hide)}
-
-// ── IMAGE PREVIEW MODAL — zoomable ──
-let _mz = 1, _mpx = 0, _mpy = 0, _mdrag = null, _mTouches = {};
-const _mMin = 0.5, _mMax = 8;
-
-function openImgModal(){
-  if(!challenge&&!img) return;
-  const mImg = document.getElementById('modal-img');
-  mImg.src = img ? img.src : challenge.image_url;
-  // Set explicit viewport dimensions before showing
-  const vp = document.getElementById('modal-viewport');
-  const vw = Math.min(window.innerWidth * 0.92, 900);
-  const vh = Math.min(window.innerHeight * 0.82, 720);
-  vp.style.width  = Math.round(vw) + 'px';
-  vp.style.height = Math.round(vh) + 'px';
-  document.getElementById('img-modal').classList.add('show');
-  // Fit after paint so dimensions are applied
-  if(mImg.complete && mImg.naturalWidth) { requestAnimationFrame(_modalFit); }
-  else { mImg.onload = () => requestAnimationFrame(_modalFit); }
-}
-function closeImgModal(){
-  document.getElementById('img-modal').classList.remove('show');
-  _mdrag = null; _mTouches = {};
-}
-function _modalFit(){
-  const vp = document.getElementById('modal-viewport');
-  const mImg = document.getElementById('modal-img');
-  if(!mImg.naturalWidth) return;
-  const iw = mImg.naturalWidth, ih = mImg.naturalHeight;
-  const vw = vp.clientWidth  || parseInt(vp.style.width)  || window.innerWidth  * 0.88;
-  const vh = vp.clientHeight || parseInt(vp.style.height) || window.innerHeight * 0.78;
-  mImg.style.width  = iw + 'px';
-  mImg.style.height = ih + 'px';
-  _mz  = Math.min(vw / iw, vh / ih, 2) * 0.94;
-  _mpx = (vw - iw * _mz) / 2;
-  _mpy = (vh - ih * _mz) / 2;
-  _modalApply();
-}
-function _modalApply(){
-  const wrap = document.getElementById('modal-img-wrap');
-  wrap.style.transform = `translate(${_mpx}px,${_mpy}px) scale(${_mz})`;
-  document.getElementById('modal-zoom-pct').textContent = Math.round(_mz * 100) + '%';
-}
-function _modalClamp(){
-  const vp = document.getElementById('modal-viewport');
-  const mImg = document.getElementById('modal-img');
-  const iw = mImg.naturalWidth * _mz, ih = mImg.naturalHeight * _mz;
-  const vw = vp.clientWidth, vh = vp.clientHeight;
-  const minX = Math.min(0, vw - iw), minY = Math.min(0, vh - ih);
-  const maxX = Math.max(0, vw - iw), maxY = Math.max(0, vh - ih);
-  _mpx = Math.max(minX, Math.min(maxX, _mpx));
-  _mpy = Math.max(minY, Math.min(maxY, _mpy));
-}
-function modalZoomStep(dir){
-  const factor = dir > 0 ? 1.3 : 1/1.3;
-  const vp = document.getElementById('modal-viewport');
-  const cx = vp.clientWidth/2, cy = vp.clientHeight/2;
-  const nz = Math.min(_mMax, Math.max(_mMin, _mz * factor));
-  _mpx = cx - (cx - _mpx) * (nz / _mz);
-  _mpy = cy - (cy - _mpy) * (nz / _mz);
-  _mz = nz; _modalClamp(); _modalApply();
-}
-function modalZoomReset(){ _modalFit(); }
-
-// Wire up modal mouse/touch interactions after DOM is ready
-window.addEventListener('load', ()=>{
-  const vp = document.getElementById('modal-viewport');
-  if(!vp) return;
-
-  vp.addEventListener('wheel', e=>{
-    e.preventDefault();
-    const rect = vp.getBoundingClientRect();
-    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-    const factor = e.deltaY < 0 ? 1.12 : 1/1.12;
-    const nz = Math.min(_mMax, Math.max(_mMin, _mz * factor));
-    _mpx = cx - (cx - _mpx) * (nz / _mz);
-    _mpy = cy - (cy - _mpy) * (nz / _mz);
-    _mz = nz; _modalClamp(); _modalApply();
-  }, {passive:false});
-
-  vp.addEventListener('mousedown', e=>{
-    if(e.button!==0) return;
-    _mdrag = {sx:e.clientX, sy:e.clientY, px:_mpx, py:_mpy};
-    vp.classList.add('grabbing');
-  });
-  window.addEventListener('mousemove', e=>{
-    if(!_mdrag || !document.getElementById('img-modal').classList.contains('show')) return;
-    _mpx = _mdrag.px + (e.clientX - _mdrag.sx);
-    _mpy = _mdrag.py + (e.clientY - _mdrag.sy);
-    _modalClamp(); _modalApply();
-  });
-  window.addEventListener('mouseup', ()=>{
-    _mdrag = null;
-    const vp = document.getElementById('modal-viewport');
-    if(vp) vp.classList.remove('grabbing');
-  });
-
-  // Touch pinch + pan
-  let _mLastPinch = 0;
-  vp.addEventListener('touchstart', e=>{
-    e.preventDefault();
-    Array.from(e.changedTouches).forEach(t=>_mTouches[t.identifier]={x:t.clientX,y:t.clientY});
-    if(Object.keys(_mTouches).length===1){
-      const [id] = Object.keys(_mTouches);
-      _mdrag = {sx:_mTouches[id].x, sy:_mTouches[id].y, px:_mpx, py:_mpy};
-    }
-    if(Object.keys(_mTouches).length===2){
-      const [a,b]=Object.values(_mTouches);
-      _mLastPinch=Math.hypot(b.x-a.x,b.y-a.y);
-      _mdrag=null;
-    }
-  },{passive:false});
-  vp.addEventListener('touchmove', e=>{
-    e.preventDefault();
-    Array.from(e.changedTouches).forEach(t=>_mTouches[t.identifier]={x:t.clientX,y:t.clientY});
-    const ids=Object.keys(_mTouches);
-    if(ids.length===2){
-      const [a,b]=[_mTouches[ids[0]],_mTouches[ids[1]]];
-      const dist=Math.hypot(b.x-a.x,b.y-a.y);
-      const cx=(a.x+b.x)/2, cy=(a.y+b.y)/2;
-      const rect=vp.getBoundingClientRect();
-      const lx=cx-rect.left, ly=cy-rect.top;
-      const factor=dist/_mLastPinch;
-      const nz=Math.min(_mMax,Math.max(_mMin,_mz*factor));
-      _mpx=lx-(lx-_mpx)*(nz/_mz);
-      _mpy=ly-(ly-_mpy)*(nz/_mz);
-      _mz=nz; _mLastPinch=dist; _modalClamp(); _modalApply();
-    } else if(ids.length===1&&_mdrag){
-      const [id]=ids;
-      _mpx=_mdrag.px+(_mTouches[id].x-_mdrag.sx);
-      _mpy=_mdrag.py+(_mTouches[id].y-_mdrag.sy);
-      _modalClamp(); _modalApply();
-    }
-  },{passive:false});
-  vp.addEventListener('touchend', e=>{
-    Array.from(e.changedTouches).forEach(t=>delete _mTouches[t.identifier]);
-    if(Object.keys(_mTouches).length===0) _mdrag=null;
-  });
-});
-
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape') closeImgModal();
-});
-</script>
-</body>
-</html>
+    color: C
