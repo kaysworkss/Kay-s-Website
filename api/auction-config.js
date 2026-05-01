@@ -83,22 +83,47 @@ function cors(res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Admin-Password");
 }
 
+// ── Sanitisers ────────────────────────────────────────────────────────────────
+
+function sanitisePiece(p) {
+  if (!p || typeof p !== "object") return null;
+  return {
+    contractAddr: String(p.contractAddr || "").slice(0, 100),
+    artTitle:     String(p.artTitle     || "").slice(0, 200),
+    artArtist:    String(p.artArtist    || "").slice(0, 200),
+    artAbout:     String(p.artAbout     || "").slice(0, 2000),
+    artYear:      String(p.artYear      || "").slice(0, 10),
+    artMedium:    String(p.artMedium    || "").slice(0, 200),
+    artImage:     String(p.artImage     || "").slice(0, 500),
+    gateName:     String(p.gateName     || "").slice(0, 200),
+    gateLink:     String(p.gateLink     || "").slice(0, 500),
+  };
+}
+
+function sanitiseAuctions(arr) {
+  if (!Array.isArray(arr)) return [];
+  // Cap at 20 pieces to keep the stored object reasonable for Edge Config
+  return arr.slice(0, 20).map(sanitisePiece).filter(Boolean);
+}
+
 // ── Default config ────────────────────────────────────────────────────────────
 
 const DEFAULT_CONFIG = {
-  status:       "off",
-  contractAddr: "",
-  artTitle:     "",
-  artArtist:    "",
-  artAbout:     "",
-  artYear:      "",
-  artMedium:    "",
-  artImage:     "",
-  gateName:     "",
-  gateLink:     "",
-  rpcUrl:       "",
-  launchDate:   "",
-  savedAt:      null,
+  status:           "off",
+  contractAddr:     "",
+  artTitle:         "",
+  artArtist:        "",
+  artAbout:         "",
+  artYear:          "",
+  artMedium:        "",
+  artImage:         "",
+  gateName:         "",
+  gateLink:         "",
+  rpcUrl:           "",
+  launchDate:       "",
+  landingCountdown: "",
+  auctions:         [],
+  savedAt:          null,
 };
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -133,19 +158,24 @@ module.exports = async function handler(req, res) {
     }
 
     const config = {
-      status:       ["live", "upcoming", "off"].includes(body.status) ? body.status : "off",
-      contractAddr: String(body.contractAddr  || "").slice(0, 100),
-      artTitle:     String(body.artTitle      || "").slice(0, 200),
-      artArtist:    String(body.artArtist     || "").slice(0, 200),
-      artAbout:     String(body.artAbout      || "").slice(0, 2000),
-      artYear:      String(body.artYear       || "").slice(0, 10),
-      artMedium:    String(body.artMedium     || "").slice(0, 200),
-      artImage:     String(body.artImage      || "").slice(0, 500),
-      gateName:     String(body.gateName      || "").slice(0, 200),
-      gateLink:     String(body.gateLink      || "").slice(0, 500),
-      rpcUrl:       String(body.rpcUrl        || "").slice(0, 500),
-      launchDate:   String(body.launchDate    || "").slice(0, 50),
-      savedAt:      Date.now(),
+      status:           ["live", "upcoming", "off"].includes(body.status) ? body.status : "off",
+      // Legacy single-piece fields (kept for backward compatibility with old readers)
+      contractAddr:     String(body.contractAddr     || "").slice(0, 100),
+      artTitle:         String(body.artTitle         || "").slice(0, 200),
+      artArtist:        String(body.artArtist        || "").slice(0, 200),
+      artAbout:         String(body.artAbout         || "").slice(0, 2000),
+      artYear:          String(body.artYear          || "").slice(0, 10),
+      artMedium:        String(body.artMedium        || "").slice(0, 200),
+      artImage:         String(body.artImage         || "").slice(0, 500),
+      gateName:         String(body.gateName         || "").slice(0, 200),
+      gateLink:         String(body.gateLink         || "").slice(0, 500),
+      // Shared / global fields
+      rpcUrl:           String(body.rpcUrl           || "").slice(0, 500),
+      launchDate:       String(body.launchDate       || "").slice(0, 50),
+      landingCountdown: String(body.landingCountdown || "").slice(0, 50),
+      // Multi-auction array — drives the piece selector and per-piece data
+      auctions:         sanitiseAuctions(body.auctions),
+      savedAt:          Date.now(),
     };
 
     try {
