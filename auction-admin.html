@@ -378,6 +378,18 @@ body {
       </div>
     </div>
 
+    <!-- Off-state landing countdown -->
+    <div class="card" id="landing-countdown-field" style="display:none">
+      <div class="card-head"><div class="card-title">Off-state countdown</div></div>
+      <div class="card-body">
+        <div class="field">
+          <label>Reveal date &amp; time (optional)</label>
+          <input type="datetime-local" id="landing-countdown-date" />
+          <div class="field-hint">Adds a static countdown beneath the "Check back soon" text on the landing page. Leave blank to hide it. Use this to build anticipation before revealing artworks.</div>
+        </div>
+      </div>
+    </div>
+
     <!-- RPC -->
     <div class="card">
       <div class="card-head">
@@ -723,6 +735,7 @@ function populateForm(cfg) {
 
   if (document.getElementById("rpc-url"))    document.getElementById("rpc-url").value    = cfg.rpcUrl    || "";
   if (document.getElementById("launch-date")) document.getElementById("launch-date").value = cfg.launchDate || "";
+  if (document.getElementById("landing-countdown-date")) document.getElementById("landing-countdown-date").value = cfg.landingCountdown || "";
   setStatus(cfg.status || "off", false);
   _populateHofSelect();
   _showPreviewCard();
@@ -757,6 +770,9 @@ function setStatus(s, updateUI = true) {
 
   const udf = document.getElementById("upcoming-date-field");
   if (udf) udf.style.display = s === "upcoming" ? "block" : "none";
+
+  const lcf = document.getElementById("landing-countdown-field");
+  if (lcf) lcf.style.display = s === "off" ? "block" : "none";
 }
 
 // ─── Contract validation ─────────────────────────────────────────────────────
@@ -799,6 +815,7 @@ async function saveConfig() {
     auctions:     pieces,
     rpcUrl:       document.getElementById("rpc-url").value.trim(),
     launchDate:   document.getElementById("launch-date")?.value || "",
+    landingCountdown: document.getElementById("landing-countdown-date")?.value || "",
   };
 
   setLoading(true);
@@ -1019,6 +1036,7 @@ function _buildPreviewPayload(forcePieceIdx) {
     gateLink:    primary.gateLink  || "",
     rpcUrl:      document.getElementById("rpc-url")?.value?.trim() || "",
     launchDate:  document.getElementById("launch-date")?.value || "",
+    landingCountdown: document.getElementById("landing-countdown-date")?.value || "",
   };
 }
 
