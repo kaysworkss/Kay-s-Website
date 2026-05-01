@@ -292,54 +292,95 @@ function tierForPieces(n) {
 async function handleStats(req, res, supabase, player) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Build an OR filter that matches scores belonging to this player by either:
-  //   - case-insensitive trimmed name (handles capitalization drift), OR
-  //   - wallet address (handles renamed profiles whose old scores still bear the old name)
-  const nameKey = (player.name || '').trim();
+  const nameKey   = (player.name || '').trim();
   const walletKey = (player.wallet_address || '').trim();
 
-  // Use ilike for case-insensitive name match. Supabase .or() takes a PostgREST filter string.
-  // We escape commas and parens defensively, though display names can't contain them per validation.
-  const escaped = nameKey.replace(/[,()"]/g, '');
-  const orFilter = walletKey
-    ? `player_name.ilike.${escaped},wallet_address.eq.${walletKey}`
-    : `player_name.ilike.${escaped}`;
+  // Two separate queries, combined in JS. This avoids PostgREST .or() filter-string
+  // parsing pitfalls with names that contain spaces or special characters.
+  // Match strategy:
+  //   (a) case-insensitive name match — handles old scores where capitalization differs
+  //   (b) wallet-address match — handles renamed players whose old score rows still
+  //       carry the previous display name
+  const cols = 'time_seconds, hints_used, piece_count, challenge_id, player_name, wallet_address';
 
-  const { data, error } = await supabase
-    .from('scores')
-    .select('time_seconds, hints_used, piece_count, challenge_id')
-    .or(orFilter);
+  const queries = [];
+  if (nameKey) {
+    queries.push(supabase.from('scores').select(cols).ilike('player_name', nameKey));
+  }
+  if (walletKey) {
+    queries.push(supabase.from('scores').select(cols).eq('wallet_address', walletKey));
+  }
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (!queries.length) {
+    return res.status(200).json({
+      solved: 0, best_time: null, hints_used: 0,
+      best_by_tier: {}, _debug: { reason: 'no name or wallet on player record' }
+    });
+  }
 
-  const scores = data || [];
+  const results = await Promise.all(queries);
+  for (const r of results) {
+    if (r.error) return res.status(500).json({ error: r.error.message });
+  }
 
-  // Deduplicate per challenge — keep only the player's best (lowest time) per challenge.
-  // Players can submit multiple scores on the same puzzle; "solved" should count distinct
-  // challenges, not attempts, to match how the leaderboard displays one row per player.
+  // Merge and dedupe by score row (a row may match both name and wallet queries).
+  // Composite key challenge_id + time_seconds + player_name catches duplicate rows
+  // returned from both queries without losing genuinely distinct attempts.
+  const seen = new Set();
+  const merged = [];
+  for (const r of results) {
+    for (const s of (r.data || [])) {
+      const key = `${s.challenge_id}|${s.time_seconds}|${s.player_name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(s);
+    }
+  }
+
+  // Per-challenge best (lowest time). "Solved" counts unique challenges to match
+  // how the leaderboard displays one row per player per puzzle.
   const bestPerChallenge = new Map();
-  for (const s of scores) {
-    const key = s.challenge_id;
-    const prev = bestPerChallenge.get(key);
-    if (!prev || (s.time_seconds || Infinity) < (prev.time_seconds || Infinity)) {
-      bestPerChallenge.set(key, s);
+  for (const s of merged) {
+    const t = Number(s.time_seconds) || 0;
+    if (t <= 0) continue;
+    const prev = bestPerChallenge.get(s.challenge_id);
+    if (!prev || t < (Number(prev.time_seconds) || Infinity)) {
+      bestPerChallenge.set(s.challenge_id, s);
     }
   }
   const uniqueScores = Array.from(bestPerChallenge.values());
 
   const solved = uniqueScores.length;
-
-  let best_time = null;
+  let best_time  = null;
   let hints_used = 0;
   const best_by_tier = {};
   for (const t of DIFF_TIERS) best_by_tier[t.label] = null;
 
+  // Some legacy score rows may have null piece_count. We still want them to count
+  // toward solved/hints/best_time totals; for per-tier bests, we look up
+  // piece_count from the challenges table as a fallback.
+  const missingPieceChallengeIds = uniqueScores
+    .filter(s => !s.piece_count)
+    .map(s => s.challenge_id);
+
+  let challengePieceMap = {};
+  if (missingPieceChallengeIds.length) {
+    const { data: chs } = await supabase
+      .from('challenges')
+      .select('id, piece_count')
+      .in('id', missingPieceChallengeIds);
+    if (chs) {
+      for (const ch of chs) challengePieceMap[ch.id] = ch.piece_count;
+    }
+  }
+
   for (const s of uniqueScores) {
     const t = Number(s.time_seconds) || 0;
     const h = Number(s.hints_used)   || 0;
-    const p = Number(s.piece_count)  || 0;
+    let   p = Number(s.piece_count)  || 0;
+    if (!p) p = Number(challengePieceMap[s.challenge_id]) || 0;
 
-    if (t > 0 && (best_time == null || t < best_time)) best_time = t;
+    if (best_time == null || t < best_time) best_time = t;
     hints_used += h;
 
     if (p > 0) {
@@ -351,7 +392,22 @@ async function handleStats(req, res, supabase, player) {
     }
   }
 
-  return res.status(200).json({ solved, best_time, hints_used, best_by_tier });
+  return res.status(200).json({
+    solved,
+    best_time,
+    hints_used,
+    best_by_tier,
+    // Diagnostic — visible in browser devtools Network tab for troubleshooting.
+    // Safe to leave in; it doesn't expose anything the player doesn't already know.
+    _debug: {
+      raw_rows_returned: merged.length,
+      unique_challenges: uniqueScores.length,
+      matched_by_name: (results[0] && results[0].data) ? results[0].data.length : 0,
+      matched_by_wallet: (results[1] && results[1].data) ? results[1].data.length : 0,
+      player_name_used: nameKey,
+      player_wallet_used: walletKey || null,
+    }
+  });
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
