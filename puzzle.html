@@ -2372,12 +2372,23 @@ async function _ensureChallengesLoaded() {
 // playerAvatar declared in STATE section above
 
 function _updateBadgeAvatar() {
+  // Update the badge avatar in the player badge strip
   const el = document.getElementById('badge-avatar');
-  if (!el) return;
-  if (playerAvatar) {
-    el.innerHTML = `<img src="${playerAvatar}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
-  } else {
-    el.innerHTML = '&#x1F464;';
+  if (el) {
+    if (playerAvatar) {
+      el.innerHTML = `<img src="${playerAvatar}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    } else {
+      el.innerHTML = '&#x1F464;';
+    }
+  }
+  // Also keep the profile modal avatar in sync (in case it is still open)
+  const modalAvatarEl = document.getElementById('pm-avatar-display');
+  if (modalAvatarEl && !document.getElementById('pm-avatar-input').files[0]) {
+    if (playerAvatar) {
+      modalAvatarEl.innerHTML = `<img src="${playerAvatar}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    } else {
+      modalAvatarEl.innerHTML = '&#x1F464;';
+    }
   }
 }
 
@@ -2493,16 +2504,17 @@ async function saveProfile() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Save failed.');
 
-    // Update local state
-    playerName   = data.name;
-    playerWallet = data.wallet_address || '';
-    playerAvatar = data.avatar_url     || '';
+    // Update local state — prefer server-echoed values, fall back to what the user submitted
+    playerName   = data.name   || name;
+    playerWallet = data.wallet_address != null ? (data.wallet_address || '') : wallet;
+    // Use the already-resolved avatarUrl (uploaded URL or existing), not solely the server echo
+    playerAvatar = data.avatar_url || avatarUrl || '';
 
-    // Update session storage
+    // Update session storage immediately so it survives a page refresh without re-login
     const sess = _loadSession();
-    if (sess) _saveSession({ ...sess, name: playerName, wallet_address: playerWallet, avatar_url: playerAvatar });
+    if (sess) _saveSession({ ...sess, name: playerName, wallet_address: playerWallet || null, avatar_url: playerAvatar || null });
 
-    // Refresh badge
+    // Refresh badge immediately — no need to re-login
     document.getElementById('badge-name').textContent = playerName;
     const walletEl = document.getElementById('badge-wallet');
     if (playerWallet) {
