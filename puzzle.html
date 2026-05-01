@@ -1007,6 +1007,49 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
 .pm-stat-val{font-family:'Cinzel',serif;font-size:1.1rem;color:var(--gold-light)}
 .pm-stat-lbl{font-size:.58rem;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;font-family:'Cinzel',serif;margin-top:.15rem}
 .pm-divider{height:1px;background:var(--border);margin:1rem 0}
+
+/* Best times broken down by difficulty */
+.pm-best-section{margin-bottom:1.25rem}
+.pm-best-title{
+  font-family:'Cinzel',serif;font-size:.62rem;letter-spacing:.14em;
+  color:var(--text-muted);text-transform:uppercase;
+  margin-bottom:.55rem;text-align:center;
+}
+.pm-best-grid{display:flex;flex-direction:column;gap:.4rem}
+.pm-best-row{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:.5rem .75rem;
+}
+.pm-best-row.empty{opacity:.45}
+.pm-best-tier{
+  display:flex;align-items:center;gap:.5rem;
+  font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:.08em;
+  color:var(--text);
+}
+.pm-best-dot{
+  width:8px;height:8px;border-radius:50%;flex-shrink:0;
+  box-shadow:0 0 6px currentColor;
+}
+.pm-best-dot.demo   {background:#8a8a8a;color:#8a8a8a}
+.pm-best-dot.easy   {background:#e07a5f;color:#e07a5f}
+.pm-best-dot.medium {background:#5fb085;color:#5fb085}
+.pm-best-dot.hard   {background:#5a7ac9;color:#5a7ac9}
+.pm-best-dot.expert {background:#d4a64a;color:#d4a64a}
+.pm-best-pcs{
+  font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:.06em;
+  color:var(--text-muted);margin-left:.25rem;text-transform:none;
+}
+.pm-best-time{
+  font-family:'Cinzel',serif;font-size:.92rem;color:var(--gold-light);
+  letter-spacing:.04em;
+}
+.pm-best-row.empty .pm-best-time{color:var(--text-muted);font-size:.78rem}
+.pm-best-loading{
+  text-align:center;color:var(--text-muted);
+  font-family:'Cinzel',serif;font-size:.7rem;letter-spacing:.08em;
+  padding:.6rem 0;
+}
 .pm-msg{font-size:.82rem;text-align:center;margin-top:.75rem;min-height:1.2em}
 
 /* ══════════════════════════════════════════
@@ -1573,11 +1616,19 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
       </div>
       <div class="pm-stat">
         <div class="pm-stat-val" id="pm-stat-best">&#x2014;</div>
-        <div class="pm-stat-lbl">Best Time</div>
+        <div class="pm-stat-lbl">Overall Best</div>
       </div>
       <div class="pm-stat">
         <div class="pm-stat-val" id="pm-stat-hints">&#x2014;</div>
         <div class="pm-stat-lbl">Hints Used</div>
+      </div>
+    </div>
+
+    <!-- Best times by difficulty -->
+    <div class="pm-best-section">
+      <div class="pm-best-title">Best Times by Difficulty</div>
+      <div class="pm-best-grid" id="pm-best-grid">
+        <div class="pm-best-loading">Loading…</div>
       </div>
     </div>
 
@@ -2415,13 +2466,19 @@ async function openProfileModal() {
     avatarEl.innerHTML = '&#x1F464;';
   }
 
-  // Load stats from server
+  // Reset stats to loading state
   document.getElementById('pm-stat-solved').textContent = '…';
   document.getElementById('pm-stat-best').textContent   = '…';
   document.getElementById('pm-stat-hints').textContent  = '…';
+  document.getElementById('pm-best-grid').innerHTML =
+    '<div class="pm-best-loading">Loading…</div>';
+
+  document.getElementById('profile-modal').classList.add('show');
+
+  // Load stats from server
   if (playerToken) {
     try {
-      const res  = await fetch(`${API}/player?action=stats`, {
+      const res = await fetch(`${API}/player?action=stats`, {
         headers: { Authorization: `Bearer ${playerToken}` }
       });
       if (res.ok) {
@@ -2429,11 +2486,47 @@ async function openProfileModal() {
         document.getElementById('pm-stat-solved').textContent = d.solved ?? 0;
         document.getElementById('pm-stat-best').textContent   = d.best_time ? fmtTime(d.best_time) : '—';
         document.getElementById('pm-stat-hints').textContent  = d.hints_used ?? 0;
+        renderBestByDifficulty(d.best_by_tier || {});
+      } else {
+        renderBestByDifficulty({});
       }
-    } catch {}
+    } catch {
+      renderBestByDifficulty({});
+    }
+  } else {
+    renderBestByDifficulty({});
   }
+}
 
-  document.getElementById('profile-modal').classList.add('show');
+// Render the per-difficulty best-times grid. Always shows every tier;
+// tiers the player hasn't solved appear dimmed with an em-dash.
+function renderBestByDifficulty(bestByTier) {
+  const grid = document.getElementById('pm-best-grid');
+  if (!grid) return;
+
+  const rows = DIFF_TIERS.map(tier => {
+    const rec = bestByTier[tier.label];
+    if (rec && rec.time) {
+      return `<div class="pm-best-row">
+        <span class="pm-best-tier">
+          <span class="pm-best-dot ${tier.cls}"></span>
+          ${tier.label}
+          <span class="pm-best-pcs">~${rec.pieces}pc</span>
+        </span>
+        <span class="pm-best-time">${fmtTime(rec.time)}</span>
+      </div>`;
+    }
+    return `<div class="pm-best-row empty">
+      <span class="pm-best-tier">
+        <span class="pm-best-dot ${tier.cls}"></span>
+        ${tier.label}
+        <span class="pm-best-pcs">~${tier.pieces}pc</span>
+      </span>
+      <span class="pm-best-time">—</span>
+    </div>`;
+  }).join('');
+
+  grid.innerHTML = rows;
 }
 
 function closeProfileModal() {
