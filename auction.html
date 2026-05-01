@@ -133,6 +133,54 @@ body {
 }
 .landing-rule { width: 40px; height: 1px; background: var(--divider); margin: 0 auto; }
 
+/* Landing countdown (admin-controlled, off-state only) */
+.landing-countdown {
+  display: none;
+  margin: 0 auto 32px;
+  max-width: 420px;
+}
+.landing-countdown.show { display: block; }
+.landing-countdown-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.55rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 14px;
+}
+.landing-countdown-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.landing-cd-cell {
+  border: 1px solid var(--divider);
+  background: rgba(255, 255, 255, 0.015);
+  padding: 14px 6px 10px;
+  text-align: center;
+  border-radius: 3px;
+}
+.landing-cd-num {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.9rem;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1;
+}
+.landing-cd-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.5rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+@media (max-width: 600px) {
+  .landing-cd-num { font-size: 1.5rem; }
+  .landing-countdown { max-width: 92vw; }
+}
+
 /* ════════════════════════════════
    UPCOMING VIEW
 ════════════════════════════════ */
@@ -943,6 +991,18 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   <div class="landing-eyebrow">Private auction</div>
   <div class="landing-title" id="landing-title">Coming<br>Soon</div>
   <div class="landing-sub" id="landing-sub">An exclusive token-gated auction is being prepared. Check back soon.</div>
+
+  <!-- ── Landing countdown (driven by cfg.landingCountdown from admin) ── -->
+  <div class="landing-countdown" id="landing-countdown">
+    <div class="landing-countdown-label">Opens in</div>
+    <div class="landing-countdown-grid">
+      <div class="landing-cd-cell"><div class="landing-cd-num" id="lcd-d">00</div><div class="landing-cd-label">Days</div></div>
+      <div class="landing-cd-cell"><div class="landing-cd-num" id="lcd-h">00</div><div class="landing-cd-label">Hrs</div></div>
+      <div class="landing-cd-cell"><div class="landing-cd-num" id="lcd-m">00</div><div class="landing-cd-label">Min</div></div>
+      <div class="landing-cd-cell"><div class="landing-cd-num" id="lcd-s">00</div><div class="landing-cd-label">Sec</div></div>
+    </div>
+  </div>
+
   <div class="landing-rule"></div>
   <div class="btn-honour-wrap">
     <div class="btn-honour-sub">See who collected before you.</div>
@@ -1317,6 +1377,7 @@ let auctionContract = null;
 let endTimestamp = 0, isLive = false, minNextBid = 0n;
 let bidHistory = [];
 let countdownTimer = null, pollTimer = null, upcomingTimer = null;
+let landingCdTimer = null;
 let notifTimer = null;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -1360,8 +1421,52 @@ window.addEventListener("load", async () => {
     if (cfg.artTitle || (_auctions[0]?.artTitle)) {
       document.getElementById("landing-title").textContent = cfg.artTitle || _auctions[0]?.artTitle;
     }
+    initLandingCountdown();
   }
 });
+
+// ─── LANDING COUNTDOWN ───────────────────────────────────────────────────────
+// Static countdown shown on the off-state landing view, driven by
+// cfg.landingCountdown (set in the admin panel). Hides itself if no value
+// is set or if the target time has passed.
+
+function initLandingCountdown() {
+  const raw = cfg.landingCountdown;
+  if (!raw) return;
+
+  const target = new Date(raw).getTime();
+  if (isNaN(target)) {
+    console.warn("[landing-countdown] Invalid date:", raw);
+    return;
+  }
+
+  const wrap = document.getElementById("landing-countdown");
+  const elD  = document.getElementById("lcd-d");
+  const elH  = document.getElementById("lcd-h");
+  const elM  = document.getElementById("lcd-m");
+  const elS  = document.getElementById("lcd-s");
+  if (!wrap || !elD || !elH || !elM || !elS) return;
+
+  const pad = n => String(Math.max(0, n)).padStart(2, "0");
+
+  function tick() {
+    const diff = target - Date.now();
+    if (diff <= 0) {
+      wrap.classList.remove("show");
+      clearInterval(landingCdTimer);
+      landingCdTimer = null;
+      return;
+    }
+    elD.textContent = pad(Math.floor(diff / 86400000));
+    elH.textContent = pad(Math.floor((diff % 86400000) / 3600000));
+    elM.textContent = pad(Math.floor((diff % 3600000) / 60000));
+    elS.textContent = pad(Math.floor((diff % 60000) / 1000));
+    wrap.classList.add("show");
+  }
+
+  tick();
+  landingCdTimer = setInterval(tick, 1000);
+}
 
 // ── Return the active auction slot config ──
 function _activeCfg() {
