@@ -250,23 +250,108 @@ async function handleUploadAvatar(req, res, supabase, player) {
 }
 
 // ── GET /api/player?action=stats ──────────────────────────────────────────────
+//
+// Returns aggregate stats for the authenticated player.
+//
+// Bug history: the previous version used `.eq('player_name', player.name)`,
+// which is case-sensitive. Two failure modes:
+//   1. Historical scores with different capitalization/whitespace.
+//   2. Players who renamed via update-profile — old scores still bear the old name.
+// The fix matches by case-insensitive trimmed name (consistent with the rest of
+// the codebase) AND by wallet_address as a fallback, so a renamed player still
+// owns their old scores via wallet.
+//
+// Response shape (frontend reads `solved`, `best_time`, `hints_used`; the
+// `best_by_tier` block is consumed by the per-difficulty profile breakdown):
+//   {
+//     solved: number,
+//     best_time: number | null,        // overall best in seconds
+//     hints_used: number,              // total across all solves
+//     best_by_tier: {                  // best per difficulty tier
+//       Cowrie:   { time, pieces } | null,
+//       Coral:    { time, pieces } | null,
+//       Jade:     { time, pieces } | null,
+//       Sapphire: { time, pieces } | null,
+//       Gold:     { time, pieces } | null,
+//     }
+//   }
+
+// Difficulty tiers — must mirror DIFF_TIERS in the frontend (puzzle.html).
+const DIFF_TIERS = [
+  { label: 'Cowrie',   range: [1,    48]   },
+  { label: 'Coral',    range: [49,   250]  },
+  { label: 'Jade',     range: [251,  600]  },
+  { label: 'Sapphire', range: [601,  1200] },
+  { label: 'Gold',     range: [1201, 9999] },
+];
+function tierForPieces(n) {
+  const pc = Number(n) || 0;
+  return DIFF_TIERS.find(t => pc >= t.range[0] && pc <= t.range[1]) || DIFF_TIERS[DIFF_TIERS.length - 1];
+}
+
 async function handleStats(req, res, supabase, player) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
+  // Build an OR filter that matches scores belonging to this player by either:
+  //   - case-insensitive trimmed name (handles capitalization drift), OR
+  //   - wallet address (handles renamed profiles whose old scores still bear the old name)
+  const nameKey = (player.name || '').trim();
+  const walletKey = (player.wallet_address || '').trim();
+
+  // Use ilike for case-insensitive name match. Supabase .or() takes a PostgREST filter string.
+  // We escape commas and parens defensively, though display names can't contain them per validation.
+  const escaped = nameKey.replace(/[,()"]/g, '');
+  const orFilter = walletKey
+    ? `player_name.ilike.${escaped},wallet_address.eq.${walletKey}`
+    : `player_name.ilike.${escaped}`;
+
   const { data, error } = await supabase
     .from('scores')
-    .select('time_seconds, hints_used, piece_count')
-    .eq('player_name', player.name)
-    .order('time_seconds', { ascending: true });
+    .select('time_seconds, hints_used, piece_count, challenge_id')
+    .or(orFilter);
 
   if (error) return res.status(500).json({ error: error.message });
 
-  const scores     = data || [];
-  const solved     = scores.length;
-  const best_time  = solved > 0 ? scores[0].time_seconds : null;
-  const hints_used = scores.reduce((sum, s) => sum + (s.hints_used || 0), 0);
+  const scores = data || [];
 
-  return res.status(200).json({ solved, best_time, hints_used });
+  // Deduplicate per challenge — keep only the player's best (lowest time) per challenge.
+  // Players can submit multiple scores on the same puzzle; "solved" should count distinct
+  // challenges, not attempts, to match how the leaderboard displays one row per player.
+  const bestPerChallenge = new Map();
+  for (const s of scores) {
+    const key = s.challenge_id;
+    const prev = bestPerChallenge.get(key);
+    if (!prev || (s.time_seconds || Infinity) < (prev.time_seconds || Infinity)) {
+      bestPerChallenge.set(key, s);
+    }
+  }
+  const uniqueScores = Array.from(bestPerChallenge.values());
+
+  const solved = uniqueScores.length;
+
+  let best_time = null;
+  let hints_used = 0;
+  const best_by_tier = {};
+  for (const t of DIFF_TIERS) best_by_tier[t.label] = null;
+
+  for (const s of uniqueScores) {
+    const t = Number(s.time_seconds) || 0;
+    const h = Number(s.hints_used)   || 0;
+    const p = Number(s.piece_count)  || 0;
+
+    if (t > 0 && (best_time == null || t < best_time)) best_time = t;
+    hints_used += h;
+
+    if (p > 0) {
+      const tier = tierForPieces(p);
+      const cur  = best_by_tier[tier.label];
+      if (!cur || t < cur.time) {
+        best_by_tier[tier.label] = { time: t, pieces: p };
+      }
+    }
+  }
+
+  return res.status(200).json({ solved, best_time, hints_used, best_by_tier });
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
