@@ -117,7 +117,7 @@ async function handleLogin(req, res, supabase) {
 async function handleProgressSave(req, res, supabase, player) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { challenge_id, piece_state, placed, total, elapsed, hints_left } = req.body || {};
+  const { challenge_id, piece_state, placed, total, elapsed, hints_left, edge_seed } = req.body || {};
 
   if (!challenge_id || !piece_state || !Array.isArray(piece_state)) {
     return res.status(400).json({ error: 'Missing required fields.' });
@@ -133,6 +133,7 @@ async function handleProgressSave(req, res, supabase, player) {
       total:        total     || 0,
       elapsed:      elapsed   || 0,
       hints_left:   typeof hints_left === 'number' ? hints_left : 3,
+      edge_seed:    edge_seed || null,
       saved_at:     new Date().toISOString(),
     }, { onConflict: 'player_id,challenge_id' });
 
@@ -149,7 +150,7 @@ async function handleProgressLoad(req, res, supabase, player) {
 
   const { data, error } = await supabase
     .from('progress')
-    .select('placed, total, elapsed, hints_left, piece_state, saved_at')
+    .select('placed, total, elapsed, hints_left, piece_state, edge_seed, saved_at')
     .eq('player_id', player.id)
     .eq('challenge_id', challenge_id)
     .maybeSingle();
@@ -162,7 +163,8 @@ async function handleProgressLoad(req, res, supabase, player) {
 
   return res.status(200).json({
     placed: data.placed, total: data.total, elapsed: data.elapsed,
-    hints_left: data.hints_left, piece_state: data.piece_state, saved_at: data.saved_at,
+    hints_left: data.hints_left, piece_state: data.piece_state,
+    edge_seed: data.edge_seed || null, saved_at: data.saved_at,
     player_name: player.name, wallet_address: player.wallet_address,
   });
 }
