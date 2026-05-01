@@ -1434,11 +1434,35 @@ function initLandingCountdown() {
   const raw = cfg.landingCountdown;
   if (!raw) return;
 
-  const target = new Date(raw).getTime();
+  // Robust parsing — handles datetime-local output ("2026-06-15T18:00"),
+  // full ISO ("2026-06-15T18:00:00.000Z"), and "YYYY-MM-DD HH:MM" variants.
+  // Treats values without explicit timezone as the visitor's local time.
+  function parseTarget(s) {
+    if (typeof s !== "string") return NaN;
+    s = s.trim();
+    if (!s) return NaN;
+
+    // Try native parser first (handles full ISO with timezone)
+    let t = new Date(s).getTime();
+    if (!isNaN(t)) return t;
+
+    // datetime-local format: YYYY-MM-DDTHH:MM or YYYY-MM-DDTHH:MM:SS
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (m) {
+      const [, y, mo, d, h, mi, se] = m;
+      // Construct as local time
+      t = new Date(+y, +mo - 1, +d, +h, +mi, +(se || 0)).getTime();
+      if (!isNaN(t)) return t;
+    }
+    return NaN;
+  }
+
+  const target = parseTarget(raw);
   if (isNaN(target)) {
-    console.warn("[landing-countdown] Invalid date:", raw);
+    console.warn("[landing-countdown] Could not parse date:", raw);
     return;
   }
+  console.log("[landing-countdown] Target:", new Date(target).toString());
 
   const wrap = document.getElementById("landing-countdown");
   const elD  = document.getElementById("lcd-d");
