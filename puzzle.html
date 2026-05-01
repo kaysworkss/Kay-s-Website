@@ -2623,6 +2623,7 @@ function selectChallenge(ch, cardEl) {
           placed:      data.placed,
           total:       data.total,
           hintsLeft:   data.hints_left,
+          edgeSeed:    data.edge_seed,   // preserve the cut so resume matches
           pieceState:  data.piece_state,
           savedAt:     Date.now(),
         }));
@@ -2708,8 +2709,22 @@ async function startGame(resume = false) {
   TAB = Math.round(Math.min(pieceW, pieceH) * (isMob ? .3 : .26));
   SNAP = Math.min(Math.max(Math.round(Math.min(pieceW, pieceH) * (isMob ? .38 : .32)), 10), 42);
 
-  // Build edges (deterministic — same seed = same edges always)
-  const rng = mkRng(cols * rows * 31337);
+  // Build edges — randomised for every new game, deterministic on resume.
+  // The seed is persisted in the save slot so a resumed game always
+  // regenerates the exact same cut that was in progress.
+  let edgeSeed;
+  if (resume) {
+    try {
+      const _raw = localStorage.getItem(saveKey());
+      const _parsed = _raw ? JSON.parse(_raw) : null;
+      edgeSeed = (_parsed && typeof _parsed.edgeSeed === 'number') ? _parsed.edgeSeed : (cols * rows * 31337);
+    } catch { edgeSeed = cols * rows * 31337; }
+  } else {
+    // Fresh game — new random seed = unique cut every time
+    edgeSeed = (Date.now() ^ (Math.random() * 0xffffffff | 0)) >>> 0;
+  }
+  window._edgeSeed = edgeSeed; // autoSave() reads this to persist it
+  const rng = mkRng(edgeSeed);
   makeEdges(rng);
 
   // Build pieces
@@ -2819,6 +2834,7 @@ function autoSave() {
     total: totalPieces,
     savedAt: Date.now(),
     hintsLeft,
+    edgeSeed: window._edgeSeed,  // persisted so resume rebuilds the exact same cut
     pieceState,
   };
   // Always save to localStorage as fast local cache
@@ -2835,6 +2851,7 @@ function autoSave() {
         total:        saveData.total,
         elapsed:      saveData.elapsed,
         hints_left:   hintsLeft,
+        edge_seed:    window._edgeSeed,
       }),
     }).catch(() => {}); // silent fail — localStorage is the fallback
   }
