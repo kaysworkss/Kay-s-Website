@@ -1720,6 +1720,7 @@ label{display:block;font-size:.75rem;letter-spacing:.1em;color:var(--text-muted)
       <div class="win-rank" id="win-rank"></div>
       <a id="win-link" class="win-link" href="#" target="_blank" style="display:none">🐦 Post Your Win on X/Twitter</a>
       <div class="win-actions">
+        <button class="btn btn-solid" onclick="playAgainFromWin()">↺ Play Again</button>
         <button class="btn" onclick="closeWin()">View Board</button>
         <a class="btn btn-series" href="https://www.kaysworks.com/apoti-olowe">Explore the Series ↗</a>
       </div>
@@ -4194,6 +4195,36 @@ function closeWin() {
   document.getElementById('timer-disp').textContent = '00:00';
 }
 
+function playAgainFromWin() {
+  stopConfetti();
+  document.getElementById('win-screen').classList.remove('show');
+  // New random seed = fresh cut every play
+  window._edgeSeed = (Date.now() ^ (Math.random() * 0xffffffff | 0)) >>> 0;
+  makeEdges(mkRng(window._edgeSeed));
+  // Unplace and regroup all pieces
+  groups = new Map(); nextGid = 0;
+  pieces.forEach(p => {
+    p.placed = false; p.x = 0; p.y = 0;
+    const gid = nextGid++;
+    p.groupId = gid;
+    groups.set(gid, new Set([p.id]));
+  });
+  // Reset timer and hints
+  clearInterval(timerInterval);
+  pausedElapsed = 0;
+  startTime = Date.now();
+  hintsLeft = HINT_MAX;
+  document.getElementById('timer-disp').textContent = '00:00';
+  timerInterval = setInterval(() => {
+    document.getElementById('timer-disp').textContent = fmtTime(Math.floor((Date.now() - startTime) / 1000));
+  }, 500);
+  clearSavedProgress();
+  resetHintGhost();
+  zoom = 1; panX = 0; panY = 0;
+  sizeCanvas();
+  updateStats();
+}
+
 // ═══════════════════════════════════════════════
 //  TOOL DEMO — first-use onboarding for mobile
 // ═══════════════════════════════════════════════
@@ -4345,7 +4376,10 @@ function returnPieceToSlot(p) {
   _showFeatureToast('Piece returned to border — drag it back when ready');
 }
 function restartPuzzle() {
-  if (!confirm('Restart? All pieces will be rescattered. Progress will be lost.')) return;
+  if (!confirm('Restart? All pieces will be rescattered with a new random cut. Progress will be lost.')) return;
+  // Generate a fresh random seed so the cut is different every restart
+  window._edgeSeed = (Date.now() ^ (Math.random() * 0xffffffff | 0)) >>> 0;
+  makeEdges(mkRng(window._edgeSeed));
   // Rebuild all groups and unplace everything
   groups = new Map(); nextGid = 0;
   pieces.forEach(p => {
