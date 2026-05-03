@@ -1462,7 +1462,7 @@ window.addEventListener("load", async () => {
   document.getElementById("view-loading").classList.add("show");
 
   cfg = await loadConfig();
-  const status = cfg.status || "off";
+  const globalStatus = cfg.status || "off";
 
   // Normalise auctions array — supports both single and multi-auction configs
   if (Array.isArray(cfg.auctions) && cfg.auctions.length > 0) {
@@ -1482,14 +1482,32 @@ window.addEventListener("load", async () => {
     }];
   }
 
+  // Compute effective status per piece — per-piece status wins, else global, else 'off'
+  // (Previews bypass this — admin sends an authoritative cfg.status to force a view.)
+  _auctions.forEach(p => { p._effectiveStatus = p.status || globalStatus; });
+
+  // Decide which view to show based on the mix of piece statuses.
+  // Preview mode (cfg._preview) honors cfg.status directly so the admin can
+  // force-preview a specific UI regardless of per-piece settings.
+  let routeStatus;
+  if (cfg._preview) {
+    routeStatus = globalStatus;
+  } else {
+    const anyLive     = _auctions.some(p => p._effectiveStatus === "live");
+    const anyUpcoming = _auctions.some(p => p._effectiveStatus === "upcoming");
+    if      (anyLive)     routeStatus = "live";
+    else if (anyUpcoming) routeStatus = "upcoming";
+    else                  routeStatus = "off";
+  }
+
   document.getElementById("view-loading").classList.remove("show");
 
-  if (status === "live") {
+  if (routeStatus === "live") {
     document.getElementById("view-live").classList.add("show");
     await initLive();
     aucOnOpen();
     initCollectorRoom();
-  } else if (status === "upcoming") {
+  } else if (routeStatus === "upcoming") {
     document.getElementById("view-upcoming").classList.add("show");
     initUpcoming();
   } else {
@@ -1579,22 +1597,29 @@ function initUpcoming() {
   // If multiple pieces, show a piece selector strip on the upcoming view too
   _buildUpcomingPieceSelector();
 
-  // Load the piece from preview config if set, else default to 0
-  const startIdx = (cfg._preview && typeof cfg._pieceIdx === "number") ? cfg._pieceIdx : 0;
-  // Sync the active state of the upcoming-piece-selector tabs to match
+  // Pick start piece:
+  //   - If admin previewed a specific piece (cfg._pieceIdx), honor it
+  //   - Otherwise default to the first piece whose effective status is 'upcoming'
+  //     (falling back to index 0 if none — e.g. preview mode showing all)
+  let startIdx;
+  if (cfg._preview && typeof cfg._pieceIdx === "number") {
+    startIdx = cfg._pieceIdx;
+  } else {
+    const firstUpcoming = _auctions.findIndex(p => p._effectiveStatus === "upcoming");
+    startIdx = firstUpcoming >= 0 ? firstUpcoming : 0;
+  }
+
+  // Sync the active state on the visible tabs (which are filtered to upcoming-only)
   const strip = document.getElementById("upcoming-piece-selector");
   if (strip) {
-    strip.querySelectorAll(".piece-tab").forEach((b, j) => b.classList.toggle("active", j === startIdx));
+    strip.querySelectorAll(".piece-tab").forEach(b => {
+      const matchIdx = parseInt(b.dataset.idx, 10);
+      b.classList.toggle("active", matchIdx === startIdx);
+    });
   }
   _loadUpcomingPiece(startIdx);
-
-  // Launch date countdown (shared across all pieces)
-  if (cfg.launchDate) {
-    const launch = new Date(cfg.launchDate).getTime();
-    document.getElementById("upcoming-launch-date").textContent = new Date(cfg.launchDate).toLocaleString();
-    upcomingTimer = setInterval(() => tickUpcoming(launch), 1000);
-    tickUpcoming(launch);
-  }
+  // Note: _loadUpcomingPiece now handles the launch countdown per piece
+  // (with cfg.launchDate as a fallback when a piece has no launchDate of its own)
 }
 
 function _buildUpcomingPieceSelector() {
@@ -1602,18 +1627,26 @@ function _buildUpcomingPieceSelector() {
   const strip = document.getElementById("upcoming-piece-selector");
   if (!strip) return;
   strip.innerHTML = "";
-  if (_auctions.length <= 1) { strip.classList.remove("show"); return; }
+
+  // Show only pieces whose effective status is 'upcoming'
+  // (cfg._preview bypasses the filter so admin previews show all pieces)
+  const visible = cfg._preview
+    ? _auctions.map((slot, i) => ({ slot, i }))
+    : _auctions.map((slot, i) => ({ slot, i })).filter(({ slot }) => slot._effectiveStatus === "upcoming");
+
+  if (visible.length <= 1) { strip.classList.remove("show"); return; }
   strip.classList.add("show");
-  _auctions.forEach((slot, i) => {
+
+  visible.forEach(({ slot, i }, vi) => {
     const btn = document.createElement("button");
-    btn.className = "piece-tab" + (i === 0 ? " active" : "");
+    btn.className = "piece-tab" + (vi === 0 ? " active" : "");
     btn.dataset.idx = i;
     const thumbHtml = slot.artImage
       ? `<img class="piece-tab-thumb" src="${toHTTP(slot.artImage)}" alt="" onerror="this.style.display='none'">`
       : "";
     btn.innerHTML = `${thumbHtml}<span>${slot.artTitle || "Piece " + (i+1)}</span>`;
     btn.addEventListener("click", () => {
-      strip.querySelectorAll(".piece-tab").forEach((b,j) => b.classList.toggle("active", j===i));
+      strip.querySelectorAll(".piece-tab").forEach((b,j) => b.classList.toggle("active", j===vi));
       _loadUpcomingPiece(i);
     });
     strip.appendChild(btn);
@@ -1661,6 +1694,32 @@ function _loadUpcomingPiece(idx) {
 
   // Image
   loadStaticImage("upcoming");
+
+  // Per-piece launch countdown — uses the piece's own launchDate if set,
+  // otherwise falls back to the global cfg.launchDate.
+  // Cancel any existing timer first so switching pieces doesn't stack timers.
+  if (upcomingTimer) { clearInterval(upcomingTimer); upcomingTimer = null; }
+
+  const dateStr = slot.launchDate || cfg.launchDate || "";
+  const dateEl  = document.getElementById("upcoming-launch-date");
+  const labelEl = document.getElementById("upcoming-launch-label");
+
+  if (dateStr) {
+    const launchMs = new Date(dateStr).getTime();
+    if (isFinite(launchMs)) {
+      if (dateEl)  dateEl.textContent = new Date(dateStr).toLocaleString();
+      if (labelEl) labelEl.textContent = "Auction opens";
+      tickUpcoming(launchMs);
+      upcomingTimer = setInterval(() => tickUpcoming(launchMs), 1000);
+    }
+  } else {
+    // No launch date for this piece and no global fallback — clear the display
+    if (dateEl) dateEl.textContent = "";
+    ["up-cd-d","up-cd-h","up-cd-m","up-cd-s"].forEach(id => {
+      const el = document.getElementById(id); if (el) el.textContent = "—";
+    });
+    if (labelEl) labelEl.textContent = "Launch date not set";
+  }
 }
 
 function tickUpcoming(launchMs) {
@@ -1694,22 +1753,33 @@ async function initLive() {
   // Build piece selector if multiple auctions
   await _buildPieceSelector();
 
-  // Load the piece from preview config if set, else default to 0
-  const startIdx = (cfg._preview && typeof cfg._pieceIdx === "number") ? cfg._pieceIdx : 0;
+  // Pick start piece — preview override > first live-status piece > 0
+  let startIdx;
+  if (cfg._preview && typeof cfg._pieceIdx === "number") {
+    startIdx = cfg._pieceIdx;
+  } else {
+    const firstLive = _auctions.findIndex(p => p._effectiveStatus === "live");
+    startIdx = firstLive >= 0 ? firstLive : 0;
+  }
   await _switchAuction(startIdx);
 }
 
 async function _buildPieceSelector() {
   const strip = document.getElementById("piece-selector");
   strip.innerHTML = "";
-  if (_auctions.length <= 1) { strip.classList.remove("show"); return; }
+
+  // Show only pieces whose effective status is 'live' (preview shows all)
+  const visible = cfg._preview
+    ? _auctions.map((slot, i) => ({ slot, i }))
+    : _auctions.map((slot, i) => ({ slot, i })).filter(({ slot }) => slot._effectiveStatus === "live");
+
+  if (visible.length <= 1) { strip.classList.remove("show"); return; }
 
   strip.classList.add("show");
 
-  for (let i = 0; i < _auctions.length; i++) {
-    const slot = _auctions[i];
+  for (const { slot, i } of visible) {
     const btn  = document.createElement("button");
-    btn.className = "piece-tab" + (i === 0 ? " active" : "");
+    btn.className = "piece-tab";
     btn.dataset.idx = i;
 
     // Thumb
@@ -1751,9 +1821,10 @@ async function _switchAuction(idx) {
   if (idx < 0 || idx >= _auctions.length) return;
   _activeIdx = idx;
 
-  // Update tab UI
-  document.querySelectorAll(".piece-tab").forEach((btn, i) => {
-    btn.classList.toggle("active", i === idx);
+  // Update tab UI — match by dataset.idx since we filter the visible set
+  document.querySelectorAll(".piece-tab").forEach(btn => {
+    const tabIdx = parseInt(btn.dataset.idx, 10);
+    btn.classList.toggle("active", tabIdx === idx);
   });
 
   const slot = _activeCfg();

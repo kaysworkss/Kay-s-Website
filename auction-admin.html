@@ -210,6 +210,31 @@ body {
   border-color: rgba(196,132,90,0.35); color: var(--text);
 }
 
+/* Per-piece status picker (smaller version inside each piece form) */
+.piece-status-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.piece-status-btn {
+  flex: 1; min-width: 100px; padding: 7px 10px;
+  border: 1px solid var(--divider); border-radius: var(--r);
+  background: var(--bg);
+  font-family: 'Cinzel', serif; font-size: 0.55rem;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  cursor: pointer; transition: all .18s; color: var(--text-muted);
+}
+.piece-status-btn:hover { color: var(--text); }
+.piece-status-btn.active-live    { background: rgba(107,124,92,0.15); border-color: rgba(107,124,92,0.5); color: var(--moss); }
+.piece-status-btn.active-upcoming{ background: rgba(201,153,58,0.12); border-color: rgba(201,153,58,0.4); color: var(--gold); }
+.piece-status-btn.active-off     { background: rgba(255,255,255,0.06); border-color: rgba(196,132,90,0.35); color: var(--text); }
+.piece-status-btn.active-inherit { background: rgba(255,255,255,0.04); border-color: var(--divider); color: var(--text); font-style: italic; }
+
+/* Status dot on piece tabs */
+.piece-tab-status-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  margin-right: 6px; vertical-align: middle;
+}
+.piece-tab-status-dot.live     { background: var(--moss); box-shadow: 0 0 4px rgba(107,124,92,0.6); }
+.piece-tab-status-dot.upcoming { background: var(--gold); }
+.piece-tab-status-dot.off      { background: var(--text-muted); opacity: 0.5; }
+
 /* Buttons */
 .btn {
   font-family: 'Cinzel', serif; font-size: 0.62rem;
@@ -699,7 +724,19 @@ function _pieceFieldId(idx, field) { return `piece-${idx}-${field}`; }
 
 function _buildPieceForm(idx) {
   const d = _pieces[idx] || {};
+  const pieceStatus = d.status || "";  // empty = inherit from global cfg.status
   return `
+    <div class="field">
+      <label>Status for this piece</label>
+      <div class="piece-status-row" id="${_pieceFieldId(idx,'statusRow')}">
+        <button type="button" class="piece-status-btn ${pieceStatus===''      ? 'active-inherit'  : ''}" onclick="setPieceStatus(${idx},'')">Inherit global</button>
+        <button type="button" class="piece-status-btn ${pieceStatus==='off'   ? 'active-off'      : ''}" onclick="setPieceStatus(${idx},'off')">Off</button>
+        <button type="button" class="piece-status-btn ${pieceStatus==='upcoming' ? 'active-upcoming' : ''}" onclick="setPieceStatus(${idx},'upcoming')">Upcoming</button>
+        <button type="button" class="piece-status-btn ${pieceStatus==='live'  ? 'active-live'     : ''}" onclick="setPieceStatus(${idx},'live')">Live</button>
+      </div>
+      <input type="hidden" id="${_pieceFieldId(idx,'status')}" value="${pieceStatus}"/>
+      <div class="field-hint">Lets you mix states across pieces — e.g. piece 1 live, piece 2 upcoming. <em>Inherit global</em> uses the master status above.</div>
+    </div>
     <div class="field">
       <label>Contract address</label>
       <input id="${_pieceFieldId(idx,'contractAddr')}" placeholder="0x…" value="${d.contractAddr||''}"
@@ -758,16 +795,32 @@ function _buildPieceForm(idx) {
     </div>`;
 }
 
+function _effectivePieceStatus(piece) {
+  // Returns the status the piece will actually use: its own if set, else global, else 'off'
+  if (piece && piece.status) return piece.status;
+  // Global status (read live from the DOM toggle, since the user may have changed it without saving)
+  const globalBtn = document.querySelector('.status-btn.active-live, .status-btn.active-upcoming, .status-btn.active-off');
+  if (globalBtn) {
+    if (globalBtn.id === 'btn-live')     return 'live';
+    if (globalBtn.id === 'btn-upcoming') return 'upcoming';
+  }
+  return 'off';
+}
+
 function _renderPieceTabs() {
   const tabs  = document.getElementById("piece-tabs");
   const forms = document.getElementById("piece-forms");
   if (!tabs || !forms) return;
 
-  tabs.innerHTML = _pieces.map((p, i) => `
+  tabs.innerHTML = _pieces.map((p, i) => {
+    const eff = _effectivePieceStatus(p);
+    const dotTitle = p.status ? `Status: ${eff}` : `Status: ${eff} (inherited)`;
+    return `
     <button class="piece-tab-btn ${i===_activePieceIdx?'active':''}" onclick="selectPiece(${i})">
-      ${p.artTitle || 'Piece '+(i+1)}
+      <span class="piece-tab-status-dot ${eff}" title="${dotTitle}"></span>${p.artTitle || 'Piece '+(i+1)}
       ${_pieces.length > 1 ? `<button class="piece-remove-btn" onclick="event.stopPropagation();removePiece(${i})">✕</button>` : ''}
-    </button>`).join("");
+    </button>`;
+  }).join("");
 
   forms.innerHTML = _buildPieceForm(_activePieceIdx);
 
@@ -971,7 +1024,7 @@ document.addEventListener("keyup", (e) => {
 
 function _savePieceFormValues(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
-  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate"];
+  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
     if (!el) return;
@@ -1078,6 +1131,52 @@ function setStatus(s, updateUI = true) {
     // Reset to the default ('upcoming') whenever the toggle becomes relevant
     if (s === "upcoming" && typeof setPreviewAs === "function") setPreviewAs("upcoming");
   }
+
+  // The global status change affects the dots on tabs of pieces that are set to "Inherit global"
+  if (typeof _renderPieceTabs === "function" && _pieces && _pieces.length) {
+    // Re-render only the tabs (not the form) to refresh the inherited-status dots
+    _renderTabsOnly();
+  }
+}
+
+// Re-render just the tab strip without rebuilding the form (avoids losing in-progress edits)
+function _renderTabsOnly() {
+  const tabs = document.getElementById("piece-tabs");
+  if (!tabs) return;
+  tabs.innerHTML = _pieces.map((p, i) => {
+    const eff = _effectivePieceStatus(p);
+    const dotTitle = p.status ? `Status: ${eff}` : `Status: ${eff} (inherited)`;
+    return `
+    <button class="piece-tab-btn ${i===_activePieceIdx?'active':''}" onclick="selectPiece(${i})">
+      <span class="piece-tab-status-dot ${eff}" title="${dotTitle}"></span>${p.artTitle || 'Piece '+(i+1)}
+      ${_pieces.length > 1 ? `<button class="piece-remove-btn" onclick="event.stopPropagation();removePiece(${i})">✕</button>` : ''}
+    </button>`;
+  }).join("");
+}
+
+// Per-piece status setter — called from the buttons inside each piece form
+function setPieceStatus(idx, s) {
+  if (!_pieces[idx]) return;
+  // Save in piece data (empty string = inherit from global)
+  _pieces[idx].status = s;
+  // Sync the hidden input so _savePieceFormValues picks it up
+  const hidden = document.getElementById(_pieceFieldId(idx, 'status'));
+  if (hidden) hidden.value = s;
+  // Update the visible button states inside the form
+  const row = document.getElementById(_pieceFieldId(idx, 'statusRow'));
+  if (row) {
+    row.querySelectorAll('.piece-status-btn').forEach(b => {
+      b.className = 'piece-status-btn';
+    });
+    const map = { '': 'active-inherit', 'off': 'active-off', 'upcoming': 'active-upcoming', 'live': 'active-live' };
+    const btns = row.querySelectorAll('.piece-status-btn');
+    // Order: Inherit, Off, Upcoming, Live (matches _buildPieceForm)
+    const order = ['', 'off', 'upcoming', 'live'];
+    const targetIdx = order.indexOf(s);
+    if (targetIdx >= 0 && btns[targetIdx]) btns[targetIdx].classList.add(map[s]);
+  }
+  // Refresh the tab strip so the status dot updates
+  _renderTabsOnly();
 }
 
 // ─── Contract validation ─────────────────────────────────────────────────────
