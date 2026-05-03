@@ -353,6 +353,15 @@ body {
 .btn-preview-piece { font-family:'Cinzel',serif; font-size: 0.44rem; letter-spacing: 0.12em; text-transform: uppercase; background: transparent; border: 1px solid rgba(201,153,58,0.35); color: var(--gold); border-radius: var(--r); padding: 4px 10px; cursor: pointer; white-space: nowrap; transition: all .18s; text-decoration: none; }
 .btn-preview-piece:hover { background: rgba(201,153,58,0.1); }
 
+/* Preview-as toggle (segmented) */
+.preview-as-wrap { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.preview-as-label { font-family:'Cinzel',serif; font-size:0.46rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); }
+.preview-as-seg { display:inline-flex; border:1px solid rgba(201,153,58,0.35); border-radius:var(--r); overflow:hidden; }
+.preview-as-seg button { font-family:'Cinzel',serif; font-size:0.46rem; letter-spacing:0.14em; text-transform:uppercase; background:transparent; color:var(--text-muted); border:0; padding:5px 12px; cursor:pointer; transition: all .18s; }
+.preview-as-seg button + button { border-left:1px solid rgba(201,153,58,0.25); }
+.preview-as-seg button:hover { color:var(--gold); }
+.preview-as-seg button.active { background:rgba(201,153,58,0.15); color:var(--gold); }
+
 /* Main content hidden until authed */
 #main-content { display: none; }
 </style>
@@ -484,6 +493,14 @@ body {
         <span style="font-family:'Cinzel',serif;font-size:0.44rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(201,153,58,0.1);color:var(--gold);border:1px solid rgba(201,153,58,0.25)">Admin only</span>
       </div>
       <div class="preview-desc">Inspect the full live auction UI with your current config before making it public. Opens in a new tab — only you can see it. Status remains <em>Off</em> for collectors.</div>
+      <!-- Preview-as toggle — only relevant when status is 'upcoming' (lets admin preview either UI) -->
+      <div class="preview-as-wrap" id="preview-as-wrap" style="display:none">
+        <span class="preview-as-label">Preview as</span>
+        <div class="preview-as-seg" role="group" aria-label="Preview as">
+          <button type="button" id="preview-as-upcoming" class="active" onclick="setPreviewAs('upcoming')">Upcoming</button>
+          <button type="button" id="preview-as-live" onclick="setPreviewAs('live')">Live</button>
+        </div>
+      </div>
       <div class="preview-piece-list" id="preview-piece-list"></div>
       <button class="btn-preview" onclick="launchPreview()">
         ◈ &nbsp;Preview all pieces
@@ -1048,6 +1065,14 @@ function setStatus(s, updateUI = true) {
 
   const lcf = document.getElementById("landing-countdown-field");
   if (lcf) lcf.style.display = s === "off" ? "block" : "none";
+
+  // Show the 'Preview as' toggle only when status is 'upcoming' (only case where it matters)
+  const wrap = document.getElementById("preview-as-wrap");
+  if (wrap) {
+    wrap.style.display = s === "upcoming" ? "flex" : "none";
+    // Reset to the default ('upcoming') whenever the toggle becomes relevant
+    if (s === "upcoming" && typeof setPreviewAs === "function") setPreviewAs("upcoming");
+  }
 }
 
 // ─── Contract validation ─────────────────────────────────────────────────────
@@ -1275,11 +1300,34 @@ async function saveToHallOfFame() {
 
 // ─── Preview mode ────────────────────────────────────────────────────────────
 
+// Tracks which UI to render in preview ('upcoming' or 'live').
+// Only meaningful when status === 'upcoming' — for 'live' or 'off' status,
+// preview always shows the live UI (since 'upcoming' UI requires a launch date).
+let _previewAs = "upcoming";
+
+function setPreviewAs(mode) {
+  if (mode !== "upcoming" && mode !== "live") return;
+  _previewAs = mode;
+  const upBtn   = document.getElementById("preview-as-upcoming");
+  const liveBtn = document.getElementById("preview-as-live");
+  if (upBtn)   upBtn.classList.toggle("active", mode === "upcoming");
+  if (liveBtn) liveBtn.classList.toggle("active", mode === "live");
+}
+
 function _showPreviewCard() {
   const card = document.getElementById("preview-launch-card");
   const list = document.getElementById("preview-piece-list");
   if (!card || !list) return;
   card.style.display = "block";
+
+  // Show the preview-as toggle only when status is 'upcoming' (only case where it matters)
+  const wrap = document.getElementById("preview-as-wrap");
+  if (wrap) {
+    const isUpcoming = document.getElementById("btn-upcoming")?.className.includes("active");
+    wrap.style.display = isUpcoming ? "flex" : "none";
+    // Reset toggle to 'upcoming' default whenever it becomes relevant
+    if (isUpcoming) setPreviewAs("upcoming");
+  }
 
   // Render one row per piece for individual piece preview
   list.innerHTML = _pieces.length > 1
@@ -1295,8 +1343,19 @@ function _buildPreviewPayload(forcePieceIdx) {
   // Read current form values without saving to server
   const pieces = _readAllPieces();
   const primary = forcePieceIdx !== undefined ? pieces[forcePieceIdx] : pieces[0] || {};
+  // Determine which UI to preview:
+  //  - status 'upcoming' → use the admin's _previewAs choice (upcoming or live)
+  //  - status 'live'     → preview live UI
+  //  - status 'off'      → preview live UI (landing page isn't useful to preview)
+  const selectedStatus = ["live","upcoming","off"].find(s =>
+    document.getElementById("btn-" + s)?.className.includes("active")
+  ) || "live";
+  let previewStatus;
+  if (selectedStatus === "upcoming") previewStatus = _previewAs;  // admin's choice
+  else if (selectedStatus === "live") previewStatus = "live";
+  else                                previewStatus = "live";     // 'off' → live UI
   return {
-    status:      "live",    // force live so the auction UI shows
+    status:      previewStatus,
     _preview:    true,      // flag for auction.html to detect
     _pieceIdx:   forcePieceIdx !== undefined ? forcePieceIdx : 0,
     auctions:    pieces,
