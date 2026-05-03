@@ -1070,6 +1070,8 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 
 <!-- ── UPCOMING VIEW ── -->
 <div id="view-upcoming">
+  <!-- Piece selector for upcoming — only shown when multiple auctions are configured -->
+  <div class="piece-selector" id="upcoming-piece-selector"></div>
   <div class="upcoming-layout">
     <div class="art-col" id="upcoming-art-col">
       <div class="art-frame">
@@ -1566,8 +1568,14 @@ function initUpcoming() {
   // If multiple pieces, show a piece selector strip on the upcoming view too
   _buildUpcomingPieceSelector();
 
-  // Load first piece into view
-  _loadUpcomingPiece(0);
+  // Load the piece from preview config if set, else default to 0
+  const startIdx = (cfg._preview && typeof cfg._pieceIdx === "number") ? cfg._pieceIdx : 0;
+  // Sync the active state of the upcoming-piece-selector tabs to match
+  const strip = document.getElementById("upcoming-piece-selector");
+  if (strip) {
+    strip.querySelectorAll(".piece-tab").forEach((b, j) => b.classList.toggle("active", j === startIdx));
+  }
+  _loadUpcomingPiece(startIdx);
 
   // Launch date countdown (shared across all pieces)
   if (cfg.launchDate) {
@@ -1579,8 +1587,9 @@ function initUpcoming() {
 }
 
 function _buildUpcomingPieceSelector() {
-  // Reuse the piece-selector strip (it sits above both live and upcoming views)
-  const strip = document.getElementById("piece-selector");
+  // Use the upcoming-specific piece-selector strip (sits inside #view-upcoming)
+  const strip = document.getElementById("upcoming-piece-selector");
+  if (!strip) return;
   strip.innerHTML = "";
   if (_auctions.length <= 1) { strip.classList.remove("show"); return; }
   strip.classList.add("show");
@@ -1593,7 +1602,7 @@ function _buildUpcomingPieceSelector() {
       : "";
     btn.innerHTML = `${thumbHtml}<span>${slot.artTitle || "Piece " + (i+1)}</span>`;
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".piece-tab").forEach((b,j) => b.classList.toggle("active", j===i));
+      strip.querySelectorAll(".piece-tab").forEach((b,j) => b.classList.toggle("active", j===i));
       _loadUpcomingPiece(i);
     });
     strip.appendChild(btn);
