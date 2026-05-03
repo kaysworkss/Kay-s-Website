@@ -185,8 +185,16 @@ body {
    UPCOMING VIEW
 ════════════════════════════════ */
 #view-upcoming { display: none; min-height: 100vh; }
-#view-upcoming.show { display: block; }
-.upcoming-layout { display: grid; grid-template-columns: 1fr 420px; flex: 1; min-height: 0; height: 100%; }
+#view-upcoming.show { display: flex; flex-direction: column; }
+.upcoming-layout { display: grid; grid-template-columns: 1fr 420px; flex: 1; min-height: 0; }
+
+/* Upcoming-specific: constrain the artwork frame so square/tall images
+   can't push the title / artist / about-toggle panel off-screen on desktop.
+   The frame is allowed to grow but is capped to leave room for .art-info.
+   !important here is required because loadStaticImage() sets width/height
+   as inline styles for the shared <img class="art-img"> element. */
+#view-upcoming .art-frame { max-height: calc(100vh - 240px); padding: 32px; }
+#view-upcoming .art-img   { max-height: 100% !important; height: auto !important; width: auto !important; max-width: 100% !important; }
 
 /* ════════════════════════════════
    LIVE VIEW
@@ -850,6 +858,9 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
     border-radius: 0;
     border-left: none; border-right: none;
   }
+  /* Reset desktop-only upcoming overrides so mobile layout (which already works) is preserved */
+  #view-upcoming .art-frame { max-height: 52vw; padding: 16px; }
+  #view-upcoming .art-img   { max-height: 100% !important; height: 100% !important; width: 100% !important; max-width: 100% !important; }
   .art-eyebrow { font-size: 0.46rem; }
   .live-art-title { font-size: 1.3rem; }
 
