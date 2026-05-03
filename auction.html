@@ -378,6 +378,7 @@ body {
 }
 .about-panel-inner {
   padding: 22px 24px 28px;
+  padding-right: 80px; /* leave room for the close button in the top-right */
   overflow-y: auto;
   flex: 1;
   min-height: 0;
@@ -392,6 +393,30 @@ body {
   border-radius: 3px;
 }
 .about-panel-inner::-webkit-scrollbar-thumb:hover { background: rgba(196,132,90,0.55); }
+
+/* Close button — sits in the top-right of the panel, stays put while content scrolls */
+.about-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 6;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-family: 'Cinzel', serif; font-size: 0.55rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--clay);
+  border: 1px solid rgba(196,132,90,0.4);
+  padding: 0.3rem 0.7rem;
+  border-radius: 3px;
+  background: rgba(30,21,16,0.85);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.about-close-btn:hover {
+  background: rgba(158,79,46,0.25);
+  color: var(--text);
+}
+.about-close-icon { font-size: 0.95rem; line-height: 1; font-family: serif; }
 
 .about-close { display: none; }
 
@@ -867,7 +892,8 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   /* ── About panel overlay ── */
   .about-panel { border-radius: 0; position: static; max-height: 0; }
   .about-panel.open { max-height: 4000px; }
-  .about-panel-inner { overflow-y: visible; }
+  .about-panel-inner { overflow-y: visible; padding-right: 24px; padding-top: 56px; }
+  .about-close-btn { top: 12px; right: 12px; }
   .about-toggle { padding: 10px 14px; min-height: 44px; }
 
   /* ── Auctioneer gavel panel ── */
@@ -1052,6 +1078,10 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
       </div>
       <!-- About panel (upcoming) — direct child of art-col so it overlays full column -->
       <div class="about-panel" id="upcoming-about-panel">
+        <button class="about-close-btn" onclick="toggleAbout('upcoming')" aria-label="Close about panel">
+          <span class="about-close-icon">×</span>
+          <span class="about-close-label">Close</span>
+        </button>
         <div class="about-panel-inner">
           <div class="about-title" id="upcoming-about-title"></div>
           <div class="about-meta"  id="upcoming-about-meta"></div>
@@ -1131,6 +1161,10 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           <img class="art-img" id="live-img" alt="NFT" />
         </div>
         <div class="about-panel" id="live-about-panel">
+          <button class="about-close-btn" onclick="toggleAbout('live')" aria-label="Close about panel">
+            <span class="about-close-icon">×</span>
+            <span class="about-close-label">Close</span>
+          </button>
           <div class="about-panel-inner">
             <div class="about-title" id="live-about-title"></div>
             <div class="about-meta"  id="live-about-meta"></div>
