@@ -126,6 +126,67 @@ body {
 }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
+/* ── Rich-text editor ── */
+.rte-wrap {
+  border: 1px solid var(--divider);
+  border-radius: var(--r);
+  background: var(--bg);
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.rte-wrap:focus-within { border-color: var(--clay); }
+.rte-toolbar {
+  display: flex; gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--divider);
+}
+.rte-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--text-muted);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.95rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  min-width: 30px;
+  transition: background .15s, color .15s, border-color .15s;
+  user-select: none;
+}
+.rte-btn:hover { background: rgba(196,132,90,0.08); color: var(--text); }
+.rte-btn.active {
+  background: rgba(196,132,90,0.15);
+  border-color: rgba(196,132,90,0.35);
+  color: var(--clay);
+}
+.rte-btn b      { font-weight: 700; }
+.rte-btn .rte-i { font-style: italic; }
+.rte-btn .rte-u { text-decoration: underline; }
+.rte-content {
+  width: 100%;
+  min-height: 110px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 9px 12px;
+  color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+  line-height: 1.65;
+  outline: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.rte-content:empty::before {
+  content: attr(data-placeholder);
+  color: rgba(196,132,90,0.3);
+  pointer-events: none;
+}
+.rte-content p { margin: 0 0 0.6em; }
+.rte-content p:last-child { margin-bottom: 0; }
+.rte-content strong, .rte-content b { color: var(--clay); font-weight: 600; }
+.rte-content em, .rte-content i { font-style: italic; }
+.rte-content u { text-decoration: underline; text-decoration-color: rgba(196,132,90,0.5); }
+
 /* Status toggle */
 .status-group { display: flex; gap: 6px; }
 .status-btn {
@@ -633,7 +694,23 @@ function _buildPieceForm(idx) {
     </div>
     <div class="field">
       <label>About the artwork</label>
-      <textarea id="${_pieceFieldId(idx,'artAbout')}" placeholder="Describe the artwork…" style="min-height:80px">${d.artAbout||''}</textarea>
+      <div class="rte-wrap" data-rte-id="${_pieceFieldId(idx,'artAbout')}">
+        <div class="rte-toolbar" role="toolbar" aria-label="Text formatting">
+          <button type="button" class="rte-btn" data-cmd="bold"      title="Bold (Ctrl+B)"      onmousedown="event.preventDefault()" onclick="rteCmd(this,'bold')"><b>B</b></button>
+          <button type="button" class="rte-btn" data-cmd="italic"    title="Italic (Ctrl+I)"    onmousedown="event.preventDefault()" onclick="rteCmd(this,'italic')"><span class="rte-i">I</span></button>
+          <button type="button" class="rte-btn" data-cmd="underline" title="Underline (Ctrl+U)" onmousedown="event.preventDefault()" onclick="rteCmd(this,'underline')"><span class="rte-u">U</span></button>
+        </div>
+        <div id="${_pieceFieldId(idx,'artAbout')}"
+             class="rte-content"
+             contenteditable="true"
+             data-placeholder="Describe the artwork…"
+             oninput="rteSync(this)"
+             onkeyup="rteUpdateButtons(this)"
+             onmouseup="rteUpdateButtons(this)"
+             onfocus="rteUpdateButtons(this)"
+             onpaste="rtePaste(event)">${_rteSanitize(d.artAbout||'')}</div>
+      </div>
+      <div class="field-hint">Select text and use <b>B</b>, <i>I</i>, <u>U</u> to format. Keyboard: Ctrl/⌘ + B / I / U.</div>
     </div>
     <div class="row2">
       <div class="field"><label>Year</label>
@@ -679,12 +756,108 @@ function selectPiece(idx) {
   _renderPieceTabs();
 }
 
+// ─── Rich-text editor helpers ────────────────────────────────────────────────
+// Sanitize HTML for the About-the-artwork field. Whitelist b/strong, i/em, u, br, p, div.
+// Strips all attributes, scripts, links, and unknown tags.
+function _rteSanitize(html) {
+  if (html == null) return "";
+  const str = String(html);
+  if (!/<[a-z!\/]/i.test(str)) {
+    const tmp = document.createElement("div");
+    tmp.textContent = str;
+    return tmp.innerHTML;
+  }
+  const ALLOWED = new Set(["B","STRONG","I","EM","U","BR","P","DIV"]);
+  const tpl = document.createElement("template");
+  tpl.innerHTML = str;
+  const walk = (node) => {
+    const children = Array.from(node.childNodes);
+    for (const child of children) {
+      if (child.nodeType === 1) {
+        if (!ALLOWED.has(child.tagName)) {
+          while (child.firstChild) node.insertBefore(child.firstChild, child);
+          node.removeChild(child);
+        } else {
+          for (const attr of Array.from(child.attributes)) child.removeAttribute(attr.name);
+          walk(child);
+        }
+      } else if (child.nodeType === 8) {
+        node.removeChild(child);
+      }
+    }
+  };
+  walk(tpl.content);
+  const wrap = document.createElement("div");
+  wrap.appendChild(tpl.content);
+  return wrap.innerHTML;
+}
+
+// Apply a formatting command (bold/italic/underline) to the current selection
+function rteCmd(btn, cmd) {
+  const wrap = btn.closest(".rte-wrap");
+  if (!wrap) return;
+  const content = wrap.querySelector(".rte-content");
+  if (!content) return;
+  content.focus();
+  document.execCommand(cmd, false, null);
+  rteUpdateButtons(content);
+  rteSync(content);
+}
+
+// Sync the current piece's artAbout value as the user types
+function rteSync(content) {
+  if (typeof _activePieceIdx !== "number") return;
+  if (_activePieceIdx < 0 || _activePieceIdx >= _pieces.length) return;
+  _pieces[_activePieceIdx].artAbout = _rteSanitize(content.innerHTML || "").trim();
+}
+
+// Reflect active formatting state on the toolbar buttons
+function rteUpdateButtons(content) {
+  const wrap = content.closest(".rte-wrap");
+  if (!wrap) return;
+  const cmds = ["bold","italic","underline"];
+  cmds.forEach(cmd => {
+    const btn = wrap.querySelector(`.rte-btn[data-cmd="${cmd}"]`);
+    if (!btn) return;
+    let active = false;
+    try { active = document.queryCommandState(cmd); } catch(_) {}
+    btn.classList.toggle("active", active);
+  });
+}
+
+// Paste handler — strip formatting from clipboard, keep plain text
+function rtePaste(e) {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData("text/plain");
+  // Use insertText so it goes through normal undo stack
+  document.execCommand("insertText", false, text);
+}
+
+// Keyboard shortcuts (Ctrl/⌘ + B / I / U) — execCommand handles these natively in
+// contenteditable, but we still want to refresh button state after.
+document.addEventListener("keyup", (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = (e.key || "").toLowerCase();
+  if (k !== "b" && k !== "i" && k !== "u") return;
+  const target = e.target;
+  if (target && target.classList && target.classList.contains("rte-content")) {
+    rteUpdateButtons(target);
+    rteSync(target);
+  }
+});
+
 function _savePieceFormValues(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
   const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
-    if (el) _pieces[idx][f] = el.value.trim();
+    if (!el) return;
+    if (f === "artAbout") {
+      // Rich-text contenteditable — store sanitized HTML
+      _pieces[idx][f] = _rteSanitize(el.innerHTML || "").trim();
+    } else {
+      _pieces[idx][f] = (el.value || "").trim();
+    }
   });
 }
 
