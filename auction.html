@@ -303,6 +303,7 @@ body {
   border-right: 1px solid var(--divider);
   background: var(--bg-alt); overflow: hidden;
   isolation: isolate; height: 100%;
+  position: relative;
 }
 
 .art-frame {
@@ -356,23 +357,41 @@ body {
 .about-toggle-icon { font-size: 0.7rem; line-height: 1; }
 
 /* About panel */
-/* about panel — roadmap-style collapsible */
+/* about panel — roadmap-style collapsible, overlays the art column when open */
 .about-panel {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 5;
+  background: var(--bg-alt);
   overflow: hidden;
   max-height: 0;
   opacity: 0;
   pointer-events: none;
-  transition: max-height 0.6s ease, opacity 0.4s ease;
+  transition: max-height 0.5s ease, opacity 0.35s ease;
+  display: flex; flex-direction: column;
 }
 .about-panel.open {
-  max-height: 2000px;
+  max-height: 75%;
   opacity: 1;
   pointer-events: auto;
   border-top: 1px solid var(--divider);
 }
 .about-panel-inner {
   padding: 22px 24px 28px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  /* subtle custom scrollbar that matches the palette */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(196,132,90,0.4) transparent;
 }
+.about-panel-inner::-webkit-scrollbar { width: 6px; }
+.about-panel-inner::-webkit-scrollbar-track { background: transparent; }
+.about-panel-inner::-webkit-scrollbar-thumb {
+  background: rgba(196,132,90,0.35);
+  border-radius: 3px;
+}
+.about-panel-inner::-webkit-scrollbar-thumb:hover { background: rgba(196,132,90,0.55); }
 
 .about-close { display: none; }
 
@@ -389,7 +408,15 @@ body {
 .about-body {
   font-family: 'Crimson Pro', serif; font-size: 1rem;
   color: var(--text-muted); line-height: 1.85; white-space: pre-wrap;
+  word-wrap: break-word; overflow-wrap: break-word;
 }
+/* Inline rich-text formatting from the admin editor */
+.about-body strong, .about-body b { color: var(--text); font-weight: 600; }
+.about-body em, .about-body i { font-style: italic; }
+.about-body u { text-decoration: underline; text-decoration-color: rgba(196,132,90,0.5); text-underline-offset: 2px; }
+.about-body p { margin: 0 0 0.9em; }
+.about-body p:last-child { margin-bottom: 0; }
+.about-body br + br { display: block; content: ""; margin-top: 0.4em; }
 
 /* ── Right bid column ── */
 .bid-col { overflow-y: auto; display: flex; flex-direction: column; background: var(--bg); height: 100%; min-height: 0; }
@@ -838,7 +865,9 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   .profile-panel { padding: 10px 14px; }
 
   /* ── About panel overlay ── */
-  .about-panel { border-radius: 0; }
+  .about-panel { border-radius: 0; position: static; max-height: 0; }
+  .about-panel.open { max-height: 4000px; }
+  .about-panel-inner { overflow-y: visible; }
   .about-toggle { padding: 10px 14px; min-height: 44px; }
 
   /* ── Auctioneer gavel panel ── */
@@ -1751,6 +1780,46 @@ async function _switchAuction(idx) {
 
 // ─── About panel ──────────────────────────────────────────────────────────────
 
+// Sanitize rich-text "about" content from admin: keep only b/strong, i/em, u, br, p.
+// Anything else (including scripts, links, images, attributes) is stripped.
+function _sanitizeAbout(html) {
+  if (html == null) return "";
+  const str = String(html);
+  // If the string contains no tags at all, treat it as plain text and preserve newlines.
+  if (!/<[a-z!\/]/i.test(str)) {
+    const tmp = document.createElement("div");
+    tmp.textContent = str;
+    return tmp.innerHTML;
+  }
+  const ALLOWED = new Set(["B","STRONG","I","EM","U","BR","P","DIV"]);
+  const tpl = document.createElement("template");
+  tpl.innerHTML = str;
+  const walk = (node) => {
+    const children = Array.from(node.childNodes);
+    for (const child of children) {
+      if (child.nodeType === 1) { // element
+        if (!ALLOWED.has(child.tagName)) {
+          // unwrap unknown tags — keep their text children
+          while (child.firstChild) node.insertBefore(child.firstChild, child);
+          node.removeChild(child);
+        } else {
+          // strip all attributes
+          for (const attr of Array.from(child.attributes)) child.removeAttribute(attr.name);
+          // normalize DIV → P-like block: keep DIVs but they'll render as blocks
+          walk(child);
+        }
+      } else if (child.nodeType === 8) { // comment
+        node.removeChild(child);
+      }
+    }
+  };
+  walk(tpl.content);
+  // serialize
+  const wrap = document.createElement("div");
+  wrap.appendChild(tpl.content);
+  return wrap.innerHTML;
+}
+
 function populateAbout(view) {
   const title  = cfg.artTitle  || "";
   const artist = cfg.artArtist || "";
@@ -1763,7 +1832,7 @@ function populateAbout(view) {
   document.getElementById(`${view}-about-title`).textContent = title;
   const metaParts = [artist, year, medium].filter(Boolean);
   document.getElementById(`${view}-about-meta`).textContent  = metaParts.join(" · ");
-  document.getElementById(`${view}-about-body`).textContent  = about;
+  document.getElementById(`${view}-about-body`).innerHTML    = _sanitizeAbout(about);
   document.getElementById(`${view}-about-toggle`).style.display = "flex";
 }
 
@@ -1879,7 +1948,7 @@ async function loadNFTMeta() {
           img.onload = () => phld && (phld.style.display = "none");
           // Also populate about if not already set
           if (!cfg.artAbout && meta.description) {
-            document.getElementById("live-about-body").textContent = meta.description;
+            document.getElementById("live-about-body").innerHTML = _sanitizeAbout(meta.description);
           }
         }
       } catch(_) {}
