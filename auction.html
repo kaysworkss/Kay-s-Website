@@ -773,6 +773,49 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 @keyframes auc-blink { 0%,100%{opacity:1} 50%{opacity:0} }
 @keyframes auc-shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-5px)} 40%,80%{transform:translateX(5px)} }
 
+/* ── Coming-next banner (live view) ── */
+#coming-next-banner {
+  display: none;
+  align-items: center; justify-content: space-between;
+  padding: 7px 20px;
+  background: rgba(201,153,58,0.08);
+  border-bottom: 1px solid rgba(201,153,58,0.22);
+  gap: 12px;
+  flex-shrink: 0;
+}
+#coming-next-banner.show { display: flex; }
+.cnb-left {
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'Crimson Pro', serif; font-size: 0.88rem;
+  color: var(--text-muted);
+}
+.cnb-label {
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--gold); white-space: nowrap;
+}
+.cnb-thumb {
+  width: 24px; height: 24px; border-radius: 2px;
+  object-fit: cover; border: 1px solid var(--divider);
+  background: var(--bg); flex-shrink: 0;
+}
+.cnb-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.92rem; font-weight: 600;
+  color: var(--text); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 220px;
+}
+.cnb-link {
+  font-family: 'Cinzel', serif; font-size: 0.46rem;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--gold); text-decoration: none;
+  border: 1px solid rgba(201,153,58,0.35); border-radius: 2px;
+  padding: 3px 9px; white-space: nowrap;
+  transition: background 0.2s, color 0.2s;
+  cursor: pointer; background: transparent;
+}
+.cnb-link:hover { background: rgba(201,153,58,0.12); }
+
 /* bid flash effect on history leader */
 @keyframes bid-flash {
   0%   { background: rgba(196,132,90,0.35); }
@@ -1159,6 +1202,16 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
       <button class="mode-tab" id="tab-auctioneer" onclick="setMode('auctioneer')" style="display:none">Auctioneer mode</button>
     </div>
     <div class="online-pill"><span class="live-dot"></span><span id="online-count">Live</span><span id="eligible-count" style="display:none;margin-left:4px;padding:1px 7px;background:rgba(107,124,92,.15);border:1px solid rgba(107,124,92,.3);border-radius:10px;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:.12em;text-transform:uppercase;color:var(--moss)"></span></div>
+  </div>
+
+  <!-- Coming-next banner — shown when a live piece has upcoming sibling(s) -->
+  <div id="coming-next-banner">
+    <div class="cnb-left">
+      <span class="cnb-label">Coming next</span>
+      <img class="cnb-thumb" id="cnb-thumb" src="" alt="" style="display:none">
+      <span class="cnb-title" id="cnb-title"></span>
+    </div>
+    <button class="cnb-link" onclick="_cnbGoUpcoming()">Preview →</button>
   </div>
 
   <!-- Piece selector — only shown when multiple auctions are configured -->
@@ -1695,12 +1748,14 @@ function _loadUpcomingPiece(idx) {
   // Image
   loadStaticImage("upcoming");
 
-  // Per-piece launch countdown — uses the piece's own launchDate if set,
-  // otherwise falls back to the global cfg.launchDate.
-  // Cancel any existing timer first so switching pieces doesn't stack timers.
+  // Per-piece launch countdown — uses the piece's own launchDate.
+  // Falls back to cfg.launchDate ONLY for single-piece (legacy) configs where
+  // there is exactly one auction slot and no per-piece date was configured.
+  // This prevents the global date from bleeding onto pieces that have no individual date.
   if (upcomingTimer) { clearInterval(upcomingTimer); upcomingTimer = null; }
 
-  const dateStr = slot.launchDate || cfg.launchDate || "";
+  const isLegacySingle = _auctions.length <= 1;
+  const dateStr = slot.launchDate || (isLegacySingle ? (cfg.launchDate || "") : "");
   const dateEl  = document.getElementById("upcoming-launch-date");
   const labelEl = document.getElementById("upcoming-launch-label");
 
@@ -1753,6 +1808,9 @@ async function initLive() {
   // Build piece selector if multiple auctions
   await _buildPieceSelector();
 
+  // Show coming-next banner if there are upcoming pieces alongside live ones
+  _renderComingNextBanner();
+
   // Pick start piece — preview override > first live-status piece > 0
   let startIdx;
   if (cfg._preview && typeof cfg._pieceIdx === "number") {
@@ -1762,6 +1820,44 @@ async function initLive() {
     startIdx = firstLive >= 0 ? firstLive : 0;
   }
   await _switchAuction(startIdx);
+}
+
+// ─── Coming-next banner ───────────────────────────────────────────────────────
+// Shows a subtle bar on the live view when there are upcoming sibling pieces.
+
+function _renderComingNextBanner() {
+  const banner = document.getElementById("coming-next-banner");
+  if (!banner) return;
+
+  // Find upcoming pieces (pieces not currently live)
+  const upcomingPieces = _auctions.filter(p => p._effectiveStatus === "upcoming");
+  if (!upcomingPieces.length) { banner.classList.remove("show"); return; }
+
+  // Show the first upcoming piece in the banner
+  const next = upcomingPieces[0];
+  const titleEl = document.getElementById("cnb-title");
+  const thumbEl = document.getElementById("cnb-thumb");
+
+  if (titleEl) titleEl.textContent = next.artTitle || "Next piece";
+  if (thumbEl && next.artImage) {
+    thumbEl.src = toHTTP(next.artImage);
+    thumbEl.style.display = "block";
+    thumbEl.onerror = () => { thumbEl.style.display = "none"; };
+  } else if (thumbEl) {
+    thumbEl.style.display = "none";
+  }
+
+  banner.classList.add("show");
+}
+
+function _cnbGoUpcoming() {
+  // Switch to the upcoming view, preserving the page (no reload needed — just flip views)
+  document.getElementById("view-live").classList.remove("show");
+  document.getElementById("view-upcoming").classList.add("show");
+  // Initialise upcoming view if not already done
+  if (!document.getElementById("upcoming-art-name").textContent || document.getElementById("upcoming-art-name").textContent === "—") {
+    initUpcoming();
+  }
 }
 
 async function _buildPieceSelector() {
@@ -1835,6 +1931,34 @@ async function _switchAuction(idx) {
   if (auctionContract) { try { auctionContract.removeAllListeners(); } catch(_) {} }
   bidHistory = [];
   endTimestamp = 0; isLive = false; minNextBid = 0n;
+
+  // ── Reset all bid-panel UI so no state from the previous piece bleeds through ──
+  document.getElementById("countdown-section").style.display      = "none";
+  document.getElementById("stats-grid").style.display             = "none";
+  document.getElementById("bid-form").style.display               = "none";
+  document.getElementById("history-section").style.display        = "none";
+  document.getElementById("buynow-section").style.display         = "none";
+  document.getElementById("settled-banner").classList.remove("show");
+  document.getElementById("eligibility").className                 = "eligibility";
+  // Clear dynamic content
+  document.getElementById("stat-bid").textContent                 = "—";
+  document.getElementById("stat-bidder").textContent              = "No bids yet";
+  document.getElementById("stat-min").textContent                 = "—";
+  document.getElementById("stat-min-sub").textContent             = "Reserve price";
+  document.getElementById("history-list").innerHTML               = "";
+  document.getElementById("history-count").textContent            = "";
+  document.getElementById("status-line").textContent              = "";
+  document.getElementById("status-line").className                = "status-line";
+  document.getElementById("bid-input").value                      = "";
+  document.getElementById("bid-hint").textContent                 = "Enter an amount above the minimum bid";
+  document.getElementById("bid-btn").disabled                     = true;
+  const _bnBtn = document.getElementById("buynow-btn");
+  if (_bnBtn) { _bnBtn.disabled = true; delete _bnBtn.dataset.price; }
+  // Hide settle/cancel buttons
+  const _settleBtn = document.getElementById("settle-btn");
+  const _cancelBtn = document.getElementById("cancel-btn");
+  if (_settleBtn) _settleBtn.style.display = "none";
+  if (_cancelBtn) _cancelBtn.style.display = "none";
 
   // Update artwork panel
   document.getElementById("live-art-name").textContent   = slot.artTitle  || "—";
