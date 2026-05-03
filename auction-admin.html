@@ -1,207 +1,1576 @@
-/**
- * /api/auction-config
- *
- * GET    — public, returns current auction config as JSON
- * POST   — admin only (X-Admin-Password header), saves new config
- * DELETE — admin only, resets config to default
- *
- * Storage: Vercel Edge Config
- * Env vars: EDGE_CONFIG, EDGE_CONFIG_ID, VERCEL_API_TOKEN, ADMIN_PASSWORD
- */
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/images/kaysworkslogo.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="/images/kayslogo1.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/kayslog02.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/kayslogo3.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auction Admin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap');
 
-const { createClient } = require("@vercel/edge-config");
-
-const EC_KEY = "auction_config";
-
-// ── Edge Config helpers ───────────────────────────────────────────────────────
-
-async function ecGet() {
-  const client = createClient(process.env.EDGE_CONFIG);
-  return await client.get(EC_KEY);
+:root {
+  --clay:      #c4845a;
+  --rust:      #9e4f2e;
+  --sand:      #e8d5b0;
+  --linen:     #f5ede0;
+  --bark:      #4a3228;
+  --moss:      #6b7c5c;
+  --ash:       #8a7060;
+  --ink:       #1e1410;
+  --gold:      #c9993a;
+  --parchment: #ede0c8;
+  --bg:        #1e1510;
+  --bg-alt:    #2a1c14;
+  --text:      #e8d5b0;
+  --text-muted: #9a8070;
+  --divider:   rgba(196,132,90,0.18);
+  --rule:      rgba(196,132,90,0.25);
+  --accent:    #9e4f2e;
+  --success:   #6b7c5c;
+  --warn:      #c9993a;
+  --r: 3px;
 }
 
-async function ecSet(value) {
-  const id    = process.env.EDGE_CONFIG_ID;
-  const token = process.env.VERCEL_API_TOKEN;
-  const res = await fetch(
-    `https://api.vercel.com/v1/edge-config/${id}/items`,
-    {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        items: [{ operation: "upsert", key: EC_KEY, value }],
-      }),
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Crimson Pro', 'Cormorant Garamond', serif;
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+  padding: 48px 20px 80px;
+}
+
+.page { max-width: 660px; margin: 0 auto; }
+
+/* Header */
+.header { border-bottom: 1px solid var(--divider); padding-bottom: 20px; margin-bottom: 36px; }
+.header-eye {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.3em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 8px;
+}
+.header h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2.6rem; font-weight: 300; line-height: 1.05;
+  color: var(--text);
+}
+.header h1 em { font-style: italic; color: var(--clay); }
+.header p {
+  margin-top: 8px; font-family: 'Crimson Pro', serif;
+  font-size: 0.95rem; color: var(--text-muted);
+}
+
+/* Auth gate */
+.auth-gate {
+  background: var(--bg-alt); border: 1px solid var(--divider);
+  border-radius: var(--r); padding: 28px 24px; margin-bottom: 28px;
+}
+.auth-gate p {
+  font-size: 0.88rem; color: var(--text-muted); margin-bottom: 14px;
+}
+.auth-row { display: flex; gap: 10px; }
+.auth-row input {
+  flex: 1; background: var(--bg); border: 1px solid var(--divider);
+  border-radius: var(--r); color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+  padding: 9px 12px; outline: none; transition: border-color .2s;
+}
+.auth-row input:focus { border-color: var(--clay); }
+
+/* Cards */
+.card {
+  background: var(--bg-alt); border: 1px solid var(--divider);
+  border-radius: var(--r); margin-bottom: 16px; overflow: hidden;
+}
+.card-head {
+  padding: 12px 18px; border-bottom: 1px solid var(--divider);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-title {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
+}
+.card-badge { font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.1em; padding: 2px 8px; border-radius: 2px; }
+.badge-live     { background: rgba(107,124,92,0.2); color: var(--moss); border: 1px solid rgba(107,124,92,0.4); }
+.badge-upcoming { background: rgba(201,153,58,0.15); color: var(--gold); border: 1px solid rgba(201,153,58,0.35); }
+.badge-off      { background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid var(--divider); }
+.card-body { padding: 18px; }
+
+/* Fields */
+.field { margin-bottom: 14px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: block; font-family: 'Cinzel', serif;
+  font-size: 0.58rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+}
+.field input, .field textarea, .field select {
+  width: 100%; background: var(--bg); border: 1px solid var(--divider);
+  border-radius: var(--r); color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+  padding: 9px 12px; outline: none; transition: border-color .2s;
+}
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--clay); }
+.field input::placeholder, .field textarea::placeholder { color: rgba(196,132,90,0.3); }
+.field textarea { resize: vertical; min-height: 90px; }
+.field-hint {
+  font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+  color: var(--text-muted); margin-top: 5px; font-style: italic;
+}
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ── Rich-text editor ── */
+.rte-wrap {
+  border: 1px solid var(--divider);
+  border-radius: var(--r);
+  background: var(--bg);
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.rte-wrap:focus-within { border-color: var(--clay); }
+.rte-toolbar {
+  display: flex; gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--divider);
+}
+.rte-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--text-muted);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.95rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  min-width: 30px;
+  transition: background .15s, color .15s, border-color .15s;
+  user-select: none;
+}
+.rte-btn:hover { background: rgba(196,132,90,0.08); color: var(--text); }
+.rte-btn.active {
+  background: rgba(196,132,90,0.15);
+  border-color: rgba(196,132,90,0.35);
+  color: var(--clay);
+}
+.rte-btn b      { font-weight: 700; }
+.rte-btn .rte-i { font-style: italic; }
+.rte-btn .rte-u { text-decoration: underline; }
+.rte-content {
+  width: 100%;
+  min-height: 110px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 9px 12px;
+  color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+  line-height: 1.65;
+  outline: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.rte-content:empty::before {
+  content: attr(data-placeholder);
+  color: rgba(196,132,90,0.3);
+  pointer-events: none;
+}
+.rte-content p { margin: 0 0 0.6em; }
+.rte-content p:last-child { margin-bottom: 0; }
+.rte-content strong, .rte-content b { color: var(--clay); font-weight: 600; }
+.rte-content em, .rte-content i { font-style: italic; }
+.rte-content u { text-decoration: underline; text-decoration-color: rgba(196,132,90,0.5); }
+
+/* Status toggle */
+.status-group { display: flex; gap: 6px; }
+.status-btn {
+  flex: 1; padding: 9px;
+  border: 1px solid var(--divider); border-radius: var(--r);
+  background: var(--bg);
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  cursor: pointer; transition: all .18s; color: var(--text-muted);
+}
+.status-btn.active-live {
+  background: rgba(107,124,92,0.15);
+  border-color: rgba(107,124,92,0.5); color: var(--moss);
+}
+.status-btn.active-upcoming {
+  background: rgba(201,153,58,0.12);
+  border-color: rgba(201,153,58,0.4); color: var(--gold);
+}
+.status-btn.active-off {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(196,132,90,0.35); color: var(--text);
+}
+
+/* Buttons */
+.btn {
+  font-family: 'Cinzel', serif; font-size: 0.62rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  padding: 10px 18px; border-radius: var(--r);
+  border: 1px solid; cursor: pointer; transition: all .18s;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary {
+  background: var(--rust); border-color: var(--rust);
+  color: var(--linen); width: 100%; justify-content: center; padding: 13px;
+}
+.btn-primary:hover:not(:disabled) { background: var(--bark); border-color: var(--bark); }
+.btn-outline {
+  background: transparent;
+  border-color: rgba(196,132,90,0.35); color: var(--text-muted);
+}
+.btn-outline:hover { border-color: var(--clay); color: var(--clay); }
+.btn-danger  { background: transparent; border-color: rgba(158,79,46,0.45); color: var(--clay); }
+.btn-danger:hover:not(:disabled)  { background: var(--rust); border-color: var(--rust); color: var(--linen); }
+
+/* Loading overlay */
+.loading-bar {
+  height: 2px; background: var(--divider); border-radius: 1px;
+  overflow: hidden; margin-bottom: 20px; display: none;
+}
+.loading-bar.show { display: block; }
+.loading-fill {
+  height: 100%; width: 0%; background: var(--clay);
+  animation: loading-anim 1.4s ease-in-out infinite;
+}
+@keyframes loading-anim {
+  0%   { width: 0%;   margin-left: 0; }
+  50%  { width: 60%;  margin-left: 20%; }
+  100% { width: 0%;   margin-left: 100%; }
+}
+
+/* Preview bar */
+.preview-bar {
+  background: var(--bg-alt); border: 1px solid var(--divider);
+  border-radius: var(--r); padding: 13px 16px;
+  align-items: center; justify-content: space-between;
+  margin-bottom: 20px; display: none;
+}
+.preview-bar.show { display: flex; }
+.preview-url {
+  font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+  color: var(--text-muted); word-break: break-all;
+}
+
+/* Sync badge */
+.sync-badge {
+  font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.15em;
+  text-transform: uppercase; padding: 3px 8px; border-radius: 2px;
+  border: 1px solid var(--divider); color: var(--text-muted);
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.sync-badge.synced { color: var(--moss); border-color: rgba(107,124,92,0.4); }
+.sync-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--bark); color: var(--sand);
+  border-radius: var(--r); padding: 12px 16px;
+  font-family: 'Crimson Pro', serif; font-size: 0.9rem;
+  max-width: 300px; z-index: 99; display: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  border: 1px solid var(--divider);
+}
+.toast.show { display: block; }
+.toast-title { font-weight: 600; margin-bottom: 3px; }
+.toast-title.ok  { color: #a8d4a0; }
+.toast-title.err { color: var(--clay); }
+
+/* Danger zone */
+.danger-zone {
+  border: 1px solid rgba(158,79,46,0.35);
+  border-radius: var(--r); padding: 16px 18px; margin-top: 32px;
+}
+.danger-title {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 12px;
+}
+
+/* Hall of fame card */
+.hof-status { font-family:'Crimson Pro',serif; font-size:0.85rem; font-style:italic; color:var(--text-muted); margin-top:10px; min-height:1.4em; }
+.hof-status.ok  { color:var(--moss); }
+.hof-status.err { color:var(--clay); }
+.btn-hof {
+  font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.18em; text-transform:uppercase;
+  background:rgba(201,153,58,0.12); border:1px solid rgba(201,153,58,0.4);
+  color:var(--gold); border-radius:var(--r); padding:10px 18px;
+  cursor:pointer; transition:all .18s; width:100%; text-align:center;
+}
+.btn-hof:hover:not(:disabled) { background:rgba(201,153,58,0.22); border-color:var(--gold); }
+.btn-hof:disabled { opacity:0.45; cursor:not-allowed; }
+
+/* Collector profiles card */
+.profile-list { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+.profile-entry { display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:center; padding:10px 12px; background:var(--bg); border:1px solid var(--divider); border-radius:var(--r); }
+.profile-entry-addr { font-family:'Crimson Pro',serif; font-size:0.8rem; color:var(--clay); font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.profile-entry-name { font-family:'Crimson Pro',serif; font-size:0.88rem; color:var(--text); }
+.profile-entry-avatar { width:28px; height:28px; border-radius:50%; object-fit:cover; border:1px solid var(--divider); display:none; }
+.profile-entry-avatar.show { display:block; }
+.btn-profile-save { font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.14em; text-transform:uppercase; background:transparent; border:1px solid rgba(107,124,92,.4); color:var(--moss); border-radius:var(--r); padding:5px 10px; cursor:pointer; transition:all .18s; white-space:nowrap; }
+.btn-profile-save:hover { background:rgba(107,124,92,.15); }
+.profile-search-row { display:flex; gap:8px; }
+.profile-status { font-family:'Crimson Pro',serif; font-size:0.82rem; font-style:italic; color:var(--text-muted); margin-top:8px; min-height:1.2em; }
+.profile-status.ok { color:var(--moss); }
+.profile-status.err { color:var(--clay); }
+
+/* Piece tabs */
+.piece-tab-btn {
+  font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.14em; text-transform:uppercase;
+  padding:10px 16px; border:none; background:transparent; color:var(--text-muted);
+  cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap;
+  transition:color .2s, border-color .2s; flex-shrink:0;
+}
+.piece-tab-btn:hover { color:var(--clay); }
+.piece-tab-btn.active { color:var(--sand); border-bottom-color:var(--clay); }
+.piece-remove-btn {
+  font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.1em; text-transform:uppercase;
+  background:transparent; border:1px solid rgba(158,79,46,.35); color:var(--clay);
+  border-radius:var(--r); padding:3px 8px; cursor:pointer; margin-left:4px; transition:all .18s;
+}
+.piece-remove-btn:hover { background:var(--rust); color:var(--linen); border-color:var(--rust); }
+
+/* Preview card */
+.preview-card { background: rgba(201,153,58,0.05); border: 1px solid rgba(201,153,58,0.25); border-radius: var(--r); padding: 16px 18px; margin-top: 16px; }
+.preview-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.preview-card-title { font-family:'Cinzel',serif; font-size: 0.56rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); }
+.preview-desc { font-family:'Crimson Pro',serif; font-size: 0.88rem; color: var(--text-muted); font-style: italic; margin-bottom: 14px; line-height: 1.5; }
+.btn-preview { display: inline-flex; align-items: center; gap: 8px; font-family:'Cinzel',serif; font-size: 0.52rem; letter-spacing: 0.18em; text-transform: uppercase; background: transparent; border: 1px solid rgba(201,153,58,0.5); color: var(--gold); border-radius: var(--r); padding: 9px 16px; cursor: pointer; text-decoration: none; transition: all .2s; width: 100%; justify-content: center; }
+.btn-preview:hover { background: rgba(201,153,58,0.1); border-color: var(--gold); }
+.preview-piece-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.preview-piece-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: var(--bg); border: 1px solid var(--divider); border-radius: var(--r); }
+.preview-piece-name { font-size: 0.85rem; color: var(--text); }
+.btn-preview-piece { font-family:'Cinzel',serif; font-size: 0.44rem; letter-spacing: 0.12em; text-transform: uppercase; background: transparent; border: 1px solid rgba(201,153,58,0.35); color: var(--gold); border-radius: var(--r); padding: 4px 10px; cursor: pointer; white-space: nowrap; transition: all .18s; text-decoration: none; }
+.btn-preview-piece:hover { background: rgba(201,153,58,0.1); }
+
+/* Main content hidden until authed */
+#main-content { display: none; }
+</style>
+<!-- Vercel Web Analytics -->
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="header-eye">// Admin Panel</div>
+    <h1>Auction<br><em>Control</em></h1>
+    <p>Configure what collectors see on the auction page. Changes are saved to the server and take effect immediately.</p>
+  </div>
+
+  <!-- Auth gate -->
+  <div class="auth-gate" id="auth-gate">
+    <div class="card-title" style="margin-bottom:10px">Admin password</div>
+    <p>Enter your admin password to load and edit the auction configuration.</p>
+    <div class="auth-row">
+      <input type="password" id="admin-pw" placeholder="••••••••••••" onkeydown="if(event.key==='Enter')authenticate()" />
+      <button class="btn btn-outline" onclick="authenticate()">Unlock →</button>
+    </div>
+  </div>
+
+  <div class="loading-bar" id="loading-bar"><div class="loading-fill"></div></div>
+
+  <!-- Main content (shown after auth) -->
+  <div id="main-content">
+
+    <!-- Status -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Auction status</div>
+        <div class="card-badge badge-off" id="status-badge">Off</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>Collector-facing status</label>
+          <div class="status-group">
+            <button class="status-btn active-off" id="btn-off"      onclick="setStatus('off')">Off</button>
+            <button class="status-btn"             id="btn-upcoming" onclick="setStatus('upcoming')">Upcoming</button>
+            <button class="status-btn"             id="btn-live"     onclick="setStatus('live')">Live</button>
+          </div>
+        </div>
+        <div class="field-hint">
+          <b>Off</b> — landing page only, no auction shown.<br>
+          <b>Upcoming</b> — shows countdown to launch date, no bidding.<br>
+          <b>Live</b> — full auction page with bidding enabled.
+        </div>
+      </div>
+    </div>
+
+    <!-- Auction config -->
+    <!-- ── Multi-auction editor ── -->
+    <div class="card" id="auction-card">
+      <div class="card-head">
+        <div class="card-title">Auction pieces</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span id="piece-count-badge" class="card-badge badge-off">1 piece</span>
+          <button class="btn btn-outline" onclick="addPiece()" style="padding:4px 10px;font-size:0.5rem">+ Add piece</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0">
+        <!-- Piece tabs -->
+        <div id="piece-tabs" style="display:flex;border-bottom:1px solid var(--divider);overflow-x:auto;"></div>
+        <!-- Piece forms — one per piece -->
+        <div id="piece-forms" style="padding:18px"></div>
+      </div>
+    </div>
+
+    <!-- Launch date (upcoming) -->
+    <div class="card" id="upcoming-date-field" style="display:none">
+      <div class="card-head"><div class="card-title">Upcoming countdown</div></div>
+      <div class="card-body">
+        <div class="field">
+          <label>Launch date &amp; time</label>
+          <input type="datetime-local" id="launch-date" />
+          <div class="field-hint">Shown on the upcoming auction page as a countdown</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Off-state landing countdown -->
+    <div class="card" id="landing-countdown-field" style="display:none">
+      <div class="card-head"><div class="card-title">Off-state countdown</div></div>
+      <div class="card-body">
+        <div class="field">
+          <label>Reveal date &amp; time (optional)</label>
+          <input type="datetime-local" id="landing-countdown-date" />
+          <div class="field-hint">Adds a static countdown beneath the "Check back soon" text on the landing page. Leave blank to hide it. Use this to build anticipation before revealing artworks.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RPC -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Network</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>RPC URL (optional — uses MetaMask if blank)</label>
+          <input id="rpc-url" placeholder="https://eth-mainnet.g.alchemy.com/v2/…" />
+          <div class="field-hint">Provide a public RPC so collectors without MetaMask can view auction state read-only</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save -->
+    <button class="btn btn-primary" id="save-btn" onclick="saveConfig()">Save &amp; publish</button>
+
+    <!-- Preview bar -->
+    <div class="preview-bar" id="preview-bar" style="margin-top:16px">
+      <div>
+        <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px">Collector page</div>
+        <div class="preview-url" id="preview-url"></div>
+      </div>
+      <a id="preview-link" href="https://www.kaysworks.com/auction" target="_blank" class="btn btn-outline" style="white-space:nowrap;text-decoration:none">Open →</a>
+    </div>
+
+    <!-- Preview mode -->
+    <div class="preview-card" id="preview-launch-card" style="display:none">
+      <div class="preview-card-head">
+        <span class="preview-card-title">◈ &nbsp;Preview mode</span>
+        <span style="font-family:'Cinzel',serif;font-size:0.44rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(201,153,58,0.1);color:var(--gold);border:1px solid rgba(201,153,58,0.25)">Admin only</span>
+      </div>
+      <div class="preview-desc">Inspect the full live auction UI with your current config before making it public. Opens in a new tab — only you can see it. Status remains <em>Off</em> for collectors.</div>
+      <div class="preview-piece-list" id="preview-piece-list"></div>
+      <button class="btn-preview" onclick="launchPreview()">
+        ◈ &nbsp;Preview all pieces
+      </button>
+    </div>
+
+    <!-- Hall of Fame -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-head">
+        <div class="card-title">Hall of Fame</div>
+        <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(201,153,58,0.12);color:var(--gold);border:1px solid rgba(201,153,58,0.3)">Permanent record</span>
+      </div>
+      <div class="card-body">
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">
+          Save an auction's final result to the public Hall of Fame. The winner and bid are read from the contract. Optionally override the winner's name and avatar below.
+        </p>
+        <div class="field" style="margin-bottom:10px" id="hof-piece-field">
+          <label>Select piece to save</label>
+          <select id="hof-piece-select" style="width:100%;background:var(--bg-alt);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:8px 10px;outline:none;">
+            <option value="0">Piece 1</option>
+          </select>
+          <div class="field-hint">Which auction piece to record in the Hall of Fame</div>
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label>Winner display name (optional override)</label>
+          <input id="hof-winner-name" placeholder="e.g. Adebayo — leave blank to use their wallet address" />
+          <div class="field-hint">Overrides the collector's own profile name in the Hall of Fame for this auction only.</div>
+        </div>
+        <div class="field" style="margin-bottom:14px">
+          <label>Winner avatar URL (optional override)</label>
+          <input id="hof-winner-avatar" placeholder="https://… — leave blank to use their profile avatar" />
+        </div>
+        <button class="btn-hof" id="hof-btn" onclick="saveToHallOfFame()">
+          ◇ &nbsp;Save auction to Hall of Fame
+        </button>
+        <div class="hof-status" id="hof-status"></div>
+      </div>
+    </div>
+
+    <!-- Auctioneer Profile -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-head">
+        <div class="card-title">Auctioneer Profile</div>
+        <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(196,132,90,0.1);color:var(--clay);border:1px solid rgba(196,132,90,0.3)">Kay · Host</span>
+      </div>
+      <div class="card-body">
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">
+          Set your display name and avatar as the auctioneer. This appears next to every message you send in the collector room and in the Hall of Fame chat archive.
+        </p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);">
+          <img id="auc-avatar-preview" class="profile-entry-avatar" src="" alt="" style="width:40px;height:40px;">
+          <div>
+            <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--clay);margin-bottom:2px">Kay · Auctioneer</div>
+            <div id="auc-current-name" style="font-family:'Crimson Pro',serif;font-size:0.88rem;color:var(--text-muted);font-style:italic">Loading…</div>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:8px">
+          <label>Display name</label>
+          <input id="auc-name" placeholder="e.g. Kayode Oyeniyi" maxlength="40" style="width:100%;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:9px 12px;outline:none;transition:border-color .2s;" />
+        </div>
+        <div class="field" style="margin-bottom:14px">
+          <label>Avatar URL</label>
+          <input id="auc-avatar" placeholder="https://…" maxlength="300" oninput="previewAucAvatar()" style="width:100%;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:9px 12px;outline:none;transition:border-color .2s;" />
+        </div>
+        <button class="btn btn-outline" id="auc-save-btn" onclick="saveAuctioneerProfile()" style="width:100%;justify-content:center;">Save auctioneer profile</button>
+        <div class="profile-status" id="auc-profile-status"></div>
+      </div>
+    </div>
+
+    <!-- Collector Profiles -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-head">
+        <div class="card-title">Collector Profiles</div>
+        <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(107,124,92,0.1);color:var(--moss);border:1px solid rgba(107,124,92,0.3)">Name &amp; Avatar</span>
+      </div>
+      <div class="card-body">
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:14px">
+          Assign a display name and avatar to any participating wallet. These appear in the Hall of Fame chat archive and the live collector room.
+        </p>
+        <div class="profile-search-row">
+          <input id="profile-wallet-input" style="flex:1;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:9px 12px;outline:none;transition:border-color .2s;" placeholder="0x… wallet address" onkeydown="if(event.key==='Enter')lookupProfile()" />
+          <button class="btn btn-outline" onclick="lookupProfile()" style="white-space:nowrap">Look up →</button>
+        </div>
+        <div class="profile-status" id="profile-lookup-status"></div>
+
+        <div id="profile-edit-form" style="display:none;margin-top:14px;padding:14px;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <img id="pef-avatar-preview" class="profile-entry-avatar" src="" alt="">
+            <div>
+              <div id="pef-addr" style="font-family:'Crimson Pro',serif;font-size:0.8rem;color:var(--clay);font-style:italic;"></div>
+              <div id="pef-existing" style="font-family:'Crimson Pro',serif;font-size:0.78rem;color:var(--text-muted);font-style:italic;"></div>
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:8px">
+            <label>Display name</label>
+            <input id="pef-name" placeholder="e.g. Adebayo" maxlength="40" style="width:100%;background:var(--bg-alt);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:8px 10px;outline:none;" />
+          </div>
+          <div class="field" style="margin-bottom:12px">
+            <label>Avatar URL</label>
+            <input id="pef-avatar" placeholder="https://…" maxlength="300" oninput="previewAvatar()" style="width:100%;background:var(--bg-alt);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:8px 10px;outline:none;" />
+          </div>
+          <button class="btn btn-outline" id="pef-save-btn" onclick="saveProfile()" style="width:100%;justify-content:center;">Save profile</button>
+          <div class="profile-status" id="pef-status"></div>
+        </div>
+
+        <div id="profile-list-wrap" style="margin-top:16px;display:none;">
+          <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Saved profiles</div>
+          <div class="profile-list" id="profile-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger zone -->
+    <div class="danger-zone">
+      <div class="danger-title">Danger zone</div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Clear all saved configuration. The collector page will show the landing state.</p>
+      <button class="btn btn-danger" id="clear-btn" onclick="clearConfig()">Clear all configuration</button>
+    </div>
+
+  </div><!-- /main-content -->
+</div><!-- /page -->
+
+<div class="toast" id="toast">
+  <div class="toast-title" id="toast-title"></div>
+  <div id="toast-body" style="font-size:11px;color:rgba(245,240,232,.6)"></div>
+</div>
+
+<script>
+// ─── Config ───────────────────────────────────────────────────────────────────
+// The API endpoint — adjust if your Vercel project uses a custom domain.
+const API_URL = "/api/auction-config";
+
+// Admin password is kept only in memory for the session; never persisted.
+let adminPassword = "";
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+async function authenticate() {
+  const pw = document.getElementById("admin-pw").value;
+  if (!pw) { toast("err", "Password required", "Please enter your admin password"); return; }
+
+  setLoading(true);
+  try {
+    // Verify the password by attempting a POST with no-op data
+    const res = await apiFetch("GET");
+    if (res.status === 401) {
+      toast("err", "Wrong password", "Admin password is incorrect");
+      return;
     }
-  );
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`Edge Config write failed ${res.status}: ${txt}`);
+    adminPassword = pw;
+    document.getElementById("auth-gate").style.display = "none";
+    document.getElementById("main-content").style.display = "block";
+    populateForm(res.config);
+    updatePreviewBar();
+    loadAuctioneerProfile();
+    toast("ok", "Unlocked", "Configuration loaded from server");
+  } catch (err) {
+    toast("err", "Connection error", err.message);
+  } finally {
+    setLoading(false);
   }
 }
 
-async function ecDel() {
-  const id    = process.env.EDGE_CONFIG_ID;
-  const token = process.env.VERCEL_API_TOKEN;
-  const res = await fetch(
-    `https://api.vercel.com/v1/edge-config/${id}/items`,
-    {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        items: [{ operation: "delete", key: EC_KEY }],
-      }),
+// ─── API helpers ──────────────────────────────────────────────────────────────
+
+async function apiFetch(method, body) {
+  const opts = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Password": adminPassword,
+    },
+  };
+  if (body) opts.body = JSON.stringify(body);
+
+  const res = await fetch(API_URL, opts);
+  const json = await res.json();
+  if (!json.ok && res.status !== 401) throw new Error(json.error || "Unknown error");
+  json.status = res.status;
+  return json;
+}
+
+// ─── Populate form from config object ────────────────────────────────────────
+
+// ─── Multi-auction piece editor ──────────────────────────────────────────────
+
+let _pieces = []; // array of piece objects
+let _activePieceIdx = 0;
+// Expose for console debugging
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "_pieces", { get: () => _pieces });
+  Object.defineProperty(window, "_activePieceIdx", { get: () => _activePieceIdx });
+}
+
+function _pieceFieldId(idx, field) { return `piece-${idx}-${field}`; }
+
+function _buildPieceForm(idx) {
+  const d = _pieces[idx] || {};
+  return `
+    <div class="field">
+      <label>Contract address</label>
+      <input id="${_pieceFieldId(idx,'contractAddr')}" placeholder="0x…" value="${d.contractAddr||''}"
+        oninput="(function(el){el.style.borderColor=el.value&&!ethers.isAddress(el.value.trim())?'var(--accent)':''})(this)"/>
+      <div class="field-hint">Your deployed FlexAuction contract address for this piece</div>
+    </div>
+    <div class="field">
+      <label>Title</label>
+      <input id="${_pieceFieldId(idx,'artTitle')}" placeholder="e.g. ìgbáradì" value="${d.artTitle||''}"/>
+    </div>
+    <div class="field">
+      <label>Artist name</label>
+      <input id="${_pieceFieldId(idx,'artArtist')}" placeholder="e.g. Kayode Oyeniyi" value="${d.artArtist||''}"/>
+    </div>
+    <div class="field">
+      <label>About the artwork</label>
+      <div class="rte-wrap" data-rte-id="${_pieceFieldId(idx,'artAbout')}">
+        <div class="rte-toolbar" role="toolbar" aria-label="Text formatting">
+          <button type="button" class="rte-btn" data-cmd="bold"      title="Bold (Ctrl+B)"      onmousedown="event.preventDefault()" onclick="rteCmd(this,'bold')"><b>B</b></button>
+          <button type="button" class="rte-btn" data-cmd="italic"    title="Italic (Ctrl+I)"    onmousedown="event.preventDefault()" onclick="rteCmd(this,'italic')"><span class="rte-i">I</span></button>
+          <button type="button" class="rte-btn" data-cmd="underline" title="Underline (Ctrl+U)" onmousedown="event.preventDefault()" onclick="rteCmd(this,'underline')"><span class="rte-u">U</span></button>
+        </div>
+        <div id="${_pieceFieldId(idx,'artAbout')}"
+             class="rte-content"
+             contenteditable="true"
+             data-placeholder="Describe the artwork…"
+             oninput="rteSync(this)"
+             onkeyup="rteUpdateButtons(this)"
+             onmouseup="rteUpdateButtons(this)"
+             onfocus="rteUpdateButtons(this)"
+             onpaste="rtePaste(event)"></div>
+      </div>
+      <div class="field-hint">Select text and use <b>B</b>, <i>I</i>, <u>U</u> to format. Keyboard: Ctrl/⌘ + B / I / U.</div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Year</label>
+        <input id="${_pieceFieldId(idx,'artYear')}" placeholder="2025" value="${d.artYear||''}"/></div>
+      <div class="field"><label>Medium</label>
+        <input id="${_pieceFieldId(idx,'artMedium')}" placeholder="Digital painting" value="${d.artMedium||''}"/></div>
+    </div>
+    <div class="field">
+      <label>Image URL</label>
+      <input id="${_pieceFieldId(idx,'artImage')}" placeholder="https://… or ipfs://…" value="${d.artImage||''}"/>
+      <div class="field-hint">Leave blank to auto-fetch from the NFT contract</div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Gate token name</label>
+        <input id="${_pieceFieldId(idx,'gateName')}" placeholder="e.g. Entry Token" value="${d.gateName||''}"/></div>
+      <div class="field"><label>Gate link</label>
+        <input id="${_pieceFieldId(idx,'gateLink')}" placeholder="https://…" value="${d.gateLink||''}"/></div>
+    </div>`;
+}
+
+function _renderPieceTabs() {
+  const tabs  = document.getElementById("piece-tabs");
+  const forms = document.getElementById("piece-forms");
+  if (!tabs || !forms) return;
+
+  tabs.innerHTML = _pieces.map((p, i) => `
+    <button class="piece-tab-btn ${i===_activePieceIdx?'active':''}" onclick="selectPiece(${i})">
+      ${p.artTitle || 'Piece '+(i+1)}
+      ${_pieces.length > 1 ? `<button class="piece-remove-btn" onclick="event.stopPropagation();removePiece(${i})">✕</button>` : ''}
+    </button>`).join("");
+
+  forms.innerHTML = _buildPieceForm(_activePieceIdx);
+
+  // Populate the rich-text editor's content via DOM API, NOT via the form
+  // template. Embedding sanitized HTML inside a larger innerHTML string can
+  // confuse the HTML parser on edge cases (block elements inside block
+  // elements, etc.), and we've seen that drop chunks of pasted content.
+  const editor = document.getElementById(_pieceFieldId(_activePieceIdx, 'artAbout'));
+  const piece  = _pieces[_activePieceIdx] || {};
+  if (editor) {
+    editor.innerHTML = _rteSanitize(piece.artAbout || "");
+  }
+
+  const badge = document.getElementById("piece-count-badge");
+  if (badge) badge.textContent = _pieces.length + " piece" + (_pieces.length===1?"":"s");
+  _showPreviewCard();
+}
+
+function selectPiece(idx) {
+  // Save current form values before switching
+  _savePieceFormValues(_activePieceIdx);
+  _activePieceIdx = idx;
+  _renderPieceTabs();
+}
+
+// ─── Rich-text editor helpers ────────────────────────────────────────────────
+// Sanitize HTML for the About-the-artwork field. Whitelist b/strong, i/em, u, br, p, div.
+// Strips all attributes, scripts, links, and unknown tags.
+// Block-level elements (h1-h6, li, blockquote, etc.) are converted to <p> so
+// pasted content from Word/Google Docs/web pages keeps its line structure.
+function _rteSanitize(html) {
+  if (html == null) return "";
+  const str = String(html);
+  if (!/<[a-z!\/]/i.test(str)) {
+    const tmp = document.createElement("div");
+    tmp.textContent = str;
+    return tmp.innerHTML;
+  }
+  // Tags we keep as-is
+  const ALLOWED = new Set(["B","STRONG","I","EM","U","BR","P","DIV"]);
+  // Block-level tags we convert to <p> so each becomes its own line
+  const BLOCK_TO_P = new Set(["H1","H2","H3","H4","H5","H6","LI","BLOCKQUOTE","ARTICLE","SECTION","HEADER","FOOTER","ASIDE"]);
+  // Wrappers we strip but recurse into to keep their children
+  // (UL, OL, SPAN, FONT, A, etc. fall through to the unwrap path below)
+  // Tags whose entire subtree should be DROPPED (not unwrapped)
+  const DROP_SUBTREE = new Set(["SCRIPT","STYLE","IFRAME","OBJECT","EMBED","NOSCRIPT","HEAD","META","LINK","TITLE"]);
+
+  // Use a real <body> via DOMParser-equivalent; <template> can swallow things
+  // like <li> that are not valid as direct children of a fragment.
+  const root = document.createElement("div");
+  root.innerHTML = str;
+
+  // Recursive sanitize-in-place. Returns the next node to process.
+  function sanitize(node) {
+    if (node.nodeType === 8) { // comment
+      const next = node.nextSibling;
+      node.remove();
+      return next;
     }
-  );
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`Edge Config delete failed ${res.status}: ${txt}`);
+    if (node.nodeType !== 1) return node.nextSibling;
+
+    const tag = node.tagName;
+
+    if (DROP_SUBTREE.has(tag)) {
+      const next = node.nextSibling;
+      node.remove();
+      return next;
+    }
+
+    // Sanitize all children first (depth-first)
+    let child = node.firstChild;
+    while (child) child = sanitize(child);
+
+    if (ALLOWED.has(tag)) {
+      // Strip every attribute
+      while (node.attributes.length) node.removeAttribute(node.attributes[0].name);
+      return node.nextSibling;
+    }
+
+    if (BLOCK_TO_P.has(tag)) {
+      const p = document.createElement("p");
+      while (node.firstChild) p.appendChild(node.firstChild);
+      node.replaceWith(p);
+      return p.nextSibling;
+    }
+
+    // Default: unwrap (move children up, drop the tag itself)
+    const parent = node.parentNode;
+    const next = node.nextSibling;
+    while (node.firstChild) parent.insertBefore(node.firstChild, node);
+    node.remove();
+    return next;
+  }
+
+  let n = root.firstChild;
+  while (n) n = sanitize(n);
+
+  return root.innerHTML;
+}
+
+// Apply a formatting command (bold/italic/underline) to the current selection
+function rteCmd(btn, cmd) {
+  const wrap = btn.closest(".rte-wrap");
+  if (!wrap) return;
+  const content = wrap.querySelector(".rte-content");
+  if (!content) return;
+  content.focus();
+  document.execCommand(cmd, false, null);
+  rteUpdateButtons(content);
+  rteSync(content);
+}
+
+// Sync the current piece's artAbout value as the user types
+function rteSync(content) {
+  if (typeof _activePieceIdx !== "number") return;
+  if (_activePieceIdx < 0 || _activePieceIdx >= _pieces.length) return;
+  _pieces[_activePieceIdx].artAbout = _rteSanitize(content.innerHTML || "").trim();
+}
+
+// Reflect active formatting state on the toolbar buttons
+function rteUpdateButtons(content) {
+  const wrap = content.closest(".rte-wrap");
+  if (!wrap) return;
+  const cmds = ["bold","italic","underline"];
+  cmds.forEach(cmd => {
+    const btn = wrap.querySelector(`.rte-btn[data-cmd="${cmd}"]`);
+    if (!btn) return;
+    let active = false;
+    try { active = document.queryCommandState(cmd); } catch(_) {}
+    btn.classList.toggle("active", active);
+  });
+}
+
+// Paste handler — strip formatting from clipboard but preserve line breaks.
+// We deliberately use text/plain (not text/html) so we don't pull in arbitrary
+// styles, but we convert newlines into proper <br> elements so multi-paragraph
+// pastes don't collapse into one line.
+function rtePaste(e) {
+  e.preventDefault();
+  const cd = e.clipboardData || window.clipboardData;
+  if (!cd) return;
+  // Prefer plain text — it's the cleanest. If it's empty (rare; some apps
+  // only put HTML on the clipboard) fall back to extracting text from the HTML.
+  let text = cd.getData("text/plain") || "";
+  if (!text) {
+    const html = cd.getData("text/html") || "";
+    if (html) {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      text = tmp.textContent || tmp.innerText || "";
+    }
+  }
+  if (!text) return;
+
+  // Insert as a real DOM fragment so multi-line content keeps its breaks.
+  // execCommand("insertText") swallows newlines on some browsers; building
+  // the fragment ourselves avoids that.
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+
+  const lines = text.split(/\r\n|\r|\n/);
+  const frag = document.createDocumentFragment();
+  lines.forEach((line, i) => {
+    if (i > 0) frag.appendChild(document.createElement("br"));
+    if (line) frag.appendChild(document.createTextNode(line));
+  });
+  // Track the last node so we can place the caret after it
+  const lastChild = frag.lastChild;
+  range.insertNode(frag);
+  if (lastChild) {
+    const newRange = document.createRange();
+    newRange.setStartAfter(lastChild);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  }
+
+  // Notify rteSync explicitly because our manual DOM ops don't always trigger
+  // the `input` event on every browser.
+  const editor = e.target && e.target.closest ? e.target.closest(".rte-content") : null;
+  if (editor) {
+    rteSync(editor);
+    rteUpdateButtons(editor);
   }
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
-function isAuthorised(req) {
-  const pw = process.env.ADMIN_PASSWORD;
-  if (!pw) {
-    console.warn("ADMIN_PASSWORD not set — admin routes unprotected!");
-    return true;
+// Keyboard shortcuts (Ctrl/⌘ + B / I / U) — execCommand handles these natively in
+// contenteditable, but we still want to refresh button state after.
+document.addEventListener("keyup", (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = (e.key || "").toLowerCase();
+  if (k !== "b" && k !== "i" && k !== "u") return;
+  const target = e.target;
+  if (target && target.classList && target.classList.contains("rte-content")) {
+    rteUpdateButtons(target);
+    rteSync(target);
   }
-  return req.headers["x-admin-password"] === pw;
+});
+
+function _savePieceFormValues(idx) {
+  if (idx < 0 || idx >= _pieces.length) return;
+  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink"];
+  fields.forEach(f => {
+    const el = document.getElementById(_pieceFieldId(idx, f));
+    if (!el) return;
+    if (f === "artAbout") {
+      // Rich-text contenteditable — store sanitized HTML
+      _pieces[idx][f] = _rteSanitize(el.innerHTML || "").trim();
+    } else {
+      _pieces[idx][f] = (el.value || "").trim();
+    }
+  });
 }
 
-// ── CORS ──────────────────────────────────────────────────────────────────────
-
-function cors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Admin-Password");
+function addPiece() {
+  _savePieceFormValues(_activePieceIdx);
+  _pieces.push({});
+  _activePieceIdx = _pieces.length - 1;
+  _renderPieceTabs();
 }
 
-// ── Sanitisers ────────────────────────────────────────────────────────────────
+function removePiece(idx) {
+  if (_pieces.length <= 1) return;
+  if (!confirm("Remove this piece from the auction?")) return;
+  _savePieceFormValues(idx);
+  _pieces.splice(idx, 1);
+  _activePieceIdx = Math.min(_activePieceIdx, _pieces.length - 1);
+  _renderPieceTabs();
+}
 
-function sanitisePiece(p) {
-  if (!p || typeof p !== "object") return null;
+function _readAllPieces() {
+  _savePieceFormValues(_activePieceIdx);
+  return _pieces;
+}
+
+function populateForm(cfg) {
+  if (!cfg) return;
+
+  // Multi-auction: auctions array
+  if (Array.isArray(cfg.auctions) && cfg.auctions.length > 0) {
+    _pieces = cfg.auctions.map(a => ({...a}));
+  } else if (cfg.contractAddr) {
+    // Legacy single-auction
+    _pieces = [{
+      contractAddr: cfg.contractAddr || "",
+      artTitle:     cfg.artTitle     || "",
+      artArtist:    cfg.artArtist    || "",
+      artAbout:     cfg.artAbout     || "",
+      artYear:      cfg.artYear      || "",
+      artMedium:    cfg.artMedium    || "",
+      artImage:     cfg.artImage     || "",
+      gateName:     cfg.gateName     || "",
+      gateLink:     cfg.gateLink     || "",
+    }];
+  } else {
+    _pieces = [{}];
+  }
+  _activePieceIdx = 0;
+  _renderPieceTabs();
+
+  if (document.getElementById("rpc-url"))    document.getElementById("rpc-url").value    = cfg.rpcUrl    || "";
+  if (document.getElementById("launch-date")) document.getElementById("launch-date").value = cfg.launchDate || "";
+  if (document.getElementById("landing-countdown-date")) document.getElementById("landing-countdown-date").value = cfg.landingCountdown || "";
+  setStatus(cfg.status || "off", false);
+  _populateHofSelect();
+  _showPreviewCard();
+}
+
+function _populateHofSelect() {
+  const sel   = document.getElementById("hof-piece-select");
+  const field = document.getElementById("hof-piece-field");
+  if (!sel) return;
+  sel.innerHTML = _pieces.map((p, i) =>
+    `<option value="${i}">${p.artTitle || "Piece " + (i+1)}</option>`
+  ).join("");
+  if (field) field.style.display = _pieces.length > 1 ? "block" : "none";
+}
+
+// ─── Status toggle ────────────────────────────────────────────────────────────
+
+function setStatus(s, updateUI = true) {
+  const ids = ["off","upcoming","live"];
+  const classes = { off: "active-off", upcoming: "active-upcoming", live: "active-live" };
+  const labels  = { off: "Off", upcoming: "Upcoming", live: "Live" };
+  const badges  = { off: "badge-off", upcoming: "badge-upcoming", live: "badge-live" };
+
+  ids.forEach(id => {
+    const btn = document.getElementById("btn-" + id);
+    btn.className = "status-btn" + (id === s ? " " + classes[id] : "");
+  });
+
+  const badge = document.getElementById("status-badge");
+  badge.textContent = labels[s];
+  badge.className = "card-badge " + badges[s];
+
+  const udf = document.getElementById("upcoming-date-field");
+  if (udf) udf.style.display = s === "upcoming" ? "block" : "none";
+
+  const lcf = document.getElementById("landing-countdown-field");
+  if (lcf) lcf.style.display = s === "off" ? "block" : "none";
+}
+
+// ─── Contract validation ─────────────────────────────────────────────────────
+// Validation is now handled inline in each piece form (see _buildPieceForm)
+function onContractInput() {}
+
+// ─── Save ─────────────────────────────────────────────────────────────────────
+
+async function saveConfig() {
+  const pieces = _readAllPieces();
+
+  // Validate all contract addresses
+  for (let i = 0; i < pieces.length; i++) {
+    const addr = pieces[i].contractAddr;
+    if (addr && !ethers.isAddress(addr)) {
+      toast("err", "Invalid address", `Piece ${i+1}: "${addr}" is not a valid Ethereum address`);
+      selectPiece(i); return;
+    }
+  }
+
+  const status = ["live","upcoming","off"].find(s =>
+    document.getElementById("btn-" + s).className.includes("active")
+  ) || "off";
+
+  // Keep legacy single-auction fields populated for backward compat
+  const primary = pieces[0] || {};
+  const cfg = {
+    status,
+    // Legacy fields (first piece) so old API readers still work
+    contractAddr: primary.contractAddr || "",
+    artTitle:     primary.artTitle     || "",
+    artArtist:    primary.artArtist    || "",
+    artAbout:     primary.artAbout     || "",
+    artYear:      primary.artYear      || "",
+    artMedium:    primary.artMedium    || "",
+    artImage:     primary.artImage     || "",
+    gateName:     primary.gateName     || "",
+    gateLink:     primary.gateLink     || "",
+    // Multi-auction array
+    auctions:     pieces,
+    rpcUrl:       document.getElementById("rpc-url").value.trim(),
+    launchDate:   document.getElementById("launch-date")?.value || "",
+    landingCountdown: document.getElementById("landing-countdown-date")?.value || "",
+  };
+
+  setLoading(true);
+  setBusy(true);
+  try {
+    await apiFetch("POST", cfg);
+    updatePreviewBar();
+    toast("ok", "Saved", `${pieces.length} piece${pieces.length===1?"":"s"} published — changes are live`);
+  } catch (err) {
+    toast("err", "Save failed", err.message);
+  } finally {
+    setLoading(false);
+    setBusy(false);
+  }
+}
+
+// ─── Clear ────────────────────────────────────────────────────────────────────
+
+// ─── Hall of Fame — manual save ──────────────────────────────────────────────
+
+const SUPABASE_URL  = "https://haijshusgcbdexfueunr.supabase.co";
+const SUPABASE_ANON = "sb_publishable_nImf-_e3-CBB8tL_EQGBCw_m_VoHbVb";
+
+async function saveToHallOfFame() {
+  const btn      = document.getElementById("hof-btn");
+  const statusEl = document.getElementById("hof-status");
+  const cfg      = await (async () => {
+    try { const r = await apiFetch("GET"); return r.config || {}; } catch(e) { return {}; }
+  })();
+
+  // Determine which piece to save
+  const hofPieceIdx  = parseInt(document.getElementById("hof-piece-select")?.value || "0") || 0;
+  const hofPiece     = (Array.isArray(cfg.auctions) ? cfg.auctions[hofPieceIdx] : null) || {};
+  const contractAddr = hofPiece.contractAddr || cfg.contractAddr || "";
+  const rpcUrl       = cfg.rpcUrl || document.getElementById("rpc-url")?.value?.trim() || "";
+
+  if (!contractAddr) {
+    statusEl.className = "hof-status err";
+    statusEl.textContent = "No contract address found — fill in the auction configuration first.";
+    return;
+  }
+  if (!rpcUrl) {
+    statusEl.className = "hof-status err";
+    statusEl.textContent = "No RPC URL found — add one in the Network section so we can read the contract.";
+    return;
+  }
+
+  btn.disabled = true;
+  statusEl.className = "hof-status";
+  statusEl.textContent = "Reading final state from contract…";
+
+  try {
+    // Read auctionState() via raw JSON-RPC — no ethers needed
+    const payload = {
+      jsonrpc:"2.0", id:1, method:"eth_call",
+      params:[{ to:contractAddr, data:"0x7fb45099" },"latest"]
+    };
+    const rpcRes = await fetch(rpcUrl, {
+      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)
+    });
+    const rpcData = await rpcRes.json();
+
+    if (!rpcData.result || rpcData.result === "0x") {
+      throw new Error("Contract returned no data — is this the correct contract address?");
+    }
+
+    // Decode FlexAuction auctionState() — 10 x 32-byte words:
+    // [0] deposited, [1] live, [2] settled, [3] endTime, [4] timeRemaining,
+    // [5] highestBidder, [6] highestBid, [7] minNextBid, [8] mode, [9] isOpen
+    const hex           = rpcData.result.slice(2);
+    const settled       = parseInt(hex.slice(2 * 64, 3 * 64), 16) === 1;
+    const highestBidder = "0x" + hex.slice(5 * 64 + 24, 5 * 64 + 64);  // word 5, last 20 bytes
+    const highestBidHex = hex.slice(6 * 64, 7 * 64);
+    const highestBid    = parseInt(highestBidHex, 16);
+    const winningBid    = highestBid / 1e18;
+
+    if (!settled) {
+      throw new Error("Auction is not yet settled — the contract has not been settled on-chain.");
+    }
+    if (!highestBidder || highestBidder === "0x0000000000000000000000000000000000000000") {
+      throw new Error("No winner found — the auction may not have received any bids.");
+    }
+
+    statusEl.textContent = `Winner confirmed: ${highestBidder.slice(0,6)}…${highestBidder.slice(-4)} · ${winningBid.toFixed(4)} ETH. Saving…`;
+
+    // Count bids from Supabase
+    let bidCount = 0;
+    try {
+      const sbRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/collector_messages?auction_id=eq.${encodeURIComponent(contractAddr.toLowerCase())}&is_bid=eq.true&select=id`,
+        { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON, "Prefer":"count=exact", "Range":"0-0" } }
+      );
+      const cr = sbRes.headers.get("Content-Range");
+      bidCount = parseInt(cr?.split("/")?.[1] || "0") || 0;
+    } catch(_) {}
+
+    // Read optional winner overrides from admin fields
+    const winnerNameOverride   = document.getElementById("hof-winner-name")?.value.trim()   || "";
+    const winnerAvatarOverride = document.getElementById("hof-winner-avatar")?.value.trim() || "";
+
+    // Find the matching piece from the auctions array, or fall back to legacy cfg fields
+    const matchingPiece = (Array.isArray(cfg.auctions) ? cfg.auctions : [])
+      .find(p => p.contractAddr?.toLowerCase() === contractAddr.toLowerCase()) || {};
+
+    const record = {
+      auction_id:          contractAddr.toLowerCase(),
+      art_title:           matchingPiece.artTitle  || cfg.artTitle  || "",
+      art_artist:          matchingPiece.artArtist || cfg.artArtist || "",
+      art_image:           matchingPiece.artImage  || cfg.artImage  || "",
+      art_about:           matchingPiece.artAbout  || cfg.artAbout  || "",
+      art_year:            matchingPiece.artYear   || cfg.artYear   || "",
+      art_medium:          matchingPiece.artMedium || cfg.artMedium || "",
+      winner:              highestBidder.toLowerCase(),
+      winner_display_name: winnerNameOverride,
+      winner_avatar_url:   winnerAvatarOverride,
+      winning_bid:         winningBid,
+      bid_count:           bidCount,
+      contract_addr:       contractAddr,
+      settled_at:          new Date().toISOString(),
+    };
+
+    // Check if record already exists — use PATCH to update, POST to insert
+    const existsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(record.auction_id)}&select=auction_id`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const existing = await existsRes.json();
+    const alreadyExists = Array.isArray(existing) && existing.length > 0;
+
+    const saveRes = await fetch(
+      alreadyExists
+        ? `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(record.auction_id)}`
+        : `${SUPABASE_URL}/rest/v1/auction_results`,
+      {
+        method: alreadyExists ? "PATCH" : "POST",
+        headers:{
+          apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
+          "Content-Type":"application/json",
+          "Prefer":"return=minimal"
+        },
+        body:JSON.stringify(record),
+      }
+    );
+
+    if (!saveRes.ok) {
+      const err = await saveRes.text();
+      throw new Error("Supabase save failed: " + err);
+    }
+
+    // If admin provided overrides, also upsert collector_profiles so it shows
+    // in the live chat and everywhere else too
+    if (winnerNameOverride || winnerAvatarOverride) {
+      await fetch(`${SUPABASE_URL}/rest/v1/collector_profiles`, {
+        method:"POST",
+        headers:{
+          apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
+          "Content-Type":"application/json",
+          "Prefer":"resolution=merge-duplicates,return=minimal"
+        },
+        body: JSON.stringify({
+          wallet:       highestBidder.toLowerCase(),
+          display_name: winnerNameOverride  || undefined,
+          avatar_url:   winnerAvatarOverride || undefined,
+          updated_at:   new Date().toISOString(),
+        }),
+      });
+    }
+
+    const winnerLabel = winnerNameOverride || `${highestBidder.slice(0,6)}…${highestBidder.slice(-4)}`;
+    statusEl.className   = "hof-status ok";
+    statusEl.textContent = `✓ Saved — ${cfg.artTitle||"Auction"} · ${winningBid.toFixed(4)} ETH · ${winnerLabel}`;
+    toast("ok", "Hall of Fame updated", "The auction result has been recorded.");
+
+  } catch(e) {
+    statusEl.className   = "hof-status err";
+    statusEl.textContent = "Error: " + (e.message || "Unknown error");
+    toast("err", "Save failed", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─── Preview mode ────────────────────────────────────────────────────────────
+
+function _showPreviewCard() {
+  const card = document.getElementById("preview-launch-card");
+  const list = document.getElementById("preview-piece-list");
+  if (!card || !list) return;
+  card.style.display = "block";
+
+  // Render one row per piece for individual piece preview
+  list.innerHTML = _pieces.length > 1
+    ? _pieces.map((p, i) => `
+        <div class="preview-piece-row">
+          <span class="preview-piece-name">${p.artTitle || "Piece " + (i+1)}</span>
+          <a class="btn-preview-piece" onclick="launchPreviewPiece(${i})">Preview →</a>
+        </div>`).join("")
+    : "";
+}
+
+function _buildPreviewPayload(forcePieceIdx) {
+  // Read current form values without saving to server
+  const pieces = _readAllPieces();
+  const primary = forcePieceIdx !== undefined ? pieces[forcePieceIdx] : pieces[0] || {};
   return {
-    contractAddr: String(p.contractAddr || "").slice(0, 100),
-    artTitle:     String(p.artTitle     || "").slice(0, 200),
-    artArtist:    String(p.artArtist    || "").slice(0, 200),
-    // Long-form HTML (rich text from the admin editor). 50k chars allows for
-    // ~8k words of formatted prose with markup overhead, well within Edge
-    // Config's per-key budget even with 20 pieces.
-    artAbout:     String(p.artAbout     || "").slice(0, 50000),
-    artYear:      String(p.artYear      || "").slice(0, 10),
-    artMedium:    String(p.artMedium    || "").slice(0, 200),
-    artImage:     String(p.artImage     || "").slice(0, 500),
-    gateName:     String(p.gateName     || "").slice(0, 200),
-    gateLink:     String(p.gateLink     || "").slice(0, 500),
+    status:      "live",    // force live so the auction UI shows
+    _preview:    true,      // flag for auction.html to detect
+    _pieceIdx:   forcePieceIdx !== undefined ? forcePieceIdx : 0,
+    auctions:    pieces,
+    contractAddr: primary.contractAddr || "",
+    artTitle:    primary.artTitle  || "",
+    artArtist:   primary.artArtist || "",
+    artAbout:    primary.artAbout  || "",
+    artYear:     primary.artYear   || "",
+    artMedium:   primary.artMedium || "",
+    artImage:    primary.artImage  || "",
+    gateName:    primary.gateName  || "",
+    gateLink:    primary.gateLink  || "",
+    rpcUrl:      document.getElementById("rpc-url")?.value?.trim() || "",
+    launchDate:  document.getElementById("launch-date")?.value || "",
+    landingCountdown: document.getElementById("landing-countdown-date")?.value || "",
   };
 }
 
-function sanitiseAuctions(arr) {
-  if (!Array.isArray(arr)) return [];
-  // Cap at 20 pieces to keep the stored object reasonable for Edge Config
-  return arr.slice(0, 20).map(sanitisePiece).filter(Boolean);
+function launchPreview(forcePieceIdx) {
+  const payload = _buildPreviewPayload(forcePieceIdx);
+  try {
+    localStorage.setItem("kw_preview_cfg", JSON.stringify(payload));
+  } catch(e) {
+    toast("err", "Preview failed", "Could not write to localStorage: " + e.message);
+    return;
+  }
+  window.open("/auction?preview=1", "_blank");
+  toast("ok", "Preview launched", "Opening auction page in preview mode — only visible to you");
 }
 
-// ── Default config ────────────────────────────────────────────────────────────
+function launchPreviewPiece(idx) {
+  launchPreview(idx);
+}
 
-const DEFAULT_CONFIG = {
-  status:           "off",
-  contractAddr:     "",
-  artTitle:         "",
-  artArtist:        "",
-  artAbout:         "",
-  artYear:          "",
-  artMedium:        "",
-  artImage:         "",
-  gateName:         "",
-  gateLink:         "",
-  rpcUrl:           "",
-  launchDate:       "",
-  landingCountdown: "",
-  auctions:         [],
-  savedAt:          null,
-};
+// ─── Auctioneer Profile ──────────────────────────────────────────────────────
 
-// ── Handler ───────────────────────────────────────────────────────────────────
+const KAY_WALLET = "0x72a04d812494cf3f6880483c6269291ce5751a83";
 
-module.exports = async function handler(req, res) {
-  cors(res);
+async function loadAuctioneerProfile() {
+  try {
+    const res  = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(KAY_WALLET)}&limit=1`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const rows = await res.json();
+    const p    = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    const nameEl   = document.getElementById("auc-current-name");
+    const nameInp  = document.getElementById("auc-name");
+    const avatInp  = document.getElementById("auc-avatar");
+    if (p) {
+      if (nameEl)  nameEl.textContent  = p.display_name || "No name set";
+      if (nameInp) nameInp.value       = p.display_name || "";
+      if (avatInp) avatInp.value       = p.avatar_url   || "";
+      previewAucAvatar();
+    } else {
+      if (nameEl) nameEl.textContent = "No profile set yet";
+    }
+  } catch(e) { console.log("loadAuctioneerProfile:", e); }
+}
 
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
+function previewAucAvatar() {
+  const url     = document.getElementById("auc-avatar").value.trim();
+  const preview = document.getElementById("auc-avatar-preview");
+  if (!preview) return;
+  if (url) {
+    preview.src = url;
+    preview.style.display = "block";
+    preview.onerror = () => { preview.style.display = "none"; };
+  } else {
+    preview.style.display = "none";
   }
+}
 
-  if (req.method === "GET") {
-    try {
-      const stored = await ecGet();
-      const config = stored || DEFAULT_CONFIG;
-      return res.status(200).json({ ok: true, config });
-    } catch (err) {
-      console.error("GET error:", err);
-      return res.status(500).json({ ok: false, error: "Failed to read config" });
-    }
+async function saveAuctioneerProfile() {
+  const btn      = document.getElementById("auc-save-btn");
+  const statusEl = document.getElementById("auc-profile-status");
+  const name     = document.getElementById("auc-name").value.trim().slice(0, 40);
+  const avatar   = document.getElementById("auc-avatar").value.trim().slice(0, 300);
+  btn.disabled   = true; btn.textContent = "Saving…";
+  statusEl.className = "profile-status"; statusEl.textContent = "";
+  try {
+    // Check if exists
+    const chkRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(KAY_WALLET)}&select=wallet`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const chk    = await chkRes.json();
+    const exists = Array.isArray(chk) && chk.length > 0;
+    const record = { wallet:KAY_WALLET, display_name:name, avatar_url:avatar, updated_at:new Date().toISOString() };
+    await fetch(
+      exists
+        ? `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(KAY_WALLET)}`
+        : `${SUPABASE_URL}/rest/v1/collector_profiles`,
+      {
+        method: exists ? "PATCH" : "POST",
+        headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
+          "Content-Type":"application/json", "Prefer":"return=minimal" },
+        body: JSON.stringify(record),
+      }
+    );
+    document.getElementById("auc-current-name").textContent = name || "Kay · Auctioneer";
+    statusEl.className   = "profile-status ok";
+    statusEl.textContent = "✓ Auctioneer profile saved";
+    btn.textContent      = "Saved ✓";
+    setTimeout(() => { btn.textContent = "Save auctioneer profile"; btn.disabled = false; }, 2000);
+    toast("ok", "Profile saved", name ? name : "Auctioneer profile updated");
+  } catch(e) {
+    statusEl.className   = "profile-status err";
+    statusEl.textContent = "Error: " + e.message;
+    btn.textContent      = "Save auctioneer profile"; btn.disabled = false;
   }
+}
 
-  if (req.method === "POST") {
-    if (!isAuthorised(req)) {
-      return res.status(401).json({ ok: false, error: "Unauthorized" });
-    }
-    let body;
-    try {
-      body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    } catch {
-      return res.status(400).json({ ok: false, error: "Invalid JSON body" });
-    }
+// ─── Collector Profiles ──────────────────────────────────────────────────────
 
-    const config = {
-      status:           ["live", "upcoming", "off"].includes(body.status) ? body.status : "off",
-      // Legacy single-piece fields (kept for backward compatibility with old readers)
-      contractAddr:     String(body.contractAddr     || "").slice(0, 100),
-      artTitle:         String(body.artTitle         || "").slice(0, 200),
-      artArtist:        String(body.artArtist        || "").slice(0, 200),
-      artAbout:         String(body.artAbout         || "").slice(0, 50000),
-      artYear:          String(body.artYear          || "").slice(0, 10),
-      artMedium:        String(body.artMedium        || "").slice(0, 200),
-      artImage:         String(body.artImage         || "").slice(0, 500),
-      gateName:         String(body.gateName         || "").slice(0, 200),
-      gateLink:         String(body.gateLink         || "").slice(0, 500),
-      // Shared / global fields
-      rpcUrl:           String(body.rpcUrl           || "").slice(0, 500),
-      launchDate:       String(body.launchDate       || "").slice(0, 50),
-      landingCountdown: String(body.landingCountdown || "").slice(0, 50),
-      // Multi-auction array — drives the piece selector and per-piece data
-      auctions:         sanitiseAuctions(body.auctions),
-      savedAt:          Date.now(),
-    };
+let _currentProfileWallet = null;
 
-    try {
-      await ecSet(config);
-      return res.status(200).json({ ok: true, config });
-    } catch (err) {
-      console.error("POST error:", err);
-      return res.status(500).json({ ok: false, error: "Failed to save config" });
-    }
+async function lookupProfile() {
+  const input    = document.getElementById("profile-wallet-input");
+  const statusEl = document.getElementById("profile-lookup-status");
+  const form     = document.getElementById("profile-edit-form");
+  const wallet   = input.value.trim().toLowerCase();
+  if (!wallet || wallet.length < 10) {
+    statusEl.className = "profile-status err";
+    statusEl.textContent = "Please enter a valid wallet address."; return;
   }
-
-  if (req.method === "DELETE") {
-    if (!isAuthorised(req)) {
-      return res.status(401).json({ ok: false, error: "Unauthorized" });
-    }
-    try {
-      await ecDel();
-      return res.status(200).json({ ok: true, config: DEFAULT_CONFIG });
-    } catch (err) {
-      console.error("DELETE error:", err);
-      return res.status(500).json({ ok: false, error: "Failed to clear config" });
-    }
+  statusEl.className = "profile-status"; statusEl.textContent = "Looking up…";
+  form.style.display = "none";
+  try {
+    const res  = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(wallet)}&limit=1`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const rows = await res.json();
+    const existing = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    _currentProfileWallet = wallet;
+    document.getElementById("pef-addr").textContent     = wallet.slice(0,8)+"…"+wallet.slice(-6);
+    document.getElementById("pef-existing").textContent = existing
+      ? "Existing: "+( existing.display_name || "no name") : "No profile yet — creating new";
+    document.getElementById("pef-name").value   = existing?.display_name || "";
+    document.getElementById("pef-avatar").value = existing?.avatar_url   || "";
+    previewAvatar();
+    form.style.display = "block";
+    statusEl.textContent = "";
+    loadAllProfiles();
+  } catch(e) {
+    statusEl.className = "profile-status err";
+    statusEl.textContent = "Error: "+e.message;
   }
+}
 
-  return res.status(405).json({ ok: false, error: "Method not allowed" });
-};
+function previewAvatar() {
+  const url     = document.getElementById("pef-avatar").value.trim();
+  const preview = document.getElementById("pef-avatar-preview");
+  if (url) {
+    preview.src = url; preview.classList.add("show");
+    preview.onerror = () => preview.classList.remove("show");
+  } else { preview.classList.remove("show"); }
+}
+
+async function saveProfile() {
+  if (!_currentProfileWallet) return;
+  const btn      = document.getElementById("pef-save-btn");
+  const statusEl = document.getElementById("pef-status");
+  const name     = document.getElementById("pef-name").value.trim().slice(0,40);
+  const avatar   = document.getElementById("pef-avatar").value.trim().slice(0,300);
+  btn.disabled = true; btn.textContent = "Saving…";
+  statusEl.className = "profile-status"; statusEl.textContent = "";
+  try {
+    const checkRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(_currentProfileWallet)}&select=wallet`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const chk = await checkRes.json();
+    const exists = Array.isArray(chk) && chk.length > 0;
+    const record = { wallet:_currentProfileWallet, display_name:name, avatar_url:avatar, updated_at:new Date().toISOString() };
+    await fetch(
+      exists
+        ? `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(_currentProfileWallet)}`
+        : `${SUPABASE_URL}/rest/v1/collector_profiles`,
+      { method:exists?"PATCH":"POST",
+        headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
+          "Content-Type":"application/json", "Prefer":"return=minimal" },
+        body:JSON.stringify(record) }
+    );
+    statusEl.className = "profile-status ok";
+    statusEl.textContent = "✓ Saved — "+(name || _currentProfileWallet.slice(0,8)+"…");
+    document.getElementById("pef-existing").textContent = "Profile saved: "+(name||"no name");
+    btn.textContent = "Saved ✓";
+    setTimeout(() => { btn.textContent = "Save profile"; btn.disabled = false; }, 2000);
+    loadAllProfiles();
+    toast("ok","Profile saved", name ? name+" · "+_currentProfileWallet.slice(0,8)+"…" : "Profile updated");
+  } catch(e) {
+    statusEl.className = "profile-status err";
+    statusEl.textContent = "Error: "+e.message;
+    btn.textContent = "Save profile"; btn.disabled = false;
+  }
+}
+
+async function loadAllProfiles() {
+  const wrap = document.getElementById("profile-list-wrap");
+  const list = document.getElementById("profile-list");
+  try {
+    const res  = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?order=updated_at.desc&limit=50`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const rows = await res.json();
+    if (!Array.isArray(rows)||rows.length===0) { wrap.style.display="none"; return; }
+    wrap.style.display = "block";
+    list.innerHTML = rows.map(r => `
+      <div class="profile-entry">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+          ${r.avatar_url
+            ? `<img src="${r.avatar_url}" class="profile-entry-avatar show" onerror="this.style.display='none'">`
+            : `<div style="width:28px;height:28px;border-radius:50%;background:rgba(196,132,90,.1);border:1px solid var(--divider);flex-shrink:0;"></div>`}
+          <div class="profile-entry-addr" title="${r.wallet}">${r.wallet.slice(0,8)}…${r.wallet.slice(-6)}</div>
+        </div>
+        <div class="profile-entry-name">${r.display_name||'<span style="color:var(--text-muted);font-style:italic">No name</span>'}</div>
+        <button class="btn-profile-save" onclick="document.getElementById('profile-wallet-input').value='${r.wallet}';lookupProfile()">Edit</button>
+      </div>`).join("");
+  } catch(e) { wrap.style.display = "none"; }
+}
+
+
+async function clearConfig() {
+  if (!confirm("Clear all configuration? The collector page will reset to the landing state.")) return;
+  setLoading(true);
+  setBusy(true);
+  try {
+    const res = await apiFetch("DELETE");
+    populateForm(res.config);
+    document.getElementById("preview-bar").classList.remove("show");
+    toast("ok", "Cleared", "All configuration has been removed");
+  } catch (err) {
+    toast("err", "Clear failed", err.message);
+  } finally {
+    setLoading(false);
+    setBusy(false);
+  }
+}
+
+// ─── Preview bar ──────────────────────────────────────────────────────────────
+
+function updatePreviewBar() {
+  const bar  = document.getElementById("preview-bar");
+  const url  = document.getElementById("preview-url");
+  const link = document.getElementById("preview-link");
+  const fullUrl = "https://www.kaysworks.com/auction";
+  url.textContent = fullUrl;
+  link.href = fullUrl;
+  bar.classList.add("show");
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+
+function setLoading(on) {
+  document.getElementById("loading-bar").classList.toggle("show", on);
+}
+
+function setBusy(on) {
+  document.getElementById("save-btn").disabled  = on;
+  document.getElementById("clear-btn").disabled = on;
+}
+
+let toastTimer;
+function toast(type, title, body) {
+  clearTimeout(toastTimer);
+  document.getElementById("toast-title").textContent = title;
+  document.getElementById("toast-title").className   = "toast-title " + type;
+  document.getElementById("toast-body").textContent  = body || "";
+  document.getElementById("toast").classList.add("show");
+  toastTimer = setTimeout(() => document.getElementById("toast").classList.remove("show"), 4500);
+}
+</script>
+</body>
+</html>
