@@ -438,12 +438,12 @@ body {
 
     <!-- Launch date (upcoming) -->
     <div class="card" id="upcoming-date-field" style="display:none">
-      <div class="card-head"><div class="card-title">Upcoming countdown</div></div>
+      <div class="card-head"><div class="card-title">Upcoming countdown — global fallback</div></div>
       <div class="card-body">
         <div class="field">
           <label>Launch date &amp; time</label>
           <input type="datetime-local" id="launch-date" />
-          <div class="field-hint">Shown on the upcoming auction page as a countdown</div>
+          <div class="field-hint">Used by any piece that doesn't have its own launch date set. Leave blank if every piece has its own.</div>
         </div>
       </div>
     </div>
@@ -750,6 +750,11 @@ function _buildPieceForm(idx) {
         <input id="${_pieceFieldId(idx,'gateName')}" placeholder="e.g. Entry Token" value="${d.gateName||''}"/></div>
       <div class="field"><label>Gate link</label>
         <input id="${_pieceFieldId(idx,'gateLink')}" placeholder="https://…" value="${d.gateLink||''}"/></div>
+    </div>
+    <div class="field">
+      <label>Launch date for this piece</label>
+      <input type="datetime-local" id="${_pieceFieldId(idx,'launchDate')}" value="${d.launchDate||''}"/>
+      <div class="field-hint">Optional — if set, the upcoming-view countdown for this piece uses this date. Leave blank to fall back to the global launch date below.</div>
     </div>`;
 }
 
@@ -966,7 +971,7 @@ document.addEventListener("keyup", (e) => {
 
 function _savePieceFormValues(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
-  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink"];
+  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
     if (!el) return;
@@ -1182,15 +1187,18 @@ async function saveToHallOfFame() {
       throw new Error("Contract returned no data — is this the correct contract address?");
     }
 
-    // Decode FlexAuction auctionState() — 10 x 32-byte words:
+    // Decode FlexAuction auctionState() — 12 x 32-byte words:
     // [0] deposited, [1] live, [2] settled, [3] endTime, [4] timeRemaining,
-    // [5] highestBidder, [6] highestBid, [7] minNextBid, [8] mode, [9] isOpen
+    // [5] highestBidder, [6] highestBid, [7] minNextBid, [8] mode, [9] isOpen,
+    // [10] buyNowPrice, [11] buyNowAvailable
     const hex           = rpcData.result.slice(2);
     const settled       = parseInt(hex.slice(2 * 64, 3 * 64), 16) === 1;
     const highestBidder = "0x" + hex.slice(5 * 64 + 24, 5 * 64 + 64);  // word 5, last 20 bytes
     const highestBidHex = hex.slice(6 * 64, 7 * 64);
-    const highestBid    = parseInt(highestBidHex, 16);
-    const winningBid    = highestBid / 1e18;
+    // Use BigInt for the bid amount — parseInt loses precision above ~0.009 ETH
+    const highestBidWei = BigInt("0x" + highestBidHex);
+    const winningBid    = Number(highestBidWei) / 1e18;
+    const highestBid    = Number(highestBidWei);  // kept for backward compat below
 
     if (!settled) {
       throw new Error("Auction is not yet settled — the contract has not been settled on-chain.");
