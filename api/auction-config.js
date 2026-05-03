@@ -91,7 +91,10 @@ function sanitisePiece(p) {
     contractAddr: String(p.contractAddr || "").slice(0, 100),
     artTitle:     String(p.artTitle     || "").slice(0, 200),
     artArtist:    String(p.artArtist    || "").slice(0, 200),
-    artAbout:     String(p.artAbout     || "").slice(0, 2000),
+    // Long-form HTML (rich text from the admin editor). 50k chars allows for
+    // ~8k words of formatted prose with markup overhead, well within Edge
+    // Config's per-key budget even with 20 pieces.
+    artAbout:     String(p.artAbout     || "").slice(0, 50000),
     artYear:      String(p.artYear      || "").slice(0, 10),
     artMedium:    String(p.artMedium    || "").slice(0, 200),
     artImage:     String(p.artImage     || "").slice(0, 500),
@@ -163,7 +166,7 @@ module.exports = async function handler(req, res) {
       contractAddr:     String(body.contractAddr     || "").slice(0, 100),
       artTitle:         String(body.artTitle         || "").slice(0, 200),
       artArtist:        String(body.artArtist        || "").slice(0, 200),
-      artAbout:         String(body.artAbout         || "").slice(0, 2000),
+      artAbout:         String(body.artAbout         || "").slice(0, 50000),
       artYear:          String(body.artYear          || "").slice(0, 10),
       artMedium:        String(body.artMedium        || "").slice(0, 200),
       artImage:         String(body.artImage         || "").slice(0, 500),
