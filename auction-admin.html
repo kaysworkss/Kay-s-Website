@@ -708,7 +708,7 @@ function _buildPieceForm(idx) {
              onkeyup="rteUpdateButtons(this)"
              onmouseup="rteUpdateButtons(this)"
              onfocus="rteUpdateButtons(this)"
-             onpaste="rtePaste(event)">${_rteSanitize(d.artAbout||'')}</div>
+             onpaste="rtePaste(event)"></div>
       </div>
       <div class="field-hint">Select text and use <b>B</b>, <i>I</i>, <u>U</u> to format. Keyboard: Ctrl/⌘ + B / I / U.</div>
     </div>
@@ -744,6 +744,16 @@ function _renderPieceTabs() {
 
   forms.innerHTML = _buildPieceForm(_activePieceIdx);
 
+  // Populate the rich-text editor's content via DOM API, NOT via the form
+  // template. Embedding sanitized HTML inside a larger innerHTML string can
+  // confuse the HTML parser on edge cases (block elements inside block
+  // elements, etc.), and we've seen that drop chunks of pasted content.
+  const editor = document.getElementById(_pieceFieldId(_activePieceIdx, 'artAbout'));
+  const piece  = _pieces[_activePieceIdx] || {};
+  if (editor) {
+    editor.innerHTML = _rteSanitize(piece.artAbout || "");
+  }
+
   const badge = document.getElementById("piece-count-badge");
   if (badge) badge.textContent = _pieces.length + " piece" + (_pieces.length===1?"":"s");
   _showPreviewCard();
@@ -759,6 +769,8 @@ function selectPiece(idx) {
 // ─── Rich-text editor helpers ────────────────────────────────────────────────
 // Sanitize HTML for the About-the-artwork field. Whitelist b/strong, i/em, u, br, p, div.
 // Strips all attributes, scripts, links, and unknown tags.
+// Block-level elements (h1-h6, li, blockquote, etc.) are converted to <p> so
+// pasted content from Word/Google Docs/web pages keeps its line structure.
 function _rteSanitize(html) {
   if (html == null) return "";
   const str = String(html);
@@ -767,29 +779,66 @@ function _rteSanitize(html) {
     tmp.textContent = str;
     return tmp.innerHTML;
   }
+  // Tags we keep as-is
   const ALLOWED = new Set(["B","STRONG","I","EM","U","BR","P","DIV"]);
-  const tpl = document.createElement("template");
-  tpl.innerHTML = str;
-  const walk = (node) => {
-    const children = Array.from(node.childNodes);
-    for (const child of children) {
-      if (child.nodeType === 1) {
-        if (!ALLOWED.has(child.tagName)) {
-          while (child.firstChild) node.insertBefore(child.firstChild, child);
-          node.removeChild(child);
-        } else {
-          for (const attr of Array.from(child.attributes)) child.removeAttribute(attr.name);
-          walk(child);
-        }
-      } else if (child.nodeType === 8) {
-        node.removeChild(child);
-      }
+  // Block-level tags we convert to <p> so each becomes its own line
+  const BLOCK_TO_P = new Set(["H1","H2","H3","H4","H5","H6","LI","BLOCKQUOTE","ARTICLE","SECTION","HEADER","FOOTER","ASIDE"]);
+  // Wrappers we strip but recurse into to keep their children
+  // (UL, OL, SPAN, FONT, A, etc. fall through to the unwrap path below)
+  // Tags whose entire subtree should be DROPPED (not unwrapped)
+  const DROP_SUBTREE = new Set(["SCRIPT","STYLE","IFRAME","OBJECT","EMBED","NOSCRIPT","HEAD","META","LINK","TITLE"]);
+
+  // Use a real <body> via DOMParser-equivalent; <template> can swallow things
+  // like <li> that are not valid as direct children of a fragment.
+  const root = document.createElement("div");
+  root.innerHTML = str;
+
+  // Recursive sanitize-in-place. Returns the next node to process.
+  function sanitize(node) {
+    if (node.nodeType === 8) { // comment
+      const next = node.nextSibling;
+      node.remove();
+      return next;
     }
-  };
-  walk(tpl.content);
-  const wrap = document.createElement("div");
-  wrap.appendChild(tpl.content);
-  return wrap.innerHTML;
+    if (node.nodeType !== 1) return node.nextSibling;
+
+    const tag = node.tagName;
+
+    if (DROP_SUBTREE.has(tag)) {
+      const next = node.nextSibling;
+      node.remove();
+      return next;
+    }
+
+    // Sanitize all children first (depth-first)
+    let child = node.firstChild;
+    while (child) child = sanitize(child);
+
+    if (ALLOWED.has(tag)) {
+      // Strip every attribute
+      while (node.attributes.length) node.removeAttribute(node.attributes[0].name);
+      return node.nextSibling;
+    }
+
+    if (BLOCK_TO_P.has(tag)) {
+      const p = document.createElement("p");
+      while (node.firstChild) p.appendChild(node.firstChild);
+      node.replaceWith(p);
+      return p.nextSibling;
+    }
+
+    // Default: unwrap (move children up, drop the tag itself)
+    const parent = node.parentNode;
+    const next = node.nextSibling;
+    while (node.firstChild) parent.insertBefore(node.firstChild, node);
+    node.remove();
+    return next;
+  }
+
+  let n = root.firstChild;
+  while (n) n = sanitize(n);
+
+  return root.innerHTML;
 }
 
 // Apply a formatting command (bold/italic/underline) to the current selection
@@ -825,12 +874,59 @@ function rteUpdateButtons(content) {
   });
 }
 
-// Paste handler — strip formatting from clipboard, keep plain text
+// Paste handler — strip formatting from clipboard but preserve line breaks.
+// We deliberately use text/plain (not text/html) so we don't pull in arbitrary
+// styles, but we convert newlines into proper <br> elements so multi-paragraph
+// pastes don't collapse into one line.
 function rtePaste(e) {
   e.preventDefault();
-  const text = (e.clipboardData || window.clipboardData).getData("text/plain");
-  // Use insertText so it goes through normal undo stack
-  document.execCommand("insertText", false, text);
+  const cd = e.clipboardData || window.clipboardData;
+  if (!cd) return;
+  // Prefer plain text — it's the cleanest. If it's empty (rare; some apps
+  // only put HTML on the clipboard) fall back to extracting text from the HTML.
+  let text = cd.getData("text/plain") || "";
+  if (!text) {
+    const html = cd.getData("text/html") || "";
+    if (html) {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      text = tmp.textContent || tmp.innerText || "";
+    }
+  }
+  if (!text) return;
+
+  // Insert as a real DOM fragment so multi-line content keeps its breaks.
+  // execCommand("insertText") swallows newlines on some browsers; building
+  // the fragment ourselves avoids that.
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+
+  const lines = text.split(/\r\n|\r|\n/);
+  const frag = document.createDocumentFragment();
+  lines.forEach((line, i) => {
+    if (i > 0) frag.appendChild(document.createElement("br"));
+    if (line) frag.appendChild(document.createTextNode(line));
+  });
+  // Track the last node so we can place the caret after it
+  const lastChild = frag.lastChild;
+  range.insertNode(frag);
+  if (lastChild) {
+    const newRange = document.createRange();
+    newRange.setStartAfter(lastChild);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  }
+
+  // Notify rteSync explicitly because our manual DOM ops don't always trigger
+  // the `input` event on every browser.
+  const editor = e.target && e.target.closest ? e.target.closest(".rte-content") : null;
+  if (editor) {
+    rteSync(editor);
+    rteUpdateButtons(editor);
+  }
 }
 
 // Keyboard shortcuts (Ctrl/⌘ + B / I / U) — execCommand handles these natively in
