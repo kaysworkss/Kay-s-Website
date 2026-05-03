@@ -436,9 +436,10 @@ body {
           </div>
         </div>
         <div class="field-hint">
-          <b>Off</b> — landing page only, no auction shown.<br>
-          <b>Upcoming</b> — shows countdown to launch date, no bidding.<br>
-          <b>Live</b> — full auction page with bidding enabled.
+          <b>Off</b> — landing page only.<br>
+          <b>Upcoming</b> — countdown view, no bidding.<br>
+          <b>Live</b> — full auction with bidding.<br>
+          <em>This is the default for any piece set to "Inherit global" below. Pieces with their own explicit status ignore this setting — set them to Off individually to hide them.</em>
         </div>
       </div>
     </div>
@@ -463,12 +464,12 @@ body {
 
     <!-- Launch date (upcoming) -->
     <div class="card" id="upcoming-date-field" style="display:none">
-      <div class="card-head"><div class="card-title">Global launch date — single-piece fallback</div></div>
+      <div class="card-head"><div class="card-title">Global launch date</div></div>
       <div class="card-body">
         <div class="field">
           <label>Launch date &amp; time</label>
           <input type="datetime-local" id="launch-date" />
-          <div class="field-hint">For single-piece auctions: drives the upcoming countdown when no per-piece date is set. For multi-piece auctions, set each piece's launch date individually above — this field is ignored when more than one piece is configured.</div>
+          <div class="field-hint">Single-piece auctions: drives the upcoming countdown when no per-piece date is set. Multi-piece auctions: set each piece's date individually above — this field is ignored when more than one piece is configured.</div>
         </div>
       </div>
     </div>
@@ -791,7 +792,7 @@ function _buildPieceForm(idx) {
     <div class="field">
       <label>Launch date for this piece</label>
       <input type="datetime-local" id="${_pieceFieldId(idx,'launchDate')}" value="${d.launchDate||''}"/>
-      <div class="field-hint">Optional — sets the countdown for this piece's upcoming view. If left blank on a multi-piece auction, this piece will show "Launch date not set" rather than inheriting the global date. The global fallback only applies to single-piece setups.</div>
+      <div class="field-hint">Optional — sets the countdown for this piece's upcoming view. In multi-piece auctions each piece needs its own date; the global fallback below applies only to single-piece setups.</div>
     </div>`;
 }
 
@@ -837,7 +838,7 @@ function _renderPieceTabs() {
   const badge = document.getElementById("piece-count-badge");
   if (badge) badge.textContent = _pieces.length + " piece" + (_pieces.length===1?"":"s");
   _showPreviewCard();
-  _refreshUpcomingDateVisibility();
+  if (typeof _refreshUpcomingDateVisibility === "function") _refreshUpcomingDateVisibility();
 }
 
 function selectPiece(idx) {
@@ -1120,12 +1121,10 @@ function setStatus(s, updateUI = true) {
   badge.className = "card-badge " + badges[s];
 
   const udf = document.getElementById("upcoming-date-field");
-  if (udf) {
-    // Show the global fallback date whenever there are upcoming pieces — either
-    // because the global status is 'upcoming' OR because individual pieces are.
-    // We re-evaluate this after any status change via _refreshUpcomingDateVisibility().
-    udf.style.display = s === "upcoming" ? "block" : "none";
-  }
+  if (udf) udf.style.display = s === "upcoming" ? "block" : "none";
+  // After changing global status, re-check whether upcoming date card should show
+  // (a piece with explicit "upcoming" status also needs it even if global is "live")
+  setTimeout(_refreshUpcomingDateVisibility, 0);
 
   const lcf = document.getElementById("landing-countdown-field");
   if (lcf) lcf.style.display = s === "off" ? "block" : "none";
@@ -1160,18 +1159,6 @@ function _renderTabsOnly() {
   }).join("");
 }
 
-// Re-evaluates whether the global launch date card should be shown.
-// Called after any per-piece status change, because a piece set to 'upcoming'
-// means the global date field is relevant even if global status is not 'upcoming'.
-function _refreshUpcomingDateVisibility() {
-  const udf = document.getElementById("upcoming-date-field");
-  if (!udf) return;
-  // Global status is upcoming, OR any piece is explicitly set to 'upcoming'
-  const globalIsUpcoming = document.getElementById("btn-upcoming")?.className.includes("active");
-  const anyPieceUpcoming = _pieces.some(p => p.status === "upcoming");
-  udf.style.display = (globalIsUpcoming || anyPieceUpcoming) ? "block" : "none";
-}
-
 // Per-piece status setter — called from the buttons inside each piece form
 function setPieceStatus(idx, s) {
   if (!_pieces[idx]) return;
@@ -1195,8 +1182,18 @@ function setPieceStatus(idx, s) {
   }
   // Refresh the tab strip so the status dot updates
   _renderTabsOnly();
-  // Show/hide the global launch date card based on combined piece statuses
+  // Show global launch-date card if any piece (including this one) is now upcoming
   _refreshUpcomingDateVisibility();
+}
+
+// Show/hide the global launch-date card based on global + per-piece statuses combined.
+// Must be called any time a piece status changes or the global status changes.
+function _refreshUpcomingDateVisibility() {
+  const udf = document.getElementById("upcoming-date-field");
+  if (!udf) return;
+  const globalIsUpcoming = document.getElementById("btn-upcoming")?.className.includes("active");
+  const anyPieceUpcoming = _pieces.some(p => p.status === "upcoming");
+  udf.style.display = (globalIsUpcoming || anyPieceUpcoming) ? "block" : "none";
 }
 
 // ─── Contract validation ─────────────────────────────────────────────────────
