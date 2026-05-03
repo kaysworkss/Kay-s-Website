@@ -1782,6 +1782,10 @@ async function _switchAuction(idx) {
 
 // Sanitize rich-text "about" content from admin: keep only b/strong, i/em, u, br, p.
 // Anything else (including scripts, links, images, attributes) is stripped.
+// Sanitize rich-text "about" content from admin: keep only b/strong, i/em, u, br, p.
+// Block-level tags (h1-h6, li, blockquote, etc.) are converted to <p> so pasted
+// content keeps its line structure. Anything else is unwrapped (children kept).
+// SCRIPT / STYLE / IFRAME / etc. are dropped along with their contents.
 function _sanitizeAbout(html) {
   if (html == null) return "";
   const str = String(html);
@@ -1792,32 +1796,56 @@ function _sanitizeAbout(html) {
     return tmp.innerHTML;
   }
   const ALLOWED = new Set(["B","STRONG","I","EM","U","BR","P","DIV"]);
-  const tpl = document.createElement("template");
-  tpl.innerHTML = str;
-  const walk = (node) => {
-    const children = Array.from(node.childNodes);
-    for (const child of children) {
-      if (child.nodeType === 1) { // element
-        if (!ALLOWED.has(child.tagName)) {
-          // unwrap unknown tags — keep their text children
-          while (child.firstChild) node.insertBefore(child.firstChild, child);
-          node.removeChild(child);
-        } else {
-          // strip all attributes
-          for (const attr of Array.from(child.attributes)) child.removeAttribute(attr.name);
-          // normalize DIV → P-like block: keep DIVs but they'll render as blocks
-          walk(child);
-        }
-      } else if (child.nodeType === 8) { // comment
-        node.removeChild(child);
-      }
+  const BLOCK_TO_P = new Set(["H1","H2","H3","H4","H5","H6","LI","BLOCKQUOTE","ARTICLE","SECTION","HEADER","FOOTER","ASIDE"]);
+  const DROP_SUBTREE = new Set(["SCRIPT","STYLE","IFRAME","OBJECT","EMBED","NOSCRIPT","HEAD","META","LINK","TITLE"]);
+
+  const root = document.createElement("div");
+  root.innerHTML = str;
+
+  function sanitize(node) {
+    if (node.nodeType === 8) {
+      const next = node.nextSibling;
+      node.remove();
+      return next;
     }
-  };
-  walk(tpl.content);
-  // serialize
-  const wrap = document.createElement("div");
-  wrap.appendChild(tpl.content);
-  return wrap.innerHTML;
+    if (node.nodeType !== 1) return node.nextSibling;
+
+    const tag = node.tagName;
+
+    if (DROP_SUBTREE.has(tag)) {
+      const next = node.nextSibling;
+      node.remove();
+      return next;
+    }
+
+    // Depth-first: sanitize children first
+    let child = node.firstChild;
+    while (child) child = sanitize(child);
+
+    if (ALLOWED.has(tag)) {
+      while (node.attributes.length) node.removeAttribute(node.attributes[0].name);
+      return node.nextSibling;
+    }
+
+    if (BLOCK_TO_P.has(tag)) {
+      const p = document.createElement("p");
+      while (node.firstChild) p.appendChild(node.firstChild);
+      node.replaceWith(p);
+      return p.nextSibling;
+    }
+
+    // Default: unwrap (keep children, drop the tag)
+    const parent = node.parentNode;
+    const next = node.nextSibling;
+    while (node.firstChild) parent.insertBefore(node.firstChild, node);
+    node.remove();
+    return next;
+  }
+
+  let n = root.firstChild;
+  while (n) n = sanitize(n);
+
+  return root.innerHTML;
 }
 
 function populateAbout(view) {
