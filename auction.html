@@ -458,13 +458,22 @@ body {
 /* Wallet row */
 .wallet-row {
   display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
   margin-bottom: 28px; padding-bottom: 18px;
   border-bottom: 1px solid var(--divider);
 }
 .wallet-status {
   display: flex; align-items: center; gap: 8px;
+  flex: 1 1 auto; min-width: 0;
   font-family: 'Crimson Pro', serif; font-size: 0.9rem;
   color: var(--text-muted);
+}
+#wallet-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--divider); transition: .3s; }
 .dot.on  { background: var(--moss); box-shadow: 0 0 4px var(--moss); }
@@ -473,7 +482,7 @@ body {
   font-family: 'Crimson Pro', serif; font-size: 0.85rem;
   color: var(--clay); font-style: italic;
 }
-.wallet-btns { display: flex; gap: 6px; }
+.wallet-btns { display: flex; flex: 0 0 auto; gap: 6px; align-items: center; }
 
 /* Section labels */
 .slabel {
@@ -631,7 +640,10 @@ body {
   color: var(--text-muted);
   font-family: 'Cinzel', serif; font-size: 0.58rem;
   letter-spacing: 0.18em; text-transform: uppercase;
+  min-height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
   padding: 7px 13px; cursor: pointer; transition: all .2s;
+  white-space: nowrap;
 }
 .btn-sm:hover { border-color: var(--clay); color: var(--clay); }
 .btn-sm.danger { border-color: rgba(158,79,46,0.45); color: var(--rust); }
@@ -773,6 +785,16 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 @keyframes auc-blink { 0%,100%{opacity:1} 50%{opacity:0} }
 @keyframes auc-shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-5px)} 40%,80%{transform:translateX(5px)} }
 
+/* ── Coming-next banner (live view) ── */
+#coming-next-banner { display:none; align-items:center; justify-content:space-between; padding:7px 20px; gap:12px; flex-shrink:0; background:rgba(201,153,58,0.07); border-bottom:1px solid rgba(201,153,58,0.2); }
+#coming-next-banner.show { display:flex; }
+.cnb-left { display:flex; align-items:center; gap:10px; min-width:0; }
+.cnb-label { font-family:'Cinzel',serif; font-size:0.48rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); white-space:nowrap; flex-shrink:0; }
+.cnb-thumb { width:24px; height:24px; border-radius:2px; object-fit:cover; border:1px solid var(--divider); background:var(--bg); flex-shrink:0; }
+.cnb-title { font-family:'Cormorant Garamond',serif; font-size:0.92rem; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cnb-link { font-family:'Cinzel',serif; font-size:0.46rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); background:transparent; border:1px solid rgba(201,153,58,0.35); border-radius:2px; padding:3px 9px; white-space:nowrap; cursor:pointer; transition:background 0.2s; flex-shrink:0; }
+.cnb-link:hover { background:rgba(201,153,58,0.12); }
+
 /* bid flash effect on history leader */
 @keyframes bid-flash {
   0%   { background: rgba(196,132,90,0.35); }
@@ -912,7 +934,8 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   .gavel-btn { padding: 9px 8px; font-size: 0.52rem; min-height: 40px; }
 
   /* ── Wallet row ── */
-  .wallet-row { flex-wrap: wrap; gap: 8px; }
+  .wallet-row { align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+  .wallet-status { flex-basis: 100%; }
   .wallet-btns { flex-wrap: wrap; gap: 5px; }
 
   /* ── Upcoming view ── */
@@ -1161,7 +1184,17 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
     <div class="online-pill"><span class="live-dot"></span><span id="online-count">Live</span><span id="eligible-count" style="display:none;margin-left:4px;padding:1px 7px;background:rgba(107,124,92,.15);border:1px solid rgba(107,124,92,.3);border-radius:10px;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:.12em;text-transform:uppercase;color:var(--moss)"></span></div>
   </div>
 
-  <!-- Piece selector — only shown when multiple auctions are configured -->
+  <!-- Coming-next banner — visible when upcoming pieces exist alongside live ones -->
+  <div id="coming-next-banner">
+    <div class="cnb-left">
+      <span class="cnb-label">Coming next</span>
+      <img class="cnb-thumb" id="cnb-thumb" src="" alt="" style="display:none">
+      <span class="cnb-title" id="cnb-title"></span>
+    </div>
+    <button class="cnb-link" onclick="_cnbGoUpcoming()">Preview →</button>
+  </div>
+
+  <!-- Piece selector — only shown when multiple live auctions are configured -->
   <div class="piece-selector" id="piece-selector"></div>
 
   <div id="live-flex-wrap" style="display:flex;flex:1;min-height:0;overflow:hidden;">
@@ -1455,6 +1488,8 @@ let bidHistory = [];
 let countdownTimer = null, pollTimer = null, upcomingTimer = null;
 let landingCdTimer = null;
 let notifTimer = null;
+let _walletConnecting = false;
+let _walletEventsBound = false;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -1462,7 +1497,7 @@ window.addEventListener("load", async () => {
   document.getElementById("view-loading").classList.add("show");
 
   cfg = await loadConfig();
-  const status = cfg.status || "off";
+  const globalStatus = cfg.status || "off";
 
   // Normalise auctions array — supports both single and multi-auction configs
   if (Array.isArray(cfg.auctions) && cfg.auctions.length > 0) {
@@ -1482,14 +1517,34 @@ window.addEventListener("load", async () => {
     }];
   }
 
+  // Compute effective status per piece.
+  // Rule: individual piece.status always wins over the global default.
+  // global=live + piece.status="upcoming" → piece stays upcoming.
+  // Empty string means "inherit global".
+  _auctions.forEach(p => { p._effectiveStatus = p.status || globalStatus; });
+
+  // Decide which view to show based on the mix of piece statuses.
+  // Preview mode (cfg._preview) honors cfg.status directly so the admin can
+  // force-preview a specific UI regardless of per-piece settings.
+  let routeStatus;
+  if (cfg._preview) {
+    routeStatus = globalStatus;
+  } else {
+    const anyLive     = _auctions.some(p => p._effectiveStatus === "live");
+    const anyUpcoming = _auctions.some(p => p._effectiveStatus === "upcoming");
+    if      (anyLive)     routeStatus = "live";
+    else if (anyUpcoming) routeStatus = "upcoming";
+    else                  routeStatus = "off";
+  }
+
   document.getElementById("view-loading").classList.remove("show");
 
-  if (status === "live") {
+  if (routeStatus === "live") {
     document.getElementById("view-live").classList.add("show");
     await initLive();
     aucOnOpen();
     initCollectorRoom();
-  } else if (status === "upcoming") {
+  } else if (routeStatus === "upcoming") {
     document.getElementById("view-upcoming").classList.add("show");
     initUpcoming();
   } else {
@@ -1579,22 +1634,29 @@ function initUpcoming() {
   // If multiple pieces, show a piece selector strip on the upcoming view too
   _buildUpcomingPieceSelector();
 
-  // Load the piece from preview config if set, else default to 0
-  const startIdx = (cfg._preview && typeof cfg._pieceIdx === "number") ? cfg._pieceIdx : 0;
-  // Sync the active state of the upcoming-piece-selector tabs to match
+  // Pick start piece:
+  //   - If admin previewed a specific piece (cfg._pieceIdx), honor it
+  //   - Otherwise default to the first piece whose effective status is 'upcoming'
+  //     (falling back to index 0 if none — e.g. preview mode showing all)
+  let startIdx;
+  if (cfg._preview && typeof cfg._pieceIdx === "number") {
+    startIdx = cfg._pieceIdx;
+  } else {
+    const firstUpcoming = _auctions.findIndex(p => p._effectiveStatus === "upcoming");
+    startIdx = firstUpcoming >= 0 ? firstUpcoming : 0;
+  }
+
+  // Sync the active state on the visible tabs (which are filtered to upcoming-only)
   const strip = document.getElementById("upcoming-piece-selector");
   if (strip) {
-    strip.querySelectorAll(".piece-tab").forEach((b, j) => b.classList.toggle("active", j === startIdx));
+    strip.querySelectorAll(".piece-tab").forEach(b => {
+      const matchIdx = parseInt(b.dataset.idx, 10);
+      b.classList.toggle("active", matchIdx === startIdx);
+    });
   }
   _loadUpcomingPiece(startIdx);
-
-  // Launch date countdown (shared across all pieces)
-  if (cfg.launchDate) {
-    const launch = new Date(cfg.launchDate).getTime();
-    document.getElementById("upcoming-launch-date").textContent = new Date(cfg.launchDate).toLocaleString();
-    upcomingTimer = setInterval(() => tickUpcoming(launch), 1000);
-    tickUpcoming(launch);
-  }
+  // Note: _loadUpcomingPiece now handles the launch countdown per piece
+  // (with cfg.launchDate as a fallback when a piece has no launchDate of its own)
 }
 
 function _buildUpcomingPieceSelector() {
@@ -1602,18 +1664,26 @@ function _buildUpcomingPieceSelector() {
   const strip = document.getElementById("upcoming-piece-selector");
   if (!strip) return;
   strip.innerHTML = "";
-  if (_auctions.length <= 1) { strip.classList.remove("show"); return; }
+
+  // Show only pieces whose effective status is 'upcoming'
+  // (cfg._preview bypasses the filter so admin previews show all pieces)
+  const visible = cfg._preview
+    ? _auctions.map((slot, i) => ({ slot, i }))
+    : _auctions.map((slot, i) => ({ slot, i })).filter(({ slot }) => slot._effectiveStatus === "upcoming");
+
+  if (visible.length <= 1) { strip.classList.remove("show"); return; }
   strip.classList.add("show");
-  _auctions.forEach((slot, i) => {
+
+  visible.forEach(({ slot, i }, vi) => {
     const btn = document.createElement("button");
-    btn.className = "piece-tab" + (i === 0 ? " active" : "");
+    btn.className = "piece-tab" + (vi === 0 ? " active" : "");
     btn.dataset.idx = i;
     const thumbHtml = slot.artImage
       ? `<img class="piece-tab-thumb" src="${toHTTP(slot.artImage)}" alt="" onerror="this.style.display='none'">`
       : "";
     btn.innerHTML = `${thumbHtml}<span>${slot.artTitle || "Piece " + (i+1)}</span>`;
     btn.addEventListener("click", () => {
-      strip.querySelectorAll(".piece-tab").forEach((b,j) => b.classList.toggle("active", j===i));
+      strip.querySelectorAll(".piece-tab").forEach((b,j) => b.classList.toggle("active", j===vi));
       _loadUpcomingPiece(i);
     });
     strip.appendChild(btn);
@@ -1623,21 +1693,12 @@ function _buildUpcomingPieceSelector() {
 function _loadUpcomingPiece(idx) {
   const slot = _auctions[idx] || _auctions[0] || {};
 
-  // Sync cfg fields so populateAbout / loadStaticImage work correctly
-  cfg.artTitle  = slot.artTitle  || cfg.artTitle  || "";
-  cfg.artArtist = slot.artArtist || cfg.artArtist || "";
-  cfg.artAbout  = slot.artAbout  || cfg.artAbout  || "";
-  cfg.artYear   = slot.artYear   || cfg.artYear   || "";
-  cfg.artMedium = slot.artMedium || cfg.artMedium || "";
-  cfg.artImage  = slot.artImage  || cfg.artImage  || "";
-  cfg.gateName  = slot.gateName  || cfg.gateName  || "";
-  cfg.gateLink  = slot.gateLink  || cfg.gateLink  || "";
+  // Never mutate cfg — pass slot directly to helpers
+  const nameEl   = document.getElementById("upcoming-art-name");
+  const artistEl = document.getElementById("upcoming-art-artist");
+  if (nameEl)   nameEl.textContent   = slot.artTitle  || "—";
+  if (artistEl) artistEl.textContent = slot.artArtist || "";
 
-  // Artwork info
-  if (cfg.artTitle)  document.getElementById("upcoming-art-name").textContent   = cfg.artTitle;
-  if (cfg.artArtist) document.getElementById("upcoming-art-artist").textContent = cfg.artArtist;
-
-  // Reset and repopulate the about panel
   ["upcoming-about-title","upcoming-about-meta","upcoming-about-body"].forEach(id => {
     const el = document.getElementById(id); if(el) el.textContent = "";
   });
@@ -1645,22 +1706,44 @@ function _loadUpcomingPiece(idx) {
   if(tog) tog.style.display = "none";
   const panel = document.getElementById("upcoming-about-panel");
   if(panel) panel.classList.remove("open");
-  populateAbout("upcoming");
+  populateAbout("upcoming", slot);
 
-  // Gate info
-  if (cfg.gateName) {
-    document.getElementById("upcoming-gate-name").textContent = cfg.gateName;
-    document.getElementById("upcoming-gate-detail").textContent = "You must hold this token to participate in the auction.";
+  const gateNameEl   = document.getElementById("upcoming-gate-name");
+  const gateDetailEl = document.getElementById("upcoming-gate-detail");
+  const gateLinkEl   = document.getElementById("upcoming-gate-link");
+  if (slot.gateName && gateNameEl) {
+    gateNameEl.textContent = slot.gateName;
+    if (gateDetailEl) gateDetailEl.textContent = "You must hold this token to participate in the auction.";
   }
-  if (cfg.gateLink) {
-    const link = document.getElementById("upcoming-gate-link");
-    link.href = cfg.gateLink.startsWith("http") ? cfg.gateLink : "#";
-    link.textContent = cfg.gateLink.startsWith("http") ? "Acquire gate token →" : cfg.gateLink;
-    link.style.display = "block";
-  }
+  if (slot.gateLink && gateLinkEl) {
+    gateLinkEl.href = slot.gateLink.startsWith("http") ? slot.gateLink : "#";
+    gateLinkEl.textContent = slot.gateLink.startsWith("http") ? "Acquire gate token →" : slot.gateLink;
+    gateLinkEl.style.display = "block";
+  } else if (gateLinkEl) { gateLinkEl.style.display = "none"; }
 
-  // Image
-  loadStaticImage("upcoming");
+  loadStaticImage("upcoming", slot);
+
+  if (upcomingTimer) { clearInterval(upcomingTimer); upcomingTimer = null; }
+  const isLegacySingle = _auctions.length <= 1;
+  const dateStr = slot.launchDate || (isLegacySingle ? (cfg.launchDate || "") : "");
+  const dateEl  = document.getElementById("upcoming-launch-date");
+  const labelEl = document.getElementById("upcoming-launch-label");
+
+  if (dateStr) {
+    const launchMs = new Date(dateStr).getTime();
+    if (isFinite(launchMs)) {
+      if (dateEl)  dateEl.textContent = new Date(dateStr).toLocaleString();
+      if (labelEl) labelEl.textContent = "Auction opens";
+      tickUpcoming(launchMs);
+      upcomingTimer = setInterval(() => tickUpcoming(launchMs), 1000);
+    }
+  } else {
+    if (dateEl) dateEl.textContent = "";
+    ["up-cd-d","up-cd-h","up-cd-m","up-cd-s"].forEach(id => {
+      const el = document.getElementById(id); if (el) el.textContent = "—";
+    });
+    if (labelEl) labelEl.textContent = "Launch date not set";
+  }
 }
 
 function tickUpcoming(launchMs) {
@@ -1693,23 +1776,60 @@ async function initLive() {
 
   // Build piece selector if multiple auctions
   await _buildPieceSelector();
+  _renderComingNextBanner();
 
-  // Load the piece from preview config if set, else default to 0
-  const startIdx = (cfg._preview && typeof cfg._pieceIdx === "number") ? cfg._pieceIdx : 0;
+  // Pick start piece — preview override > first live-status piece > 0
+  let startIdx;
+  if (cfg._preview && typeof cfg._pieceIdx === "number") {
+    startIdx = cfg._pieceIdx;
+  } else {
+    const firstLive = _auctions.findIndex(p => p._effectiveStatus === "live");
+    startIdx = firstLive >= 0 ? firstLive : 0;
+  }
   await _switchAuction(startIdx);
+}
+
+// ─── Coming-next banner ───────────────────────────────────────────────────────
+
+let _upcomingInitialised = false;
+
+function _renderComingNextBanner() {
+  const banner = document.getElementById("coming-next-banner");
+  if (!banner) return;
+  const next = _auctions.find(p => p._effectiveStatus === "upcoming");
+  if (!next) { banner.classList.remove("show"); return; }
+  const titleEl = document.getElementById("cnb-title");
+  const thumbEl = document.getElementById("cnb-thumb");
+  if (titleEl) titleEl.textContent = next.artTitle || "Next piece";
+  if (thumbEl && next.artImage) {
+    thumbEl.src = toHTTP(next.artImage); thumbEl.style.display = "block";
+    thumbEl.onerror = () => { thumbEl.style.display = "none"; };
+  } else if (thumbEl) { thumbEl.style.display = "none"; }
+  banner.classList.add("show");
+}
+
+function _cnbGoUpcoming() {
+  document.getElementById("view-live").classList.remove("show");
+  document.getElementById("view-upcoming").classList.add("show");
+  if (!_upcomingInitialised) { _upcomingInitialised = true; initUpcoming(); }
 }
 
 async function _buildPieceSelector() {
   const strip = document.getElementById("piece-selector");
   strip.innerHTML = "";
-  if (_auctions.length <= 1) { strip.classList.remove("show"); return; }
+
+  // Show only pieces whose effective status is 'live' (preview shows all)
+  const visible = cfg._preview
+    ? _auctions.map((slot, i) => ({ slot, i }))
+    : _auctions.map((slot, i) => ({ slot, i })).filter(({ slot }) => slot._effectiveStatus === "live");
+
+  if (visible.length <= 1) { strip.classList.remove("show"); return; }
 
   strip.classList.add("show");
 
-  for (let i = 0; i < _auctions.length; i++) {
-    const slot = _auctions[i];
+  for (const { slot, i } of visible) {
     const btn  = document.createElement("button");
-    btn.className = "piece-tab" + (i === 0 ? " active" : "");
+    btn.className = "piece-tab";
     btn.dataset.idx = i;
 
     // Thumb
@@ -1751,40 +1871,68 @@ async function _switchAuction(idx) {
   if (idx < 0 || idx >= _auctions.length) return;
   _activeIdx = idx;
 
-  // Update tab UI
-  document.querySelectorAll(".piece-tab").forEach((btn, i) => {
-    btn.classList.toggle("active", i === idx);
+  // Update tab UI — match by dataset.idx since we filter the visible set
+  document.querySelectorAll(".piece-tab").forEach(btn => {
+    const tabIdx = parseInt(btn.dataset.idx, 10);
+    btn.classList.toggle("active", tabIdx === idx);
   });
 
   const slot = _activeCfg();
 
-  // Reset visual state
+  // Reset JS state
   clearInterval(countdownTimer);
   clearInterval(pollTimer);
   if (auctionContract) { try { auctionContract.removeAllListeners(); } catch(_) {} }
   bidHistory = [];
   endTimestamp = 0; isLive = false; minNextBid = 0n;
 
+  // Reset all bid-panel DOM so no state from the previous piece bleeds through
+  document.getElementById("countdown-section").style.display   = "none";
+  document.getElementById("stats-grid").style.display          = "none";
+  document.getElementById("bid-form").style.display            = "none";
+  document.getElementById("history-section").style.display     = "none";
+  document.getElementById("buynow-section").style.display      = "none";
+  document.getElementById("settled-banner").classList.remove("show");
+  document.getElementById("eligibility").className              = "eligibility";
+  document.getElementById("stat-bid").textContent              = "—";
+  document.getElementById("stat-bidder").textContent           = "No bids yet";
+  document.getElementById("stat-min").textContent              = "—";
+  document.getElementById("stat-min-sub").textContent          = "Reserve price";
+  document.getElementById("history-list").innerHTML            = "";
+  document.getElementById("history-count").textContent         = "";
+  document.getElementById("status-line").textContent           = "";
+  document.getElementById("status-line").className             = "status-line";
+  document.getElementById("bid-input").value                   = "";
+  document.getElementById("bid-hint").textContent              = "Enter an amount above the minimum bid";
+  document.getElementById("bid-btn").disabled                  = true;
+  const _bnBtn = document.getElementById("buynow-btn");
+  if (_bnBtn) { _bnBtn.disabled = true; delete _bnBtn.dataset.price; }
+  const _settleBtn = document.getElementById("settle-btn");
+  const _cancelBtn = document.getElementById("cancel-btn");
+  if (_settleBtn) _settleBtn.style.display = "none";
+  if (_cancelBtn) _cancelBtn.style.display = "none";
+
   // Update artwork panel
-  document.getElementById("live-art-name").textContent   = slot.artTitle  || "—";
-  document.getElementById("live-art-artist").textContent = slot.artArtist || "";
+  document.getElementById("live-art-name").textContent    = slot.artTitle  || "—";
+  document.getElementById("live-art-artist").textContent  = slot.artArtist || "";
   document.getElementById("live-placeholder").textContent = "Token artwork";
   document.getElementById("live-img").style.display = "none";
   document.getElementById("live-img").src = "";
 
-  // Temporarily point cfg fields at this slot for populateAbout / loadStaticImage
-  cfg.artTitle  = slot.artTitle;
-  cfg.artArtist = slot.artArtist;
-  cfg.artAbout  = slot.artAbout;
-  cfg.artYear   = slot.artYear;
-  cfg.artMedium = slot.artMedium;
-  cfg.artImage  = slot.artImage;
-  cfg.gateName  = slot.gateName;
-  cfg.gateLink  = slot.gateLink;
+  // Update cfg for loadNFTMeta, but pass slot directly to populateAbout/loadStaticImage
+  // so the upcoming view's data is never overwritten by the live view switching pieces.
   cfg.contractAddr = slot.contractAddr;
+  cfg.artTitle     = slot.artTitle;
+  cfg.artArtist    = slot.artArtist;
+  cfg.artAbout     = slot.artAbout;
+  cfg.artYear      = slot.artYear;
+  cfg.artMedium    = slot.artMedium;
+  cfg.artImage     = slot.artImage;
+  cfg.gateName     = slot.gateName;
+  cfg.gateLink     = slot.gateLink;
 
-  populateAbout("live");
-  loadStaticImage("live");
+  populateAbout("live", slot);
+  loadStaticImage("live", slot);
 
   if (!slot.contractAddr || !ethers.isAddress(slot.contractAddr)) return;
 
@@ -1902,12 +2050,13 @@ function _sanitizeAbout(html) {
   return root.innerHTML;
 }
 
-function populateAbout(view) {
-  const title  = cfg.artTitle  || "";
-  const artist = cfg.artArtist || "";
-  const year   = cfg.artYear   || "";
-  const medium = cfg.artMedium || "";
-  const about  = cfg.artAbout  || "";
+function populateAbout(view, data) {
+  const src    = data || cfg;
+  const title  = src.artTitle  || "";
+  const artist = src.artArtist || "";
+  const year   = src.artYear   || "";
+  const medium = src.artMedium || "";
+  const about  = src.artAbout  || "";
 
   if (!about && !title) return;
 
@@ -1945,11 +2094,13 @@ function closeAbout(view) {
 
 // ─── Image loading ────────────────────────────────────────────────────────────
 
-function loadStaticImage(view) {
-  if (!cfg.artImage) return;
+function loadStaticImage(view, data) {
+  const src   = data || cfg;
+  const image = src.artImage;
+  if (!image) return;
   const img  = document.getElementById(`${view}-img`);
   const phld = document.getElementById(`${view}-placeholder`);
-  const primary = toHTTP(cfg.artImage);
+  const primary = toHTTP(image);
   // Always show the img element — hide placeholder immediately
   if (phld) phld.style.display = "none";
   img.style.display = "block";
@@ -1965,7 +2116,7 @@ function loadStaticImage(view) {
       "https://nftstorage.link/ipfs/",
       "https://nftstorage.link/ipfs/",
     ];
-    const cid = extractCID(cfg.artImage);
+    const cid = extractCID(image);
     if (!cid) {
       // Not IPFS — just show placeholder again
       img.style.display = "none";
@@ -2040,10 +2191,61 @@ async function loadNFTMeta() {
 
 // ─── Wallet ───────────────────────────────────────────────────────────────────
 
+function setWalletUi(state, addr) {
+  const dot = document.getElementById("dot");
+  const label = document.getElementById("wallet-label");
+  const connectBtn = document.getElementById("connect-btn");
+  const disconnectBtn = document.getElementById("disconnect-btn");
+
+  if (!dot || !label || !connectBtn || !disconnectBtn) return;
+
+  dot.className = "dot";
+  connectBtn.style.display = "inline-flex";
+  disconnectBtn.style.display = "none";
+  connectBtn.disabled = false;
+
+  if (state === "connecting") {
+    label.textContent = "Waiting for wallet";
+    connectBtn.textContent = "Connecting...";
+    connectBtn.disabled = true;
+    return;
+  }
+
+  if (state === "signing") {
+    label.textContent = "Signature required";
+    connectBtn.textContent = "Sign to verify...";
+    connectBtn.disabled = true;
+    return;
+  }
+
+  if (state === "connected" && addr) {
+    dot.className = "dot on";
+    label.innerHTML = `<span class="addr">${addr.slice(0,6)}...${addr.slice(-4)}</span>`;
+    connectBtn.textContent = "Connected";
+    connectBtn.disabled = true;
+    connectBtn.style.display = "none";
+    disconnectBtn.style.display = "inline-flex";
+    return;
+  }
+
+  if (state === "failed") {
+    dot.className = "dot err";
+    label.textContent = "Connect failed";
+    connectBtn.textContent = "Connect wallet";
+    return;
+  }
+
+  label.textContent = "Not connected";
+  connectBtn.textContent = "Connect wallet";
+}
+
 async function connectWallet() {
+  if (_walletConnecting) return;
+  _walletConnecting = true;
   const btn = document.getElementById("connect-btn");
   btn.textContent = "Connecting…";
   btn.disabled = true;
+  setWalletUi("connecting");
 
   try {
     if (!window.ethereum) throw new Error("MetaMask not found — open via http://localhost");
@@ -2057,6 +2259,7 @@ async function connectWallet() {
     const ts  = Date.now();
     const msg = `Gated Auction — wallet verification\n\nAddress: ${addr}\nTimestamp: ${ts}\n\nThis signature proves wallet ownership. It does not cost gas or authorise any transaction.`;
     btn.textContent = "Sign to verify…";
+    setWalletUi("signing");
     const sig = await signer.signMessage(msg);
     const rec = ethers.verifyMessage(msg, sig);
     if (rec.toLowerCase() !== addr.toLowerCase()) throw new Error("Signature mismatch");
@@ -2070,8 +2273,13 @@ async function connectWallet() {
     btn.disabled = true;
     btn.style.display = "none";
     document.getElementById("disconnect-btn").style.display = "block";
+    setWalletUi("connected", addr);
 
-    window.ethereum.on("accountsChanged", () => location.reload());
+    if (!_walletEventsBound && window.ethereum?.on) {
+      window.ethereum.on("accountsChanged", () => location.reload());
+      window.ethereum.on("chainChanged", () => location.reload());
+      _walletEventsBound = true;
+    }
 
     if (auctionContract) {
       // Reconnect all cached contracts with signer
@@ -2079,10 +2287,10 @@ async function connectWallet() {
         _contractCache[addr] = _contractCache[addr].connect(signer);
       });
       auctionContract = auctionContract.connect(signer);
-      await checkEligibility();
-      await checkPendingReturn();
+      // Run post-connect steps independently — a failure in one must not block the others
+      await checkEligibility().catch(e => console.warn("checkEligibility:", e));
       onRoomEligibilityGranted();
-      await _loadMyProfile();
+      _loadMyProfile().catch(e => console.warn("_loadMyProfile:", e));
     }
 
   } catch(e) {
@@ -2090,9 +2298,14 @@ async function connectWallet() {
     document.getElementById("wallet-label").textContent = "Connect failed";
     btn.textContent = "Connect wallet";
     btn.disabled = false;
+    signer = null;
+    signerAddress = null;
+    setWalletUi("failed");
     const msg = (e.code === 4001 || e.message?.includes("rejected") || e.message?.includes("denied"))
       ? "Signature rejected — required to verify wallet" : e.message;
     notify("err", "Connection failed", msg);
+  } finally {
+    _walletConnecting = false;
   }
 }
 
@@ -2100,6 +2313,7 @@ function disconnectWallet() {
   signer = null;
   signerAddress = null;
   sessionStorage.setItem("wallet_disconnected", "true");
+  _walletConnecting = false;
 
   document.getElementById("dot").className = "dot";
   document.getElementById("wallet-label").textContent = "Not connected";
@@ -2107,6 +2321,7 @@ function disconnectWallet() {
   document.getElementById("connect-btn").disabled     = false;
   document.getElementById("connect-btn").style.display    = "block";
   document.getElementById("disconnect-btn").style.display = "none";
+  setWalletUi("disconnected");
   document.getElementById("eligibility").className = "eligibility";
   document.getElementById("bid-btn").disabled = true;
   const bn = document.getElementById("buynow-btn");
@@ -2139,7 +2354,6 @@ async function refreshState() {
 
     endTimestamp = Number(endTime);
     minNextBid   = mnb;
-    isLive       = live && !settled;
     const noBids = highestBidder === ethers.ZeroAddress;
 
     // Show countdown when live with a known end time
@@ -2149,14 +2363,26 @@ async function refreshState() {
     }
 
     // Status line — covers all FlexAuction states
+    // _isOpen = "no token gate" (open to all wallets), NOT "currently accepting bids".
+    // Bidding is accepted whenever (deposited && !settled) AND
+    //   (mode 0 timed: live AND time remaining)  OR  (mode 1 reserve: live AND time remaining, OR pre-first-bid)
+    const now = Math.floor(Date.now() / 1000);
+    const acceptingBids =
+      deposited && !settled && (
+        (live && Number(endTime) > now) ||              // any mode, clock running
+        (mode === 1 && !live && noBids)                  // reserve mode, awaiting first bid
+      );
+
     const sl = document.getElementById("status-line");
     if (!deposited)                              { sl.textContent = "Awaiting NFT deposit";            sl.className = "status-line"; }
     else if (settled)                            { sl.textContent = "Auction settled";                  sl.className = "status-line settled"; }
-    else if (!live && mode === 1 && noBids)      { sl.textContent = "Waiting for first bid to start";  sl.className = "status-line upcoming-line"; }
-    else if (!live && mode === 0)                { sl.textContent = "Waiting for seller to start";      sl.className = "status-line upcoming-line"; }
-    else if (live && !isOpen)                    { sl.textContent = "Live — reserve not yet met";       sl.className = "status-line"; }
-    else if (isOpen)                             { sl.textContent = "Live — bids open";                 sl.className = "status-line live"; }
+    else if (mode === 1 && !live && noBids)      { sl.textContent = "Open — first bid starts the clock"; sl.className = "status-line live"; }
+    else if (mode === 0 && !live)                { sl.textContent = "Waiting for seller to start";      sl.className = "status-line upcoming-line"; }
+    else if (live && Number(endTime) > now)      { sl.textContent = "Live — bids open";                 sl.className = "status-line live"; }
     else                                         { sl.textContent = "Ended — awaiting settlement";      sl.className = "status-line ended"; }
+
+    // isLive used elsewhere (countdown, bid button) — track whether bids are accepted right now
+    isLive = acceptingBids;
 
     // Stats
     if (deposited) {
@@ -2167,8 +2393,8 @@ async function refreshState() {
       document.getElementById("stat-min-sub").textContent = noBids ? "Reserve price" : "Min increment";
     }
 
-    // Bid form — only when open
-    if (isOpen && !settled) {
+    // Bid form — show whenever bids are accepted (covers reserve mode pre-first-bid too)
+    if (acceptingBids) {
       document.getElementById("bid-form").style.display = "block";
       document.getElementById("history-section").style.display = "block";
       updateBidHint();
@@ -2180,9 +2406,12 @@ async function refreshState() {
     if (settled)   showSettled(highestBidder, highestBid);
 
     // Settle / cancel buttons
+    // Settle requires: clock has expired (live=true, endTime passed), bids exist, not settled
+    // Cancel requires: deposited, no bids, not settled
     const settleBtn = document.getElementById("settle-btn");
     const cancelBtn = document.getElementById("cancel-btn");
-    if (settleBtn) settleBtn.style.display = (_isKay() && !live && !settled && !noBids) ? "block" : "none";
+    const clockExpired = live && Number(endTime) > 0 && Number(endTime) <= now;
+    if (settleBtn) settleBtn.style.display = (_isKay() && clockExpired && !settled && !noBids) ? "block" : "none";
     if (cancelBtn) cancelBtn.style.display = (_isKay() && !settled && noBids && deposited) ? "block" : "none";
 
     // Buy now — show when available (deposited, no bids, not settled, price set)
@@ -2228,6 +2457,8 @@ function tickCountdown() {
     document.getElementById("status-line").textContent = "Ended — awaiting settlement";
     document.getElementById("status-line").className   = "status-line ended";
     document.getElementById("bid-form").style.display  = "none";
+    // Refresh state so seller sees the settle button
+    refreshState().catch(() => {});
   }
   // Last-minute warnings
   if (isLive && (diff === 300 || diff === 120 || diff === 60)) aucLastMinutes(diff);
