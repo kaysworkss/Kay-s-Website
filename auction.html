@@ -1492,6 +1492,7 @@ let landingCdTimer = null;
 let notifTimer = null;
 let _walletConnecting = false;
 let _walletEventsBound = false;
+let _switchToken = 0;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -1871,6 +1872,7 @@ async function _pollAllTabBids() {
 
 async function _switchAuction(idx) {
   if (idx < 0 || idx >= _auctions.length) return;
+  const switchToken = ++_switchToken;
   _activeIdx = idx;
 
   // Update tab UI — match by dataset.idx since we filter the visible set
@@ -1946,24 +1948,46 @@ async function _switchAuction(idx) {
   }
   auctionContract = _contractCache[slot.contractAddr];
   if (signer) auctionContract = auctionContract.connect(signer);
+  const activeContract = auctionContract;
 
-  await refreshState();
-  await loadBidHistory();
-  if (slot.contractAddr) await loadNFTMeta();
+  await refreshState(switchToken, activeContract);
+  await loadBidHistory(switchToken, slot.contractAddr);
+  if (switchToken !== _switchToken) return;
+  if (slot.contractAddr) await loadNFTMeta(switchToken, activeContract);
+  if (switchToken !== _switchToken) return;
 
-  countdownTimer = setInterval(tickCountdown, 1000);
-  pollTimer      = setInterval(refreshState, 15000);
+  countdownTimer = setInterval(() => {
+    if (switchToken === _switchToken) tickCountdown();
+  }, 1000);
+  pollTimer = setInterval(() => refreshState(switchToken, activeContract), 15000);
 
-  auctionContract.removeAllListeners();
-  auctionContract.on("BidPlaced",       (bidder, amount, e) => { pushBid(bidder, amount, null, e.log?.transactionHash); refreshState(); _pollAllTabBids(); });
-  auctionContract.on("AuctionExtended", (newEnd)            => { endTimestamp = Number(newEnd); notify("info","Auction extended","A last-minute bid extended the deadline."); });
-  auctionContract.on("AuctionSettled",  (winner, amount)    => { showSettled(winner, amount); clearInterval(countdownTimer); clearInterval(pollTimer); _pollAllTabBids(); });
-  auctionContract.on("ReserveActivated",(firstBidder, amount, endTime) => {
+  activeContract.removeAllListeners();
+  activeContract.on("BidPlaced", (bidder, amount, e) => {
+    if (switchToken !== _switchToken) return;
+    pushBid(bidder, amount, null, e.log?.transactionHash);
+    refreshState(switchToken, activeContract);
+    _pollAllTabBids();
+  });
+  activeContract.on("AuctionExtended", (newEnd) => {
+    if (switchToken !== _switchToken) return;
+    endTimestamp = Number(newEnd);
+    notify("info","Auction extended","A last-minute bid extended the deadline.");
+  });
+  activeContract.on("AuctionSettled", (winner, amount) => {
+    if (switchToken !== _switchToken) return;
+    showSettled(winner, amount);
+    clearInterval(countdownTimer);
+    clearInterval(pollTimer);
+    _pollAllTabBids();
+  });
+  activeContract.on("ReserveActivated",(firstBidder, amount, endTime) => {
+    if (switchToken !== _switchToken) return;
     endTimestamp = Number(endTime); isLive = true;
     notify("info", "Reserve met — auction is live!", `First bid of ${ethers.formatEther(amount)} ETH started the countdown.`);
-    refreshState();
+    refreshState(switchToken, activeContract);
   });
-  auctionContract.on("BuyNowExecuted",  (buyer, price) => {
+  activeContract.on("BuyNowExecuted",  (buyer, price) => {
+    if (switchToken !== _switchToken) return;
     document.getElementById("buynow-section").style.display = "none";
     const isMine = signerAddress && buyer.toLowerCase() === signerAddress.toLowerCase();
     if (!isMine) notify("info", "Sold via Buy Now", `${shortAddr(buyer)} purchased at ${ethers.formatEther(price)} ETH.`);
@@ -1981,7 +2005,7 @@ async function _switchAuction(idx) {
   }
 
   // Re-check eligibility with new contract
-  if (signerAddress) { await checkEligibility(); }
+  if (signerAddress) { await checkEligibility(switchToken, activeContract); }
 }
 
 // ─── About panel ──────────────────────────────────────────────────────────────
@@ -2158,10 +2182,12 @@ function extractCID(url) {
   return null;
 }
 
-async function loadNFTMeta() {
+async function loadNFTMeta(runToken = _switchToken, contract = auctionContract) {
   try {
-    const nftAddr = await auctionContract.nftContract();
-    const tokenId = await auctionContract.nftTokenId();
+    if (!contract || runToken !== _switchToken) return;
+    const nftAddr = await contract.nftContract();
+    const tokenId = await contract.nftTokenId();
+    if (runToken !== _switchToken) return;
     const nft     = new ethers.Contract(nftAddr, ERC721_ABI, provider);
 
     // Only overwrite from chain if admin didn't fill in title
@@ -2246,9 +2272,6 @@ function setWalletUi(state, addr) {
 async function connectWallet() {
   if (_walletConnecting) return;
   _walletConnecting = true;
-  const btn = document.getElementById("connect-btn");
-  btn.textContent = "Connecting…";
-  btn.disabled = true;
   setWalletUi("connecting");
 
   try {
@@ -2262,7 +2285,6 @@ async function connectWallet() {
     // Signature challenge — forces active approval on every connect
     const ts  = Date.now();
     const msg = `Gated Auction — wallet verification\n\nAddress: ${addr}\nTimestamp: ${ts}\n\nThis signature proves wallet ownership. It does not cost gas or authorise any transaction.`;
-    btn.textContent = "Sign to verify…";
     setWalletUi("signing");
     const sig = await signer.signMessage(msg);
     const rec = ethers.verifyMessage(msg, sig);
@@ -2271,12 +2293,6 @@ async function connectWallet() {
     signerAddress = addr;
     sessionStorage.removeItem("wallet_disconnected");
 
-    document.getElementById("dot").className = "dot on";
-    document.getElementById("wallet-label").innerHTML = `<span class="addr">${addr.slice(0,6)}…${addr.slice(-4)}</span>`;
-    btn.textContent = "Connected";
-    btn.disabled = true;
-    btn.style.display = "none";
-    document.getElementById("disconnect-btn").style.display = "block";
     setWalletUi("connected", addr);
 
     if (!_walletEventsBound && window.ethereum?.on) {
@@ -2298,10 +2314,6 @@ async function connectWallet() {
     }
 
   } catch(e) {
-    document.getElementById("dot").className = "dot err";
-    document.getElementById("wallet-label").textContent = "Connect failed";
-    btn.textContent = "Connect wallet";
-    btn.disabled = false;
     signer = null;
     signerAddress = null;
     setWalletUi("failed");
@@ -2319,12 +2331,6 @@ function disconnectWallet() {
   sessionStorage.setItem("wallet_disconnected", "true");
   _walletConnecting = false;
 
-  document.getElementById("dot").className = "dot";
-  document.getElementById("wallet-label").textContent = "Not connected";
-  document.getElementById("connect-btn").textContent  = "Connect wallet";
-  document.getElementById("connect-btn").disabled     = false;
-  document.getElementById("connect-btn").style.display    = "block";
-  document.getElementById("disconnect-btn").style.display = "none";
   setWalletUi("disconnected");
   document.getElementById("eligibility").className = "eligibility";
   document.getElementById("bid-btn").disabled = true;
@@ -2338,10 +2344,11 @@ function disconnectWallet() {
 
 // ─── Auction state ────────────────────────────────────────────────────────────
 
-async function refreshState() {
-  if (!auctionContract) return;
+async function refreshState(runToken = _switchToken, contract = auctionContract) {
+  if (!contract || runToken !== _switchToken) return;
   try {
-    const s = await auctionContract.auctionState();
+    const s = await contract.auctionState();
+    if (runToken !== _switchToken) return;
     // FlexAuction: _deposited, _live, _settled, _endTime, _timeRemaining,
     //              _highestBidder, _highestBid, _minNextBid, _mode, _isOpen
     const deposited     = s[0];
@@ -2470,10 +2477,11 @@ function tickCountdown() {
 
 // ─── Eligibility ──────────────────────────────────────────────────────────────
 
-async function checkEligibility() {
-  if (!auctionContract || !signerAddress) return;
+async function checkEligibility(runToken = _switchToken, contract = auctionContract) {
+  if (!contract || !signerAddress || runToken !== _switchToken) return;
   try {
-    const ok = await auctionContract.isEligible(signerAddress);
+    const ok = await contract.isEligible(signerAddress);
+    if (runToken !== _switchToken) return;
     const el = document.getElementById("eligibility");
     el.className = `eligibility show ${ok ? "yes" : "no"}`;
     document.getElementById("elig-icon").textContent = ok ? "✓" : "✗";
@@ -2560,16 +2568,17 @@ async function executeBuyNow() {
 
 // ─── Bid history ─────────────────────────────────────────────────────────────
 
-async function loadBidHistory() {
+async function loadBidHistory(runToken = _switchToken, contractAddr = cfg.contractAddr) {
   // Load from Supabase — avoids eth_getLogs restrictions on free RPC tier
   bidHistory = [];
-  const auctionId = cfg.contractAddr?.toLowerCase();
+  const auctionId = contractAddr?.toLowerCase();
   if (!auctionId) { renderHistory(); return; }
   try {
     const rows = await _sb.select(
       "collector_messages",
       `auction_id=eq.${encodeURIComponent(auctionId)}&is_bid=eq.true&order=created_at.desc&limit=50`
     );
+    if (runToken !== _switchToken) return;
     if (!Array.isArray(rows)) { renderHistory(); return; }
     for (const row of rows) {
       const ethVal = parseFloat(row.message);
