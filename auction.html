@@ -1506,8 +1506,10 @@ window.addEventListener("load", async () => {
     }];
   }
 
-  // Compute effective status per piece — per-piece status wins, else global, else 'off'
-  // (Previews bypass this — admin sends an authoritative cfg.status to force a view.)
+  // Compute effective status per piece.
+  // Rule: individual piece.status always wins over the global default.
+  // This means global=live + piece.status="upcoming" → piece stays upcoming.
+  // Empty string means "inherit global" — the piece follows the global toggle exactly.
   _auctions.forEach(p => { p._effectiveStatus = p.status || globalStatus; });
 
   // Decide which view to show based on the mix of piece statuses.
@@ -1680,8 +1682,8 @@ function _buildUpcomingPieceSelector() {
 function _loadUpcomingPiece(idx) {
   const slot = _auctions[idx] || _auctions[0] || {};
 
-  // ── Do NOT mutate cfg here. Pass slot data directly to helpers so the live
-  //    view's cfg fields are never overwritten by the upcoming view. ──
+  // Do NOT mutate cfg — pass slot data directly to helpers so the live view's
+  // cfg fields are never overwritten when the upcoming view loads.
 
   // Artwork info
   const nameEl   = document.getElementById("upcoming-art-name");
@@ -1704,7 +1706,7 @@ function _loadUpcomingPiece(idx) {
   const gateDetailEl = document.getElementById("upcoming-gate-detail");
   const gateLinkEl   = document.getElementById("upcoming-gate-link");
   if (slot.gateName && gateNameEl) {
-    gateNameEl.textContent   = slot.gateName;
+    gateNameEl.textContent = slot.gateName;
     if (gateDetailEl) gateDetailEl.textContent = "You must hold this token to participate in the auction.";
   }
   if (slot.gateLink && gateLinkEl) {
@@ -1715,10 +1717,10 @@ function _loadUpcomingPiece(idx) {
     gateLinkEl.style.display = "none";
   }
 
-  // Image — pass slot directly so cfg is not read
+  // Image — pass slot directly
   loadStaticImage("upcoming", slot);
 
-  // Per-piece launch countdown — uses piece's own launchDate only.
+  // Per-piece launch countdown — piece's own date only.
   // Global cfg.launchDate fallback applies only to single-piece (legacy) configs.
   if (upcomingTimer) { clearInterval(upcomingTimer); upcomingTimer = null; }
 
@@ -1775,7 +1777,7 @@ async function initLive() {
   // Build piece selector if multiple auctions
   await _buildPieceSelector();
 
-  // Show coming-next banner if any pieces are upcoming alongside live ones
+  // Show coming-next banner if any upcoming pieces exist alongside live ones
   _renderComingNextBanner();
 
   // Pick start piece — preview override > first live-status piece > 0
@@ -1791,7 +1793,7 @@ async function initLive() {
 
 // ─── Coming-next banner ───────────────────────────────────────────────────────
 
-let _upcomingInitialised = false;  // guard: only call initUpcoming() once
+let _upcomingInitialised = false;
 
 function _renderComingNextBanner() {
   const banner = document.getElementById("coming-next-banner");
@@ -1891,7 +1893,7 @@ async function _switchAuction(idx) {
   bidHistory = [];
   endTimestamp = 0; isLive = false; minNextBid = 0n;
 
-  // Reset all bid-panel DOM elements so no state from the previous piece bleeds through
+  // Reset all bid-panel DOM so no state from the previous piece bleeds through
   document.getElementById("countdown-section").style.display   = "none";
   document.getElementById("stats-grid").style.display          = "none";
   document.getElementById("bid-form").style.display            = "none";
@@ -1924,10 +1926,8 @@ async function _switchAuction(idx) {
   document.getElementById("live-img").style.display = "none";
   document.getElementById("live-img").src = "";
 
-  // Update cfg.contractAddr and art fields so loadNFTMeta (which reads cfg.*) stays correct.
-  // populateAbout and loadStaticImage now receive slot directly — they no longer
-  // read from cfg — so the upcoming view's data is never clobbered by this.
-  cfg.contractAddr = slot.contractAddr;
+  // Update cfg for loadNFTMeta (reads cfg.artTitle/artImage etc.) — but pass slot
+  // directly to populateAbout/loadStaticImage so they never read from the shared cfg.
   cfg.artTitle     = slot.artTitle;
   cfg.artArtist    = slot.artArtist;
   cfg.artAbout     = slot.artAbout;
@@ -1936,6 +1936,7 @@ async function _switchAuction(idx) {
   cfg.artImage     = slot.artImage;
   cfg.gateName     = slot.gateName;
   cfg.gateLink     = slot.gateLink;
+  cfg.contractAddr = slot.contractAddr;
 
   populateAbout("live", slot);
   loadStaticImage("live", slot);
@@ -2056,9 +2057,6 @@ function _sanitizeAbout(html) {
   return root.innerHTML;
 }
 
-// data is a plain object with artTitle, artArtist, artYear, artMedium, artAbout.
-// Passing it explicitly avoids reading from the shared mutable cfg object,
-// which would cause the live and upcoming views to overwrite each other's state.
 function populateAbout(view, data) {
   const src    = data || cfg;
   const title  = src.artTitle  || "";
@@ -2103,7 +2101,6 @@ function closeAbout(view) {
 
 // ─── Image loading ────────────────────────────────────────────────────────────
 
-// data is a plain object with artImage (optional). Falls back to cfg if omitted.
 function loadStaticImage(view, data) {
   const src   = data || cfg;
   const image = src.artImage;

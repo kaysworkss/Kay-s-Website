@@ -436,10 +436,8 @@ body {
           </div>
         </div>
         <div class="field-hint">
-          <b>Off</b> — landing page only.<br>
-          <b>Upcoming</b> — countdown view, no bidding.<br>
-          <b>Live</b> — full auction with bidding.<br>
-          <em>This is the default for any piece set to "Inherit global" below. Pieces with their own explicit status ignore this setting — set them to Off individually to hide them.</em>
+          Sets the default for all pieces. Any piece set to <em>Inherit global</em> will follow this exactly.<br>
+          Individual piece overrides still apply — a piece set to <b>Upcoming</b> stays upcoming even when this is Live.
         </div>
       </div>
     </div>
@@ -464,12 +462,12 @@ body {
 
     <!-- Launch date (upcoming) -->
     <div class="card" id="upcoming-date-field" style="display:none">
-      <div class="card-head"><div class="card-title">Global launch date</div></div>
+      <div class="card-head"><div class="card-title">Upcoming countdown — global fallback</div></div>
       <div class="card-body">
         <div class="field">
           <label>Launch date &amp; time</label>
           <input type="datetime-local" id="launch-date" />
-          <div class="field-hint">Single-piece auctions: drives the upcoming countdown when no per-piece date is set. Multi-piece auctions: set each piece's date individually above — this field is ignored when more than one piece is configured.</div>
+          <div class="field-hint">Used by any piece that doesn't have its own launch date set. Leave blank if every piece has its own.</div>
         </div>
       </div>
     </div>
@@ -736,7 +734,7 @@ function _buildPieceForm(idx) {
         <button type="button" class="piece-status-btn ${pieceStatus==='live'  ? 'active-live'     : ''}" onclick="setPieceStatus(${idx},'live')">Live</button>
       </div>
       <input type="hidden" id="${_pieceFieldId(idx,'status')}" value="${pieceStatus}"/>
-      <div class="field-hint">Lets you mix states across pieces — e.g. piece 1 live, piece 2 upcoming. <em>Inherit global</em> uses the master status above.</div>
+      <div id="${_pieceFieldId(idx,'effectiveHint')}" class="field-hint" style="margin-top:6px"></div>
     </div>
     <div class="field">
       <label>Contract address</label>
@@ -792,7 +790,7 @@ function _buildPieceForm(idx) {
     <div class="field">
       <label>Launch date for this piece</label>
       <input type="datetime-local" id="${_pieceFieldId(idx,'launchDate')}" value="${d.launchDate||''}"/>
-      <div class="field-hint">Optional — sets the countdown for this piece's upcoming view. In multi-piece auctions each piece needs its own date; the global fallback below applies only to single-piece setups.</div>
+      <div class="field-hint">Optional — if set, the upcoming-view countdown for this piece uses this date. Leave blank to fall back to the global launch date below.</div>
     </div>`;
 }
 
@@ -838,7 +836,8 @@ function _renderPieceTabs() {
   const badge = document.getElementById("piece-count-badge");
   if (badge) badge.textContent = _pieces.length + " piece" + (_pieces.length===1?"":"s");
   _showPreviewCard();
-  if (typeof _refreshUpcomingDateVisibility === "function") _refreshUpcomingDateVisibility();
+  // Populate the effective-status hint for the newly rendered form
+  if (typeof _updateEffectiveHint === "function") _updateEffectiveHint(_activePieceIdx);
 }
 
 function selectPiece(idx) {
@@ -1122,9 +1121,6 @@ function setStatus(s, updateUI = true) {
 
   const udf = document.getElementById("upcoming-date-field");
   if (udf) udf.style.display = s === "upcoming" ? "block" : "none";
-  // After changing global status, re-check whether upcoming date card should show
-  // (a piece with explicit "upcoming" status also needs it even if global is "live")
-  setTimeout(_refreshUpcomingDateVisibility, 0);
 
   const lcf = document.getElementById("landing-countdown-field");
   if (lcf) lcf.style.display = s === "off" ? "block" : "none";
@@ -1142,6 +1138,8 @@ function setStatus(s, updateUI = true) {
     // Re-render only the tabs (not the form) to refresh the inherited-status dots
     _renderTabsOnly();
   }
+  // Update the effective-status hint in the active piece form
+  if (typeof _updateAllEffectiveHints === "function") _updateAllEffectiveHints();
 }
 
 // Re-render just the tab strip without rebuilding the form (avoids losing in-progress edits)
@@ -1182,18 +1180,42 @@ function setPieceStatus(idx, s) {
   }
   // Refresh the tab strip so the status dot updates
   _renderTabsOnly();
-  // Show global launch-date card if any piece (including this one) is now upcoming
-  _refreshUpcomingDateVisibility();
+  // Update the effective-status hint in the currently visible form
+  _updateEffectiveHint(_activePieceIdx);
 }
 
-// Show/hide the global launch-date card based on global + per-piece statuses combined.
-// Must be called any time a piece status changes or the global status changes.
-function _refreshUpcomingDateVisibility() {
-  const udf = document.getElementById("upcoming-date-field");
-  if (!udf) return;
-  const globalIsUpcoming = document.getElementById("btn-upcoming")?.className.includes("active");
-  const anyPieceUpcoming = _pieces.some(p => p.status === "upcoming");
-  udf.style.display = (globalIsUpcoming || anyPieceUpcoming) ? "block" : "none";
+// ── Effective-status hint ─────────────────────────────────────────────────────
+// Shows the collector-facing result for the active piece inline in the form,
+// so the admin always knows what a piece will actually display.
+
+function _getGlobalStatus() {
+  if (document.getElementById("btn-live")?.className.includes("active"))     return "live";
+  if (document.getElementById("btn-upcoming")?.className.includes("active")) return "upcoming";
+  return "off";
+}
+
+function _updateEffectiveHint(idx) {
+  const hintEl = document.getElementById(_pieceFieldId(idx, 'effectiveHint'));
+  if (!hintEl) return;
+  const piece  = _pieces[idx] || {};
+  const global = _getGlobalStatus();
+  const eff    = piece.status || global;  // mirrors auction.html's _effectiveStatus logic
+
+  const labels = { live: "Live — bidding enabled", upcoming: "Upcoming — countdown only", off: "Off — hidden from collectors" };
+  const colors = { live: "var(--moss)", upcoming: "var(--gold)", off: "var(--text-muted)" };
+
+  const isInherited = !piece.status;
+  const suffix = isInherited ? ` <em>(inherited from global)</em>` : "";
+  const extraNote = (!piece.status && global === "live")
+    ? " · Set to <b>Upcoming</b> to show this piece's countdown while others are live."
+    : "";
+
+  hintEl.innerHTML = `<span style="color:${colors[eff]}">● ${labels[eff] || eff}</span>${suffix}${extraNote}`;
+}
+
+// Called by setStatus so the hint updates when the global toggle changes
+function _updateAllEffectiveHints() {
+  _updateEffectiveHint(_activePieceIdx);
 }
 
 // ─── Contract validation ─────────────────────────────────────────────────────
