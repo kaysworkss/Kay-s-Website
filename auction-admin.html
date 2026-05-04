@@ -210,6 +210,31 @@ body {
   border-color: rgba(196,132,90,0.35); color: var(--text);
 }
 
+/* Per-piece status picker (smaller version inside each piece form) */
+.piece-status-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.piece-status-btn {
+  flex: 1; min-width: 100px; padding: 7px 10px;
+  border: 1px solid var(--divider); border-radius: var(--r);
+  background: var(--bg);
+  font-family: 'Cinzel', serif; font-size: 0.55rem;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  cursor: pointer; transition: all .18s; color: var(--text-muted);
+}
+.piece-status-btn:hover { color: var(--text); }
+.piece-status-btn.active-live    { background: rgba(107,124,92,0.15); border-color: rgba(107,124,92,0.5); color: var(--moss); }
+.piece-status-btn.active-upcoming{ background: rgba(201,153,58,0.12); border-color: rgba(201,153,58,0.4); color: var(--gold); }
+.piece-status-btn.active-off     { background: rgba(255,255,255,0.06); border-color: rgba(196,132,90,0.35); color: var(--text); }
+.piece-status-btn.active-inherit { background: rgba(255,255,255,0.04); border-color: var(--divider); color: var(--text); font-style: italic; }
+
+/* Status dot on piece tabs */
+.piece-tab-status-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  margin-right: 6px; vertical-align: middle;
+}
+.piece-tab-status-dot.live     { background: var(--moss); box-shadow: 0 0 4px rgba(107,124,92,0.6); }
+.piece-tab-status-dot.upcoming { background: var(--gold); }
+.piece-tab-status-dot.off      { background: var(--text-muted); opacity: 0.5; }
+
 /* Buttons */
 .btn {
   font-family: 'Cinzel', serif; font-size: 0.62rem;
@@ -411,9 +436,8 @@ body {
           </div>
         </div>
         <div class="field-hint">
-          <b>Off</b> — landing page only, no auction shown.<br>
-          <b>Upcoming</b> — shows countdown to launch date, no bidding.<br>
-          <b>Live</b> — full auction page with bidding enabled.
+          Sets the default for all pieces. Any piece set to <em>Inherit global</em> will follow this exactly.<br>
+          Individual piece overrides still apply — a piece set to <b>Upcoming</b> stays upcoming even when this is Live.
         </div>
       </div>
     </div>
@@ -438,12 +462,12 @@ body {
 
     <!-- Launch date (upcoming) -->
     <div class="card" id="upcoming-date-field" style="display:none">
-      <div class="card-head"><div class="card-title">Upcoming countdown</div></div>
+      <div class="card-head"><div class="card-title">Upcoming countdown — global fallback</div></div>
       <div class="card-body">
         <div class="field">
           <label>Launch date &amp; time</label>
           <input type="datetime-local" id="launch-date" />
-          <div class="field-hint">Shown on the upcoming auction page as a countdown</div>
+          <div class="field-hint">Used by any piece that doesn't have its own launch date set. Leave blank if every piece has its own.</div>
         </div>
       </div>
     </div>
@@ -699,7 +723,19 @@ function _pieceFieldId(idx, field) { return `piece-${idx}-${field}`; }
 
 function _buildPieceForm(idx) {
   const d = _pieces[idx] || {};
+  const pieceStatus = d.status || "";  // empty = inherit from global cfg.status
   return `
+    <div class="field">
+      <label>Status for this piece</label>
+      <div class="piece-status-row" id="${_pieceFieldId(idx,'statusRow')}">
+        <button type="button" class="piece-status-btn ${pieceStatus===''      ? 'active-inherit'  : ''}" onclick="setPieceStatus(${idx},'')">Inherit global</button>
+        <button type="button" class="piece-status-btn ${pieceStatus==='off'   ? 'active-off'      : ''}" onclick="setPieceStatus(${idx},'off')">Off</button>
+        <button type="button" class="piece-status-btn ${pieceStatus==='upcoming' ? 'active-upcoming' : ''}" onclick="setPieceStatus(${idx},'upcoming')">Upcoming</button>
+        <button type="button" class="piece-status-btn ${pieceStatus==='live'  ? 'active-live'     : ''}" onclick="setPieceStatus(${idx},'live')">Live</button>
+      </div>
+      <input type="hidden" id="${_pieceFieldId(idx,'status')}" value="${pieceStatus}"/>
+      <div id="${_pieceFieldId(idx,'effectiveHint')}" class="field-hint" style="margin-top:6px"></div>
+    </div>
     <div class="field">
       <label>Contract address</label>
       <input id="${_pieceFieldId(idx,'contractAddr')}" placeholder="0x…" value="${d.contractAddr||''}"
@@ -750,7 +786,24 @@ function _buildPieceForm(idx) {
         <input id="${_pieceFieldId(idx,'gateName')}" placeholder="e.g. Entry Token" value="${d.gateName||''}"/></div>
       <div class="field"><label>Gate link</label>
         <input id="${_pieceFieldId(idx,'gateLink')}" placeholder="https://…" value="${d.gateLink||''}"/></div>
+    </div>
+    <div class="field">
+      <label>Launch date for this piece</label>
+      <input type="datetime-local" id="${_pieceFieldId(idx,'launchDate')}" value="${d.launchDate||''}"/>
+      <div class="field-hint">Optional — if set, the upcoming-view countdown for this piece uses this date. Leave blank to fall back to the global launch date below.</div>
     </div>`;
+}
+
+function _effectivePieceStatus(piece) {
+  // Returns the status the piece will actually use: its own if set, else global, else 'off'
+  if (piece && piece.status) return piece.status;
+  // Global status (read live from the DOM toggle, since the user may have changed it without saving)
+  const globalBtn = document.querySelector('.status-btn.active-live, .status-btn.active-upcoming, .status-btn.active-off');
+  if (globalBtn) {
+    if (globalBtn.id === 'btn-live')     return 'live';
+    if (globalBtn.id === 'btn-upcoming') return 'upcoming';
+  }
+  return 'off';
 }
 
 function _renderPieceTabs() {
@@ -758,11 +811,15 @@ function _renderPieceTabs() {
   const forms = document.getElementById("piece-forms");
   if (!tabs || !forms) return;
 
-  tabs.innerHTML = _pieces.map((p, i) => `
+  tabs.innerHTML = _pieces.map((p, i) => {
+    const eff = _effectivePieceStatus(p);
+    const dotTitle = p.status ? `Status: ${eff}` : `Status: ${eff} (inherited)`;
+    return `
     <button class="piece-tab-btn ${i===_activePieceIdx?'active':''}" onclick="selectPiece(${i})">
-      ${p.artTitle || 'Piece '+(i+1)}
+      <span class="piece-tab-status-dot ${eff}" title="${dotTitle}"></span>${p.artTitle || 'Piece '+(i+1)}
       ${_pieces.length > 1 ? `<button class="piece-remove-btn" onclick="event.stopPropagation();removePiece(${i})">✕</button>` : ''}
-    </button>`).join("");
+    </button>`;
+  }).join("");
 
   forms.innerHTML = _buildPieceForm(_activePieceIdx);
 
@@ -779,6 +836,8 @@ function _renderPieceTabs() {
   const badge = document.getElementById("piece-count-badge");
   if (badge) badge.textContent = _pieces.length + " piece" + (_pieces.length===1?"":"s");
   _showPreviewCard();
+  // Populate the effective-status hint for the newly rendered form
+  if (typeof _updateEffectiveHint === "function") _updateEffectiveHint(_activePieceIdx);
 }
 
 function selectPiece(idx) {
@@ -966,7 +1025,7 @@ document.addEventListener("keyup", (e) => {
 
 function _savePieceFormValues(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
-  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink"];
+  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
     if (!el) return;
@@ -1073,6 +1132,90 @@ function setStatus(s, updateUI = true) {
     // Reset to the default ('upcoming') whenever the toggle becomes relevant
     if (s === "upcoming" && typeof setPreviewAs === "function") setPreviewAs("upcoming");
   }
+
+  // The global status change affects the dots on tabs of pieces that are set to "Inherit global"
+  if (typeof _renderPieceTabs === "function" && _pieces && _pieces.length) {
+    // Re-render only the tabs (not the form) to refresh the inherited-status dots
+    _renderTabsOnly();
+  }
+  // Update the effective-status hint in the active piece form
+  if (typeof _updateAllEffectiveHints === "function") _updateAllEffectiveHints();
+}
+
+// Re-render just the tab strip without rebuilding the form (avoids losing in-progress edits)
+function _renderTabsOnly() {
+  const tabs = document.getElementById("piece-tabs");
+  if (!tabs) return;
+  tabs.innerHTML = _pieces.map((p, i) => {
+    const eff = _effectivePieceStatus(p);
+    const dotTitle = p.status ? `Status: ${eff}` : `Status: ${eff} (inherited)`;
+    return `
+    <button class="piece-tab-btn ${i===_activePieceIdx?'active':''}" onclick="selectPiece(${i})">
+      <span class="piece-tab-status-dot ${eff}" title="${dotTitle}"></span>${p.artTitle || 'Piece '+(i+1)}
+      ${_pieces.length > 1 ? `<button class="piece-remove-btn" onclick="event.stopPropagation();removePiece(${i})">✕</button>` : ''}
+    </button>`;
+  }).join("");
+}
+
+// Per-piece status setter — called from the buttons inside each piece form
+function setPieceStatus(idx, s) {
+  if (!_pieces[idx]) return;
+  // Save in piece data (empty string = inherit from global)
+  _pieces[idx].status = s;
+  // Sync the hidden input so _savePieceFormValues picks it up
+  const hidden = document.getElementById(_pieceFieldId(idx, 'status'));
+  if (hidden) hidden.value = s;
+  // Update the visible button states inside the form
+  const row = document.getElementById(_pieceFieldId(idx, 'statusRow'));
+  if (row) {
+    row.querySelectorAll('.piece-status-btn').forEach(b => {
+      b.className = 'piece-status-btn';
+    });
+    const map = { '': 'active-inherit', 'off': 'active-off', 'upcoming': 'active-upcoming', 'live': 'active-live' };
+    const btns = row.querySelectorAll('.piece-status-btn');
+    // Order: Inherit, Off, Upcoming, Live (matches _buildPieceForm)
+    const order = ['', 'off', 'upcoming', 'live'];
+    const targetIdx = order.indexOf(s);
+    if (targetIdx >= 0 && btns[targetIdx]) btns[targetIdx].classList.add(map[s]);
+  }
+  // Refresh the tab strip so the status dot updates
+  _renderTabsOnly();
+  // Update the effective-status hint in the currently visible form
+  _updateEffectiveHint(_activePieceIdx);
+}
+
+// ── Effective-status hint ─────────────────────────────────────────────────────
+// Shows the collector-facing result for the active piece inline in the form,
+// so the admin always knows what a piece will actually display.
+
+function _getGlobalStatus() {
+  if (document.getElementById("btn-live")?.className.includes("active"))     return "live";
+  if (document.getElementById("btn-upcoming")?.className.includes("active")) return "upcoming";
+  return "off";
+}
+
+function _updateEffectiveHint(idx) {
+  const hintEl = document.getElementById(_pieceFieldId(idx, 'effectiveHint'));
+  if (!hintEl) return;
+  const piece  = _pieces[idx] || {};
+  const global = _getGlobalStatus();
+  const eff    = piece.status || global;  // mirrors auction.html's _effectiveStatus logic
+
+  const labels = { live: "Live — bidding enabled", upcoming: "Upcoming — countdown only", off: "Off — hidden from collectors" };
+  const colors = { live: "var(--moss)", upcoming: "var(--gold)", off: "var(--text-muted)" };
+
+  const isInherited = !piece.status;
+  const suffix = isInherited ? ` <em>(inherited from global)</em>` : "";
+  const extraNote = (!piece.status && global === "live")
+    ? " · Set to <b>Upcoming</b> to show this piece's countdown while others are live."
+    : "";
+
+  hintEl.innerHTML = `<span style="color:${colors[eff]}">● ${labels[eff] || eff}</span>${suffix}${extraNote}`;
+}
+
+// Called by setStatus so the hint updates when the global toggle changes
+function _updateAllEffectiveHints() {
+  _updateEffectiveHint(_activePieceIdx);
 }
 
 // ─── Contract validation ─────────────────────────────────────────────────────
@@ -1182,15 +1325,18 @@ async function saveToHallOfFame() {
       throw new Error("Contract returned no data — is this the correct contract address?");
     }
 
-    // Decode FlexAuction auctionState() — 10 x 32-byte words:
+    // Decode FlexAuction auctionState() — 12 x 32-byte words:
     // [0] deposited, [1] live, [2] settled, [3] endTime, [4] timeRemaining,
-    // [5] highestBidder, [6] highestBid, [7] minNextBid, [8] mode, [9] isOpen
+    // [5] highestBidder, [6] highestBid, [7] minNextBid, [8] mode, [9] isOpen,
+    // [10] buyNowPrice, [11] buyNowAvailable
     const hex           = rpcData.result.slice(2);
     const settled       = parseInt(hex.slice(2 * 64, 3 * 64), 16) === 1;
     const highestBidder = "0x" + hex.slice(5 * 64 + 24, 5 * 64 + 64);  // word 5, last 20 bytes
     const highestBidHex = hex.slice(6 * 64, 7 * 64);
-    const highestBid    = parseInt(highestBidHex, 16);
-    const winningBid    = highestBid / 1e18;
+    // Use BigInt for the bid amount — parseInt loses precision above ~0.009 ETH
+    const highestBidWei = BigInt("0x" + highestBidHex);
+    const winningBid    = Number(highestBidWei) / 1e18;
+    const highestBid    = Number(highestBidWei);  // kept for backward compat below
 
     if (!settled) {
       throw new Error("Auction is not yet settled — the contract has not been settled on-chain.");
