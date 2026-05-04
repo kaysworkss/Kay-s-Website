@@ -232,7 +232,7 @@
     background: rgba(255,255,255,0.04);
     border-radius: 4px;
     overflow: hidden;
-    width: 100%;
+    max-width: 620px;
   }
   .live-auction-carousel.show { display: block; }
   .lac-head {
@@ -1468,7 +1468,7 @@
 
     /* SERIES */
     .series-inner { grid-template-columns: 1fr; gap: 2.5rem; }
-    .live-auction-carousel { width: 100%; }
+    .live-auction-carousel { max-width: 100%; }
     .lac-head { align-items: flex-start; }
     .lac-track { grid-auto-columns: 88%; }
     .lac-card { grid-template-columns: 92px 1fr; }
@@ -1795,7 +1795,7 @@
           </div>
           <div class="lac-track" id="idx-lac-track"></div>
         </div>
-        <div class="auc-countdown-strip" id="idx-cd-strip">
+<div class="auc-countdown-strip" id="idx-cd-strip">
           <span>Auction ends in</span>
           <div class="auc-cd-nums" id="idx-cd-nums">-- : -- : --</div>
         </div>
@@ -2833,71 +2833,28 @@
     if (!liveCarousel || !liveTrack) return;
     const live = _liveSlots(cfg);
     liveCarousel.classList.toggle("show", live.length > 0);
-    liveTrack.innerHTML = "";
-    if (!live.length) return;
+    if (!live.length) {
+      liveTrack.innerHTML = "";
+      return;
+    }
 
-    live.forEach(function(slot, i) {
-      const title = slot.title || slot.name || "Live auction";
-      const artist = slot.artist || slot.maker || "";
-      const medium = slot.medium || slot.category || "";
-      const estimate = slot.estimate || slot.price || slot.currentBid || "Live bidding";
-      const img = _http(slot.image || slot.imageUrl || slot.artworkImage || "");
-      const href = slot.auctionUrl || slot.url || "/auction";
-      const meta = [artist, medium].filter(Boolean).join(" - ");
-
-      const card = document.createElement("a");
-      card.className = "lac-card";
-      card.href = href;
-      card.setAttribute("aria-label", "View live auction: " + title);
-
-      const imgWrap = document.createElement("div");
-      imgWrap.className = "lac-img-wrap";
-      if (img) {
-        const image = document.createElement("img");
-        image.src = img;
-        image.alt = title;
-        image.addEventListener("error", function() {
-          image.style.display = "none";
-        });
-        imgWrap.appendChild(image);
-      }
-
-      const body = document.createElement("div");
-      body.className = "lac-body";
-
-      const titleEl = document.createElement("div");
-      titleEl.className = "lac-title";
-      titleEl.textContent = title;
-
-      const metaEl = document.createElement("div");
-      metaEl.className = "lac-meta";
-      metaEl.textContent = meta;
-
-      const foot = document.createElement("div");
-      foot.className = "lac-foot";
-
-      const estimateEl = document.createElement("span");
-      estimateEl.textContent = estimate;
-
-      const cta = document.createElement("span");
-      cta.textContent = "Bid now ->";
-
-      foot.appendChild(estimateEl);
-      foot.appendChild(cta);
-      body.appendChild(titleEl);
-      if (meta) body.appendChild(metaEl);
-      body.appendChild(foot);
-      card.appendChild(imgWrap);
-      card.appendChild(body);
-      liveTrack.appendChild(card);
-
-      if (i === 0) card.setAttribute("aria-current", "true");
-    });
+    liveTrack.innerHTML = live.map(function(slot, i) {
+      const title = slot.artTitle || ("Live auction " + (i + 1));
+      const artist = slot.artArtist ? slot.artArtist + " - " : "";
+      const meta = artist + (slot.artMedium || "Chapter auction");
+      const img = _http(slot.artImage) || "images/IjokooB.png";
+      const href = slot.auctionUrl || "/auction";
+      return '<a class="lac-card" href="' + _escHtml(href) + '">' +
+        '<div class="lac-img-wrap"><img src="' + _escHtml(img) + '" alt="' + _escHtml(title) + '" onerror="this.style.display=\'none\'"></div>' +
+        '<div class="lac-body"><p class="lac-title">' + _escHtml(title) + '</p>' +
+        '<p class="lac-meta">' + _escHtml(meta) + '</p><span class="lac-cta">Bid now &rarr;</span></div></a>';
+    }).join("");
 
     const showControls = live.length > 1;
-    if (livePrev) livePrev.style.display = showControls ? "inline-flex" : "none";
-    if (liveNext) liveNext.style.display = showControls ? "inline-flex" : "none";
+    if (livePrev) livePrev.disabled = !showControls;
+    if (liveNext) liveNext.disabled = !showControls;
   }
+
   function _scrollLiveCarousel(dir) {
     if (!liveTrack) return;
     liveTrack.scrollBy({ left: dir * Math.max(260, liveTrack.clientWidth * 0.82), behavior: "smooth" });
@@ -2988,5 +2945,3 @@
 </script>
 </body>
 </html>
-
-
