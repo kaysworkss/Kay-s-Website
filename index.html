@@ -232,7 +232,7 @@
     background: rgba(255,255,255,0.04);
     border-radius: 4px;
     overflow: hidden;
-    max-width: 620px;
+    width: 100%;
   }
   .live-auction-carousel.show { display: block; }
   .lac-head {
@@ -1468,7 +1468,7 @@
 
     /* SERIES */
     .series-inner { grid-template-columns: 1fr; gap: 2.5rem; }
-    .live-auction-carousel { max-width: 100%; }
+    .live-auction-carousel { width: 100%; }
     .lac-head { align-items: flex-start; }
     .lac-track { grid-auto-columns: 88%; }
     .lac-card { grid-template-columns: 92px 1fr; }
@@ -1647,12 +1647,12 @@
     <li><a href="#shop">Shop</a></li>
     <li><a href="#about">About</a></li>
     <li style="display:flex;align-items:center;">
-      <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">ðŸŒ™</button>
+      <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">🌙</button>
     </li>
   </ul>
   <!-- Mobile controls -->
   <div id="mobileControls" style="display:none;align-items:center;gap:0.8rem;">
-    <button class="theme-toggle" id="themeToggleMobile" title="Toggle dark mode">ðŸŒ™</button>
+    <button class="theme-toggle" id="themeToggleMobile" title="Toggle dark mode">🌙</button>
     <button class="hamburger" id="hamburger" aria-label="Menu">
       <span></span><span></span><span></span>
     </button>
@@ -1795,7 +1795,7 @@
           </div>
           <div class="lac-track" id="idx-lac-track"></div>
         </div>
-<div class="auc-countdown-strip" id="idx-cd-strip">
+        <div class="auc-countdown-strip" id="idx-cd-strip">
           <span>Auction ends in</span>
           <div class="auc-cd-nums" id="idx-cd-nums">-- : -- : --</div>
         </div>
@@ -2079,7 +2079,7 @@
          onclick="event.stopPropagation()"
          class="auction-badge"
          style="display:none;">
-        ðŸ”¨ <span>Auction</span>
+        🔨 <span>Auction</span>
       </a>
     </div>
     <div class="art-card art-card-clickable" tabindex="0" role="button" aria-label="View artwork: Anastasia" data-art-index="0" data-art-title="Anastasia" data-art-medium="Digital Painting · 2026">
@@ -2142,25 +2142,25 @@
   <p class="shop-desc">Own a piece of the work. From archival prints to original paintings, each item ships worldwide with a certificate of authenticity.</p>
   <div class="shop-items">
     <div class="shop-item">
-      <div class="shop-item-icon">ðŸ–¼ï¸</div>
+      <div class="shop-item-icon">🖼️</div>
       <p class="shop-item-name"> Paintings</p>
       <p class="shop-item-price">from $400</p>
       <p style="font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--clay);margin-top:0.6rem;">Coming Soon</p>
     </div>
     <div class="shop-item">
-      <div class="shop-item-icon">ðŸ—‚ï¸</div>
+      <div class="shop-item-icon">🗂️</div>
       <p class="shop-item-name">Archival Prints</p>
       <p class="shop-item-price">from $45</p>
       <p style="font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--clay);margin-top:0.6rem;">Coming Soon</p>
     </div>
     <div class="shop-item">
-      <div class="shop-item-icon">ðŸ““</div>
+      <div class="shop-item-icon">📓</div>
       <p class="shop-item-name">Sketchbooks</p>
       <p class="shop-item-price">from $28</p>
       <p style="font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--clay);margin-top:0.6rem;">Coming Soon</p>
     </div>
     <div class="shop-item">
-      <div class="shop-item-icon">ðŸŽ</div>
+      <div class="shop-item-icon">🎁</div>
       <p class="shop-item-name">Gift Cards</p>
       <p class="shop-item-price">from $25</p>
       <p style="font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--clay);margin-top:0.6rem;">Coming Soon</p>
@@ -2172,7 +2172,6 @@
     </a>
   </div>
 </section>
-
 <!-- ── ABOUT ── -->
 <section id="about">
   <div class="about-image-wrap reveal">
@@ -2833,28 +2832,71 @@
     if (!liveCarousel || !liveTrack) return;
     const live = _liveSlots(cfg);
     liveCarousel.classList.toggle("show", live.length > 0);
-    if (!live.length) {
-      liveTrack.innerHTML = "";
-      return;
-    }
+    liveTrack.innerHTML = "";
+    if (!live.length) return;
 
-    liveTrack.innerHTML = live.map(function(slot, i) {
-      const title = slot.artTitle || ("Live auction " + (i + 1));
-      const artist = slot.artArtist ? slot.artArtist + " - " : "";
-      const meta = artist + (slot.artMedium || "Chapter auction");
-      const img = _http(slot.artImage) || "images/IjokooB.png";
-      const href = slot.auctionUrl || "/auction";
-      return '<a class="lac-card" href="' + _escHtml(href) + '">' +
-        '<div class="lac-img-wrap"><img src="' + _escHtml(img) + '" alt="' + _escHtml(title) + '" onerror="this.style.display=\'none\'"></div>' +
-        '<div class="lac-body"><p class="lac-title">' + _escHtml(title) + '</p>' +
-        '<p class="lac-meta">' + _escHtml(meta) + '</p><span class="lac-cta">Bid now &rarr;</span></div></a>';
-    }).join("");
+    live.forEach(function(slot, i) {
+      const title = slot.artTitle || slot.title || slot.name || "Live auction";
+      const artist = slot.artArtist || slot.artist || slot.maker || "";
+      const medium = slot.artMedium || slot.medium || slot.category || "";
+      const estimate = slot.estimate || slot.price || slot.currentBid || slot.reserve || "Live bidding";
+      const img = _http(slot.artImage || slot.image || slot.imageUrl || slot.artworkImage || slot.thumbnail || "");
+      const href = slot.auctionUrl || slot.url || "/auction";
+      const meta = [artist, medium].filter(Boolean).join(" - ");
+
+      const card = document.createElement("a");
+      card.className = "lac-card";
+      card.href = href;
+      card.setAttribute("aria-label", "View live auction: " + title);
+
+      const imgWrap = document.createElement("div");
+      imgWrap.className = "lac-img-wrap";
+      if (img) {
+        const image = document.createElement("img");
+        image.src = img;
+        image.alt = title;
+        image.addEventListener("error", function() {
+          image.style.display = "none";
+        });
+        imgWrap.appendChild(image);
+      }
+
+      const body = document.createElement("div");
+      body.className = "lac-body";
+
+      const titleEl = document.createElement("div");
+      titleEl.className = "lac-title";
+      titleEl.textContent = title;
+
+      const metaEl = document.createElement("div");
+      metaEl.className = "lac-meta";
+      metaEl.textContent = meta;
+
+      const foot = document.createElement("div");
+      foot.className = "lac-foot";
+
+      const estimateEl = document.createElement("span");
+      estimateEl.textContent = estimate;
+
+      const cta = document.createElement("span");
+      cta.textContent = "Bid now ->";
+
+      foot.appendChild(estimateEl);
+      foot.appendChild(cta);
+      body.appendChild(titleEl);
+      if (meta) body.appendChild(metaEl);
+      body.appendChild(foot);
+      card.appendChild(imgWrap);
+      card.appendChild(body);
+      liveTrack.appendChild(card);
+
+      if (i === 0) card.setAttribute("aria-current", "true");
+    });
 
     const showControls = live.length > 1;
-    if (livePrev) livePrev.disabled = !showControls;
-    if (liveNext) liveNext.disabled = !showControls;
+    if (livePrev) livePrev.style.display = showControls ? "inline-flex" : "none";
+    if (liveNext) liveNext.style.display = showControls ? "inline-flex" : "none";
   }
-
   function _scrollLiveCarousel(dir) {
     if (!liveTrack) return;
     liveTrack.scrollBy({ left: dir * Math.max(260, liveTrack.clientWidth * 0.82), behavior: "smooth" });
@@ -2945,3 +2987,7 @@
 </script>
 </body>
 </html>
+
+
+
+
