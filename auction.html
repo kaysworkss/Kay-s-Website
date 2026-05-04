@@ -774,18 +774,14 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 @keyframes auc-shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-5px)} 40%,80%{transform:translateX(5px)} }
 
 /* ── Coming-next banner (live view) ── */
-#coming-next-banner {
-  display: none; align-items: center; justify-content: space-between;
-  padding: 7px 20px; gap: 12px; flex-shrink: 0;
-  background: rgba(201,153,58,0.07); border-bottom: 1px solid rgba(201,153,58,0.2);
-}
-#coming-next-banner.show { display: flex; }
-.cnb-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.cnb-label { font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); white-space: nowrap; flex-shrink: 0; }
-.cnb-thumb { width: 24px; height: 24px; border-radius: 2px; object-fit: cover; border: 1px solid var(--divider); background: var(--bg); flex-shrink: 0; }
-.cnb-title { font-family: 'Cormorant Garamond', serif; font-size: 0.92rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cnb-link { font-family: 'Cinzel', serif; font-size: 0.46rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); background: transparent; border: 1px solid rgba(201,153,58,0.35); border-radius: 2px; padding: 3px 9px; white-space: nowrap; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
-.cnb-link:hover { background: rgba(201,153,58,0.12); }
+#coming-next-banner { display:none; align-items:center; justify-content:space-between; padding:7px 20px; gap:12px; flex-shrink:0; background:rgba(201,153,58,0.07); border-bottom:1px solid rgba(201,153,58,0.2); }
+#coming-next-banner.show { display:flex; }
+.cnb-left { display:flex; align-items:center; gap:10px; min-width:0; }
+.cnb-label { font-family:'Cinzel',serif; font-size:0.48rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); white-space:nowrap; flex-shrink:0; }
+.cnb-thumb { width:24px; height:24px; border-radius:2px; object-fit:cover; border:1px solid var(--divider); background:var(--bg); flex-shrink:0; }
+.cnb-title { font-family:'Cormorant Garamond',serif; font-size:0.92rem; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cnb-link { font-family:'Cinzel',serif; font-size:0.46rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); background:transparent; border:1px solid rgba(201,153,58,0.35); border-radius:2px; padding:3px 9px; white-space:nowrap; cursor:pointer; transition:background 0.2s; flex-shrink:0; }
+.cnb-link:hover { background:rgba(201,153,58,0.12); }
 
 /* bid flash effect on history leader */
 @keyframes bid-flash {
@@ -1508,8 +1504,8 @@ window.addEventListener("load", async () => {
 
   // Compute effective status per piece.
   // Rule: individual piece.status always wins over the global default.
-  // This means global=live + piece.status="upcoming" → piece stays upcoming.
-  // Empty string means "inherit global" — the piece follows the global toggle exactly.
+  // global=live + piece.status="upcoming" → piece stays upcoming.
+  // Empty string means "inherit global".
   _auctions.forEach(p => { p._effectiveStatus = p.status || globalStatus; });
 
   // Decide which view to show based on the mix of piece statuses.
@@ -1682,16 +1678,12 @@ function _buildUpcomingPieceSelector() {
 function _loadUpcomingPiece(idx) {
   const slot = _auctions[idx] || _auctions[0] || {};
 
-  // Do NOT mutate cfg — pass slot data directly to helpers so the live view's
-  // cfg fields are never overwritten when the upcoming view loads.
-
-  // Artwork info
+  // Never mutate cfg — pass slot directly to helpers
   const nameEl   = document.getElementById("upcoming-art-name");
   const artistEl = document.getElementById("upcoming-art-artist");
   if (nameEl)   nameEl.textContent   = slot.artTitle  || "—";
   if (artistEl) artistEl.textContent = slot.artArtist || "";
 
-  // Reset and repopulate the about panel
   ["upcoming-about-title","upcoming-about-meta","upcoming-about-body"].forEach(id => {
     const el = document.getElementById(id); if(el) el.textContent = "";
   });
@@ -1701,7 +1693,6 @@ function _loadUpcomingPiece(idx) {
   if(panel) panel.classList.remove("open");
   populateAbout("upcoming", slot);
 
-  // Gate info
   const gateNameEl   = document.getElementById("upcoming-gate-name");
   const gateDetailEl = document.getElementById("upcoming-gate-detail");
   const gateLinkEl   = document.getElementById("upcoming-gate-link");
@@ -1710,20 +1701,14 @@ function _loadUpcomingPiece(idx) {
     if (gateDetailEl) gateDetailEl.textContent = "You must hold this token to participate in the auction.";
   }
   if (slot.gateLink && gateLinkEl) {
-    gateLinkEl.href        = slot.gateLink.startsWith("http") ? slot.gateLink : "#";
+    gateLinkEl.href = slot.gateLink.startsWith("http") ? slot.gateLink : "#";
     gateLinkEl.textContent = slot.gateLink.startsWith("http") ? "Acquire gate token →" : slot.gateLink;
     gateLinkEl.style.display = "block";
-  } else if (gateLinkEl) {
-    gateLinkEl.style.display = "none";
-  }
+  } else if (gateLinkEl) { gateLinkEl.style.display = "none"; }
 
-  // Image — pass slot directly
   loadStaticImage("upcoming", slot);
 
-  // Per-piece launch countdown — piece's own date only.
-  // Global cfg.launchDate fallback applies only to single-piece (legacy) configs.
   if (upcomingTimer) { clearInterval(upcomingTimer); upcomingTimer = null; }
-
   const isLegacySingle = _auctions.length <= 1;
   const dateStr = slot.launchDate || (isLegacySingle ? (cfg.launchDate || "") : "");
   const dateEl  = document.getElementById("upcoming-launch-date");
@@ -1776,8 +1761,6 @@ async function initLive() {
 
   // Build piece selector if multiple auctions
   await _buildPieceSelector();
-
-  // Show coming-next banner if any upcoming pieces exist alongside live ones
   _renderComingNextBanner();
 
   // Pick start piece — preview override > first live-status piece > 0
@@ -1798,15 +1781,13 @@ let _upcomingInitialised = false;
 function _renderComingNextBanner() {
   const banner = document.getElementById("coming-next-banner");
   if (!banner) return;
-  const upcomingPieces = _auctions.filter(p => p._effectiveStatus === "upcoming");
-  if (!upcomingPieces.length) { banner.classList.remove("show"); return; }
-  const next    = upcomingPieces[0];
+  const next = _auctions.find(p => p._effectiveStatus === "upcoming");
+  if (!next) { banner.classList.remove("show"); return; }
   const titleEl = document.getElementById("cnb-title");
   const thumbEl = document.getElementById("cnb-thumb");
   if (titleEl) titleEl.textContent = next.artTitle || "Next piece";
   if (thumbEl && next.artImage) {
-    thumbEl.src = toHTTP(next.artImage);
-    thumbEl.style.display = "block";
+    thumbEl.src = toHTTP(next.artImage); thumbEl.style.display = "block";
     thumbEl.onerror = () => { thumbEl.style.display = "none"; };
   } else if (thumbEl) { thumbEl.style.display = "none"; }
   banner.classList.add("show");
@@ -1815,10 +1796,7 @@ function _renderComingNextBanner() {
 function _cnbGoUpcoming() {
   document.getElementById("view-live").classList.remove("show");
   document.getElementById("view-upcoming").classList.add("show");
-  if (!_upcomingInitialised) {
-    _upcomingInitialised = true;
-    initUpcoming();
-  }
+  if (!_upcomingInitialised) { _upcomingInitialised = true; initUpcoming(); }
 }
 
 async function _buildPieceSelector() {
@@ -1920,14 +1898,15 @@ async function _switchAuction(idx) {
   if (_cancelBtn) _cancelBtn.style.display = "none";
 
   // Update artwork panel
-  document.getElementById("live-art-name").textContent   = slot.artTitle  || "—";
-  document.getElementById("live-art-artist").textContent = slot.artArtist || "";
+  document.getElementById("live-art-name").textContent    = slot.artTitle  || "—";
+  document.getElementById("live-art-artist").textContent  = slot.artArtist || "";
   document.getElementById("live-placeholder").textContent = "Token artwork";
   document.getElementById("live-img").style.display = "none";
   document.getElementById("live-img").src = "";
 
-  // Update cfg for loadNFTMeta (reads cfg.artTitle/artImage etc.) — but pass slot
-  // directly to populateAbout/loadStaticImage so they never read from the shared cfg.
+  // Update cfg for loadNFTMeta, but pass slot directly to populateAbout/loadStaticImage
+  // so the upcoming view's data is never overwritten by the live view switching pieces.
+  cfg.contractAddr = slot.contractAddr;
   cfg.artTitle     = slot.artTitle;
   cfg.artArtist    = slot.artArtist;
   cfg.artAbout     = slot.artAbout;
@@ -1936,7 +1915,6 @@ async function _switchAuction(idx) {
   cfg.artImage     = slot.artImage;
   cfg.gateName     = slot.gateName;
   cfg.gateLink     = slot.gateLink;
-  cfg.contractAddr = slot.contractAddr;
 
   populateAbout("live", slot);
   loadStaticImage("live", slot);
@@ -2237,10 +2215,10 @@ async function connectWallet() {
         _contractCache[addr] = _contractCache[addr].connect(signer);
       });
       auctionContract = auctionContract.connect(signer);
-      await checkEligibility();
-      await checkPendingReturn();
+      // Run post-connect steps independently — a failure in one must not block the others
+      await checkEligibility().catch(e => console.warn("checkEligibility:", e));
       onRoomEligibilityGranted();
-      await _loadMyProfile();
+      _loadMyProfile().catch(e => console.warn("_loadMyProfile:", e));
     }
 
   } catch(e) {
