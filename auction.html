@@ -533,6 +533,24 @@ body {
 .status-line.ended    { color: var(--rust); }
 .status-line.settled  { color: var(--moss); font-style: normal; }
 .status-line.upcoming-line { color: var(--gold); }
+#countdown-section {
+  min-height: 142px;
+}
+#countdown-section.reserve-waiting .countdown {
+  opacity: 0;
+  pointer-events: none;
+}
+#countdown-section.reserve-waiting .status-line {
+  margin-top: -74px;
+  min-height: 74px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--divider);
+  background: var(--bg-alt);
+  border-radius: 3px;
+  padding: 14px;
+}
 
 /* Stats grid */
 .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 24px; }
@@ -1919,6 +1937,7 @@ async function _switchAuction(idx) {
 
   // Reset all bid-panel DOM so no state from the previous piece bleeds through
   document.getElementById("countdown-section").style.display   = "none";
+  document.getElementById("countdown-section").classList.remove("reserve-waiting");
   document.getElementById("stats-grid").style.display          = "none";
   document.getElementById("bid-form").style.display            = "none";
   document.getElementById("history-section").style.display     = "none";
@@ -2407,10 +2426,12 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     endTimestamp = Number(endTime);
     minNextBid   = mnb;
     const noBids = highestBidder === ethers.ZeroAddress;
+    const countdownSection = document.getElementById("countdown-section");
+    countdownSection.classList.remove("reserve-waiting");
 
     // Show countdown when live with a known end time
     if (live && endTimestamp > 0) {
-      document.getElementById("countdown-section").style.display = "block";
+      countdownSection.style.display = "block";
       tickCountdown();
     }
 
@@ -2434,6 +2455,17 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     else                                         { sl.textContent = "Ended — awaiting settlement";      sl.className = "status-line ended"; }
 
     // isLive used elsewhere (countdown, bid button) — track whether bids are accepted right now
+    if (mode === 1 && !live && noBids && deposited && !settled) {
+      countdownSection.style.display = "block";
+      countdownSection.classList.add("reserve-waiting");
+      ["cd-d","cd-h","cd-m","cd-s"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = "00";
+      });
+      sl.textContent = "Open - first bid starts the clock";
+      sl.className = "status-line live";
+    }
+
     isLive = acceptingBids;
 
     // Stats
