@@ -354,8 +354,39 @@ body {
 }
 
 /* About toggle — roadmap pill style */
-.about-toggle {
+.art-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   margin-top: 12px;
+}
+.auction-nav {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.auction-nav-btn {
+  width: 34px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(196,132,90,0.4);
+  border-radius: 3px;
+  background: rgba(158,79,46,0.08);
+  color: var(--clay);
+  font-family: 'Cinzel', serif;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+.auction-nav-btn:hover:not(:disabled) { background: rgba(158,79,46,0.18); }
+.auction-nav-btn:disabled { opacity: 0.32; cursor: not-allowed; }
+
+.about-toggle {
+  margin-top: 0;
   display: inline-flex; align-items: center; gap: 0.4rem;
   font-family: 'Cinzel', serif; font-size: 0.6rem;
   letter-spacing: 0.2em; text-transform: uppercase;
@@ -910,8 +941,10 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   /* ── Art column ── */
   .art-col { height: auto; min-height: auto; }
   .art-frame {
-    min-height: 320px;
-    height: min(82vh, 118vw);
+    display: block;
+    aspect-ratio: auto;
+    min-height: 0;
+    height: auto;
     max-height: none;
     padding: 16px;
     border-radius: 0;
@@ -919,9 +952,9 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   }
   #view-live .art-img {
     width: 100% !important;
-    height: 100% !important;
+    height: auto !important;
     max-width: 100% !important;
-    max-height: 100% !important;
+    max-height: none !important;
     object-fit: contain !important;
   }
   /* Reset desktop-only upcoming overrides so mobile layout (which already works) is preserved */
@@ -972,6 +1005,8 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   .about-panel-inner { overflow-y: visible; padding-right: 24px; padding-top: 56px; }
   .about-close-btn { top: 12px; right: 12px; }
   .about-toggle { padding: 10px 14px; min-height: 44px; }
+  .art-actions { align-items: stretch; }
+  .auction-nav-btn { width: 44px; height: 44px; font-size: 1.1rem; }
 
   /* ── Auctioneer gavel panel ── */
   .gavel-btns { grid-template-columns: 1fr 1fr; gap: 5px; }
@@ -1265,10 +1300,16 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           <div class="art-eyebrow" id="live-art-eyebrow">Live auction</div>
           <div class="art-name"    id="live-art-name">—</div>
           <div class="art-artist"  id="live-art-artist"></div>
-          <button class="about-toggle" id="live-about-toggle" onclick="toggleAbout('live')" style="display:none">
-            <span class="about-toggle-icon" id="live-toggle-icon">+</span>
-            <span id="live-toggle-label">About this work</span>
-          </button>
+          <div class="art-actions">
+            <button class="about-toggle" id="live-about-toggle" onclick="toggleAbout('live')" style="display:none">
+              <span class="about-toggle-icon" id="live-toggle-icon">+</span>
+              <span id="live-toggle-label">About this work</span>
+            </button>
+            <div class="auction-nav" id="live-auction-nav">
+              <button class="auction-nav-btn" id="auction-prev-btn" onclick="switchAuctionStep(-1)" aria-label="Previous auction">‹</button>
+              <button class="auction-nav-btn" id="auction-next-btn" onclick="switchAuctionStep(1)" aria-label="Next auction">›</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1524,6 +1565,7 @@ const ERC721_ABI = [
 let cfg        = {};          // full config from API
 let _auctions  = [];          // array of auction slot configs
 let _activeIdx = 0;           // which auction slot is currently displayed
+let _visibleLiveIndexes = [];
 
 let provider = null, signer = null, signerAddress = null;
 let auctionContract = null;
@@ -1868,8 +1910,13 @@ async function _buildPieceSelector() {
   const visible = cfg._preview
     ? _auctions.map((slot, i) => ({ slot, i }))
     : _auctions.map((slot, i) => ({ slot, i })).filter(({ slot }) => slot._effectiveStatus === "live");
+  _visibleLiveIndexes = visible.map(({ i }) => i);
 
-  if (visible.length <= 1) { strip.classList.remove("show"); return; }
+  if (visible.length <= 1) {
+    strip.classList.remove("show");
+    updateAuctionNav();
+    return;
+  }
 
   strip.classList.add("show");
 
@@ -1892,6 +1939,7 @@ async function _buildPieceSelector() {
     btn.addEventListener("click", () => _switchAuction(i));
     strip.appendChild(btn);
   }
+  updateAuctionNav();
 
   // Poll all tab bids every 20s
   _pollAllTabBids();
@@ -1918,11 +1966,41 @@ function _setPieceTabsBusy(isBusy) {
     btn.disabled = isBusy;
     btn.setAttribute("aria-busy", isBusy ? "true" : "false");
   });
+  updateAuctionNav(isBusy);
+}
+
+function activeAuctionOrder() {
+  const orderIdx = _visibleLiveIndexes.indexOf(_activeIdx);
+  return {
+    current: orderIdx >= 0 ? orderIdx + 1 : _activeIdx + 1,
+    total: _visibleLiveIndexes.length || _auctions.length || 1,
+    orderIdx,
+  };
+}
+
+function updateAuctionNav(isBusy = _auctionSwitching) {
+  const nav = document.getElementById("live-auction-nav");
+  const prev = document.getElementById("auction-prev-btn");
+  const next = document.getElementById("auction-next-btn");
+  if (!nav || !prev || !next) return;
+  const { orderIdx, total } = activeAuctionOrder();
+  nav.style.display = total > 1 ? "flex" : "none";
+  const atStart = orderIdx <= 0;
+  const atEnd = orderIdx < 0 || orderIdx >= total - 1;
+  prev.disabled = isBusy || atStart;
+  next.disabled = isBusy || atEnd;
+}
+
+function switchAuctionStep(delta) {
+  const { orderIdx, total } = activeAuctionOrder();
+  if (orderIdx < 0 || total <= 1) return;
+  const nextOrderIdx = orderIdx + delta;
+  if (nextOrderIdx < 0 || nextOrderIdx >= total) return;
+  _switchAuction(_visibleLiveIndexes[nextOrderIdx]);
 }
 
 async function _switchAuction(idx) {
   if (idx < 0 || idx >= _auctions.length) return;
-  if (_auctionSwitching) return;
   _auctionSwitching = true;
   _setPieceTabsBusy(true);
   const switchToken = ++_switchToken;
@@ -1975,6 +2053,9 @@ async function _switchAuction(idx) {
   // Update artwork panel
   document.getElementById("live-art-name").textContent    = slot.artTitle  || "—";
   document.getElementById("live-art-artist").textContent  = slot.artArtist || "";
+  const order = activeAuctionOrder();
+  document.getElementById("live-art-eyebrow").textContent = `Live auction #${order.current} of ${order.total}`;
+  updateAuctionNav();
   document.getElementById("live-placeholder").textContent = "Token artwork";
   document.getElementById("live-img").style.display = "none";
   document.getElementById("live-img").src = "";
@@ -1993,10 +2074,10 @@ async function _switchAuction(idx) {
 
   populateAbout("live", slot);
   loadStaticImage("live", slot);
+  _auctionSwitching = false;
+  _setPieceTabsBusy(false);
 
   if (!slot.contractAddr || !ethers.isAddress(slot.contractAddr)) {
-    _auctionSwitching = false;
-    _setPieceTabsBusy(false);
     return;
   }
 
@@ -2196,14 +2277,30 @@ function loadStaticImage(view, data) {
   if (!image) return;
   const img  = document.getElementById(`${view}-img`);
   const phld = document.getElementById(`${view}-placeholder`);
+  const frame = img?.closest(".art-frame");
   const primary = toHTTP(image);
   // Always show the img element — hide placeholder immediately
-  if (phld) phld.style.display = "none";
-  img.style.display = "block";
+  if (phld) phld.style.display = "flex";
+  img.style.display = "none";
   img.style.width = "100%";
   img.style.height = "100%";
   img.style.objectFit = "contain";
+  img.loading = "eager";
+  img.decoding = "sync";
+  img.fetchPriority = "high";
+  const showLoadedImage = () => {
+    if (phld) phld.style.display = "none";
+    img.style.display = "block";
+    if (frame && view === "live" && img.naturalWidth && img.naturalHeight) {
+      frame.style.setProperty("--art-ratio", `${img.naturalWidth} / ${img.naturalHeight}`);
+    }
+  };
+  img.onload = showLoadedImage;
   img.src = primary;
+  if (img.complete && img.naturalWidth) showLoadedImage();
+  setTimeout(() => {
+    if (img.naturalWidth) showLoadedImage();
+  }, 2500);
   img.onerror = () => {
     // Try fallback gateways one by one
     const fallbacks = [
@@ -2263,7 +2360,8 @@ async function loadNFTMeta(runToken = _switchToken, contract = auctionContract) 
       try { const n = await nft.name(); if (n) document.getElementById("live-art-name").textContent = n; } catch(_) {}
     }
 
-    document.getElementById("live-art-eyebrow").textContent = `Live auction · #${tokenId}`;
+    const order = activeAuctionOrder();
+    document.getElementById("live-art-eyebrow").textContent = `Live auction #${order.current} of ${order.total}`;
 
     // Only pull image from chain if admin didn't provide one
     if (!cfg.artImage) {
@@ -2787,7 +2885,10 @@ function toHTTP(url, gateway) {
   if (url.startsWith("ipfs://")) return gw + url.slice(7);
   if (url.startsWith("ar://"))   return "https://arweave.net/" + url.slice(5);
   if (!/^https?:\/\//i.test(url) && !url.startsWith("/") && !url.startsWith("file:")) {
-    return "/" + url.replace(/^\.?\//, "");
+    const clean = url.replace(/^\.?\//, "");
+    return location.protocol === "file:"
+      ? "https://www.kaysworks.com/" + clean
+      : "/" + clean;
   }
   // Strip known gateway prefixes and re-serve through cloudflare for reliability
   const knownGateways = [
