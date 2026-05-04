@@ -425,9 +425,9 @@
     cursor: pointer;
   }
   .ao-chapter-items {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0,1fr));
-    gap: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
   }
   .ao-chapter-item {
     border: 1px solid rgba(201,153,58,0.16);
@@ -436,13 +436,24 @@
     overflow: hidden;
     min-width: 0;
   }
+  .ao-chapter-item-featured {
+    display: grid;
+    grid-template-columns: minmax(260px, 1.35fr) minmax(240px, 0.85fr);
+    align-items: stretch;
+  }
+  .ao-chapter-item-sculpture {
+    display: grid;
+    grid-template-columns: minmax(210px, 0.72fr) minmax(280px, 1fr);
+    align-items: stretch;
+  }
   .ao-chapter-item-img {
-    aspect-ratio: 16 / 9;
+    min-height: 230px;
     background: rgba(30,20,14,0.35);
     overflow: hidden;
   }
+  .ao-chapter-item-sculpture .ao-chapter-item-img { min-height: 190px; }
   .ao-chapter-item-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .ao-chapter-item-body { padding: 0.95rem; }
+  .ao-chapter-item-body { padding: clamp(1rem, 2vw, 1.35rem); display: flex; flex-direction: column; justify-content: center; }
   .ao-chapter-item-type {
     font-family: 'Cinzel', serif;
     font-size: 0.55rem;
@@ -519,7 +530,7 @@
     margin: 1.25rem 0;
   }
   @media (max-width: 760px) {
-    .ao-chapter-items { grid-template-columns: 1fr; }
+    .ao-chapter-item-featured, .ao-chapter-item-sculpture { grid-template-columns: 1fr; }
     .ao-chapter-reveal-head { flex-direction: column; }
   }
   .ao-post-row {
@@ -1368,10 +1379,11 @@
   </a>
   <ul class="nav-center">
     <li><a href="#statement">Statement</a></li>
-    <li><a href="#gallery">Gallery</a></li>
+    <li><a href="#chapter-one-panel">Chapter 1</a></li>
+    <li><a href="#ijokoo">The Set</a></li>
+    <li><a href="#tokens">Before You Bid</a></li>
     <li><a href="#schedule">Schedule</a></li>
-    <li><a href="#tokens">Tokens</a></li>
-    <li><a href="#research">Research</a></li>
+    <li><a href="#gallery">Archive</a></li>
   </ul>
   <div class="nav-right">
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle light / dark mode">
@@ -1388,10 +1400,11 @@
 <!-- ── MOBILE DRAWER ── -->
 <div class="mobile-nav-ao" id="aoMobileNav" aria-hidden="true">
   <a href="#statement" class="mobile-link">Statement</a>
-  <a href="#gallery" class="mobile-link">Gallery</a>
+  <a href="#chapter-one-panel" class="mobile-link">Chapter 1</a>
+  <a href="#ijokoo" class="mobile-link">The Ìjòkòó Set</a>
+  <a href="#tokens" class="mobile-link">Before You Bid</a>
   <a href="#schedule" class="mobile-link">Schedule</a>
-  <a href="#tokens" class="mobile-link">Tokens</a>
-  <a href="#threads" class="mobile-link">From Twitter</a>
+  <a href="#gallery" class="mobile-link">Visual Archive</a>
   <a href="#research" class="mobile-link">Research &amp; WIP</a>
   <a href="/puzzle" class="mobile-link" style="color:var(--gold)">&#9632; Play the Puzzle</a>
   <a href="/index" class="mobile-back mobile-link">&#8592; Back to Kaysworks</a>
@@ -1420,8 +1433,8 @@
       <p class="ao-meta-value">September 27, 2026</p>
     </div>
   </div>
-  <a href="/puzzle" class="ao-puzzle-btn">
-    <span>&#9632;</span> Play the Puzzle
+  <a href="#chapter-one-panel" class="ao-puzzle-btn">
+    <span>&#9632;</span> Enter Chapter 1
   </a>
 </header>
 
@@ -1444,100 +1457,31 @@
     </div>
   </section>
 
-  <!-- GALLERY -->
-  <section class="ao-section reveal" id="gallery">
-    <p class="ao-section-label">Visual archive</p>
-    <p class="gal-intro-text">Works, studies, objects, and design elements from the series&mdash;come closer, look around. This is the world Ayo lives in.</p>
-    <div class="gal-grid" id="galGrid"></div>
-    <div id="lbContainer"></div>
-  </section>
-
-  <!-- RELEASE SCHEDULE -->
-  <section class="ao-section reveal" id="schedule">
-    <p class="ao-section-label">Release schedule</p>
-    <p class="ao-chapter-intro">Six chapters across six months&mdash;May through September 2026. Each release is a self-contained world that advances Ayo&rsquo;s story, built from a 1/1 digital painting, a set of digital sculptures, written narrative, and optional archival prints. You can follow from the beginning, or step in wherever the story finds you.</p>
-    <p class="ao-chapter-intro" style="margin-top:-1.25rem;font-size:0.9rem;font-style:italic;color:var(--text-muted);">Dates are subject to change. I will always announce if any date changes.</p>
-    <div class="ao-precursor-row phase-past" data-release-card="precursor">
-      <div><p class="ao-precursor-label" data-release-status>&#9675;&nbsp; Complete</p></div>
-      <div>
-        <p class="ao-precursor-name">Precursor Month</p>
-        <p class="ao-precursor-desc">Entry tokens, world primer &amp; narrative introduction, early access, social teasers, merch reveal</p>
-      </div>
-      <p class="ao-precursor-date">Apr 1&ndash;May 2</p>
-    </div>
-    <div class="ao-chapter-card chapter-active" data-release-card="ch1" role="button" tabindex="0" aria-controls="chapter-one-panel" aria-expanded="false">
-      <p class="ao-chapter-num">01</p>
-      <div><p class="ao-chapter-name">The Chiefs&rsquo; Meeting</p><p class="ao-chapter-yoruba">A gathering of elders gives insight into the character of Ayo and the outlook of society on his craft</p></div>
-      <p class="ao-chapter-date" data-release-status>&#9679;&nbsp; Now live</p>
-    </div>
-    <div class="ao-chapter-card" data-release-card="ch2">
-      <p class="ao-chapter-num">02</p>
-      <div><p class="ao-chapter-name">Ìpàdé</p><p class="ao-chapter-yoruba">The Meeting &mdash; Ayo and Morenike first cross paths</p></div>
-      <p class="ao-chapter-date" data-release-status>Jun 1</p>
-    </div>
-    <div class="ao-chapter-card" data-release-card="ch3">
-      <p class="ao-chapter-num">03</p>
-      <div><p class="ao-chapter-name">L&rsquo;abẹ Igi Oronbo</p><p class="ao-chapter-yoruba">Under the Orange Tree &mdash; a moment of intimacy, truth, and shared vulnerability</p></div>
-      <p class="ao-chapter-date" data-release-status>Jul 1</p>
-    </div>
-    <div class="ao-chapter-card" data-release-card="ch4">
-      <p class="ao-chapter-num">04</p>
-      <div><p class="ao-chapter-name">Ilé Agbẹgilérè</p><p class="ao-chapter-yoruba">The Sculptor&rsquo;s House &mdash; inside Ayo&rsquo;s world of craft, lineage, and symbolic creation</p></div>
-      <p class="ao-chapter-date" data-release-status>Aug 1</p>
-    </div>
-    <div class="ao-chapter-card" data-release-card="ch5">
-      <p class="ao-chapter-num">05</p>
-      <div><p class="ao-chapter-name">The Engagement</p><p class="ao-chapter-yoruba">An event that tests family expectations, tradition, and love &mdash; the role of the Àpótí is revealed</p></div>
-      <p class="ao-chapter-date" data-release-status>Sep 1</p>
-    </div>
-    <div class="ao-chapter-card" data-release-card="ch6">
-      <p class="ao-chapter-num">06</p>
-      <div><p class="ao-chapter-name">Aftermath</p><p class="ao-chapter-yoruba">Narrative resolution, emotional closure &mdash; key elements and characters revealed</p></div>
-      <p class="ao-chapter-date" data-release-status>Sep 27</p>
-    </div>
-    <div class="ao-post-row">
-      <div><p class="ao-post-label">Post</p></div>
-      <div>
-        <p class="ao-post-name">Collector Rewards Unlock &amp; World Compendium</p>
-        <p class="ao-post-desc">Gold rewards, digital book, character deep dives, exhibition, optional commemorative items</p>
-      </div>
-      <p class="ao-post-date">Oct &ndash; Nov</p>
-    </div>
-  </section>
-
-  <section class="ao-section ao-chapter-reveal" id="chapter-one-panel" aria-live="polite">
+  <section class="ao-section ao-chapter-reveal open reveal" id="chapter-one-panel" aria-live="polite">
     <div class="ao-chapter-reveal-head">
       <div>
         <p class="ao-chapter-reveal-kicker">Chapter 1 &middot; Now live</p>
         <h2 class="ao-chapter-reveal-title">The Chiefs&rsquo; Meeting</h2>
       </div>
-      <button class="ao-chapter-reveal-close" type="button" data-close-chapter-one>Close</button>
+      <button class="ao-chapter-reveal-close" type="button" data-close-chapter-one>Collapse</button>
     </div>
     <div class="ao-chapter-items">
-      <article class="ao-chapter-item">
+      <article class="ao-chapter-item ao-chapter-item-featured">
         <div class="ao-chapter-item-img"><img src="/images/CM1.jpg" alt="Chapter 1 painting entry for The Chiefs&rsquo; Meeting"></div>
         <div class="ao-chapter-item-body">
           <p class="ao-chapter-item-type">Painting</p>
           <h3 class="ao-chapter-item-title">The Chiefs&rsquo; Meeting</h3>
           <p class="ao-chapter-item-copy">The central Chapter 1 painting introduces the gathering of elders and the social world surrounding Ayo&rsquo;s craft.</p>
-          <a class="ao-chapter-item-link" href="#gallery">View archive</a>
+          <a class="ao-chapter-item-link" href="#ijokoo">Continue to the set</a>
         </div>
       </article>
-      <article class="ao-chapter-item">
+      <article class="ao-chapter-item ao-chapter-item-sculpture">
         <div class="ao-chapter-item-img"><img src="images/IjokooB.png" alt="Ìjòkòó Set digital sculpture"></div>
         <div class="ao-chapter-item-body">
           <p class="ao-chapter-item-type">Sculptures</p>
           <h3 class="ao-chapter-item-title">The Ìjòkòó Set</h3>
           <p class="ao-chapter-item-copy">The carved stools present in the chiefs&rsquo; meeting. They hold power, presence, and evidence of Ayo&rsquo;s hand.</p>
           <a class="ao-chapter-item-link" href="#ijokoo">Explore set</a>
-        </div>
-      </article>
-      <article class="ao-chapter-item">
-        <div class="ao-chapter-item-body">
-          <p class="ao-chapter-item-type">Story</p>
-          <h3 class="ao-chapter-item-title">Ayo before the elders</h3>
-          <p class="ao-chapter-item-copy">Chapter 1 opens with a gathering that reveals how Ayo is seen by his community, and how craft, status, and expectation shape the road ahead.</p>
-          <a class="ao-chapter-item-link" href="#chapter-one-script">Read script</a>
         </div>
       </article>
     </div>
@@ -1584,14 +1528,13 @@
     </div>
   </section>
 
-  <!-- IJOKOO TEASER -->
+  <!-- CHAPTER OBJECT -->
   <section class="ao-section reveal" id="ijokoo">
-    <p class="ao-section-label">Live auction &nbsp;&middot;&nbsp; The Ìjòkòó Set</p>
+    <p class="ao-section-label">Chapter object &nbsp;&middot;&nbsp; The Ìjòkòó Set</p>
 
     <div style="max-width:680px;margin-bottom:2.2rem;">
       <p style="font-family:'Cormorant Garamond',serif;font-size:clamp(1rem,2.2vw,1.22rem);font-weight:300;line-height:1.85;color:var(--text-soft);transition:color 0.35s;">
-        The Gems of Chapter 1, the Ìjòkòó Set — these are stools present in the chief's meeting a testament of Ayo's craft.
-      </p>
+        The gems of Chapter 1, the Ìjòkòó Set, are the stools present in the chiefs&rsquo; meeting: quiet evidence of Ayo&rsquo;s hand, his discipline, and the dignity of work that is often noticed only after it has already been carrying everyone.
       </p>
     </div>
 
@@ -1868,10 +1811,10 @@ if (imgGrey.complete) loop();
   })();
   </script>
 
-  <!-- TOKENS -->
+  <!-- BEFORE YOU BID -->
   <section class="ao-section reveal" id="tokens">
-    <p class="ao-section-label">Token dynamics &amp; privileges</p>
-    <p class="token-intro">The tokens are your entry into the world of Àpótí Ọlọ́wẹ̀. Each tier unlocks a different relationship with the series&mdash;its paintings, its sculptures, and the story unfolding across six chapters.</p>
+    <p class="ao-section-label">Before you bid</p>
+    <p class="token-intro">Bidding is token-gated so collectors know exactly why access opens or closes. Hold an Entry Token or Bronze Token to bid on chapter paintings and sculptures; Gold Tokens are awarded through the auctions and unlock end-of-series collector rewards.</p>
     <div class="token-grid">
       <div class="token-card token-wood">
         <div class="token-header">
@@ -1904,7 +1847,7 @@ if (imgGrey.complete) loop();
           <span class="token-badge token-badge-gold">Airdropped</span>
         </div>
         <ul class="token-privileges">
-          <li>Granted to bidders at each auction</li>
+          <li>Awarded through chapter auctions</li>
           <li>One airdrop per chapter &mdash; six total</li>
           <li>Unlocks collector reward at series close</li>
         </ul>
@@ -1912,7 +1855,7 @@ if (imgGrey.complete) loop();
     </div>
     <div class="token-burn-note">
       <span class="token-burn-icon">&#9432;</span>
-      <p><strong>Token burn mechanism:</strong> Collect five Entry (Wood) tokens and burn them to redeem one Bronze token, unlocking the elevated tier of privileges.</p>
+      <p><strong>Why this matters before the auction:</strong> Entry and Bronze tokens unlock bidding access. Collect five Entry (Wood) tokens and burn them to redeem one Bronze token, unlocking the elevated tier of privileges.</p>
     </div>
 
     <!-- Crypto Beginner Guide -->
@@ -1921,8 +1864,8 @@ if (imgGrey.complete) loop();
         <div class="crypto-guide-header-left">
           <span class="crypto-guide-icon">&#9672;</span>
           <div>
-            <p class="crypto-guide-title">New to crypto?</p>
-            <p class="crypto-guide-sub">A simple guide to collecting your first token</p>
+            <p class="crypto-guide-title">Need bidding access?</p>
+            <p class="crypto-guide-sub">A simple guide to getting your Entry Token before you bid</p>
           </div>
         </div>
         <span class="crypto-guide-chevron">&#9660;</span>
@@ -2014,7 +1957,7 @@ if (imgGrey.complete) loop();
 
     <!-- Mint card with live countdowns -->
     <div class="precursor-card">
-      <p class="precursor-title">Mint Entry Token</p>
+      <p class="precursor-title">Get Bidding Access</p>
       <div class="precursor-phases">
         <div class="precursor-phase" id="phase-public">
           <div class="phase-status">
@@ -2029,7 +1972,7 @@ if (imgGrey.complete) loop();
       </div>
     </div>
 
-    <div style="margin-top:1.2rem;">
+    <div style="margin-top:1.2rem;" id="live-auction">
       <div class="auction-actions">
       <a href="/auction" id="ao-auction-btn" class="btn-mint auction-live" aria-label="Bid on the Àpótí Ọlọ́wẹ̀ auction" style="display:inline-block;cursor:pointer;">
         <span class="auc-live-dot"></span>Live Auction &mdash; Bid Now
@@ -2040,7 +1983,7 @@ if (imgGrey.complete) loop();
       </div>
       <div class="live-auction-carousel" id="ao-live-auctions" aria-label="Live auctions">
         <div class="lac-head">
-          <div class="lac-label"><span class="lac-live-dot"></span> Live auctions</div>
+          <div class="lac-label"><span class="lac-live-dot"></span> Live auction</div>
           <div class="lac-controls">
             <button class="lac-btn" type="button" id="lac-prev" aria-label="Previous live auction">&lsaquo;</button>
             <button class="lac-btn" type="button" id="lac-next" aria-label="Next live auction">&rsaquo;</button>
@@ -2051,7 +1994,7 @@ if (imgGrey.complete) loop();
             <div class="lac-img-wrap"><img src="images/IjokooB.png" alt="Ìjòkòó Set"></div>
             <div class="lac-body">
               <p class="lac-title">The Ìjòkòó Set</p>
-              <p class="lac-meta">Chapter One auction - Carved stools of power and presence</p>
+              <p class="lac-meta">Chapter 1 auction &mdash; Carved stools of power and presence</p>
               <span class="lac-cta">Bid now &rarr;</span>
             </div>
           </a>
@@ -2067,6 +2010,67 @@ if (imgGrey.complete) loop();
     </div>
 
 
+  </section>
+
+  <!-- RELEASE SCHEDULE -->
+  <section class="ao-section reveal" id="schedule">
+    <p class="ao-section-label">Release schedule</p>
+    <p class="ao-chapter-intro">After Chapter 1, the series continues across five more releases. Six chapters across six months&mdash;May through September 2026. Each release is a self-contained world that advances Ayo&rsquo;s story, built from a 1/1 digital painting, a set of digital sculptures, written narrative, and optional archival prints. You can follow from the beginning, or step in wherever the story finds you.</p>
+    <p class="ao-chapter-intro" style="margin-top:-1.25rem;font-size:0.9rem;font-style:italic;color:var(--text-muted);">Dates are subject to change. I will always announce if any date changes.</p>
+    <div class="ao-precursor-row phase-past" data-release-card="precursor">
+      <div><p class="ao-precursor-label" data-release-status>&#9675;&nbsp; Complete</p></div>
+      <div>
+        <p class="ao-precursor-name">Precursor Month</p>
+        <p class="ao-precursor-desc">Entry tokens, world primer &amp; narrative introduction, early access, social teasers, merch reveal</p>
+      </div>
+      <p class="ao-precursor-date">Apr 1&ndash;May 2</p>
+    </div>
+    <div class="ao-chapter-card chapter-active" data-release-card="ch1" role="button" tabindex="0" aria-controls="chapter-one-panel" aria-expanded="true">
+      <p class="ao-chapter-num">01</p>
+      <div><p class="ao-chapter-name">The Chiefs&rsquo; Meeting</p><p class="ao-chapter-yoruba">A gathering of elders gives insight into the character of Ayo and the outlook of society on his craft</p></div>
+      <p class="ao-chapter-date" data-release-status>&#9679;&nbsp; Now live</p>
+    </div>
+    <div class="ao-chapter-card" data-release-card="ch2">
+      <p class="ao-chapter-num">02</p>
+      <div><p class="ao-chapter-name">Ìpàdé</p><p class="ao-chapter-yoruba">The Meeting &mdash; Ayo and Morenike first cross paths</p></div>
+      <p class="ao-chapter-date" data-release-status>Jun 1</p>
+    </div>
+    <div class="ao-chapter-card" data-release-card="ch3">
+      <p class="ao-chapter-num">03</p>
+      <div><p class="ao-chapter-name">L&rsquo;abẹ Igi Oronbo</p><p class="ao-chapter-yoruba">Under the Orange Tree &mdash; a moment of intimacy, truth, and shared vulnerability</p></div>
+      <p class="ao-chapter-date" data-release-status>Jul 1</p>
+    </div>
+    <div class="ao-chapter-card" data-release-card="ch4">
+      <p class="ao-chapter-num">04</p>
+      <div><p class="ao-chapter-name">Ilé Agbẹgilérè</p><p class="ao-chapter-yoruba">The Sculptor&rsquo;s House &mdash; inside Ayo&rsquo;s world of craft, lineage, and symbolic creation</p></div>
+      <p class="ao-chapter-date" data-release-status>Aug 1</p>
+    </div>
+    <div class="ao-chapter-card" data-release-card="ch5">
+      <p class="ao-chapter-num">05</p>
+      <div><p class="ao-chapter-name">The Engagement</p><p class="ao-chapter-yoruba">An event that tests family expectations, tradition, and love &mdash; the role of the Àpótí is revealed</p></div>
+      <p class="ao-chapter-date" data-release-status>Sep 1</p>
+    </div>
+    <div class="ao-chapter-card" data-release-card="ch6">
+      <p class="ao-chapter-num">06</p>
+      <div><p class="ao-chapter-name">Aftermath</p><p class="ao-chapter-yoruba">Narrative resolution, emotional closure &mdash; key elements and characters revealed</p></div>
+      <p class="ao-chapter-date" data-release-status>Sep 27</p>
+    </div>
+    <div class="ao-post-row">
+      <div><p class="ao-post-label">Post</p></div>
+      <div>
+        <p class="ao-post-name">Collector Rewards Unlock &amp; World Compendium</p>
+        <p class="ao-post-desc">Gold rewards, digital book, character deep dives, exhibition, optional commemorative items</p>
+      </div>
+      <p class="ao-post-date">Oct &ndash; Nov</p>
+    </div>
+  </section>
+
+  <!-- GALLERY -->
+  <section class="ao-section reveal" id="gallery">
+    <p class="ao-section-label">Visual archive</p>
+    <p class="gal-intro-text">Works, studies, objects, and design elements from the series&mdash;come closer, look around. This is the world Ayo lives in.</p>
+    <div class="gal-grid" id="galGrid"></div>
+    <div id="lbContainer"></div>
   </section>
 
   <!-- THREADS -->
@@ -2304,11 +2308,11 @@ if (imgGrey.complete) loop();
   var chapterOnePanel = document.getElementById('chapter-one-panel');
   var chapterOneClose = document.querySelector('[data-close-chapter-one]');
 
-  function openChapterOne() {
+  function openChapterOne(shouldScroll) {
     if (!chapterOnePanel || !chapterOneCard) return;
     chapterOnePanel.classList.add('open');
     chapterOneCard.setAttribute('aria-expanded', 'true');
-    chapterOnePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (shouldScroll) chapterOnePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function closeChapterOne() {
@@ -2319,11 +2323,11 @@ if (imgGrey.complete) loop();
   }
 
   if (chapterOneCard) {
-    chapterOneCard.addEventListener('click', openChapterOne);
+    chapterOneCard.addEventListener('click', function() { openChapterOne(true); });
     chapterOneCard.addEventListener('keydown', function(event) {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
-        openChapterOne();
+        openChapterOne(true);
       }
     });
   }
@@ -2333,6 +2337,7 @@ if (imgGrey.complete) loop();
 
 // ── GALLERY ──
 var IMGS = [
+  {src:"/images/CM1.jpg",              title:"The Chiefs’ Meeting",       sub:"Chapter 1 painting"},
   {src:"images/preperation.png",        title:"Igbaradi(preperation)",         sub:"World building reference"},
   {src:"images/monostudy.png",           title:"Study in Monochrome",          sub:"Process sketch"},
   {src:"images/apotiolowebox.jpg",       title:"Àpótí Ọlọ́wẹ̀ — The Chest",  sub:"Digital sculpture"},
@@ -2588,6 +2593,14 @@ lbPanel.addEventListener('touchend', function(e) {
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
 
 
 
