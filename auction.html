@@ -203,7 +203,7 @@ body {
 #view-live.show { display: flex; }
 /* CSS var updated by JS when bars render — fallback covers topbar+modebar+strip */
 :root { --bars-h: 116px; }
-.live-layout { display: grid; grid-template-columns: 3fr 360px; flex: 1; min-height: 0; overflow: hidden; height: 100%; }
+.live-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; flex: 1; min-height: 0; overflow: hidden; height: 100%; }
 
 /* ── Piece selector strip ── */
 .piece-selector { display:none; border-bottom:1px solid var(--divider); background:var(--bg-alt); padding:0 28px; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
@@ -218,6 +218,7 @@ body {
 }
 .piece-tab:hover { color:var(--clay); }
 .piece-tab.active { color:var(--sand); border-bottom-color:var(--clay); }
+.piece-tab:disabled { cursor: wait; opacity: .7; }
 .piece-tab-thumb {
   width:28px; height:28px; border-radius:2px; object-fit:cover;
   border:1px solid var(--divider); background:var(--bg); flex-shrink:0;
@@ -310,7 +311,7 @@ body {
   display: flex; flex-direction: column;
   border-right: 1px solid var(--divider);
   background: var(--bg-alt); overflow: hidden;
-  isolation: isolate; height: 100%;
+  isolation: isolate; height: 100%; min-width: 0;
   position: relative;
 }
 
@@ -452,12 +453,20 @@ body {
 .about-body br + br { display: block; content: ""; margin-top: 0.4em; }
 
 /* ── Right bid column ── */
-.bid-col { overflow-y: auto; display: flex; flex-direction: column; background: var(--bg); height: 100%; min-height: 0; }
-.bid-inner { padding: 28px 24px 48px; flex: 1; }
+.bid-col {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+  width: 360px; min-width: 360px; max-width: 360px;
+  height: 100%; min-height: 0;
+}
+.bid-inner { padding: 28px 24px 48px; flex: 1; min-width: 0; }
 
 /* Wallet row */
 .wallet-row {
   display: flex; align-items: center; justify-content: space-between;
+  width: 100%; flex-wrap: nowrap;
   gap: 12px;
   min-height: 42px;
   margin-bottom: 28px; padding-bottom: 18px;
@@ -855,7 +864,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   #view-live { height: auto; overflow: visible; }
   #live-flex-wrap { height: auto !important; overflow: visible !important; }
   .live-layout { overflow: visible; }
-  .bid-col { height: auto; overflow-y: visible; }
+  .bid-col { width: 100%; min-width: 0; max-width: none; height: auto; overflow-y: visible; scrollbar-gutter: auto; }
   #collector-room { position: relative; height: auto; }
 
   /* ── Piece selector strip — smaller tabs, horizontal scroll ── */
@@ -889,7 +898,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   .live-art-title { font-size: 1.3rem; }
 
   /* ── Bid column — no fixed height, scrolls with page ── */
-  .bid-col { overflow-y: visible; max-height: none; }
+  .bid-col { width: 100%; min-width: 0; max-width: none; overflow-y: visible; max-height: none; scrollbar-gutter: auto; }
   .bid-inner { padding: 18px 16px 36px; }
 
   /* ── Countdown ── */
@@ -1493,6 +1502,7 @@ let notifTimer = null;
 let _walletConnecting = false;
 let _walletEventsBound = false;
 let _switchToken = 0;
+let _auctionSwitching = false;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -1870,8 +1880,18 @@ async function _pollAllTabBids() {
   }
 }
 
+function _setPieceTabsBusy(isBusy) {
+  document.querySelectorAll(".piece-tab").forEach(btn => {
+    btn.disabled = isBusy;
+    btn.setAttribute("aria-busy", isBusy ? "true" : "false");
+  });
+}
+
 async function _switchAuction(idx) {
   if (idx < 0 || idx >= _auctions.length) return;
+  if (_auctionSwitching) return;
+  _auctionSwitching = true;
+  _setPieceTabsBusy(true);
   const switchToken = ++_switchToken;
   _activeIdx = idx;
 
@@ -1940,7 +1960,11 @@ async function _switchAuction(idx) {
   populateAbout("live", slot);
   loadStaticImage("live", slot);
 
-  if (!slot.contractAddr || !ethers.isAddress(slot.contractAddr)) return;
+  if (!slot.contractAddr || !ethers.isAddress(slot.contractAddr)) {
+    _auctionSwitching = false;
+    _setPieceTabsBusy(false);
+    return;
+  }
 
   // Get or create contract
   if (!_contractCache[slot.contractAddr]) {
@@ -1952,9 +1976,17 @@ async function _switchAuction(idx) {
 
   await refreshState(switchToken, activeContract);
   await loadBidHistory(switchToken, slot.contractAddr);
-  if (switchToken !== _switchToken) return;
+  if (switchToken !== _switchToken) {
+    _auctionSwitching = false;
+    _setPieceTabsBusy(false);
+    return;
+  }
   if (slot.contractAddr) await loadNFTMeta(switchToken, activeContract);
-  if (switchToken !== _switchToken) return;
+  if (switchToken !== _switchToken) {
+    _auctionSwitching = false;
+    _setPieceTabsBusy(false);
+    return;
+  }
 
   countdownTimer = setInterval(() => {
     if (switchToken === _switchToken) tickCountdown();
@@ -2006,6 +2038,8 @@ async function _switchAuction(idx) {
 
   // Re-check eligibility with new contract
   if (signerAddress) { await checkEligibility(switchToken, activeContract); }
+  _auctionSwitching = false;
+  _setPieceTabsBusy(false);
 }
 
 // ─── About panel ──────────────────────────────────────────────────────────────
