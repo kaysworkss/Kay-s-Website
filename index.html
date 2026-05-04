@@ -226,19 +226,22 @@
   /* ── Live auction button state ── */
   /* Live auction carousel */
   .live-auction-carousel {
+    grid-column: 1 / -1;
     display: none;
-    margin-top: 1.15rem;
-    border: 1px solid rgba(201,153,58,0.22);
-    background: rgba(255,255,255,0.04);
-    border-radius: 4px;
+    margin-top: -1.1rem;
+    border: 1px solid rgba(201,153,58,0.24);
+    background: linear-gradient(180deg, rgba(255,255,255,0.055), rgba(30,20,14,0.18));
+    border-radius: 6px;
     overflow: hidden;
     width: 100%;
+    box-shadow: 0 18px 45px rgba(20,12,8,0.18);
   }
   .live-auction-carousel.show { display: block; }
   .lac-head {
     display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-    padding: 0.85rem 1rem;
+    padding: 0.9rem 1.05rem;
     border-bottom: 1px solid rgba(201,153,58,0.16);
+    background: rgba(30,20,14,0.16);
   }
   .lac-label {
     font-family: 'Cinzel', serif; font-size: 0.58rem;
@@ -264,7 +267,9 @@
   .lac-track {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(240px, 1fr);
+    grid-auto-columns: minmax(280px, 1fr);
+    gap: 0.8rem;
+    padding: 0.8rem;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     scroll-behavior: smooth;
@@ -273,18 +278,23 @@
   .lac-track::-webkit-scrollbar { display: none; }
   .lac-card {
     scroll-snap-align: start;
-    display: grid; grid-template-columns: 108px 1fr;
-    min-height: 118px;
-    border-right: 1px solid rgba(201,153,58,0.14);
+    display: grid; grid-template-columns: 112px 1fr;
+    min-height: 124px;
+    border: 1px solid rgba(201,153,58,0.16);
+    border-radius: 5px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.035);
     color: inherit; text-decoration: none;
+    transition: border-color 0.2s, background 0.2s, transform 0.2s;
   }
-  .lac-card:last-child { border-right: none; }
-  .lac-img-wrap { background: rgba(30,20,14,0.35); min-height: 118px; overflow: hidden; }
-  .lac-img-wrap img { width: 100%; height: 100%; min-height: 118px; object-fit: cover; display: block; }
-  .lac-body { padding: 0.9rem 1rem; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-  .lac-title { font-family: 'Cormorant Garamond', serif; font-size: 1.08rem; color: var(--sand); line-height: 1.18; margin-bottom: 0.22rem; }
+  .lac-card:hover { border-color: rgba(201,153,58,0.38); background: rgba(201,153,58,0.07); transform: translateY(-1px); }
+  .lac-img-wrap { background: rgba(30,20,14,0.35); min-height: 124px; overflow: hidden; }
+  .lac-img-wrap img { width: 100%; height: 100%; min-height: 124px; object-fit: cover; display: block; }
+  .lac-body { padding: 0.95rem 1rem; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+  .lac-title { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; color: var(--sand); line-height: 1.18; margin-bottom: 0.22rem; }
   .lac-meta { font-size: 0.82rem; color: rgba(232,213,176,0.7); line-height: 1.45; }
-  .lac-cta { margin-top: 0.65rem; font-family: 'Cinzel', serif; font-size: 0.52rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
+  .lac-foot { margin-top: 0.65rem; display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; font-family: 'Cinzel', serif; font-size: 0.52rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); }
+  .lac-foot span:first-child { color: rgba(232,213,176,0.72); letter-spacing: 0.08em; }
   @keyframes pulseAucLive {
     0%, 100% { box-shadow: 0 0 0 0 rgba(201,153,58,0.7), 0 0 18px rgba(201,153,58,0.25); }
     50%       { box-shadow: 0 0 0 10px rgba(201,153,58,0), 0 0 28px rgba(201,153,58,0.45); }
@@ -1785,16 +1795,6 @@
         <a href="/auction" id="idx-auction-btn" class="btn-mint" aria-label="Bid on the Àpótí Ọlọ́wẹ̀ auction" style="display:inline-block;cursor:pointer;">
           &#9670;&nbsp; Bid on the Auction
         </a>
-        <div class="live-auction-carousel" id="idx-live-auctions" aria-label="Live auctions">
-          <div class="lac-head">
-            <div class="lac-label"><span class="lac-live-dot"></span> Live auctions</div>
-            <div class="lac-controls">
-              <button class="lac-btn" type="button" id="idx-lac-prev" aria-label="Previous live auction">&lsaquo;</button>
-              <button class="lac-btn" type="button" id="idx-lac-next" aria-label="Next live auction">&rsaquo;</button>
-            </div>
-          </div>
-          <div class="lac-track" id="idx-lac-track"></div>
-        </div>
         <div class="auc-countdown-strip" id="idx-cd-strip">
           <span>Auction ends in</span>
           <div class="auc-cd-nums" id="idx-cd-nums">-- : -- : --</div>
@@ -1803,27 +1803,35 @@
           Auction opening soon
         </div>
       </div>
-
-
-
     </div>
 
     <div class="series-right reveal" style="transition-delay:0.2s">
       <div class="series-preview-grid" style="grid-template-columns:1fr;">
         <div class="preview-card featured" style="padding:0;overflow:hidden;">
-          <img src="images/tokens.png" style="width:100%;height:100%;object-fit:cover;display:block;" alt="Opening Mint — Entry Tokens"/>
+          <img src="/images/tokens.png" style="width:100%;height:100%;object-fit:cover;display:block;" alt="Opening Mint — Entry Tokens"/>
           <span class="wip-badge">Opening Mint Tokens</span>
         </div>
-         <div class="preview-card" style="padding:0;overflow:hidden;aspect-ratio:16/7;grid-column:1/-1;">
-          <img src="images/igbaradi.jpg" style="width:100%;height:100%;object-fit:cover;display:block;" alt="Digital Sculpture Study"/>
+        <div class="preview-card" style="padding:0;overflow:hidden;aspect-ratio:16/7;grid-column:1/-1;">
+          <img src="/images/igbaradi.jpg" style="width:100%;height:100%;object-fit:cover;display:block;" alt="Digital Sculpture Study"/>
           <span class="wip-badge">ìgbáradì(preperation)</span>
         </div>
         <div class="preview-card" style="padding:0;overflow:hidden;aspect-ratio:16/7;grid-column:1/-1;">
-         <img src="images/dopt.jpg" alt="Àpótí Ọlọ́wẹ̀ series artwork - digital painting by Oyeniyi Kayode (kaysworks), showing warm earthy tones" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;">
+          <img src="/images/dopt.jpg" alt="Àpótí Ọlọ́wẹ̀ series artwork - digital painting by Oyeniyi Kayode (kaysworks), showing warm earthy tones" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;">
           <span class="wip-badge">Ìlẹ̀kun Ìtàn (story door)</span>
         </div>
       </div>
-       <div class="release-countdown" id="mintCountdown" style="display:none;"></div>
+      <div class="release-countdown" id="mintCountdown" style="display:none;"></div>
+    </div>
+
+    <div class="live-auction-carousel" id="idx-live-auctions" aria-label="Live auctions">
+      <div class="lac-head">
+        <div class="lac-label"><span class="lac-live-dot"></span> Live auctions</div>
+        <div class="lac-controls">
+          <button class="lac-btn" type="button" id="idx-lac-prev" aria-label="Previous live auction">&lsaquo;</button>
+          <button class="lac-btn" type="button" id="idx-lac-next" aria-label="Next live auction">&rsaquo;</button>
+        </div>
+      </div>
+      <div class="lac-track" id="idx-lac-track"></div>
     </div>
   </div>
 
@@ -2987,6 +2995,11 @@
 </script>
 </body>
 </html>
+
+
+
+
+
 
 
 
