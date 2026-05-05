@@ -234,7 +234,8 @@ body {
 
 /* ── Mode toggle ── */
 .mode-toggle-bar { display:flex; align-items:center; justify-content:space-between; gap:10px 24px; padding:8px 28px; border-bottom:1px solid var(--divider); background:var(--bg-alt); }
-.mode-tabs { display:flex; gap:6px; flex:0 0 auto; margin-right:10px; }
+.mode-tabs { display:none; gap:6px; flex:0 0 auto; margin-right:10px; }
+.mode-tabs.show { display:flex; }
 .mode-tab { font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.18em; text-transform:uppercase; background:transparent; border:1px solid rgba(196,132,90,0.2); border-radius:3px; color:var(--text-muted); padding:5px 12px; cursor:pointer; transition:all .2s; }
 .mode-tab:hover { border-color:var(--clay); color:var(--clay); }
 .mode-tab.active { background:var(--rust); color:var(--linen); border-color:var(--rust); }
@@ -3691,7 +3692,10 @@ function onRoomEligibilityGranted() {
   _roomEligible = true;
   _updateChatInputState();
   showNotifOptin();
-  if (_isKay()) document.getElementById("tab-auctioneer").style.display = "block";
+  if (_isKay()) {
+    document.querySelector(".mode-tabs")?.classList.add("show");
+    document.getElementById("tab-auctioneer").style.display = "block";
+  }
   _reattachDeleteGestures();
   _upgradePresence("eligible");
 }
@@ -3700,6 +3704,7 @@ function onRoomEligibilityRevoked() {
   _roomEligible = false;
   _updateChatInputState();
   hideNotifOptin();
+  document.querySelector(".mode-tabs")?.classList.remove("show");
   document.getElementById("tab-auctioneer").style.display = "none";
   if (_currentMode === "auctioneer") setMode("collector");
   _upgradePresence("visitor");
