@@ -353,6 +353,33 @@ body {
   color: var(--text-muted); margin-top: 5px; font-style: italic;
 }
 
+.series-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  font-family: 'Cinzel', serif;
+  font-size: 0.52rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.series-back-link:hover { color: var(--clay); }
+.series-back-link span { font-size: 0.75rem; line-height: 1; }
+#view-upcoming > .series-back-link { margin: 18px 0 0 24px; }
+.mode-toggle-bar .series-back-link { margin-right: auto; }
+.swipe-hint {
+  display: none;
+  margin-top: 10px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.48rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 /* About toggle — roadmap pill style */
 .art-actions {
   display: flex;
@@ -928,9 +955,12 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   .piece-tab { padding: 8px 10px; font-size: 0.46rem; gap: 5px; }
   .piece-tab-thumb { width: 20px; height: 20px; }
   .piece-tab-bid { font-size: 0.72rem; }
+  #view-upcoming > .series-back-link { margin: 12px 0 0 16px; }
+  .mode-toggle-bar .series-back-link { margin-right: 0; }
+  .swipe-hint.show { display: block; }
 
   /* ── Mode toggle bar ── */
-  .mode-toggle-bar { padding: 6px 14px; }
+  .mode-toggle-bar { padding: 6px 14px; gap: 8px; flex-wrap: wrap; }
   .mode-tab { font-size: 0.5rem; padding: 6px 10px; }
   .online-pill { font-size: 0.5rem; }
 
@@ -1185,6 +1215,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 <div id="view-upcoming">
   <!-- Piece selector for upcoming — only shown when multiple auctions are configured -->
   <div class="piece-selector" id="upcoming-piece-selector"></div>
+  <a href="/apoti-olowe" class="series-back-link"><span>&larr;</span> Back to series</a>
   <div class="upcoming-layout">
     <div class="art-col" id="upcoming-art-col">
       <div class="art-frame">
@@ -1207,6 +1238,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
         <div class="art-eyebrow" id="upcoming-art-eyebrow">Upcoming auction</div>
         <div class="art-name"    id="upcoming-art-name">—</div>
         <div class="art-artist"  id="upcoming-art-artist"></div>
+        <div class="swipe-hint" id="upcoming-swipe-hint">Swipe for next auction</div>
         <button class="about-toggle" id="upcoming-about-toggle" onclick="toggleAbout('upcoming')" style="display:none">
           <span class="about-toggle-icon" id="upcoming-toggle-icon">+</span>
           <span id="upcoming-toggle-label">About this work</span>
@@ -1256,6 +1288,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 
   <!-- Mode toggle bar -->
   <div class="mode-toggle-bar">
+    <a href="/apoti-olowe" class="series-back-link"><span>&larr;</span> Back to series</a>
     <div class="mode-tabs">
       <button class="mode-tab active" id="tab-collector" onclick="setMode('collector')">Collector view</button>
       <button class="mode-tab" id="tab-auctioneer" onclick="setMode('auctioneer')" style="display:none">Auctioneer mode</button>
@@ -1300,6 +1333,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           <div class="art-eyebrow" id="live-art-eyebrow">Live auction</div>
           <div class="art-name"    id="live-art-name">—</div>
           <div class="art-artist"  id="live-art-artist"></div>
+          <div class="swipe-hint" id="live-swipe-hint">Swipe for next auction</div>
           <div class="art-actions">
             <button class="about-toggle" id="live-about-toggle" onclick="toggleAbout('live')" style="display:none">
               <span class="about-toggle-icon" id="live-toggle-icon">+</span>
@@ -1743,6 +1777,7 @@ function initUpcoming() {
     });
   }
   _loadUpcomingPiece(startIdx);
+  initAuctionSwipe();
   // Note: _loadUpcomingPiece now handles the launch countdown per piece
   // (with cfg.launchDate as a fallback when a piece has no launchDate of its own)
 }
@@ -1780,6 +1815,16 @@ function _buildUpcomingPieceSelector() {
 
 function _loadUpcomingPiece(idx) {
   const slot = _auctions[idx] || _auctions[0] || {};
+  const strip = document.getElementById("upcoming-piece-selector");
+  if (strip) {
+    strip.dataset.activeIdx = idx;
+    strip.querySelectorAll(".piece-tab").forEach(btn => {
+      const tabIdx = parseInt(btn.dataset.idx, 10);
+      btn.classList.toggle("active", tabIdx === idx);
+    });
+  }
+  const upcomingHint = document.getElementById("upcoming-swipe-hint");
+  if (upcomingHint) upcomingHint.classList.toggle("show", _visibleUpcomingIndexes().length > 1);
 
   // Never mutate cfg — pass slot directly to helpers
   const nameEl   = document.getElementById("upcoming-art-name");
@@ -1875,6 +1920,7 @@ async function initLive() {
     startIdx = firstLive >= 0 ? firstLive : 0;
   }
   await _switchAuction(startIdx);
+  initAuctionSwipe();
 }
 
 // ─── Coming-next banner ───────────────────────────────────────────────────────
@@ -1992,11 +2038,56 @@ function updateAuctionNav(isBusy = _auctionSwitching) {
 }
 
 function switchAuctionStep(delta) {
+  if (_auctionSwitching) return;
   const { orderIdx, total } = activeAuctionOrder();
   if (orderIdx < 0 || total <= 1) return;
   const nextOrderIdx = orderIdx + delta;
   if (nextOrderIdx < 0 || nextOrderIdx >= total) return;
   _switchAuction(_visibleLiveIndexes[nextOrderIdx]);
+}
+
+function _visibleUpcomingIndexes() {
+  return cfg._preview
+    ? _auctions.map((_, i) => i)
+    : _auctions.map((slot, i) => ({ slot, i })).filter(({ slot }) => slot._effectiveStatus === "upcoming").map(({ i }) => i);
+}
+
+function switchUpcomingStep(delta) {
+  const visible = _visibleUpcomingIndexes();
+  if (visible.length <= 1) return;
+  const strip = document.getElementById("upcoming-piece-selector");
+  const activeIdx = parseInt((strip && strip.dataset.activeIdx) || visible[0], 10);
+  const orderIdx = Math.max(0, visible.indexOf(activeIdx));
+  const nextOrderIdx = orderIdx + delta;
+  if (nextOrderIdx < 0 || nextOrderIdx >= visible.length) return;
+  _loadUpcomingPiece(visible[nextOrderIdx]);
+}
+
+function initAuctionSwipe() {
+  const swipeTargets = [
+    { el: document.querySelector("#view-live .art-col"), onSwipe: switchAuctionStep },
+    { el: document.querySelector("#view-upcoming .art-col"), onSwipe: switchUpcomingStep },
+  ];
+  swipeTargets.forEach(({ el, onSwipe }) => {
+    if (!el || el.dataset.swipeReady === "1") return;
+    el.dataset.swipeReady = "1";
+    let startX = 0, startY = 0, startTime = 0;
+    el.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startTime = Date.now();
+    }, { passive: true });
+    el.addEventListener("touchend", (e) => {
+      if (!startTime || e.changedTouches.length !== 1) return;
+      const dx = e.changedTouches[0].clientX - startX;
+      const dy = e.changedTouches[0].clientY - startY;
+      const quickEnough = Date.now() - startTime < 700;
+      startTime = 0;
+      if (!quickEnough || Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+      onSwipe(dx < 0 ? 1 : -1);
+    }, { passive: true });
+  });
 }
 
 async function _switchAuction(idx) {
@@ -2056,6 +2147,7 @@ async function _switchAuction(idx) {
   const order = activeAuctionOrder();
   document.getElementById("live-art-eyebrow").textContent = `Live auction #${order.current} of ${order.total}`;
   updateAuctionNav();
+  document.getElementById("live-swipe-hint")?.classList.toggle("show", order.total > 1);
   document.getElementById("live-placeholder").textContent = "Token artwork";
   document.getElementById("live-img").style.display = "none";
   document.getElementById("live-img").src = "";
