@@ -645,6 +645,11 @@ body {
   border: 1px solid rgba(107,124,92,0.35);
   color: var(--moss);
 }
+.eligibility.checking {
+  background: rgba(196,132,90,0.08);
+  border: 1px solid rgba(196,132,90,0.26);
+  color: var(--clay);
+}
 .eligibility.no {
   background: rgba(158,79,46,0.1);
   border: 1px solid rgba(158,79,46,0.3);
@@ -2183,6 +2188,15 @@ async function _switchAuction(idx) {
   if (signer) auctionContract = auctionContract.connect(signer);
   const activeContract = auctionContract;
 
+  if (signerAddress) {
+    checkEligibility(switchToken, activeContract)
+      .then(ok => {
+        if (switchToken !== _switchToken) return;
+        ok ? onRoomEligibilityGranted() : onRoomEligibilityRevoked();
+      })
+      .catch(e => console.warn("checkEligibility:", e));
+  }
+
   await refreshState(switchToken, activeContract);
   await loadBidHistory(switchToken, slot.contractAddr);
   if (switchToken !== _switchToken) {
@@ -2245,8 +2259,6 @@ async function _switchAuction(idx) {
     _loadAucProfile().then(() => { _loadHistory(); _subscribeRoom(); });
   }
 
-  // Re-check eligibility with new contract
-  if (signerAddress) { await checkEligibility(switchToken, activeContract); }
   _auctionSwitching = false;
   _setPieceTabsBusy(false);
 }
@@ -2568,8 +2580,11 @@ async function connectWallet() {
       });
       auctionContract = auctionContract.connect(signer);
       // Run post-connect steps independently — a failure in one must not block the others
-      await checkEligibility().catch(e => console.warn("checkEligibility:", e));
-      onRoomEligibilityGranted();
+      const ok = await checkEligibility().catch(e => {
+        console.warn("checkEligibility:", e);
+        return false;
+      });
+      ok ? onRoomEligibilityGranted() : onRoomEligibilityRevoked();
       _loadMyProfile().catch(e => console.warn("_loadMyProfile:", e));
     }
 
@@ -2758,11 +2773,33 @@ function tickCountdown() {
 
 // ─── Eligibility ──────────────────────────────────────────────────────────────
 
+function setEligibilityChecking(detail = "Checking wallet eligibility on-chain...") {
+  const el = document.getElementById("eligibility");
+  if (!el) return;
+  el.className = "eligibility show checking";
+  document.getElementById("elig-icon").textContent = "...";
+  document.getElementById("elig-text").textContent = "Checking eligibility";
+  document.getElementById("elig-detail").textContent = detail;
+  onBidInput();
+}
+
+function withTimeout(promise, ms, message) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms))
+  ]);
+}
+
 async function checkEligibility(runToken = _switchToken, contract = auctionContract) {
-  if (!contract || !signerAddress || runToken !== _switchToken) return;
+  if (!contract || !signerAddress || runToken !== _switchToken) return false;
+  setEligibilityChecking();
   try {
-    const ok = await contract.isEligible(signerAddress);
-    if (runToken !== _switchToken) return;
+    const ok = await withTimeout(
+      contract.isEligible(signerAddress),
+      9000,
+      "Eligibility check is taking longer than expected."
+    );
+    if (runToken !== _switchToken) return false;
     const el = document.getElementById("eligibility");
     el.className = `eligibility show ${ok ? "yes" : "no"}`;
     document.getElementById("elig-icon").textContent = ok ? "✓" : "✗";
@@ -2772,7 +2809,19 @@ async function checkEligibility(runToken = _switchToken, contract = auctionContr
     document.getElementById("elig-detail").textContent = !ok && cfg.gateName
       ? `Required: ${cfg.gateName}${cfg.gateLink ? " — " + cfg.gateLink : ""}` : "";
     onBidInput();
-  } catch(e) { console.log("Eligibility:", e); }
+    return !!ok;
+  } catch(e) {
+    console.log("Eligibility:", e);
+    const el = document.getElementById("eligibility");
+    if (el && runToken === _switchToken) {
+      el.className = "eligibility show checking";
+      document.getElementById("elig-icon").textContent = "!";
+      document.getElementById("elig-text").textContent = "Still checking eligibility";
+      document.getElementById("elig-detail").textContent = "The network is slow. Please wait a moment or reconnect if this does not update.";
+      onBidInput();
+    }
+    return false;
+  }
 }
 
 // ─── Bid ─────────────────────────────────────────────────────────────────────
