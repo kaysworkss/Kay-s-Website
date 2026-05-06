@@ -1620,13 +1620,18 @@ let _walletEventsBound = false;
 let _switchToken = 0;
 let _auctionSwitching = false;
 
+function normaliseStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  return ["live","upcoming","off"].includes(value) ? value : "";
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 window.addEventListener("load", async () => {
   document.getElementById("view-loading").classList.add("show");
 
   cfg = await loadConfig();
-  const globalStatus = cfg.status || "off";
+  const globalStatus = normaliseStatus(cfg.status) || "off";
 
   // Normalise auctions array — supports both single and multi-auction configs
   if (Array.isArray(cfg.auctions) && cfg.auctions.length > 0) {
@@ -1650,7 +1655,10 @@ window.addEventListener("load", async () => {
   // Rule: individual piece.status always wins over the global default.
   // global=live + piece.status="upcoming" → piece stays upcoming.
   // Empty string means "inherit global".
-  _auctions.forEach(p => { p._effectiveStatus = p.status || globalStatus; });
+  _auctions.forEach(p => {
+    p.status = normaliseStatus(p.status);
+    p._effectiveStatus = p.status || globalStatus;
+  });
 
   // Decide which view to show based on the mix of piece statuses.
   // Preview mode (cfg._preview) honors cfg.status directly so the admin can
@@ -1825,6 +1833,11 @@ function _buildUpcomingPieceSelector() {
 }
 
 function _loadUpcomingPiece(idx) {
+  if (!_slotMatchesStatus(_auctions[idx], "upcoming")) {
+    const firstUpcoming = _visibleUpcomingIndexes()[0] ?? _auctions.findIndex(slot => _slotMatchesStatus(slot, "upcoming"));
+    if (firstUpcoming >= 0 && firstUpcoming !== idx) return _loadUpcomingPiece(firstUpcoming);
+    return;
+  }
   const slot = _auctions[idx] || _auctions[0] || {};
   const strip = document.getElementById("upcoming-piece-selector");
   if (strip) {
@@ -2105,6 +2118,11 @@ function initAuctionSwipe() {
 
 async function _switchAuction(idx) {
   if (idx < 0 || idx >= _auctions.length) return;
+  if (!_slotMatchesStatus(_auctions[idx], "live")) {
+    const firstLive = _visibleLiveIndexes[0] ?? _auctions.findIndex(slot => _slotMatchesStatus(slot, "live"));
+    if (firstLive >= 0 && firstLive !== idx) return _switchAuction(firstLive);
+    return;
+  }
   _auctionSwitching = true;
   _setPieceTabsBusy(true);
   const switchToken = ++_switchToken;
