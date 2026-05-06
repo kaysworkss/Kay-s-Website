@@ -806,6 +806,10 @@ function _effectivePieceStatus(piece) {
   return 'off';
 }
 
+function _normalisePieceStatus(status) {
+  return ["live","upcoming","off"].includes(status) ? status : "";
+}
+
 function _renderPieceTabs() {
   const tabs  = document.getElementById("piece-tabs");
   const forms = document.getElementById("piece-forms");
@@ -1036,6 +1040,7 @@ function _savePieceFormValues(idx) {
       _pieces[idx][f] = (el.value || "").trim();
     }
   });
+  _pieces[idx].status = _normalisePieceStatus(_pieces[idx].status);
 }
 
 function addPiece() {
@@ -1056,6 +1061,7 @@ function removePiece(idx) {
 
 function _readAllPieces() {
   _savePieceFormValues(_activePieceIdx);
+  _pieces.forEach(p => { p.status = _normalisePieceStatus(p.status); });
   return _pieces;
 }
 
@@ -1160,6 +1166,7 @@ function _renderTabsOnly() {
 // Per-piece status setter — called from the buttons inside each piece form
 function setPieceStatus(idx, s) {
   if (!_pieces[idx]) return;
+  s = _normalisePieceStatus(s);
   // Save in piece data (empty string = inherit from global)
   _pieces[idx].status = s;
   // Sync the hidden input so _savePieceFormValues picks it up
@@ -1497,7 +1504,10 @@ function _buildPreviewPayload(forcePieceIdx) {
     document.getElementById("btn-" + s)?.className.includes("active")
   ) || "live";
   let previewStatus;
-  if (selectedStatus === "upcoming") previewStatus = _previewAs;  // admin's choice
+  if (forcePieceIdx !== undefined) {
+    const pieceStatus = primary.status || selectedStatus;
+    previewStatus = pieceStatus === "off" ? "live" : pieceStatus;
+  } else if (selectedStatus === "upcoming") previewStatus = _previewAs;  // admin's choice
   else if (selectedStatus === "live") previewStatus = "live";
   else                                previewStatus = "live";     // 'off' → live UI
   return {
