@@ -1757,6 +1757,10 @@ function _activeCfg() {
   return _auctions[_activeIdx] || _auctions[0] || cfg;
 }
 
+function _slotMatchesStatus(slot, status) {
+  return slot?._effectiveStatus === status || (cfg._preview && slot?._effectiveStatus === "off");
+}
+
 // ─── UPCOMING INIT ────────────────────────────────────────────────────────────
 
 function initUpcoming() {
@@ -1795,11 +1799,11 @@ function _buildUpcomingPieceSelector() {
   if (!strip) return;
   strip.innerHTML = "";
 
-  // Show only pieces whose effective status is 'upcoming'
-  // (cfg._preview bypasses the filter so admin previews show all pieces)
-  const visible = cfg._preview
-    ? _auctions.map((slot, i) => ({ slot, i }))
-    : _auctions.map((slot, i) => ({ slot, i })).filter(({ slot }) => slot._effectiveStatus === "upcoming");
+  // Show only upcoming pieces. Preview mode also allows Off pieces so admins
+  // can inspect unpublished work without making Live/Upcoming overrides leak.
+  const visible = _auctions
+    .map((slot, i) => ({ slot, i }))
+    .filter(({ slot }) => _slotMatchesStatus(slot, "upcoming"));
 
   if (visible.length <= 1) { strip.classList.remove("show"); return; }
   strip.classList.add("show");
@@ -1959,10 +1963,11 @@ async function _buildPieceSelector() {
   const strip = document.getElementById("piece-selector");
   strip.innerHTML = "";
 
-  // Show only pieces whose effective status is 'live' (preview shows all)
-  const visible = cfg._preview
-    ? _auctions.map((slot, i) => ({ slot, i }))
-    : _auctions.map((slot, i) => ({ slot, i })).filter(({ slot }) => slot._effectiveStatus === "live");
+  // Show only live pieces. Preview mode also allows Off pieces so admins
+  // can inspect unpublished work without making Live/Upcoming overrides leak.
+  const visible = _auctions
+    .map((slot, i) => ({ slot, i }))
+    .filter(({ slot }) => _slotMatchesStatus(slot, "live"));
   _visibleLiveIndexes = visible.map(({ i }) => i);
 
   if (visible.length <= 1) {
@@ -2054,9 +2059,10 @@ function switchAuctionStep(delta) {
 }
 
 function _visibleUpcomingIndexes() {
-  return cfg._preview
-    ? _auctions.map((_, i) => i)
-    : _auctions.map((slot, i) => ({ slot, i })).filter(({ slot }) => slot._effectiveStatus === "upcoming").map(({ i }) => i);
+  return _auctions
+    .map((slot, i) => ({ slot, i }))
+    .filter(({ slot }) => _slotMatchesStatus(slot, "upcoming"))
+    .map(({ i }) => i);
 }
 
 function switchUpcomingStep(delta) {
