@@ -108,29 +108,64 @@ async function handleUploadImage(req, res, supabase) {
 }
 
 // ── GET /api/admin?action=wallets ─────────────────────────────────────────────
+function normalizePlayerName(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
+// ── GET /api/admin?action=wallets ─────────────────────────────────────────────
 async function handleGetWallets(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
   const { challenge_id } = req.query;
+  const includeAllWinners = req.query.include_all_winners === '1' || req.query.include_all_winners === 'true';
+
   let query = supabase
     .from('scores')
     .select('player_name, wallet_address, time_seconds, piece_count, hints_used, created_at, challenge_id, challenges(title)')
-    .not('wallet_address', 'is', null)
     .order('created_at', { ascending: false });
-  if (challenge_id) query = query.eq('challenge_id', challenge_id);
-  const { data, error } = await query;
-  if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json((data || []).map(s => ({
-    player_name:     s.player_name,
-    wallet_address:  s.wallet_address,
-    time_seconds:    s.time_seconds,
-    piece_count:     s.piece_count,
-    hints_used:      s.hints_used,
-    created_at:      s.created_at,
-    challenge_id:    s.challenge_id,
-    challenge_title: s.challenges?.title || '',
-  })));
-}
 
+  if (challenge_id) query = query.eq('challenge_id', challenge_id);
+
+  const { data: scores, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+
+  const names = [...new Set((scores || [])
+    .map(s => (s.player_name || '').trim())
+    .filter(Boolean))];
+
+  const profileWalletByName = new Map();
+  if (names.length) {
+    const { data: players, error: playersError } = await supabase
+      .from('players')
+      .select('name, wallet_address')
+      .in('name', names);
+
+    if (playersError) return res.status(500).json({ error: playersError.message });
+
+    (players || []).forEach(p => {
+      const key = normalizePlayerName(p.name);
+      if (key && p.wallet_address) profileWalletByName.set(key, p.wallet_address);
+    });
+  }
+
+  const rows = (scores || []).map(s => {
+    const profileWallet = profileWalletByName.get(normalizePlayerName(s.player_name)) || null;
+    return {
+      player_name:            s.player_name,
+      wallet_address:         s.wallet_address,
+      profile_wallet_address: profileWallet,
+      latest_wallet_address:  profileWallet || s.wallet_address || null,
+      time_seconds:           s.time_seconds,
+      piece_count:            s.piece_count,
+      hints_used:             s.hints_used,
+      created_at:             s.created_at,
+      challenge_id:           s.challenge_id,
+      challenge_title:        s.challenges?.title || '',
+    };
+  }).filter(row => includeAllWinners || row.wallet_address || row.profile_wallet_address);
+
+  return res.status(200).json(rows);
+}
 
 // ── PATCH /api/admin?action=challenge (rename + extend end date) ─────────────
 async function handleExtendChallenge(req, res, supabase) {
