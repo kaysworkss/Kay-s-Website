@@ -654,6 +654,12 @@ body {
   background: rgba(158,79,46,0.1);
   border: 1px solid rgba(158,79,46,0.3);
   color: var(--clay);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.eligibility.no:hover {
+  background: rgba(158,79,46,0.18);
+  border-color: rgba(158,79,46,0.5);
 }
 .eligibility-icon { flex-shrink: 0; margin-top: 2px; font-size: 0.85rem; }
 .eligibility-detail {
@@ -2826,12 +2832,28 @@ async function checkEligibility(runToken = _switchToken, contract = auctionContr
     if (runToken !== _switchToken) return false;
     const el = document.getElementById("eligibility");
     el.className = `eligibility show ${ok ? "yes" : "no"}`;
+    // Make the whole banner clickable when ineligible and a gateLink is provided
+    if (!ok && cfg.gateLink) {
+      el.onclick = () => window.open(cfg.gateLink, "_blank", "noopener,noreferrer");
+      el.title = "Click to get the required token";
+    } else {
+      el.onclick = null;
+      el.title = "";
+    }
     document.getElementById("elig-icon").textContent = ok ? "✓" : "✗";
     document.getElementById("elig-text").textContent = ok
       ? "You are eligible to bid"
       : `You don't hold the required token`;
-    document.getElementById("elig-detail").textContent = !ok && cfg.gateName
-      ? `Required: ${cfg.gateName}${cfg.gateLink ? " — " + cfg.gateLink : ""}` : "";
+    const eligDetail = document.getElementById("elig-detail");
+    if (!ok && cfg.gateName) {
+      if (cfg.gateLink) {
+        eligDetail.innerHTML = `<a href="${cfg.gateLink}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer;" title="Click to get the required token">Required: ${cfg.gateName} — ${cfg.gateLink}</a>`;
+      } else {
+        eligDetail.textContent = `Required: ${cfg.gateName}`;
+      }
+    } else {
+      eligDetail.textContent = "";
+    }
     onBidInput();
     return !!ok;
   } catch(e) {
