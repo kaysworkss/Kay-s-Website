@@ -651,15 +651,16 @@ body {
   color: var(--clay);
 }
 .eligibility.no {
-  background: rgba(158,79,46,0.1);
-  border: 1px solid rgba(158,79,46,0.3);
-  color: var(--clay);
+  background: rgba(201,153,58,0.08);
+  border: 1px solid rgba(201,153,58,0.3);
+  color: var(--sand);
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 .eligibility.no:hover {
-  background: rgba(158,79,46,0.18);
-  border-color: rgba(158,79,46,0.5);
+  background: rgba(201,153,58,0.14);
+  border-color: rgba(201,153,58,0.55);
+  box-shadow: 0 0 0 1px rgba(201,153,58,0.15);
 }
 .eligibility-icon { flex-shrink: 0; margin-top: 2px; font-size: 0.85rem; }
 .eligibility-detail {
@@ -2835,21 +2836,21 @@ async function checkEligibility(runToken = _switchToken, contract = auctionContr
     // Make the whole banner clickable when ineligible and a gateLink is provided
     if (!ok && cfg.gateLink) {
       el.onclick = () => window.open(cfg.gateLink, "_blank", "noopener,noreferrer");
-      el.title = "Click to get the required token";
+      el.title = "Tap to acquire your entry token and join the auction";
     } else {
       el.onclick = null;
       el.title = "";
     }
-    document.getElementById("elig-icon").textContent = ok ? "✓" : "✗";
+    document.getElementById("elig-icon").textContent = ok ? "✓" : "🔑";
     document.getElementById("elig-text").textContent = ok
       ? "You are eligible to bid"
-      : `You don't hold the required token`;
+      : `Get your entry token to join the auction`;
     const eligDetail = document.getElementById("elig-detail");
     if (!ok && cfg.gateName) {
       if (cfg.gateLink) {
-        eligDetail.innerHTML = `<a href="${cfg.gateLink}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer;" title="Click to get the required token">Required: ${cfg.gateName} — ${cfg.gateLink}</a>`;
+        eligDetail.innerHTML = `<a href="${cfg.gateLink}" target="_blank" rel="noopener noreferrer" style="color:var(--gold);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-style:normal;letter-spacing:0.02em;" title="Tap to acquire your entry token">Tap here to acquire the ${cfg.gateName} →</a>`;
       } else {
-        eligDetail.textContent = `Required: ${cfg.gateName}`;
+        eligDetail.textContent = `Requires: ${cfg.gateName}`;
       }
     } else {
       eligDetail.textContent = "";
