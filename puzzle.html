@@ -3165,10 +3165,9 @@ function arrangePieces() {
   const { x: asmX, y: asmY, w: asmW, h: asmH, scale } = window._asm;
   const sPW = Math.round(pieceW * scale), sPH = Math.round(pieceH * scale);
   const tabPx = Math.round(TAB * scale);
-  const PAD = Math.max(6, Math.round(Math.min(sPW, sPH) * 0.15));
-  const cellW = sPW + PAD, cellH = sPH + PAD;
+  const isMobPortrait = CW < 600 && CH > CW;
 
-  // Step 1: disband groups outside the work area
+  // Disband groups outside the work area so Arrange can place each loose piece.
   pieces.forEach(p => {
     if (p.placed || _inWorkArea(p, asmX, asmY, asmW, asmH)) return;
     const newGid = nextGid++;
@@ -3178,144 +3177,115 @@ function arrangePieces() {
     p.groupId = newGid;
   });
 
-  // Step 2: border regions, sized from the actual board position.
-  const isMobPortrait = CW < 600 && CH > CW;
-  const EDGE = tabPx + 2;
-  const mobileGap = Math.round(Math.min(sPW, sPH) * 0.12 + 4);
-  // Desktop needs extra visual clearance because jigsaw tabs protrude outside
-  // the piece rectangle; without this, arranged pieces appear to touch the board.
-  const desktopGap = tabPx + Math.max(18, Math.round(Math.min(sPW, sPH) * 0.42));
-  const GAP = isMobPortrait ? mobileGap : desktopGap;
-  const bLeft  = asmX - GAP;
-  const bRight = asmX + asmW + GAP;
-  const bTop   = asmY - GAP;
-  const bBot   = asmY + asmH + GAP;
-  const desktopCellGap = Math.max(10, Math.round(Math.min(sPW, sPH) * 0.16));
-  const arrangeCellW = isMobPortrait ? cellW : sPW + desktopCellGap;
-  const arrangeCellH = isMobPortrait ? cellH : sPH + desktopCellGap;
-
-  let regions;
-  if (isMobPortrait) {
-    // Mobile stays top/bottom only.
-    const topR = { id:'T', x0:EDGE, y0:EDGE, x1:CW-EDGE, y1:bTop };
-    const botR = { id:'B', x0:EDGE, y0:bBot, x1:CW-EDGE, y1:CH-EDGE };
-    regions = [topR, botR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
-  } else {
-    // Desktop uses four non-overlapping regions around the board.
-    const topR   = { id:'T', x0:EDGE,   y0:EDGE, x1:CW-EDGE, y1:bTop };
-    const botR   = { id:'B', x0:EDGE,   y0:bBot, x1:CW-EDGE, y1:CH-EDGE };
-    const leftR  = { id:'L', x0:EDGE,   y0:bTop, x1:bLeft,   y1:bBot };
-    const rightR = { id:'R', x0:bRight, y0:bTop, x1:CW-EDGE, y1:bBot };
-    regions = [topR, botR, leftR, rightR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
-  }
-  if (!regions.length) return;
-
-  function buildSlots(cw, ch) {
-    regions.forEach(r => {
-      const boundPadX = isMobPortrait ? 0 : tabPx;
-      const boundPadY = isMobPortrait ? 0 : tabPx;
-      const xBase = r.x0 + boundPadX;
-      const yBase = r.y0 + boundPadY;
-      const width = Math.max(0, r.x1 - r.x0 - boundPadX * 2);
-      const height = Math.max(0, r.y1 - r.y0 - boundPadY * 2);
-      r.boundPadX = boundPadX;
-      r.boundPadY = boundPadY;
-      r.cols = Math.max(1, Math.floor(width / cw));
-      r.rows = Math.max(1, Math.floor(height / ch));
-      r.cap  = r.cols * r.rows;
-
-      const slackX = width - r.cols * cw;
-      const slackY = height - r.rows * ch;
-      let offX = Math.round(slackX / 2 + PAD / 2);
-      let offY = Math.round(slackY / 2 + PAD / 2);
-
-      // Desktop grids start at the board edge and grow outward, which keeps
-      // top/bottom runs close to the work area instead of floating mid-strip.
-      if (!isMobPortrait) {
-        if (r.id === 'T') offY = Math.max(PAD / 2, height - r.rows * ch + PAD / 2);
-        if (r.id === 'B') offY = PAD / 2;
-        if (r.id === 'L') offX = Math.max(PAD / 2, width - r.cols * cw + PAD / 2);
-        if (r.id === 'R') offX = PAD / 2;
-      }
-
-      const rowOrder = Array.from({ length: r.rows }, (_, i) => i);
-      const colOrder = Array.from({ length: r.cols }, (_, i) => i);
-      if (r.id === 'T') rowOrder.reverse();
-      if (r.id === 'L') colOrder.reverse();
-
-      r.slots = [];
-      for (const row of rowOrder) {
-        for (const col of colOrder) {
-          r.slots.push({
-            x: Math.round(xBase + offX + col * cw),
-            y: Math.round(yBase + offY + row * ch)
-          });
-        }
-      }
-    });
-
-    const totalCap = regions.reduce((s, r) => s + r.cap, 0);
-    const slots = [];
-    const heads = regions.map(() => 0);
-
-    // Proportional round-robin by region capacity. This prevents the largest
-    // side from being drained first and keeps wide/tall images balanced.
-    for (let i = 0; i < totalCap; i++) {
-      let best = -1, bestProgress = Infinity;
-      regions.forEach((r, ri) => {
-        if (heads[ri] >= r.cap) return;
-        const progress = heads[ri] / r.cap;
-        if (progress < bestProgress) { bestProgress = progress; best = ri; }
-      });
-      if (best === -1) break;
-      slots.push({ slot: regions[best].slots[heads[best]], r: regions[best] });
-      heads[best]++;
-    }
-    return slots;
-  }
-
   const rng = mkRng(Date.now() % 999983);
   const unplaced = pieces
     .filter(p => !p.placed && !_inWorkArea(p, asmX, asmY, asmW, asmH))
     .sort(() => rng() - 0.5);
   if (!unplaced.length) return;
 
-  let allSlots = buildSlots(arrangeCellW, arrangeCellH);
+  // Mobile behaviour stays as a top/bottom shelf, because that layout works well.
+  if (isMobPortrait) {
+    const PAD = Math.max(6, Math.round(Math.min(sPW, sPH) * 0.15));
+    const cellW = sPW + PAD, cellH = sPH + PAD;
+    const EDGE = tabPx + 2;
+    const GAP = Math.round(Math.min(sPW, sPH) * 0.12 + 4);
+    const regions = [
+      { id:'T', x0:EDGE, y0:EDGE, x1:CW-EDGE, y1:asmY-GAP },
+      { id:'B', x0:EDGE, y0:asmY+asmH+GAP, x1:CW-EDGE, y1:CH-EDGE }
+    ].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
+    if (!regions.length) return;
 
-  // If the puzzle has more pieces than normal-size slots, use progressively
-  // denser unique slots. Never wrap with modulo: that is what caused stacking.
-  if (unplaced.length > allSlots.length) {
-    const totalArea = regions.reduce((s, r) => s + (r.x1-r.x0) * (r.y1-r.y0), 0);
-    const neededCell = Math.sqrt(totalArea / unplaced.length);
-    if (isMobPortrait) {
-      const denseW = Math.max(Math.round(neededCell), Math.round(sPW * 0.55));
-      const denseH = Math.max(Math.round(neededCell * (sPH / sPW)), Math.round(sPH * 0.55));
-      allSlots = buildSlots(denseW, denseH);
-    } else {
-      for (let factor = 0.82; factor >= 0.46 && unplaced.length > allSlots.length; factor -= 0.06) {
-        const denseW = Math.max(Math.round(neededCell), Math.round(sPW * factor));
-        const denseH = Math.max(Math.round(neededCell * (sPH / sPW)), Math.round(sPH * factor));
-        allSlots = buildSlots(denseW, denseH);
+    const slots = [];
+    regions.forEach(r => {
+      const cols = Math.max(1, Math.floor((r.x1-r.x0) / cellW));
+      const rows = Math.max(1, Math.floor((r.y1-r.y0) / cellH));
+      const offX = Math.round(((r.x1-r.x0) - cols * cellW + PAD) / 2);
+      const offY = Math.round(((r.y1-r.y0) - rows * cellH + PAD) / 2);
+      const rowOrder = Array.from({ length: rows }, (_, i) => i);
+      if (r.id === 'T') rowOrder.reverse();
+      for (const row of rowOrder) {
+        for (let col = 0; col < cols; col++) {
+          slots.push({ x: r.x0 + offX + col * cellW, y: r.y0 + offY + row * cellH, r });
+        }
       }
-      if (unplaced.length > allSlots.length) {
-        allSlots = buildSlots(Math.max(8, Math.round(sPW * 0.38)), Math.max(8, Math.round(sPH * 0.38)));
+    });
+
+    const jMax = Math.round(Math.min(sPW, sPH) * 0.08);
+    unplaced.forEach((p, i) => {
+      const slot = slots[i % slots.length];
+      const jx = Math.round((rng() - 0.5) * 2 * jMax);
+      const jy = Math.round((rng() - 0.5) * 2 * jMax);
+      p.x = Math.round(Math.max(slot.r.x0, Math.min(slot.r.x1 - p.sPW, slot.x + jx)));
+      p.y = Math.round(Math.max(slot.r.y0, Math.min(slot.r.y1 - p.sPH, slot.y + jy)));
+    });
+    queueAutoSave(500);
+    return;
+  }
+
+  // Desktop: build a ring of legal grid slots around the board. A slot is legal
+  // only if the piece plus its tab protrusion does not intersect the board zone.
+  const visualPad = tabPx + Math.max(6, Math.round(Math.min(sPW, sPH) * 0.10));
+  const boardGap = tabPx + Math.max(22, Math.round(Math.min(sPW, sPH) * 0.38));
+  const clear = {
+    x0: asmX - boardGap,
+    y0: asmY - boardGap,
+    x1: asmX + asmW + boardGap,
+    y1: asmY + asmH + boardGap
+  };
+  const cx = asmX + asmW / 2;
+  const cy = asmY + asmH / 2;
+
+  function makeRingSlots(stepFactor) {
+    const gap = Math.max(8, Math.round(Math.min(sPW, sPH) * stepFactor));
+    const stepX = Math.max(8, sPW + gap);
+    const stepY = Math.max(8, sPH + gap);
+    const slots = [];
+    const startX = visualPad;
+    const startY = visualPad;
+    const endX = CW - sPW - visualPad;
+    const endY = CH - sPH - visualPad;
+
+    for (let y = startY; y <= endY; y += stepY) {
+      for (let x = startX; x <= endX; x += stepX) {
+        const vx0 = x - visualPad;
+        const vy0 = y - visualPad;
+        const vx1 = x + sPW + visualPad;
+        const vy1 = y + sPH + visualPad;
+        const outsideBoard = vx1 <= clear.x0 || vx0 >= clear.x1 || vy1 <= clear.y0 || vy0 >= clear.y1;
+        if (!outsideBoard) continue;
+        const sx = x + sPW / 2;
+        const sy = y + sPH / 2;
+        slots.push({
+          x: Math.round(x),
+          y: Math.round(y),
+          angle: Math.atan2(sy - cy, sx - cx),
+          dist: Math.hypot(sx - cx, sy - cy)
+        });
       }
     }
-  }
-  if (!allSlots.length) return;
 
-  const jMax = isMobPortrait ? Math.round(Math.min(sPW, sPH) * 0.08) : Math.min(2, Math.round(Math.min(sPW, sPH) * 0.04));
+    slots.sort((a, b) => (a.angle - b.angle) || (a.dist - b.dist));
+    return slots;
+  }
+
+  let slots = makeRingSlots(0.16);
+  for (let f = 0.12; f >= -0.18 && slots.length < unplaced.length; f -= 0.06) {
+    slots = makeRingSlots(f);
+  }
+  if (!slots.length) return;
+
+  const used = new Set();
+  const jMax = slots.length >= unplaced.length ? Math.min(2, Math.round(Math.min(sPW, sPH) * 0.03)) : 0;
   unplaced.forEach((p, i) => {
-    if (i >= allSlots.length) return;
-    const { slot, r } = allSlots[i];
+    if (used.size >= slots.length) return;
+    let idx = Math.floor(i * slots.length / unplaced.length);
+    while (used.has(idx)) idx = (idx + 1) % slots.length;
+    used.add(idx);
+    const slot = slots[idx];
     const jx = Math.round((rng() - 0.5) * 2 * jMax);
     const jy = Math.round((rng() - 0.5) * 2 * jMax);
-    const minX = r.x0 + (r.boundPadX || 0);
-    const maxX = r.x1 - p.sPW - (r.boundPadX || 0);
-    const minY = r.y0 + (r.boundPadY || 0);
-    const maxY = r.y1 - p.sPH - (r.boundPadY || 0);
-    p.x = Math.round(Math.max(minX, Math.min(maxX, slot.x + jx)));
-    p.y = Math.round(Math.max(minY, Math.min(maxY, slot.y + jy)));
+    p.x = Math.round(Math.max(visualPad, Math.min(CW - p.sPW - visualPad, slot.x + jx)));
+    p.y = Math.round(Math.max(visualPad, Math.min(CH - p.sPH - visualPad, slot.y + jy)));
   });
   queueAutoSave(500);
 }
