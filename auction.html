@@ -231,6 +231,22 @@ body {
   width:5px; height:5px; border-radius:50%; background:var(--moss);
   animation:live-blink 1.4s ease-in-out infinite; flex-shrink:0;
 }
+/* Sold badge on piece tabs */
+.piece-tab-sold-badge {
+  font-family:'Cinzel',serif; font-size:0.42rem; letter-spacing:0.12em;
+  text-transform:uppercase; background:rgba(107,124,92,0.18);
+  border:1px solid rgba(107,124,92,0.45); border-radius:2px;
+  padding:1px 5px; color:var(--moss); flex-shrink:0; line-height:1.4;
+}
+/* Settled / manual chat lock notice */
+.chat-settled-lock {
+  display:none; align-items:center; gap:8px;
+  padding:10px 13px; border-top:1px solid var(--divider);
+  background:rgba(107,124,92,0.06);
+  font-family:'Crimson Pro',serif; font-size:0.82rem;
+  color:var(--text-muted); font-style:italic;
+}
+.chat-settled-lock.show { display:flex; }
 
 /* ── Mode toggle ── */
 .mode-toggle-bar { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px 24px; padding:8px 28px; border-bottom:1px solid var(--divider); background:var(--bg-alt); }
@@ -1526,7 +1542,12 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
         </div>
       </div>
 
-      <div class="chat-input-zone">
+      <!-- Settled / manual chat lock (shown when auction concluded or admin locks chat) -->
+      <div class="chat-settled-lock" id="chat-settled-lock">
+        <span style="font-size:14px">🔒</span> <span id="chat-settled-lock-msg">This auction has concluded — the collector room is now archived</span>
+      </div>
+
+      <div class="chat-input-zone" id="chat-input-zone">
         <div class="slabel" style="margin-bottom:6px">React</div>
         <div class="react-row">
           <button class="react-btn-sm" onclick="sendRoomReaction('🔥')" disabled>🔥</button>
@@ -2012,7 +2033,8 @@ async function _buildPieceSelector() {
       ${thumbHtml}
       <span>${slot.artTitle || "Piece " + (i + 1)}</span>
       <span class="piece-tab-bid" id="tab-bid-${i}">—</span>
-      <span class="piece-tab-live-dot"></span>`;
+      <span class="piece-tab-sold-badge" id="tab-sold-${i}" style="display:none">Sold</span>
+      <span class="piece-tab-live-dot" id="tab-dot-${i}"></span>`;
 
     btn.addEventListener("click", () => _switchAuction(i));
     strip.appendChild(btn);
@@ -2031,10 +2053,21 @@ async function _pollAllTabBids() {
     try {
       let c = _contractCache[slot.contractAddr];
       if (!c) { c = new ethers.Contract(slot.contractAddr, AUCTION_ABI, provider); _contractCache[slot.contractAddr] = c; }
-      const s   = await c.auctionState();
-      const bid = s[6]; // _highestBid
-      const el  = document.getElementById("tab-bid-" + i);
-      if (el) el.textContent = bid > 0n ? ethers.formatEther(bid) + " ETH" : "—";
+      const s       = await c.auctionState();
+      const bid     = s[6]; // _highestBid
+      const settled = s[2]; // _settled
+      const bidEl   = document.getElementById("tab-bid-"  + i);
+      const soldEl  = document.getElementById("tab-sold-" + i);
+      const dotEl   = document.getElementById("tab-dot-"  + i);
+      if (settled) {
+        if (bidEl)  bidEl.style.display  = "none";
+        if (soldEl) soldEl.style.display = "";
+        if (dotEl)  dotEl.style.display  = "none";
+      } else {
+        if (bidEl)  { bidEl.style.display = ""; bidEl.textContent = bid > 0n ? ethers.formatEther(bid) + " ETH" : "—"; }
+        if (soldEl) soldEl.style.display = "none";
+        if (dotEl)  dotEl.style.display  = "";
+      }
     } catch(_) {}
   }
 }
@@ -2149,6 +2182,13 @@ async function _switchAuction(idx) {
   if (auctionContract) { try { auctionContract.removeAllListeners(); } catch(_) {} }
   bidHistory = [];
   endTimestamp = 0; isLive = false; minNextBid = 0n;
+  // Reset chat lock state for this piece
+  _auctionSettled     = false;
+  _chatManuallyLocked = !!(slot.chatLocked);
+  _updateChatInputState();
+  // Restore room header to "Live"
+  const roomSub = document.querySelector(".room-sub");
+  if (roomSub) roomSub.innerHTML = `<span class="live-dot"></span><span>Live</span>`;
 
   // Reset all bid-panel DOM so no state from the previous piece bleeds through
   document.getElementById("countdown-section").style.display   = "none";
@@ -3017,6 +3057,14 @@ function showSettled(winner, amount) {
     ? `Congratulations — you won with ${ethers.formatEther(amount)} ETH`
     : `Won by ${shortAddr(winner)} for ${ethers.formatEther(amount)} ETH`;
   document.getElementById("bid-form").style.display = "none";
+
+  // Lock chat — auction concluded (unless admin has manually kept it open)
+  _auctionSettled = true;
+  _updateChatInputState();
+  // Update room header to show "Archived" instead of "Live"
+  const roomSub = document.querySelector(".room-sub");
+  if (roomSub) roomSub.innerHTML = `<span style="font-size:12px">📜</span><span>Archived</span>`;
+
   aucOnWon(winner, amount);
 }
 
@@ -3714,12 +3762,34 @@ function setMode(mode) {
   _updateChatInputState();
 }
 
+let _auctionSettled      = false;
+let _chatManuallyLocked  = false;  // set from slot.chatLocked config
+
 function _updateChatInputState() {
-  const input   = document.getElementById("room-chat-input");
-  const sendBtn = document.querySelector(".chat-send-btn");
-  const locked  = document.getElementById("room-locked");
-  const reacts  = document.querySelectorAll(".react-btn-sm");
+  const input        = document.getElementById("room-chat-input");
+  const sendBtn      = document.querySelector(".chat-send-btn");
+  const locked       = document.getElementById("room-locked");
+  const settledLock  = document.getElementById("chat-settled-lock");
+  const lockMsg      = document.getElementById("chat-settled-lock-msg");
+  const inputZone    = document.getElementById("chat-input-zone");
+  const reacts       = document.querySelectorAll(".react-btn-sm");
   const profilePanel = document.getElementById("profile-panel");
+
+  const chatLocked = _auctionSettled || _chatManuallyLocked;
+
+  if (chatLocked) {
+    if (inputZone)  inputZone.style.display = "none";
+    if (profilePanel) profilePanel.classList.remove("show");
+    if (settledLock) settledLock.classList.add("show");
+    if (lockMsg) lockMsg.textContent = _chatManuallyLocked && !_auctionSettled
+      ? "Chat is temporarily closed — check back soon"
+      : "This auction has concluded — the collector room is now archived";
+    return;
+  }
+
+  if (settledLock) settledLock.classList.remove("show");
+  if (inputZone)   inputZone.style.display = "";
+
   if (_roomEligible) {
     if (input)   { input.disabled = false; input.placeholder = "Write as a collector…"; }
     if (sendBtn) sendBtn.disabled = false;
