@@ -3190,9 +3190,9 @@ function arrangePieces() {
   const bRight = asmX + asmW + GAP;
   const bTop   = asmY - GAP;
   const bBot   = asmY + asmH + GAP;
-  const desktopCellGap = Math.max(10, Math.round(Math.min(sPW, sPH) * 0.18));
-  const arrangeCellW = isMobPortrait ? cellW : sPW + tabPx * 2 + desktopCellGap;
-  const arrangeCellH = isMobPortrait ? cellH : sPH + tabPx * 2 + desktopCellGap;
+  const desktopCellGap = Math.max(10, Math.round(Math.min(sPW, sPH) * 0.16));
+  const arrangeCellW = isMobPortrait ? cellW : sPW + desktopCellGap;
+  const arrangeCellH = isMobPortrait ? cellH : sPH + desktopCellGap;
 
   let regions;
   if (isMobPortrait) {
@@ -3282,24 +3282,32 @@ function arrangePieces() {
 
   let allSlots = buildSlots(arrangeCellW, arrangeCellH);
 
-  // If the puzzle has more pieces than normal-size slots, use a denser grid
-  // rather than letting pieces pile onto the same positions.
+  // If the puzzle has more pieces than normal-size slots, use progressively
+  // denser unique slots. Never wrap with modulo: that is what caused stacking.
   if (unplaced.length > allSlots.length) {
     const totalArea = regions.reduce((s, r) => s + (r.x1-r.x0) * (r.y1-r.y0), 0);
     const neededCell = Math.sqrt(totalArea / unplaced.length);
-    const denseW = isMobPortrait
-      ? Math.max(Math.round(neededCell), Math.round(sPW * 0.55))
-      : Math.max(Math.round(neededCell), arrangeCellW);
-    const denseH = isMobPortrait
-      ? Math.max(Math.round(neededCell * (sPH / sPW)), Math.round(sPH * 0.55))
-      : Math.max(Math.round(neededCell * (sPH / sPW)), arrangeCellH);
-    allSlots = buildSlots(denseW, denseH);
+    if (isMobPortrait) {
+      const denseW = Math.max(Math.round(neededCell), Math.round(sPW * 0.55));
+      const denseH = Math.max(Math.round(neededCell * (sPH / sPW)), Math.round(sPH * 0.55));
+      allSlots = buildSlots(denseW, denseH);
+    } else {
+      for (let factor = 0.82; factor >= 0.46 && unplaced.length > allSlots.length; factor -= 0.06) {
+        const denseW = Math.max(Math.round(neededCell), Math.round(sPW * factor));
+        const denseH = Math.max(Math.round(neededCell * (sPH / sPW)), Math.round(sPH * factor));
+        allSlots = buildSlots(denseW, denseH);
+      }
+      if (unplaced.length > allSlots.length) {
+        allSlots = buildSlots(Math.max(8, Math.round(sPW * 0.38)), Math.max(8, Math.round(sPH * 0.38)));
+      }
+    }
   }
   if (!allSlots.length) return;
 
-  const jMax = Math.round(Math.min(sPW, sPH) * 0.08);
+  const jMax = isMobPortrait ? Math.round(Math.min(sPW, sPH) * 0.08) : Math.min(2, Math.round(Math.min(sPW, sPH) * 0.04));
   unplaced.forEach((p, i) => {
-    const { slot, r } = allSlots[i % allSlots.length];
+    if (i >= allSlots.length) return;
+    const { slot, r } = allSlots[i];
     const jx = Math.round((rng() - 0.5) * 2 * jMax);
     const jy = Math.round((rng() - 0.5) * 2 * jMax);
     const minX = r.x0 + (r.boundPadX || 0);
