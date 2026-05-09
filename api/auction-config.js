@@ -100,6 +100,9 @@ function sanitisePiece(p) {
     artImage:     String(p.artImage     || "").slice(0, 500),
     gateName:     String(p.gateName     || "").slice(0, 200),
     gateLink:     String(p.gateLink     || "").slice(0, 500),
+    launchDate:   String(p.launchDate   || "").slice(0, 50),
+    status:       ["live","upcoming","off",""].includes(p.status) ? (p.status || "") : "",
+    chatLocked:   p.chatLocked === true,
   };
 }
 
