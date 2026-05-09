@@ -245,6 +245,20 @@ body {
   color:var(--text-muted); font-style:italic;
 }
 .chat-settled-lock.show { display:flex; }
+.piece-tab-sold-badge {
+  font-family:'Cinzel',serif; font-size:0.42rem; letter-spacing:0.12em;
+  text-transform:uppercase; background:rgba(107,124,92,0.18);
+  border:1px solid rgba(107,124,92,0.45); border-radius:2px;
+  padding:1px 5px; color:var(--moss); flex-shrink:0; line-height:1.4;
+}
+.chat-settled-lock {
+  display:none; align-items:center; gap:8px;
+  padding:10px 13px; border-top:1px solid var(--divider);
+  background:rgba(107,124,92,0.06);
+  font-family:'Crimson Pro',serif; font-size:0.82rem;
+  color:var(--text-muted); font-style:italic;
+}
+.chat-settled-lock.show { display:flex; }
 
 /* ── Mode toggle ── */
 .mode-toggle-bar { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px 24px; padding:8px 28px; border-bottom:1px solid var(--divider); background:var(--bg-alt); }
@@ -1517,7 +1531,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
     <div id="collector-room">
       <div class="room-header">
         <div class="room-title">Collector room</div>
-        <div class="room-sub"><span class="live-dot"></span><span>Live</span></div>
+        <div class="room-sub" id="room-sub"><span class="live-dot"></span><span>Live</span></div>
       </div>
       <div class="chat-feed" id="chat-feed"></div>
       <!-- Collector profile (shown when eligible) -->
@@ -2191,7 +2205,7 @@ async function _switchAuction(idx) {
   _chatManuallyLocked = !!(slot.chatLocked);
   _updateChatInputState();
   const _roomSubReset = document.querySelector(".room-sub");
-  if (_roomSubReset) _roomSubReset.innerHTML = `<span class="live-dot"></span><span>Live</span>`;
+  if (_roomSubReset && !_chatManuallyLocked) _roomSubReset.innerHTML = `<span class="live-dot"></span><span>Live</span>`;
 
   // Reset all bid-panel DOM so no state from the previous piece bleeds through
   document.getElementById("countdown-section").style.display   = "none";
@@ -3073,9 +3087,20 @@ function _updateChatInputState() {
     if (inputZone)    inputZone.style.display = "none";
     if (profilePanel) profilePanel.classList.remove("show");
     if (settledLock)  settledLock.classList.add("show");
-    if (lockMsg) lockMsg.textContent = _chatManuallyLocked && !_auctionSettled
-      ? "Chat is temporarily closed"
-      : "This auction has concluded — the collector room is now archived";
+    if (lockMsg) {
+      const slot = _activeCfg();
+      if (_chatManuallyLocked && !_auctionSettled && slot?.chatLockMsg) {
+        lockMsg.textContent = slot.chatLockMsg;
+      } else if (_chatManuallyLocked && !_auctionSettled) {
+        lockMsg.textContent = "Chat is temporarily closed";
+      } else {
+        lockMsg.textContent = "This auction has concluded — the collector room is now archived";
+      }
+    }
+    const roomSub = document.querySelector(".room-sub");
+    if (roomSub && !roomSub.innerHTML.includes("Archived")) {
+      roomSub.innerHTML = `<span style="font-size:11px">📜</span><span>Archived</span>`;
+    }
     return;
   }
 
@@ -3104,6 +3129,9 @@ let _chatLockScheduled = false; // prevent duplicate schedules per piece load
 async function _scheduleChatLock(contractAddr) {
   if (_chatLockScheduled) return;
   _chatLockScheduled = true;
+
+  // If admin manually locked, chat is already locked — no timer needed
+  if (_chatManuallyLocked) return;
 
   const roomSub = document.querySelector(".room-sub");
 
