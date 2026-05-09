@@ -3178,102 +3178,108 @@ function arrangePieces() {
     p.groupId = newGid;
   });
 
-  // Step 2: border regions — sized from actual board position, not fixed fractions.
-  // A small gap separates pieces from the board edge.
+  // Step 2: border regions, sized from the actual board position.
   const GAP  = Math.round(Math.min(sPW, sPH) * 0.12 + 4);
-  const EDGE  = tabPx + 2;
-  // Board clearance lines
+  const EDGE = tabPx + 2;
   const bLeft  = asmX - GAP;
   const bRight = asmX + asmW + GAP;
   const bTop   = asmY - GAP;
   const bBot   = asmY + asmH + GAP;
-
   const isMobPortrait = CW < 600 && CH > CW;
 
   let regions;
   if (isMobPortrait) {
-    // ── MOBILE: unchanged ─────────────────────────────────────────────
-    const topR = { id:'T', x0:EDGE, y0:EDGE,  x1:CW-EDGE, y1:bTop    };
-    const botR = { id:'B', x0:EDGE, y0:bBot,  x1:CW-EDGE, y1:CH-EDGE };
+    // Mobile stays top/bottom only.
+    const topR = { id:'T', x0:EDGE, y0:EDGE, x1:CW-EDGE, y1:bTop };
+    const botR = { id:'B', x0:EDGE, y0:bBot, x1:CW-EDGE, y1:CH-EDGE };
     regions = [topR, botR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
   } else {
-    // ── DESKTOP: four non-overlapping regions derived from actual board position ──
-    // Top/bottom span the full canvas width.
-    // Left/right fill only the vertical band beside the board (no corner overlap).
-    const topR   = { id:'T', x0:EDGE,   y0:EDGE,  x1:CW-EDGE,  y1:bTop   };
-    const botR   = { id:'B', x0:EDGE,   y0:bBot,  x1:CW-EDGE,  y1:CH-EDGE };
-    const leftR  = { id:'L', x0:EDGE,   y0:bTop,  x1:bLeft,    y1:bBot   };
-    const rightR = { id:'R', x0:bRight, y0:bTop,  x1:CW-EDGE,  y1:bBot   };
+    // Desktop uses four non-overlapping regions around the board.
+    const topR   = { id:'T', x0:EDGE,   y0:EDGE, x1:CW-EDGE, y1:bTop };
+    const botR   = { id:'B', x0:EDGE,   y0:bBot, x1:CW-EDGE, y1:CH-EDGE };
+    const leftR  = { id:'L', x0:EDGE,   y0:bTop, x1:bLeft,   y1:bBot };
+    const rightR = { id:'R', x0:bRight, y0:bTop, x1:CW-EDGE, y1:bBot };
     regions = [topR, botR, leftR, rightR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
   }
   if (!regions.length) return;
 
-  // Step 3: generate slot grids for each region, centred within the region.
-  regions.forEach(r => {
-    r.cols = Math.max(1, Math.floor((r.x1 - r.x0) / cellW));
-    r.rows = Math.max(1, Math.floor((r.y1 - r.y0) / cellH));
-    r.cap  = r.cols * r.rows;
-    const offX = Math.round(((r.x1 - r.x0) - r.cols * cellW + PAD) / 2);
-    const offY = Math.round(((r.y1 - r.y0) - r.rows * cellH + PAD) / 2);
-    r.slots = [];
-    for (let row = 0; row < r.rows; row++)
-      for (let col = 0; col < r.cols; col++)
-        r.slots.push({ x: r.x0 + offX + col * cellW, y: r.y0 + offY + row * cellH });
-  });
+  function buildSlots(cw, ch) {
+    regions.forEach(r => {
+      const width = r.x1 - r.x0;
+      const height = r.y1 - r.y0;
+      r.cols = Math.max(1, Math.floor(width / cw));
+      r.rows = Math.max(1, Math.floor(height / ch));
+      r.cap  = r.cols * r.rows;
 
-  // Step 4: collect and shuffle unplaced pieces
+      const slackX = width - r.cols * cw;
+      const slackY = height - r.rows * ch;
+      let offX = Math.round(slackX / 2 + PAD / 2);
+      let offY = Math.round(slackY / 2 + PAD / 2);
+
+      // Desktop grids start at the board edge and grow outward, which keeps
+      // top/bottom runs close to the work area instead of floating mid-strip.
+      if (!isMobPortrait) {
+        if (r.id === 'T') offY = Math.max(PAD / 2, height - r.rows * ch + PAD / 2);
+        if (r.id === 'B') offY = PAD / 2;
+        if (r.id === 'L') offX = Math.max(PAD / 2, width - r.cols * cw + PAD / 2);
+        if (r.id === 'R') offX = PAD / 2;
+      }
+
+      const rowOrder = Array.from({ length: r.rows }, (_, i) => i);
+      const colOrder = Array.from({ length: r.cols }, (_, i) => i);
+      if (r.id === 'T') rowOrder.reverse();
+      if (r.id === 'L') colOrder.reverse();
+
+      r.slots = [];
+      for (const row of rowOrder) {
+        for (const col of colOrder) {
+          r.slots.push({
+            x: Math.round(r.x0 + offX + col * cw),
+            y: Math.round(r.y0 + offY + row * ch)
+          });
+        }
+      }
+    });
+
+    const totalCap = regions.reduce((s, r) => s + r.cap, 0);
+    const slots = [];
+    const heads = regions.map(() => 0);
+
+    // Proportional round-robin by region capacity. This prevents the largest
+    // side from being drained first and keeps wide/tall images balanced.
+    for (let i = 0; i < totalCap; i++) {
+      let best = -1, bestProgress = Infinity;
+      regions.forEach((r, ri) => {
+        if (heads[ri] >= r.cap) return;
+        const progress = heads[ri] / r.cap;
+        if (progress < bestProgress) { bestProgress = progress; best = ri; }
+      });
+      if (best === -1) break;
+      slots.push({ slot: regions[best].slots[heads[best]], r: regions[best] });
+      heads[best]++;
+    }
+    return slots;
+  }
+
   const rng = mkRng(Date.now() % 999983);
   const unplaced = pieces
     .filter(p => !p.placed && !_inWorkArea(p, asmX, asmY, asmW, asmH))
     .sort(() => rng() - 0.5);
   if (!unplaced.length) return;
-  const n = unplaced.length;
 
-  // Step 5: interleave slots from all regions proportionally (weighted round-robin).
-  // Result: pieces are spread evenly across every available side regardless of
-  // how many slots each region has — works for any image/canvas shape.
-  const totalCap = regions.reduce((s, r) => s + r.cap, 0);
-  const allSlots = [];
-  const heads = regions.map(() => 0);
-  for (let i = 0; i < totalCap; i++) {
-    let best = -1, bestScore = -Infinity;
-    regions.forEach((r, ri) => {
-      if (heads[ri] >= r.cap) return;
-      // Score = how far behind its fair share this region is
-      const score = (r.cap / totalCap) - (heads[ri] / totalCap);
-      if (score > bestScore) { bestScore = score; best = ri; }
-    });
-    if (best === -1) break;
-    allSlots.push({ slot: regions[best].slots[heads[best]], r: regions[best] });
-    heads[best]++;
-  }
+  let allSlots = buildSlots(cellW, cellH);
 
-  // Step 6: if pieces outnumber slots, shrink cellW/cellH and rebuild slots so
-  // every piece still gets its own non-overlapping position.
-  if (n > allSlots.length) {
-    // Find the scale factor that fits n pieces across all regions combined
+  // If the puzzle has more pieces than normal-size slots, use a denser grid
+  // rather than letting pieces pile onto the same positions.
+  if (unplaced.length > allSlots.length) {
     const totalArea = regions.reduce((s, r) => s + (r.x1-r.x0) * (r.y1-r.y0), 0);
-    const neededCell = Math.sqrt(totalArea / n);
-    const tinyCell = Math.max(
-      Math.round(neededCell),
-      Math.round(Math.min(sPW, sPH) * 0.5)  // never smaller than half a piece
-    );
-    const tinyCW = tinyCell, tinyCH = Math.round(tinyCell * (sPH / sPW));
-    allSlots.length = 0;
-    regions.forEach(r => {
-      const tc = Math.max(1, Math.floor((r.x1 - r.x0) / tinyCW));
-      const tr = Math.max(1, Math.floor((r.y1 - r.y0) / tinyCH));
-      const ox = Math.round(((r.x1-r.x0) - tc*tinyCW) / 2);
-      const oy = Math.round(((r.y1-r.y0) - tr*tinyCH) / 2);
-      for (let row = 0; row < tr; row++)
-        for (let col = 0; col < tc; col++)
-          allSlots.push({ slot: { x: r.x0+ox+col*tinyCW, y: r.y0+oy+row*tinyCH }, r });
-    });
-    // Shuffle the dense slots so pieces mix across sides
-    allSlots.sort(() => rng() - 0.5);
+    const neededCell = Math.sqrt(totalArea / unplaced.length);
+    const denseW = Math.max(Math.round(neededCell), Math.round(sPW * 0.55));
+    const denseH = Math.max(Math.round(neededCell * (sPH / sPW)), Math.round(sPH * 0.55));
+    allSlots = buildSlots(denseW, denseH);
   }
+  if (!allSlots.length) return;
 
-  // Step 7: assign each piece to a slot, tiny jitter so it doesn't look robotic.
   const jMax = Math.round(Math.min(sPW, sPH) * 0.08);
   unplaced.forEach((p, i) => {
     const { slot, r } = allSlots[i % allSlots.length];
