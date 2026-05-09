@@ -3177,11 +3177,13 @@ function arrangePieces() {
     const botR = { id:'B', x0:tabPx, y0:clY1,   x1:CW-tabPx, y1:CH-tabPx  };
     regions = [topR, botR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
   } else {
-    const leftR  = { id:'L', x0:tabPx,  y0:tabPx,  x1:clX0,      y1:CH-tabPx };
-    const rightR = { id:'R', x0:clX1,   y0:tabPx,  x1:CW-tabPx,  y1:CH-tabPx };
-    const topR   = { id:'T', x0:clX0,   y0:tabPx,  x1:clX1,      y1:clY0     };
-    const botR   = { id:'B', x0:clX0,   y0:clY1,   x1:clX1,      y1:CH-tabPx };
-    regions = [leftR, rightR, topR, botR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
+    // Top and bottom span the full canvas width — same generous space as mobile strips.
+    // Left and right only cover the board's vertical band to avoid corner overlap with top/bottom.
+    const topR   = { id:'T', x0:tabPx,  y0:tabPx,  x1:CW-tabPx,  y1:clY0     };
+    const botR   = { id:'B', x0:tabPx,  y0:clY1,   x1:CW-tabPx,  y1:CH-tabPx };
+    const leftR  = { id:'L', x0:tabPx,  y0:clY0,   x1:clX0,      y1:clY1     };
+    const rightR = { id:'R', x0:clX1,   y0:clY0,   x1:CW-tabPx,  y1:clY1     };
+    regions = [topR, botR, leftR, rightR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
   }
   if (!regions.length) return;
 
