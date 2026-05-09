@@ -231,6 +231,23 @@ body {
 }
 .piece-tab-drag-hint.show { display: block; }
 
+/* Chat lock toggle */
+.chat-lock-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.chat-lock-toggle {
+  position: relative; width: 36px; height: 20px; flex-shrink: 0;
+  background: var(--bg); border: 1px solid var(--divider); border-radius: 10px;
+  cursor: pointer; transition: background .2s, border-color .2s;
+}
+.chat-lock-toggle.on { background: rgba(158,79,46,0.35); border-color: rgba(158,79,46,0.6); }
+.chat-lock-toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--text-muted); transition: transform .2s, background .2s;
+}
+.chat-lock-toggle.on::after { transform: translateX(16px); background: var(--clay); }
+.chat-lock-label { font-family: 'Crimson Pro', serif; font-size: 0.88rem; color: var(--text-muted); }
+.chat-lock-label.on { color: var(--clay); }
+
 /* Per-piece status picker (smaller version inside each piece form) */
 .piece-status-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .piece-status-btn {
@@ -813,6 +830,20 @@ function _buildPieceForm(idx) {
       <label>Launch date for this piece</label>
       <input type="datetime-local" id="${_pieceFieldId(idx,'launchDate')}" value="${d.launchDate||''}"/>
       <div class="field-hint">Optional — if set, the upcoming-view countdown for this piece uses this date. Leave blank to fall back to the global launch date below.</div>
+    </div>
+    <div class="field">
+      <label>Collector room chat</label>
+      <div class="chat-lock-row">
+        <button type="button"
+          class="chat-lock-toggle ${d.chatLocked ? 'on' : ''}"
+          id="${_pieceFieldId(idx,'chatLockToggle')}"
+          onclick="toggleChatLock(${idx})"></button>
+        <span class="chat-lock-label ${d.chatLocked ? 'on' : ''}" id="${_pieceFieldId(idx,'chatLockLabel')}">
+          ${d.chatLocked ? '🔒 Chat locked' : 'Chat open'}
+        </span>
+        <input type="hidden" id="${_pieceFieldId(idx,'chatLocked')}" value="${d.chatLocked ? 'true' : 'false'}"/>
+      </div>
+      <div class="field-hint">Lock to archive the room. Leave open to let the collector post their thanks after a sale.</div>
     </div>`;
 }
 
@@ -831,6 +862,17 @@ function _effectivePieceStatus(piece) {
 function _normalisePieceStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   return ["live","upcoming","off"].includes(value) ? value : "";
+}
+
+function toggleChatLock(idx) {
+  const next   = !(_pieces[idx].chatLocked || false);
+  _pieces[idx].chatLocked = next;
+  const toggle = document.getElementById(_pieceFieldId(idx, 'chatLockToggle'));
+  const label  = document.getElementById(_pieceFieldId(idx, 'chatLockLabel'));
+  const hidden = document.getElementById(_pieceFieldId(idx, 'chatLocked'));
+  if (toggle) toggle.classList.toggle('on', next);
+  if (label)  { label.classList.toggle('on', next); label.textContent = next ? '🔒 Chat locked' : 'Chat open'; }
+  if (hidden) hidden.value = next ? 'true' : 'false';
 }
 
 function _renderPieceTabs() {
@@ -1120,13 +1162,14 @@ document.addEventListener("keyup", (e) => {
 
 function _savePieceFormValues(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
-  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status"];
+  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status","chatLocked"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
     if (!el) return;
     if (f === "artAbout") {
-      // Rich-text contenteditable — store sanitized HTML
       _pieces[idx][f] = _rteSanitize(el.innerHTML || "").trim();
+    } else if (f === "chatLocked") {
+      _pieces[idx][f] = el.value === "true";
     } else {
       _pieces[idx][f] = (el.value || "").trim();
     }
