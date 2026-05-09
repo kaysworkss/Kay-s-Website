@@ -3179,13 +3179,20 @@ function arrangePieces() {
   });
 
   // Step 2: border regions, sized from the actual board position.
-  const GAP  = Math.round(Math.min(sPW, sPH) * 0.12 + 4);
+  const isMobPortrait = CW < 600 && CH > CW;
   const EDGE = tabPx + 2;
+  const mobileGap = Math.round(Math.min(sPW, sPH) * 0.12 + 4);
+  // Desktop needs extra visual clearance because jigsaw tabs protrude outside
+  // the piece rectangle; without this, arranged pieces appear to touch the board.
+  const desktopGap = tabPx + Math.max(18, Math.round(Math.min(sPW, sPH) * 0.42));
+  const GAP = isMobPortrait ? mobileGap : desktopGap;
   const bLeft  = asmX - GAP;
   const bRight = asmX + asmW + GAP;
   const bTop   = asmY - GAP;
   const bBot   = asmY + asmH + GAP;
-  const isMobPortrait = CW < 600 && CH > CW;
+  const desktopCellGap = Math.max(10, Math.round(Math.min(sPW, sPH) * 0.18));
+  const arrangeCellW = isMobPortrait ? cellW : sPW + tabPx * 2 + desktopCellGap;
+  const arrangeCellH = isMobPortrait ? cellH : sPH + tabPx * 2 + desktopCellGap;
 
   let regions;
   if (isMobPortrait) {
@@ -3205,8 +3212,14 @@ function arrangePieces() {
 
   function buildSlots(cw, ch) {
     regions.forEach(r => {
-      const width = r.x1 - r.x0;
-      const height = r.y1 - r.y0;
+      const boundPadX = isMobPortrait ? 0 : tabPx;
+      const boundPadY = isMobPortrait ? 0 : tabPx;
+      const xBase = r.x0 + boundPadX;
+      const yBase = r.y0 + boundPadY;
+      const width = Math.max(0, r.x1 - r.x0 - boundPadX * 2);
+      const height = Math.max(0, r.y1 - r.y0 - boundPadY * 2);
+      r.boundPadX = boundPadX;
+      r.boundPadY = boundPadY;
       r.cols = Math.max(1, Math.floor(width / cw));
       r.rows = Math.max(1, Math.floor(height / ch));
       r.cap  = r.cols * r.rows;
@@ -3234,8 +3247,8 @@ function arrangePieces() {
       for (const row of rowOrder) {
         for (const col of colOrder) {
           r.slots.push({
-            x: Math.round(r.x0 + offX + col * cw),
-            y: Math.round(r.y0 + offY + row * ch)
+            x: Math.round(xBase + offX + col * cw),
+            y: Math.round(yBase + offY + row * ch)
           });
         }
       }
@@ -3267,15 +3280,19 @@ function arrangePieces() {
     .sort(() => rng() - 0.5);
   if (!unplaced.length) return;
 
-  let allSlots = buildSlots(cellW, cellH);
+  let allSlots = buildSlots(arrangeCellW, arrangeCellH);
 
   // If the puzzle has more pieces than normal-size slots, use a denser grid
   // rather than letting pieces pile onto the same positions.
   if (unplaced.length > allSlots.length) {
     const totalArea = regions.reduce((s, r) => s + (r.x1-r.x0) * (r.y1-r.y0), 0);
     const neededCell = Math.sqrt(totalArea / unplaced.length);
-    const denseW = Math.max(Math.round(neededCell), Math.round(sPW * 0.55));
-    const denseH = Math.max(Math.round(neededCell * (sPH / sPW)), Math.round(sPH * 0.55));
+    const denseW = isMobPortrait
+      ? Math.max(Math.round(neededCell), Math.round(sPW * 0.55))
+      : Math.max(Math.round(neededCell), arrangeCellW);
+    const denseH = isMobPortrait
+      ? Math.max(Math.round(neededCell * (sPH / sPW)), Math.round(sPH * 0.55))
+      : Math.max(Math.round(neededCell * (sPH / sPW)), arrangeCellH);
     allSlots = buildSlots(denseW, denseH);
   }
   if (!allSlots.length) return;
@@ -3285,8 +3302,12 @@ function arrangePieces() {
     const { slot, r } = allSlots[i % allSlots.length];
     const jx = Math.round((rng() - 0.5) * 2 * jMax);
     const jy = Math.round((rng() - 0.5) * 2 * jMax);
-    p.x = Math.round(Math.max(r.x0, Math.min(r.x1 - p.sPW, slot.x + jx)));
-    p.y = Math.round(Math.max(r.y0, Math.min(r.y1 - p.sPH, slot.y + jy)));
+    const minX = r.x0 + (r.boundPadX || 0);
+    const maxX = r.x1 - p.sPW - (r.boundPadX || 0);
+    const minY = r.y0 + (r.boundPadY || 0);
+    const maxY = r.y1 - p.sPH - (r.boundPadY || 0);
+    p.x = Math.round(Math.max(minX, Math.min(maxX, slot.x + jx)));
+    p.y = Math.round(Math.max(minY, Math.min(maxY, slot.y + jy)));
   });
   queueAutoSave(500);
 }
