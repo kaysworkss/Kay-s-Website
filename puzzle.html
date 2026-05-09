@@ -3167,7 +3167,6 @@ function arrangePieces() {
   const tabPx = Math.round(TAB * scale);
   const isMobPortrait = CW < 600 && CH > CW;
 
-  // Disband groups outside the work area so Arrange can place each loose piece.
   pieces.forEach(p => {
     if (p.placed || _inWorkArea(p, asmX, asmY, asmW, asmH)) return;
     const newGid = nextGid++;
@@ -3183,7 +3182,6 @@ function arrangePieces() {
     .sort(() => rng() - 0.5);
   if (!unplaced.length) return;
 
-  // Mobile behaviour stays as a top/bottom shelf, because that layout works well.
   if (isMobPortrait) {
     const PAD = Math.max(6, Math.round(Math.min(sPW, sPH) * 0.15));
     const cellW = sPW + PAD, cellH = sPH + PAD;
@@ -3204,9 +3202,7 @@ function arrangePieces() {
       const rowOrder = Array.from({ length: rows }, (_, i) => i);
       if (r.id === 'T') rowOrder.reverse();
       for (const row of rowOrder) {
-        for (let col = 0; col < cols; col++) {
-          slots.push({ x: r.x0 + offX + col * cellW, y: r.y0 + offY + row * cellH, r });
-        }
+        for (let col = 0; col < cols; col++) slots.push({ x: r.x0 + offX + col * cellW, y: r.y0 + offY + row * cellH, r });
       }
     });
 
@@ -3222,78 +3218,104 @@ function arrangePieces() {
     return;
   }
 
-  // Desktop: explicit four-side shelves. Pieces are dealt across top, bottom,
-  // left, and right in rotation so one side cannot become empty or overloaded.
+  // Desktop: four shelves plus collision-aware placement. The previous versions
+  // created legal-looking slots but did not verify piece-to-piece clearance.
   const EDGE = tabPx + 2;
-  const boardGap = tabPx + Math.max(18, Math.round(Math.min(sPW, sPH) * 0.30));
-  const sideGap = Math.max(6, Math.round(Math.min(sPW, sPH) * 0.12));
-  const cellW = sPW + sideGap;
-  const cellH = sPH + sideGap;
-
-  const rawRegions = [
+  const boardGap = tabPx + Math.max(20, Math.round(Math.min(sPW, sPH) * 0.34));
+  const regions = [
     { id:'T', x0:EDGE, y0:EDGE, x1:CW-EDGE, y1:asmY-boardGap },
     { id:'B', x0:EDGE, y0:asmY+asmH+boardGap, x1:CW-EDGE, y1:CH-EDGE },
     { id:'L', x0:EDGE, y0:asmY-boardGap, x1:asmX-boardGap, y1:asmY+asmH+boardGap },
     { id:'R', x0:asmX+asmW+boardGap, y0:asmY-boardGap, x1:CW-EDGE, y1:asmY+asmH+boardGap }
-  ];
-
-  const regions = rawRegions.filter(r => r.x1-r.x0 >= Math.max(sPW, cellW * 0.55) && r.y1-r.y0 >= Math.max(sPH, cellH * 0.55));
+  ].filter(r => r.x1-r.x0 > sPW * 0.65 && r.y1-r.y0 > sPH * 0.65);
   if (!regions.length) return;
 
-  function buildRegionSlots(r) {
-    const width = r.x1 - r.x0;
-    const height = r.y1 - r.y0;
-    const cols = Math.max(1, Math.floor((width + sideGap) / cellW));
-    const rows = Math.max(1, Math.floor((height + sideGap) / cellH));
-    const usedW = cols * cellW - sideGap;
-    const usedH = rows * cellH - sideGap;
-    const offX = Math.max(0, Math.round((width - usedW) / 2));
-    const offY = Math.max(0, Math.round((height - usedH) / 2));
+  const occPad = Math.max(3, Math.round(tabPx * 0.55));
+  const baseGap = Math.max(5, Math.round(Math.min(sPW, sPH) * 0.08));
 
-    const rowOrder = Array.from({ length: rows }, (_, i) => i);
-    const colOrder = Array.from({ length: cols }, (_, i) => i);
-    if (r.id === 'T') rowOrder.reverse();
-    if (r.id === 'L') colOrder.reverse();
+  function rectFor(x, y, p) {
+    return { x0:x-occPad, y0:y-occPad, x1:x+p.sPW+occPad, y1:y+p.sPH+occPad };
+  }
+  function overlaps(a, b) {
+    return a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+  }
+  function makeSlots(gapScale) {
+    const cellW = Math.max(8, sPW + baseGap * gapScale);
+    const cellH = Math.max(8, sPH + baseGap * gapScale);
+    const bySide = new Map();
+    regions.forEach(r => {
+      const width = r.x1-r.x0;
+      const height = r.y1-r.y0;
+      const cols = Math.max(1, Math.floor((width + baseGap) / cellW));
+      const rows = Math.max(1, Math.floor((height + baseGap) / cellH));
+      const usedW = cols * cellW - baseGap;
+      const usedH = rows * cellH - baseGap;
+      const offX = Math.max(0, Math.round((width - usedW) / 2));
+      const offY = Math.max(0, Math.round((height - usedH) / 2));
+      const rowOrder = Array.from({ length: rows }, (_, i) => i);
+      const colOrder = Array.from({ length: cols }, (_, i) => i);
+      if (r.id === 'T') rowOrder.reverse();
+      if (r.id === 'L') colOrder.reverse();
+      const slots = [];
+      for (const row of rowOrder) {
+        for (const col of colOrder) {
+          const x = Math.round(r.x0 + offX + col * cellW);
+          const y = Math.round(r.y0 + offY + row * cellH);
+          if (x < r.x0 || y < r.y0 || x + sPW > r.x1 || y + sPH > r.y1) continue;
+          slots.push({ x, y, r });
+        }
+      }
+      bySide.set(r.id, slots);
+    });
 
-    const slots = [];
-    for (const row of rowOrder) {
-      for (const col of colOrder) {
-        const x = Math.round(r.x0 + offX + col * cellW);
-        const y = Math.round(r.y0 + offY + row * cellH);
-        if (x < r.x0 || y < r.y0 || x + sPW > r.x1 || y + sPH > r.y1) continue;
-        slots.push({ x, y, r });
+    const order = ['T','B','L','R'].filter(id => (bySide.get(id) || []).length);
+    const heads = Object.fromEntries(order.map(id => [id, 0]));
+    const dealt = [];
+    while (dealt.length < unplaced.length) {
+      let added = false;
+      for (const id of order) {
+        const slots = bySide.get(id);
+        if (heads[id] >= slots.length) continue;
+        dealt.push(slots[heads[id]++]);
+        added = true;
+        if (dealt.length >= unplaced.length) break;
+      }
+      if (!added) break;
+    }
+    return dealt;
+  }
+
+  let slots = makeSlots(1.6);
+  for (let g = 1.25; slots.length < unplaced.length && g >= 0.35; g -= 0.25) slots = makeSlots(g);
+  if (!slots.length) return;
+
+  const placedRects = [];
+  const usedSlots = new Set();
+  unplaced.forEach(p => {
+    let chosen = -1;
+    for (let i = 0; i < slots.length; i++) {
+      if (usedSlots.has(i)) continue;
+      const s = slots[i];
+      const rr = rectFor(s.x, s.y, p);
+      if (placedRects.some(pr => overlaps(rr, pr))) continue;
+      chosen = i;
+      break;
+    }
+
+    // Extremely tight windows may not have enough fully clear slots. In that
+    // case choose the first unused slot rather than stacking on an occupied one.
+    if (chosen === -1) {
+      for (let i = 0; i < slots.length; i++) {
+        if (!usedSlots.has(i)) { chosen = i; break; }
       }
     }
-    return slots;
-  }
+    if (chosen === -1) return;
 
-  const bySide = new Map(regions.map(r => [r.id, buildRegionSlots(r)]));
-  const order = ['T', 'B', 'L', 'R'].filter(id => (bySide.get(id) || []).length);
-  if (!order.length) return;
-
-  const dealt = [];
-  const heads = Object.fromEntries(order.map(id => [id, 0]));
-  while (dealt.length < unplaced.length) {
-    let added = false;
-    for (const id of order) {
-      const slots = bySide.get(id);
-      if (heads[id] >= slots.length) continue;
-      dealt.push(slots[heads[id]++]);
-      added = true;
-      if (dealt.length >= unplaced.length) break;
-    }
-    if (!added) break;
-  }
-  if (!dealt.length) return;
-
-  const jMax = Math.min(2, Math.round(Math.min(sPW, sPH) * 0.03));
-  unplaced.forEach((p, i) => {
-    if (i >= dealt.length) return;
-    const slot = dealt[i];
-    const jx = Math.round((rng() - 0.5) * 2 * jMax);
-    const jy = Math.round((rng() - 0.5) * 2 * jMax);
-    p.x = Math.round(Math.max(slot.r.x0, Math.min(slot.r.x1 - p.sPW, slot.x + jx)));
-    p.y = Math.round(Math.max(slot.r.y0, Math.min(slot.r.y1 - p.sPH, slot.y + jy)));
+    usedSlots.add(chosen);
+    const s = slots[chosen];
+    p.x = Math.round(Math.max(s.r.x0, Math.min(s.r.x1 - p.sPW, s.x)));
+    p.y = Math.round(Math.max(s.r.y0, Math.min(s.r.y1 - p.sPH, s.y)));
+    placedRects.push(rectFor(p.x, p.y, p));
   });
   queueAutoSave(500);
 }
@@ -3708,6 +3730,7 @@ function evWorld(e) { return { x: (e.clientX - panX) / zoom, y: (e.clientY - pan
 let spaceDown = false;
 document.addEventListener('keydown', e => {
   if (e.code === 'Space') { spaceDown = true; if (!drag) BC.style.cursor = 'grab'; }
+  if (e.key === 'Escape') cancelCanvasInteraction();
   if (e.code === 'KeyP' && document.getElementById('game-screen').style.display === 'flex') {
     isPaused ? resumeGame() : pauseGame();
   }
@@ -3718,6 +3741,16 @@ document.addEventListener('keyup', e => { if (e.code === 'Space') { spaceDown = 
 BC.addEventListener('contextmenu', e => { e.preventDefault(); });
 
 let panDrag = null;
+function cancelCanvasInteraction() {
+  drag = null;
+  panDrag = null;
+  selState = null;
+  selectedIds.clear();
+  const sr = document.getElementById('sel-rect');
+  if (sr) sr.style.display = 'none';
+  if (BC) BC.style.cursor = spaceDown ? 'grab' : 'default';
+  if (document.getElementById('game-screen')?.style.display === 'flex') renderAll();
+}
 BC.addEventListener('mousedown', e => {
   if (isPaused) return;
   e.preventDefault();
@@ -3737,9 +3770,15 @@ BC.addEventListener('mousedown', e => {
     const ids = new Set(gp.map(p => p.id));
     pieces = [...pieces.filter(p => !ids.has(p.id)), ...gp];
     drag = { pieces: gp, offsets: gp.map(p => ({ dx: wx - p.x, dy: wy - p.y })), wx, wy };
-  } else {
+  } else if (e.shiftKey) {
+    // Selection is opt-in. This prevents accidental empty-space drags from
+    // creating a stuck selection rectangle and blocking normal puzzle movement.
+    selectedIds.clear();
     selState = { x0: e.clientX, y0: e.clientY };
     showSel(e.clientX, e.clientY, e.clientX, e.clientY);
+  } else {
+    panDrag = { startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY };
+    BC.style.cursor = 'grabbing';
   }
   renderAll();
 });
@@ -3774,6 +3813,7 @@ window.addEventListener('mouseup', e => {
     selState = null; document.getElementById('sel-rect').style.display = 'none'; renderAll();
   }
 });
+window.addEventListener('blur', cancelCanvasInteraction);
 
 // ── Shift+click or long-press (touch): return placed piece to border ──
 let _lpTimer = null, _lpTarget = null;
