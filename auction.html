@@ -245,20 +245,6 @@ body {
   color:var(--text-muted); font-style:italic;
 }
 .chat-settled-lock.show { display:flex; }
-.piece-tab-sold-badge {
-  font-family:'Cinzel',serif; font-size:0.42rem; letter-spacing:0.12em;
-  text-transform:uppercase; background:rgba(107,124,92,0.18);
-  border:1px solid rgba(107,124,92,0.45); border-radius:2px;
-  padding:1px 5px; color:var(--moss); flex-shrink:0; line-height:1.4;
-}
-.chat-settled-lock {
-  display:none; align-items:center; gap:8px;
-  padding:10px 13px; border-top:1px solid var(--divider);
-  background:rgba(107,124,92,0.06);
-  font-family:'Crimson Pro',serif; font-size:0.82rem;
-  color:var(--text-muted); font-style:italic;
-}
-.chat-settled-lock.show { display:flex; }
 
 /* ── Mode toggle ── */
 .mode-toggle-bar { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px 24px; padding:8px 28px; border-bottom:1px solid var(--divider); background:var(--bg-alt); }
@@ -1335,7 +1321,10 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
       <button class="mode-tab active" id="tab-collector" onclick="setMode('collector')">Collector view</button>
       <button class="mode-tab" id="tab-auctioneer" onclick="setMode('auctioneer')" style="display:none">Auctioneer mode</button>
     </div>
-    <div class="online-pill"><span class="live-dot"></span><span id="online-count">Live</span><span id="eligible-count" style="display:none;margin-left:4px;padding:1px 7px;background:rgba(107,124,92,.15);border:1px solid rgba(107,124,92,.3);border-radius:10px;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:.12em;text-transform:uppercase;color:var(--moss)"></span></div>
+    <div style="display:flex;align-items:center;gap:14px;justify-self:end">
+      <a href="/hall-of-fame" class="series-back-link" style="font-size:0.48rem;letter-spacing:0.16em">Hall of Fame <span>↗</span></a>
+      <div class="online-pill"><span class="live-dot"></span><span id="online-count">Live</span><span id="eligible-count" style="display:none;margin-left:4px;padding:1px 7px;background:rgba(107,124,92,.15);border:1px solid rgba(107,124,92,.3);border-radius:10px;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:.12em;text-transform:uppercase;color:var(--moss)"></span></div>
+    </div>
   </div>
 
   <!-- Coming-next banner — visible when upcoming pieces exist alongside live ones -->
@@ -3084,20 +3073,9 @@ function _updateChatInputState() {
     if (inputZone)    inputZone.style.display = "none";
     if (profilePanel) profilePanel.classList.remove("show");
     if (settledLock)  settledLock.classList.add("show");
-    if (lockMsg) {
-      const slot = _activeCfg();
-      if (_chatManuallyLocked && !_auctionSettled && slot?.chatLockMsg) {
-        lockMsg.textContent = slot.chatLockMsg;
-      } else if (_chatManuallyLocked && !_auctionSettled) {
-        lockMsg.textContent = "Chat is temporarily closed";
-      } else {
-        lockMsg.textContent = "This auction has concluded — the collector room is now archived";
-      }
-    }
-    const roomSub = document.querySelector(".room-sub");
-    if (roomSub && !roomSub.innerHTML.includes("Archived")) {
-      roomSub.innerHTML = `<span style="font-size:11px">📜</span><span>Archived</span>`;
-    }
+    if (lockMsg) lockMsg.textContent = _chatManuallyLocked && !_auctionSettled
+      ? "Chat is temporarily closed"
+      : "This auction has concluded — the collector room is now archived";
     return;
   }
 
@@ -3126,9 +3104,6 @@ let _chatLockScheduled = false; // prevent duplicate schedules per piece load
 async function _scheduleChatLock(contractAddr) {
   if (_chatLockScheduled) return;
   _chatLockScheduled = true;
-
-  // If admin manually locked, chat is already locked — no timer needed
-  if (_chatManuallyLocked) return;
 
   const roomSub = document.querySelector(".room-sub");
 
