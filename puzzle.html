@@ -3222,70 +3222,78 @@ function arrangePieces() {
     return;
   }
 
-  // Desktop: build a ring of legal grid slots around the board. A slot is legal
-  // only if the piece plus its tab protrusion does not intersect the board zone.
-  const visualPad = tabPx + Math.max(6, Math.round(Math.min(sPW, sPH) * 0.10));
-  const boardGap = tabPx + Math.max(22, Math.round(Math.min(sPW, sPH) * 0.38));
-  const clear = {
-    x0: asmX - boardGap,
-    y0: asmY - boardGap,
-    x1: asmX + asmW + boardGap,
-    y1: asmY + asmH + boardGap
-  };
-  const cx = asmX + asmW / 2;
-  const cy = asmY + asmH / 2;
+  // Desktop: explicit four-side shelves. Pieces are dealt across top, bottom,
+  // left, and right in rotation so one side cannot become empty or overloaded.
+  const EDGE = tabPx + 2;
+  const boardGap = tabPx + Math.max(18, Math.round(Math.min(sPW, sPH) * 0.30));
+  const sideGap = Math.max(6, Math.round(Math.min(sPW, sPH) * 0.12));
+  const cellW = sPW + sideGap;
+  const cellH = sPH + sideGap;
 
-  function makeRingSlots(stepFactor) {
-    const gap = Math.max(8, Math.round(Math.min(sPW, sPH) * stepFactor));
-    const stepX = Math.max(8, sPW + gap);
-    const stepY = Math.max(8, sPH + gap);
+  const rawRegions = [
+    { id:'T', x0:EDGE, y0:EDGE, x1:CW-EDGE, y1:asmY-boardGap },
+    { id:'B', x0:EDGE, y0:asmY+asmH+boardGap, x1:CW-EDGE, y1:CH-EDGE },
+    { id:'L', x0:EDGE, y0:asmY-boardGap, x1:asmX-boardGap, y1:asmY+asmH+boardGap },
+    { id:'R', x0:asmX+asmW+boardGap, y0:asmY-boardGap, x1:CW-EDGE, y1:asmY+asmH+boardGap }
+  ];
+
+  const regions = rawRegions.filter(r => r.x1-r.x0 >= Math.max(sPW, cellW * 0.55) && r.y1-r.y0 >= Math.max(sPH, cellH * 0.55));
+  if (!regions.length) return;
+
+  function buildRegionSlots(r) {
+    const width = r.x1 - r.x0;
+    const height = r.y1 - r.y0;
+    const cols = Math.max(1, Math.floor((width + sideGap) / cellW));
+    const rows = Math.max(1, Math.floor((height + sideGap) / cellH));
+    const usedW = cols * cellW - sideGap;
+    const usedH = rows * cellH - sideGap;
+    const offX = Math.max(0, Math.round((width - usedW) / 2));
+    const offY = Math.max(0, Math.round((height - usedH) / 2));
+
+    const rowOrder = Array.from({ length: rows }, (_, i) => i);
+    const colOrder = Array.from({ length: cols }, (_, i) => i);
+    if (r.id === 'T') rowOrder.reverse();
+    if (r.id === 'L') colOrder.reverse();
+
     const slots = [];
-    const startX = visualPad;
-    const startY = visualPad;
-    const endX = CW - sPW - visualPad;
-    const endY = CH - sPH - visualPad;
-
-    for (let y = startY; y <= endY; y += stepY) {
-      for (let x = startX; x <= endX; x += stepX) {
-        const vx0 = x - visualPad;
-        const vy0 = y - visualPad;
-        const vx1 = x + sPW + visualPad;
-        const vy1 = y + sPH + visualPad;
-        const outsideBoard = vx1 <= clear.x0 || vx0 >= clear.x1 || vy1 <= clear.y0 || vy0 >= clear.y1;
-        if (!outsideBoard) continue;
-        const sx = x + sPW / 2;
-        const sy = y + sPH / 2;
-        slots.push({
-          x: Math.round(x),
-          y: Math.round(y),
-          angle: Math.atan2(sy - cy, sx - cx),
-          dist: Math.hypot(sx - cx, sy - cy)
-        });
+    for (const row of rowOrder) {
+      for (const col of colOrder) {
+        const x = Math.round(r.x0 + offX + col * cellW);
+        const y = Math.round(r.y0 + offY + row * cellH);
+        if (x < r.x0 || y < r.y0 || x + sPW > r.x1 || y + sPH > r.y1) continue;
+        slots.push({ x, y, r });
       }
     }
-
-    slots.sort((a, b) => (a.angle - b.angle) || (a.dist - b.dist));
     return slots;
   }
 
-  let slots = makeRingSlots(0.16);
-  for (let f = 0.12; f >= -0.18 && slots.length < unplaced.length; f -= 0.06) {
-    slots = makeRingSlots(f);
-  }
-  if (!slots.length) return;
+  const bySide = new Map(regions.map(r => [r.id, buildRegionSlots(r)]));
+  const order = ['T', 'B', 'L', 'R'].filter(id => (bySide.get(id) || []).length);
+  if (!order.length) return;
 
-  const used = new Set();
-  const jMax = slots.length >= unplaced.length ? Math.min(2, Math.round(Math.min(sPW, sPH) * 0.03)) : 0;
+  const dealt = [];
+  const heads = Object.fromEntries(order.map(id => [id, 0]));
+  while (dealt.length < unplaced.length) {
+    let added = false;
+    for (const id of order) {
+      const slots = bySide.get(id);
+      if (heads[id] >= slots.length) continue;
+      dealt.push(slots[heads[id]++]);
+      added = true;
+      if (dealt.length >= unplaced.length) break;
+    }
+    if (!added) break;
+  }
+  if (!dealt.length) return;
+
+  const jMax = Math.min(2, Math.round(Math.min(sPW, sPH) * 0.03));
   unplaced.forEach((p, i) => {
-    if (used.size >= slots.length) return;
-    let idx = Math.floor(i * slots.length / unplaced.length);
-    while (used.has(idx)) idx = (idx + 1) % slots.length;
-    used.add(idx);
-    const slot = slots[idx];
+    if (i >= dealt.length) return;
+    const slot = dealt[i];
     const jx = Math.round((rng() - 0.5) * 2 * jMax);
     const jy = Math.round((rng() - 0.5) * 2 * jMax);
-    p.x = Math.round(Math.max(visualPad, Math.min(CW - p.sPW - visualPad, slot.x + jx)));
-    p.y = Math.round(Math.max(visualPad, Math.min(CH - p.sPH - visualPad, slot.y + jy)));
+    p.x = Math.round(Math.max(slot.r.x0, Math.min(slot.r.x1 - p.sPW, slot.x + jx)));
+    p.y = Math.round(Math.max(slot.r.y0, Math.min(slot.r.y1 - p.sPH, slot.y + jy)));
   });
   queueAutoSave(500);
 }
