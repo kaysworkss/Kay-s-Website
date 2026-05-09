@@ -372,6 +372,112 @@ async function handleNotifyOutbid(req, res) {
   }
 }
 
+// ── POST /api/game?action=notify-bid ─────────────────────────────────────────
+// Sends a bid alert email to the site owner whenever a new bid is placed.
+async function handleNotifyBid(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { bidder, amount, art_title, auction_url, auction_id } = req.body || {};
+
+  if (!bidder || !amount) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const RESEND_KEY = process.env.RESEND_API_KEY;
+  if (!RESEND_KEY) {
+    return res.status(500).json({ error: 'Server misconfigured — missing RESEND_API_KEY' });
+  }
+
+  const shortBidder = bidder.slice(0, 6) + '…' + bidder.slice(-4);
+  const title       = art_title  || 'Àpótí Ọlọ́wẹ̀';
+  const url         = auction_url || 'https://kaysworks.com/auction';
+  const auctionRef  = auction_id  ? ` (${auction_id.slice(0, 8)}…)` : '';
+
+  const emailBody = {
+    from:    'Àpótí Ọlọ́wẹ̀ Auction <auction@mail.kaysworks.com>',
+    to:      ['oyeniyikayode4@gmail.com'],
+    subject: `New bid — ${amount} on ${title}`,
+    html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>New Bid Alert</title>
+</head>
+<body style="margin:0;padding:0;background:#1e1510;font-family:'Georgia',serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#1e1510;padding:40px 0">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#2a1c14;border:1px solid rgba(196,132,90,0.25);border-radius:6px;overflow:hidden;max-width:560px;width:100%">
+        <tr>
+          <td style="padding:28px 32px 20px;border-bottom:1px solid rgba(196,132,90,0.18)">
+            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works · Live Auction</p>
+            <h1 style="margin:0;font-family:'Georgia',serif;font-size:26px;font-weight:400;color:#e8d5b0;line-height:1.2">${title}</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 32px">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(107,124,92,0.12);border:1px solid rgba(107,124,92,0.3);border-radius:4px">
+              <tr><td style="padding:18px 20px">
+                <p style="margin:0 0 6px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#6b7c5c;font-family:'Georgia',serif">New bid placed</p>
+                <p style="margin:0;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">Someone just bid <strong style="color:#c4845a">${amount}</strong></p>
+                <p style="margin:8px 0 0;font-size:13px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">${shortBidder} placed a bid on ${title}${auctionRef}.</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 32px 20px">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
+                  <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Bidder</span>
+                </td>
+                <td align="right" style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
+                  <span style="font-size:13px;color:#c4845a;font-style:italic;font-family:'Georgia',serif">${shortBidder}</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
+                  <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Bid amount</span>
+                </td>
+                <td align="right" style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
+                  <span style="font-size:16px;color:#e8d5b0;font-weight:600;font-family:'Georgia',serif">${amount}</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:4px 32px 32px;text-align:center">
+            <a href="${url}" style="display:inline-block;background:#9e4f2e;color:#f5ede0;text-decoration:none;font-family:'Georgia',serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 32px;border-radius:4px">View auction</a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 32px;border-top:1px solid rgba(196,132,90,0.18);text-align:center">
+            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">© Kay's Works · <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+  };
+
+  try {
+    const resendRes = await fetch('https://api.resend.com/emails', {
+      method:  'POST',
+      headers: { Authorization: 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
+      body:    JSON.stringify(emailBody),
+    });
+    const resendData = await resendRes.json();
+    if (!resendRes.ok) throw new Error(resendData.message || 'Resend error');
+    return res.status(200).json({ sent: true, id: resendData.id });
+  } catch (e) {
+    return res.status(500).json({ error: 'Email send failed: ' + e.message });
+  }
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 module.exports = async (req, res) => {
@@ -397,6 +503,7 @@ module.exports = async (req, res) => {
     }
     else if (urlPath.includes('/hall-of-fame'))   action = 'hall-of-fame';
     else if (urlPath.includes('/notify-outbid'))  action = 'notify-outbid';
+    else if (urlPath.includes('/notify-bid'))      action = 'notify-bid';
   }
 
   const supabase = getSupabase();
@@ -409,6 +516,7 @@ module.exports = async (req, res) => {
     case 'leaderboard':   return handleLeaderboard(req, res, supabase);
     case 'hall-of-fame':  return handleHallOfFame(req, res, supabase);
     case 'notify-outbid': return handleNotifyOutbid(req, res);
+    case 'notify-bid':    return handleNotifyBid(req, res);
     default:
       return res.status(404).json({ error: `Unknown action: ${action}` });
   }
