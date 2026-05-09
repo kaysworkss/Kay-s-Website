@@ -210,22 +210,26 @@ body {
   border-color: rgba(196,132,90,0.35); color: var(--text);
 }
 
-/* Chat lock toggle */
-.chat-lock-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
-.chat-lock-toggle {
-  position: relative; width: 36px; height: 20px; flex-shrink: 0;
-  background: var(--bg); border: 1px solid var(--divider); border-radius: 10px;
-  cursor: pointer; transition: background .2s, border-color .2s;
+/* Piece tab drag-to-reorder */
+.piece-tab-btn {
+  cursor: grab;
+  user-select: none;
 }
-.chat-lock-toggle.on { background: rgba(158,79,46,0.35); border-color: rgba(158,79,46,0.6); }
-.chat-lock-toggle::after {
-  content: ''; position: absolute; top: 2px; left: 2px;
-  width: 14px; height: 14px; border-radius: 50%;
-  background: var(--text-muted); transition: transform .2s, background .2s;
+.piece-tab-btn:active { cursor: grabbing; }
+.piece-tab-btn.drag-over {
+  border-left: 2px solid var(--clay) !important;
+  background: rgba(196,132,90,0.08);
 }
-.chat-lock-toggle.on::after { transform: translateX(16px); background: var(--clay); }
-.chat-lock-label { font-family: 'Crimson Pro', serif; font-size: 0.88rem; color: var(--text-muted); }
-.chat-lock-label.on { color: var(--clay); }
+.piece-tab-btn.dragging {
+  opacity: 0.4;
+}
+.piece-tab-drag-hint {
+  font-family: 'Crimson Pro', serif; font-size: 0.75rem;
+  color: var(--text-muted); font-style: italic;
+  padding: 4px 14px 8px;
+  display: none;
+}
+.piece-tab-drag-hint.show { display: block; }
 
 /* Per-piece status picker (smaller version inside each piece form) */
 .piece-status-row { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -472,6 +476,7 @@ body {
       <div class="card-body" style="padding:0">
         <!-- Piece tabs -->
         <div id="piece-tabs" style="display:flex;border-bottom:1px solid var(--divider);overflow-x:auto;"></div>
+        <div class="piece-tab-drag-hint" id="piece-drag-hint">Drag tabs to reorder pieces</div>
         <!-- Piece forms — one per piece -->
         <div id="piece-forms" style="padding:18px"></div>
       </div>
@@ -808,21 +813,6 @@ function _buildPieceForm(idx) {
       <label>Launch date for this piece</label>
       <input type="datetime-local" id="${_pieceFieldId(idx,'launchDate')}" value="${d.launchDate||''}"/>
       <div class="field-hint">Optional — if set, the upcoming-view countdown for this piece uses this date. Leave blank to fall back to the global launch date below.</div>
-    </div>
-    <div class="field">
-      <label>Collector room chat</label>
-      <div class="chat-lock-row">
-        <button type="button"
-          class="chat-lock-toggle ${d.chatLocked ? 'on' : ''}"
-          id="${_pieceFieldId(idx,'chatLockToggle')}"
-          onclick="toggleChatLock(${idx})"
-          title="Toggle chat lock for this piece"></button>
-        <span class="chat-lock-label ${d.chatLocked ? 'on' : ''}" id="${_pieceFieldId(idx,'chatLockLabel')}">
-          ${d.chatLocked ? '🔒 Chat locked — collectors cannot send messages' : 'Chat open — collectors can send messages'}
-        </span>
-        <input type="hidden" id="${_pieceFieldId(idx,'chatLocked')}" value="${d.chatLocked ? 'true' : 'false'}"/>
-      </div>
-      <div class="field-hint">Lock to archive the room after a sale, or unlock to let the collector share their thoughts first.</div>
     </div>`;
 }
 
@@ -846,17 +836,24 @@ function _normalisePieceStatus(status) {
 function _renderPieceTabs() {
   const tabs  = document.getElementById("piece-tabs");
   const forms = document.getElementById("piece-forms");
+  const hint  = document.getElementById("piece-drag-hint");
   if (!tabs || !forms) return;
 
   tabs.innerHTML = _pieces.map((p, i) => {
     const eff = _effectivePieceStatus(p);
     const dotTitle = p.status ? `Status: ${eff}` : `Status: ${eff} (inherited)`;
     return `
-    <button class="piece-tab-btn ${i===_activePieceIdx?'active':''}" onclick="selectPiece(${i})">
+    <button class="piece-tab-btn ${i===_activePieceIdx?'active':''}" data-idx="${i}" draggable="true" onclick="selectPiece(${i})">
       <span class="piece-tab-status-dot ${eff}" title="${dotTitle}"></span>${p.artTitle || 'Piece '+(i+1)}
       ${_pieces.length > 1 ? `<button class="piece-remove-btn" onclick="event.stopPropagation();removePiece(${i})">✕</button>` : ''}
     </button>`;
   }).join("");
+
+  // Show drag hint only when there are multiple pieces
+  if (hint) hint.classList.toggle("show", _pieces.length > 1);
+
+  // Wire up drag-to-reorder
+  if (_pieces.length > 1) _initTabDrag(tabs);
 
   forms.innerHTML = _buildPieceForm(_activePieceIdx);
 
@@ -875,6 +872,67 @@ function _renderPieceTabs() {
   _showPreviewCard();
   // Populate the effective-status hint for the newly rendered form
   if (typeof _updateEffectiveHint === "function") _updateEffectiveHint(_activePieceIdx);
+}
+
+// ─── Drag-to-reorder piece tabs ───────────────────────────────────────────────
+
+let _dragSrcIdx = null;
+
+function _initTabDrag(container) {
+  const btns = container.querySelectorAll(".piece-tab-btn[draggable]");
+
+  btns.forEach(btn => {
+    btn.addEventListener("dragstart", e => {
+      _dragSrcIdx = parseInt(btn.dataset.idx, 10);
+      btn.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", _dragSrcIdx);
+    });
+
+    btn.addEventListener("dragend", () => {
+      btn.classList.remove("dragging");
+      container.querySelectorAll(".piece-tab-btn").forEach(b => b.classList.remove("drag-over"));
+    });
+
+    btn.addEventListener("dragover", e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      container.querySelectorAll(".piece-tab-btn").forEach(b => b.classList.remove("drag-over"));
+      const targetIdx = parseInt(btn.dataset.idx, 10);
+      if (targetIdx !== _dragSrcIdx) btn.classList.add("drag-over");
+    });
+
+    btn.addEventListener("dragleave", () => {
+      btn.classList.remove("drag-over");
+    });
+
+    btn.addEventListener("drop", e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const targetIdx = parseInt(btn.dataset.idx, 10);
+      if (_dragSrcIdx === null || _dragSrcIdx === targetIdx) return;
+
+      // Save current form before reordering
+      _savePieceFormValues(_activePieceIdx);
+
+      // Reorder _pieces array
+      const moved = _pieces.splice(_dragSrcIdx, 1)[0];
+      _pieces.splice(targetIdx, 0, moved);
+
+      // Keep the active piece selected after reorder
+      if (_activePieceIdx === _dragSrcIdx) {
+        _activePieceIdx = targetIdx;
+      } else if (_dragSrcIdx < _activePieceIdx && targetIdx >= _activePieceIdx) {
+        _activePieceIdx--;
+      } else if (_dragSrcIdx > _activePieceIdx && targetIdx <= _activePieceIdx) {
+        _activePieceIdx++;
+      }
+
+      _dragSrcIdx = null;
+      _renderPieceTabs();
+      toast("ok", "Reordered", "Save to publish the new order");
+    });
+  });
 }
 
 function selectPiece(idx) {
@@ -1062,15 +1120,13 @@ document.addEventListener("keyup", (e) => {
 
 function _savePieceFormValues(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
-  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status","chatLocked"];
+  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
     if (!el) return;
     if (f === "artAbout") {
       // Rich-text contenteditable — store sanitized HTML
       _pieces[idx][f] = _rteSanitize(el.innerHTML || "").trim();
-    } else if (f === "chatLocked") {
-      _pieces[idx][f] = el.value === "true";
     } else {
       _pieces[idx][f] = (el.value || "").trim();
     }
@@ -1255,18 +1311,8 @@ function _updateEffectiveHint(idx) {
   hintEl.innerHTML = `<span style="color:${colors[eff]}">● ${labels[eff] || eff}</span>${suffix}${extraNote}`;
 }
 
-// Per-piece chat lock toggle
-function toggleChatLock(idx) {
-  const current = _pieces[idx].chatLocked || false;
-  const next    = !current;
-  _pieces[idx].chatLocked = next;
-  const toggle  = document.getElementById(_pieceFieldId(idx, 'chatLockToggle'));
-  const label   = document.getElementById(_pieceFieldId(idx, 'chatLockLabel'));
-  const hidden  = document.getElementById(_pieceFieldId(idx, 'chatLocked'));
-  if (toggle) toggle.classList.toggle('on', next);
-  if (label)  { label.classList.toggle('on', next); label.textContent = next ? '🔒 Chat locked — collectors cannot send messages' : 'Chat open — collectors can send messages'; }
-  if (hidden) hidden.value = next ? 'true' : 'false';
-}
+// Called by setStatus so the hint updates when the global toggle changes
+function _updateAllEffectiveHints() {
   _updateEffectiveHint(_activePieceIdx);
 }
 
