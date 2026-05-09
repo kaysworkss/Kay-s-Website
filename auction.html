@@ -1335,10 +1335,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
       <button class="mode-tab active" id="tab-collector" onclick="setMode('collector')">Collector view</button>
       <button class="mode-tab" id="tab-auctioneer" onclick="setMode('auctioneer')" style="display:none">Auctioneer mode</button>
     </div>
-    <div style="display:flex;align-items:center;gap:14px;justify-self:end">
-      <a href="/hall-of-fame" class="series-back-link" style="font-size:0.48rem;letter-spacing:0.16em">Hall of Fame <span>↗</span></a>
-      <div class="online-pill"><span class="live-dot"></span><span id="online-count">Live</span><span id="eligible-count" style="display:none;margin-left:4px;padding:1px 7px;background:rgba(107,124,92,.15);border:1px solid rgba(107,124,92,.3);border-radius:10px;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:.12em;text-transform:uppercase;color:var(--moss)"></span></div>
-    </div>
+    <div class="online-pill"><span class="live-dot"></span><span id="online-count">Live</span><span id="eligible-count" style="display:none;margin-left:4px;padding:1px 7px;background:rgba(107,124,92,.15);border:1px solid rgba(107,124,92,.3);border-radius:10px;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:.12em;text-transform:uppercase;color:var(--moss)"></span></div>
   </div>
 
   <!-- Coming-next banner — visible when upcoming pieces exist alongside live ones -->
@@ -1531,7 +1528,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
     <div id="collector-room">
       <div class="room-header">
         <div class="room-title">Collector room</div>
-        <div class="room-sub" id="room-sub"><span class="live-dot"></span><span>Live</span></div>
+        <div class="room-sub"><span class="live-dot"></span><span>Live</span></div>
       </div>
       <div class="chat-feed" id="chat-feed"></div>
       <!-- Collector profile (shown when eligible) -->
@@ -2205,7 +2202,7 @@ async function _switchAuction(idx) {
   _chatManuallyLocked = !!(slot.chatLocked);
   _updateChatInputState();
   const _roomSubReset = document.querySelector(".room-sub");
-  if (_roomSubReset && !_chatManuallyLocked) _roomSubReset.innerHTML = `<span class="live-dot"></span><span>Live</span>`;
+  if (_roomSubReset) _roomSubReset.innerHTML = `<span class="live-dot"></span><span>Live</span>`;
 
   // Reset all bid-panel DOM so no state from the previous piece bleeds through
   document.getElementById("countdown-section").style.display   = "none";
@@ -3507,6 +3504,9 @@ function aucOnBid(bid, confirmed = false) {
   _aucPrevLeader = bid.bidder;
   _aucPrevHigh   = bid.amount;
 
+  // Notify owner of every new bid
+  _triggerBidAlert(bid.bidder, amt);
+
   _startIdleCheck();
 }
 
@@ -3998,6 +3998,22 @@ async function _triggerOutbidNotification(outbidWallet, newAmt, newBidder) {
     await fetch("/api/notify-outbid", {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ outbid_wallet: outbidWallet.toLowerCase(), new_bidder: newBidder, new_amount: newAmt, auction_id: _auctionId||"", art_title: cfg.artTitle||"Igbaradi", auction_url: window.location.href }),
+    });
+  } catch(_) {}
+}
+
+// Fire-and-forget bid alert to site owner on every new bid
+async function _triggerBidAlert(bidder, amount) {
+  try {
+    await fetch("/api/notify-bid", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bidder,
+        amount,
+        auction_id:  _auctionId || "",
+        art_title:   _activeCfg()?.artTitle || cfg.artTitle || "Àpótí Ọlọ́wẹ̀",
+        auction_url: window.location.href,
+      }),
     });
   } catch(_) {}
 }
