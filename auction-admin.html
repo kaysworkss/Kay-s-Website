@@ -247,6 +247,8 @@ body {
 .chat-lock-toggle.on::after { transform: translateX(16px); background: var(--clay); }
 .chat-lock-label { font-family: 'Crimson Pro', serif; font-size: 0.88rem; color: var(--text-muted); }
 .chat-lock-label.on { color: var(--clay); }
+.chat-lock-msg-wrap { margin-top: 10px; display: none; }
+.chat-lock-msg-wrap.show { display: block; }
 
 /* Per-piece status picker (smaller version inside each piece form) */
 .piece-status-row { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -843,7 +845,13 @@ function _buildPieceForm(idx) {
         </span>
         <input type="hidden" id="${_pieceFieldId(idx,'chatLocked')}" value="${d.chatLocked ? 'true' : 'false'}"/>
       </div>
-      <div class="field-hint">Lock to archive the room. Leave open to let the collector post their thanks after a sale.</div>
+      <div class="chat-lock-msg-wrap ${d.chatLocked ? 'show' : ''}" id="${_pieceFieldId(idx,'chatLockMsgWrap')}">
+        <input id="${_pieceFieldId(idx,'chatLockMsg')}"
+          placeholder="e.g. The room is now closed. Thank you all for being here."
+          value="${d.chatLockMsg||''}"
+          style="margin-top:0"/>
+      </div>
+      <div class="field-hint">Lock to close the room. The message above will be shown to collectors instead of the input.</div>
     </div>`;
 }
 
@@ -865,14 +873,16 @@ function _normalisePieceStatus(status) {
 }
 
 function toggleChatLock(idx) {
-  const next   = !(_pieces[idx].chatLocked || false);
+  const next    = !(_pieces[idx].chatLocked || false);
   _pieces[idx].chatLocked = next;
-  const toggle = document.getElementById(_pieceFieldId(idx, 'chatLockToggle'));
-  const label  = document.getElementById(_pieceFieldId(idx, 'chatLockLabel'));
-  const hidden = document.getElementById(_pieceFieldId(idx, 'chatLocked'));
-  if (toggle) toggle.classList.toggle('on', next);
-  if (label)  { label.classList.toggle('on', next); label.textContent = next ? '🔒 Chat locked' : 'Chat open'; }
-  if (hidden) hidden.value = next ? 'true' : 'false';
+  const toggle  = document.getElementById(_pieceFieldId(idx, 'chatLockToggle'));
+  const label   = document.getElementById(_pieceFieldId(idx, 'chatLockLabel'));
+  const hidden  = document.getElementById(_pieceFieldId(idx, 'chatLocked'));
+  const msgWrap = document.getElementById(_pieceFieldId(idx, 'chatLockMsgWrap'));
+  if (toggle)  toggle.classList.toggle('on', next);
+  if (label)   { label.classList.toggle('on', next); label.textContent = next ? '🔒 Chat locked' : 'Chat open'; }
+  if (hidden)  hidden.value = next ? 'true' : 'false';
+  if (msgWrap) msgWrap.classList.toggle('show', next);
 }
 
 function _renderPieceTabs() {
@@ -1162,12 +1172,11 @@ document.addEventListener("keyup", (e) => {
 
 function _savePieceFormValues(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
-  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status","chatLocked"];
+  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status","chatLocked","chatLockMsg"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
     if (!el) return;
     if (f === "artAbout") {
-      // Rich-text contenteditable — store sanitized HTML
       _pieces[idx][f] = _rteSanitize(el.innerHTML || "").trim();
     } else if (f === "chatLocked") {
       _pieces[idx][f] = el.value === "true";
