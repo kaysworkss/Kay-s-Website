@@ -3104,11 +3104,28 @@ function sizeCanvas() {
   // On portrait mobile, use a smaller assembly zone (48%) so pieces have
   // more room around the edges. On landscape/desktop keep 60%.
   const isMobPortrait = CW < 600 && CH > CW;
-  const zoneFrac = isMobPortrait ? 0.48 : 0.60;
-  const maxW = CW * zoneFrac, maxH = CH * zoneFrac;
-  const scale = Math.min(maxW / imgW, maxH / imgH, 1);
-  const aW = Math.round(imgW * scale), aH = Math.round(imgH * scale);
-  const asmX = Math.round((CW - aW) / 2), asmY = Math.round((CH - aH) / 2);
+
+  // Compute a zone fraction that guarantees a minimum border strip on every side.
+  // Instead of a fixed percentage, we solve: what scale makes the shorter border
+  // at least MIN_BORDER wide? Then cap so the board is never too large.
+  // Mobile portrait: keep existing working behaviour (48% fixed).
+  let scale, aW, aH, asmX, asmY;
+  if (isMobPortrait) {
+    const zoneFrac = 0.48;
+    const maxW = CW * zoneFrac, maxH = CH * zoneFrac;
+    scale = Math.min(maxW / imgW, maxH / imgH, 1);
+    aW = Math.round(imgW * scale); aH = Math.round(imgH * scale);
+    asmX = Math.round((CW - aW) / 2); asmY = Math.round((CH - aH) / 2);
+  } else {
+    // Minimum border we want on every side (in px), scales with canvas size
+    const MIN_BORDER = Math.max(60, Math.round(Math.min(CW, CH) * 0.18));
+    // Maximum board size: leave at least MIN_BORDER on each side
+    const maxW = CW - MIN_BORDER * 2;
+    const maxH = CH - MIN_BORDER * 2;
+    scale = Math.min(maxW / imgW, maxH / imgH, 1);
+    aW = Math.round(imgW * scale); aH = Math.round(imgH * scale);
+    asmX = Math.round((CW - aW) / 2); asmY = Math.round((CH - aH) / 2);
+  }
   pieces.forEach(p => {
     // Derive screen position from source coordinates to avoid per-column rounding drift.
     // asmX + round(sx * scale) is exact; col * round(pieceW * scale) accumulates error.
@@ -3142,13 +3159,13 @@ function _inWorkArea(p, asmX, asmY, asmW, asmH) {
   return cx > asmX && cx < asmX + asmW && cy > asmY && cy < asmY + asmH;
 }
 
-// ── ARRANGE — all four sides, proportional by region capacity ──
+// ── ARRANGE — all four sides, fully responsive to canvas + image proportions ──
 function arrangePieces() {
   if (!window._asm) return;
   const { x: asmX, y: asmY, w: asmW, h: asmH, scale } = window._asm;
   const sPW = Math.round(pieceW * scale), sPH = Math.round(pieceH * scale);
   const tabPx = Math.round(TAB * scale);
-  const PAD = Math.max(5, Math.round(SNAP * 1.0));
+  const PAD = Math.max(6, Math.round(Math.min(sPW, sPH) * 0.15));
   const cellW = sPW + PAD, cellH = sPH + PAD;
 
   // Step 1: disband groups outside the work area
@@ -3161,85 +3178,107 @@ function arrangePieces() {
     p.groupId = newGid;
   });
 
-  // Step 2: regions around the board
-  // Mobile portrait: top + bottom spanning full canvas width (more usable space)
-  // Desktop / landscape: all four sides
-  const margin = Math.round(Math.min(sPW, sPH) * 0.08 + 3);
-  const clX0 = asmX - margin, clY0 = asmY - margin;
-  const clX1 = asmX + asmW + margin, clY1 = asmY + asmH + margin;
+  // Step 2: border regions — sized from actual board position, not fixed fractions.
+  // A small gap separates pieces from the board edge.
+  const GAP  = Math.round(Math.min(sPW, sPH) * 0.12 + 4);
+  const EDGE  = tabPx + 2;
+  // Board clearance lines
+  const bLeft  = asmX - GAP;
+  const bRight = asmX + asmW + GAP;
+  const bTop   = asmY - GAP;
+  const bBot   = asmY + asmH + GAP;
 
   const isMobPortrait = CW < 600 && CH > CW;
 
   let regions;
   if (isMobPortrait) {
-    // Full-width top and bottom strips — same as the original working mobile behaviour
-    const topR = { id:'T', x0:tabPx, y0:tabPx,  x1:CW-tabPx, y1:clY0      };
-    const botR = { id:'B', x0:tabPx, y0:clY1,   x1:CW-tabPx, y1:CH-tabPx  };
+    // ── MOBILE: unchanged ─────────────────────────────────────────────
+    const topR = { id:'T', x0:EDGE, y0:EDGE,  x1:CW-EDGE, y1:bTop    };
+    const botR = { id:'B', x0:EDGE, y0:bBot,  x1:CW-EDGE, y1:CH-EDGE };
     regions = [topR, botR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
   } else {
-    // Top and bottom span the full canvas width — same generous space as mobile strips.
-    // Left and right only cover the board's vertical band to avoid corner overlap with top/bottom.
-    const topR   = { id:'T', x0:tabPx,  y0:tabPx,  x1:CW-tabPx,  y1:clY0     };
-    const botR   = { id:'B', x0:tabPx,  y0:clY1,   x1:CW-tabPx,  y1:CH-tabPx };
-    const leftR  = { id:'L', x0:tabPx,  y0:clY0,   x1:clX0,      y1:clY1     };
-    const rightR = { id:'R', x0:clX1,   y0:clY0,   x1:CW-tabPx,  y1:clY1     };
+    // ── DESKTOP: four non-overlapping regions derived from actual board position ──
+    // Top/bottom span the full canvas width.
+    // Left/right fill only the vertical band beside the board (no corner overlap).
+    const topR   = { id:'T', x0:EDGE,   y0:EDGE,  x1:CW-EDGE,  y1:bTop   };
+    const botR   = { id:'B', x0:EDGE,   y0:bBot,  x1:CW-EDGE,  y1:CH-EDGE };
+    const leftR  = { id:'L', x0:EDGE,   y0:bTop,  x1:bLeft,    y1:bBot   };
+    const rightR = { id:'R', x0:bRight, y0:bTop,  x1:CW-EDGE,  y1:bBot   };
     regions = [topR, botR, leftR, rightR].filter(r => r.x1-r.x0 > sPW && r.y1-r.y0 > sPH);
   }
   if (!regions.length) return;
 
-  // Step 3: build all slots for every region
-  // Order slots inward (closest to board first) so pieces fill near the edges neatly.
+  // Step 3: generate slot grids for each region, centred within the region.
   regions.forEach(r => {
     r.cols = Math.max(1, Math.floor((r.x1 - r.x0) / cellW));
     r.rows = Math.max(1, Math.floor((r.y1 - r.y0) / cellH));
     r.cap  = r.cols * r.rows;
+    const offX = Math.round(((r.x1 - r.x0) - r.cols * cellW + PAD) / 2);
+    const offY = Math.round(((r.y1 - r.y0) - r.rows * cellH + PAD) / 2);
     r.slots = [];
-    const rowArr = Array.from({length:r.rows}, (_,i) => i);
-    const colArr = Array.from({length:r.cols}, (_,i) => i);
-    if (r.id === 'T') rowArr.reverse(); // start from row closest to board
-    if (r.id === 'B') {}               // start from row closest to board (already 0)
-    if (r.id === 'L') colArr.reverse(); // start from col closest to board
-    // R: already starts from col closest to board (col 0 = clX1)
-    for (const row of rowArr)
-      for (const col of colArr)
-        r.slots.push({ x: r.x0 + PAD/2 + col*cellW, y: r.y0 + PAD/2 + row*cellH });
+    for (let row = 0; row < r.rows; row++)
+      for (let col = 0; col < r.cols; col++)
+        r.slots.push({ x: r.x0 + offX + col * cellW, y: r.y0 + offY + row * cellH });
   });
 
-  // Step 4: collect unplaced pieces and shuffle
+  // Step 4: collect and shuffle unplaced pieces
   const rng = mkRng(Date.now() % 999983);
-  const unplaced = [...pieces.filter(p => !p.placed && !_inWorkArea(p, asmX, asmY, asmW, asmH))]
+  const unplaced = pieces
+    .filter(p => !p.placed && !_inWorkArea(p, asmX, asmY, asmW, asmH))
     .sort(() => rng() - 0.5);
   if (!unplaced.length) return;
   const n = unplaced.length;
 
-  // Step 5: build one merged slot list interleaving all regions round-robin by capacity.
-  // This guarantees even visual spread — no region gets overloaded regardless of piece count.
+  // Step 5: interleave slots from all regions proportionally (weighted round-robin).
+  // Result: pieces are spread evenly across every available side regardless of
+  // how many slots each region has — works for any image/canvas shape.
   const totalCap = regions.reduce((s, r) => s + r.cap, 0);
   const allSlots = [];
-  // Interleave: take from each region proportionally so slots are evenly spread
-  const counters = regions.map(() => 0);
-  for (let s = 0; s < totalCap; s++) {
-    // Pick the region whose next slot is most "due" (weighted round-robin)
+  const heads = regions.map(() => 0);
+  for (let i = 0; i < totalCap; i++) {
     let best = -1, bestScore = -Infinity;
-    regions.forEach((r, i) => {
-      if (counters[i] >= r.slots.length) return;
-      const score = (r.cap / totalCap) - (counters[i] / Math.max(1, r.slots.length));
-      if (score > bestScore) { bestScore = score; best = i; }
+    regions.forEach((r, ri) => {
+      if (heads[ri] >= r.cap) return;
+      // Score = how far behind its fair share this region is
+      const score = (r.cap / totalCap) - (heads[ri] / totalCap);
+      if (score > bestScore) { bestScore = score; best = ri; }
     });
     if (best === -1) break;
-    allSlots.push({ ...regions[best].slots[counters[best]], r: regions[best] });
-    counters[best]++;
+    allSlots.push({ slot: regions[best].slots[heads[best]], r: regions[best] });
+    heads[best]++;
   }
 
-  // Step 6: assign each piece to a slot — no overflow, no stacking.
-  // If there are more pieces than slots, wrap around (pieces will overlap at extremes
-  // but each slot is only used once in the first pass).
-  const jMax = Math.round(Math.min(sPW, sPH) * 0.10);
+  // Step 6: if pieces outnumber slots, shrink cellW/cellH and rebuild slots so
+  // every piece still gets its own non-overlapping position.
+  if (n > allSlots.length) {
+    // Find the scale factor that fits n pieces across all regions combined
+    const totalArea = regions.reduce((s, r) => s + (r.x1-r.x0) * (r.y1-r.y0), 0);
+    const neededCell = Math.sqrt(totalArea / n);
+    const tinyCell = Math.max(
+      Math.round(neededCell),
+      Math.round(Math.min(sPW, sPH) * 0.5)  // never smaller than half a piece
+    );
+    const tinyCW = tinyCell, tinyCH = Math.round(tinyCell * (sPH / sPW));
+    allSlots.length = 0;
+    regions.forEach(r => {
+      const tc = Math.max(1, Math.floor((r.x1 - r.x0) / tinyCW));
+      const tr = Math.max(1, Math.floor((r.y1 - r.y0) / tinyCH));
+      const ox = Math.round(((r.x1-r.x0) - tc*tinyCW) / 2);
+      const oy = Math.round(((r.y1-r.y0) - tr*tinyCH) / 2);
+      for (let row = 0; row < tr; row++)
+        for (let col = 0; col < tc; col++)
+          allSlots.push({ slot: { x: r.x0+ox+col*tinyCW, y: r.y0+oy+row*tinyCH }, r });
+    });
+    // Shuffle the dense slots so pieces mix across sides
+    allSlots.sort(() => rng() - 0.5);
+  }
+
+  // Step 7: assign each piece to a slot, tiny jitter so it doesn't look robotic.
+  const jMax = Math.round(Math.min(sPW, sPH) * 0.08);
   unplaced.forEach((p, i) => {
-    const slot = allSlots[i % allSlots.length];
-    const r = slot.r;
-    const jx = Math.round((rng()-0.5)*2*jMax);
-    const jy = Math.round((rng()-0.5)*2*jMax);
+    const { slot, r } = allSlots[i % allSlots.length];
+    const jx = Math.round((rng() - 0.5) * 2 * jMax);
+    const jy = Math.round((rng() - 0.5) * 2 * jMax);
     p.x = Math.round(Math.max(r.x0, Math.min(r.x1 - p.sPW, slot.x + jx)));
     p.y = Math.round(Math.max(r.y0, Math.min(r.y1 - p.sPH, slot.y + jy)));
   });
