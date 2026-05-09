@@ -3187,7 +3187,8 @@ function arrangePieces() {
   }
   if (!regions.length) return;
 
-  // Step 3: build slots — each region fills inward toward the board
+  // Step 3: build all slots for every region
+  // Order slots inward (closest to board first) so pieces fill near the edges neatly.
   regions.forEach(r => {
     r.cols = Math.max(1, Math.floor((r.x1 - r.x0) / cellW));
     r.rows = Math.max(1, Math.floor((r.y1 - r.y0) / cellH));
@@ -3195,11 +3196,13 @@ function arrangePieces() {
     r.slots = [];
     const rowArr = Array.from({length:r.rows}, (_,i) => i);
     const colArr = Array.from({length:r.cols}, (_,i) => i);
-    if (r.id === 'T') rowArr.reverse(); // bottom row first — closest to board
-    if (r.id === 'L') colArr.reverse(); // rightmost col first — closest to board
+    if (r.id === 'T') rowArr.reverse(); // start from row closest to board
+    if (r.id === 'B') {}               // start from row closest to board (already 0)
+    if (r.id === 'L') colArr.reverse(); // start from col closest to board
+    // R: already starts from col closest to board (col 0 = clX1)
     for (const row of rowArr)
       for (const col of colArr)
-        r.slots.push({ x: r.x0 + PAD/2 + col*cellW, y: r.y0 + PAD/2 + row*cellH, region: r });
+        r.slots.push({ x: r.x0 + PAD/2 + col*cellW, y: r.y0 + PAD/2 + row*cellH });
   });
 
   // Step 4: collect unplaced pieces and shuffle
@@ -3209,35 +3212,36 @@ function arrangePieces() {
   if (!unplaced.length) return;
   const n = unplaced.length;
 
-  // Step 5: distribute proportionally by region capacity
+  // Step 5: build one merged slot list interleaving all regions round-robin by capacity.
+  // This guarantees even visual spread — no region gets overloaded regardless of piece count.
   const totalCap = regions.reduce((s, r) => s + r.cap, 0);
-  let distributed = 0;
-  const shares = regions.map((r, i) => {
-    if (i === regions.length - 1) return n - distributed;
-    const s = Math.round(n * r.cap / totalCap);
-    distributed += s;
-    return s;
-  });
+  const allSlots = [];
+  // Interleave: take from each region proportionally so slots are evenly spread
+  const counters = regions.map(() => 0);
+  for (let s = 0; s < totalCap; s++) {
+    // Pick the region whose next slot is most "due" (weighted round-robin)
+    let best = -1, bestScore = -Infinity;
+    regions.forEach((r, i) => {
+      if (counters[i] >= r.slots.length) return;
+      const score = (r.cap / totalCap) - (counters[i] / Math.max(1, r.slots.length));
+      if (score > bestScore) { bestScore = score; best = i; }
+    });
+    if (best === -1) break;
+    allSlots.push({ ...regions[best].slots[counters[best]], r: regions[best] });
+    counters[best]++;
+  }
 
-  // Step 6: place with jitter clamped to region
+  // Step 6: assign each piece to a slot — no overflow, no stacking.
+  // If there are more pieces than slots, wrap around (pieces will overlap at extremes
+  // but each slot is only used once in the first pass).
   const jMax = Math.round(Math.min(sPW, sPH) * 0.10);
-  let idx = 0;
-  regions.forEach((r, ri) => {
-    const share = shares[ri];
-    for (let i = 0; i < share; i++) {
-      const p = unplaced[idx++];
-      if (!p) break;
-      const si = Math.min(i, r.slots.length - 1);
-      const slot = r.slots[si];
-      // Overflow: cascade into additional rows
-      const ov = Math.max(0, i - (r.slots.length - 1));
-      const cascX = ov > 0 ? (ov % Math.max(1, r.cols)) * cellW * 0.5 : 0;
-      const cascY = ov > 0 ? Math.floor(ov / Math.max(1, r.cols)) * cellH * 0.5 : 0;
-      const jx = Math.round((rng()-0.5)*2*jMax);
-      const jy = Math.round((rng()-0.5)*2*jMax);
-      p.x = Math.round(Math.max(r.x0, Math.min(r.x1-p.sPW, slot.x+jx+cascX)));
-      p.y = Math.round(Math.max(r.y0, Math.min(r.y1-p.sPH, slot.y+jy+cascY)));
-    }
+  unplaced.forEach((p, i) => {
+    const slot = allSlots[i % allSlots.length];
+    const r = slot.r;
+    const jx = Math.round((rng()-0.5)*2*jMax);
+    const jy = Math.round((rng()-0.5)*2*jMax);
+    p.x = Math.round(Math.max(r.x0, Math.min(r.x1 - p.sPW, slot.x + jx)));
+    p.y = Math.round(Math.max(r.y0, Math.min(r.y1 - p.sPH, slot.y + jy)));
   });
   queueAutoSave(500);
 }
