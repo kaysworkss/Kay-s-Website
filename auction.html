@@ -3073,6 +3073,11 @@ function _updateChatInputState() {
     if (lockMsg) lockMsg.textContent = _chatManuallyLocked && !_auctionSettled
       ? "Chat is temporarily closed"
       : "This auction has concluded — the collector room is now archived";
+    // Keep room header consistent
+    const roomSub = document.querySelector(".room-sub");
+    if (roomSub && !roomSub.innerHTML.includes("Archived")) {
+      roomSub.innerHTML = `<span style="font-size:11px">📜</span><span>Archived</span>`;
+    }
     return;
   }
 
@@ -3101,6 +3106,9 @@ let _chatLockScheduled = false; // prevent duplicate schedules per piece load
 async function _scheduleChatLock(contractAddr) {
   if (_chatLockScheduled) return;
   _chatLockScheduled = true;
+
+  // If admin manually locked, chat is already locked — no timer needed
+  if (_chatManuallyLocked) return;
 
   const roomSub = document.querySelector(".room-sub");
 
