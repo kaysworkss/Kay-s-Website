@@ -231,14 +231,12 @@ body {
   width:5px; height:5px; border-radius:50%; background:var(--moss);
   animation:live-blink 1.4s ease-in-out infinite; flex-shrink:0;
 }
-/* Sold badge on piece tabs */
 .piece-tab-sold-badge {
   font-family:'Cinzel',serif; font-size:0.42rem; letter-spacing:0.12em;
   text-transform:uppercase; background:rgba(107,124,92,0.18);
   border:1px solid rgba(107,124,92,0.45); border-radius:2px;
   padding:1px 5px; color:var(--moss); flex-shrink:0; line-height:1.4;
 }
-/* Settled / manual chat lock notice */
 .chat-settled-lock {
   display:none; align-items:center; gap:8px;
   padding:10px 13px; border-top:1px solid var(--divider);
@@ -1542,9 +1540,10 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
         </div>
       </div>
 
-      <!-- Settled / manual chat lock (shown when auction concluded or admin locks chat) -->
+      <!-- Chat lock notice (shown 2 h after settlement) -->
       <div class="chat-settled-lock" id="chat-settled-lock">
-        <span style="font-size:14px">🔒</span> <span id="chat-settled-lock-msg">This auction has concluded — the collector room is now archived</span>
+        <span style="font-size:14px">🔒</span>
+        <span id="chat-settled-lock-msg">This auction has concluded — the collector room is now archived</span>
       </div>
 
       <div class="chat-input-zone" id="chat-input-zone">
@@ -2183,12 +2182,13 @@ async function _switchAuction(idx) {
   bidHistory = [];
   endTimestamp = 0; isLive = false; minNextBid = 0n;
   // Reset chat lock state for this piece
+  clearTimeout(_chatLockTimer);
   _auctionSettled     = false;
+  _chatLockScheduled  = false;
   _chatManuallyLocked = !!(slot.chatLocked);
   _updateChatInputState();
-  // Restore room header to "Live"
-  const roomSub = document.querySelector(".room-sub");
-  if (roomSub) roomSub.innerHTML = `<span class="live-dot"></span><span>Live</span>`;
+  const _roomSubReset = document.querySelector(".room-sub");
+  if (_roomSubReset) _roomSubReset.innerHTML = `<span class="live-dot"></span><span>Live</span>`;
 
   // Reset all bid-panel DOM so no state from the previous piece bleeds through
   document.getElementById("countdown-section").style.display   = "none";
@@ -3049,6 +3049,99 @@ function renderHistory() {
 
 // ─── Settled ─────────────────────────────────────────────────────────────────
 
+let _auctionSettled     = false;
+let _chatManuallyLocked = false;  // from slot.chatLocked in admin config
+let _chatLockTimer      = null;
+const CHAT_LOCK_DELAY_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+function _updateChatInputState() {
+  const input        = document.getElementById("room-chat-input");
+  const sendBtn      = document.querySelector(".chat-send-btn");
+  const locked       = document.getElementById("room-locked");
+  const settledLock  = document.getElementById("chat-settled-lock");
+  const lockMsg      = document.getElementById("chat-settled-lock-msg");
+  const inputZone    = document.getElementById("chat-input-zone");
+  const reacts       = document.querySelectorAll(".react-btn-sm");
+  const profilePanel = document.getElementById("profile-panel");
+
+  const hardLocked = _auctionSettled || _chatManuallyLocked;
+
+  if (hardLocked) {
+    if (inputZone)    inputZone.style.display = "none";
+    if (profilePanel) profilePanel.classList.remove("show");
+    if (settledLock)  settledLock.classList.add("show");
+    if (lockMsg) lockMsg.textContent = _chatManuallyLocked && !_auctionSettled
+      ? "Chat is temporarily closed"
+      : "This auction has concluded — the collector room is now archived";
+    return;
+  }
+
+  if (settledLock)  settledLock.classList.remove("show");
+  if (inputZone)    inputZone.style.display = "";
+
+  if (_roomEligible) {
+    if (input)   { input.disabled = false; input.placeholder = "Write as a collector…"; }
+    if (sendBtn) sendBtn.disabled = false;
+    if (locked)  locked.style.display = "none";
+    if (profilePanel) profilePanel.classList.add("show");
+    reacts.forEach(b => b.disabled = false);
+  } else {
+    if (input)   { input.disabled = true; input.placeholder = "Connect eligible wallet to chat…"; }
+    if (sendBtn) sendBtn.disabled = true;
+    if (locked)  locked.style.display = "flex";
+    if (profilePanel) profilePanel.classList.remove("show");
+    reacts.forEach(b => b.disabled = true);
+  }
+}
+
+// Fetch settled_at from auction_results, then either lock immediately (>2h ago)
+// or schedule the remaining lock time. Called once per piece when settled=true.
+let _chatLockScheduled = false; // prevent duplicate schedules per piece load
+
+async function _scheduleChatLock(contractAddr) {
+  if (_chatLockScheduled) return;
+  _chatLockScheduled = true;
+
+  const roomSub = document.querySelector(".room-sub");
+
+  try {
+    const res  = await fetch(
+      `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(contractAddr.toLowerCase())}&select=settled_at&limit=1`,
+      { headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON } }
+    );
+    const rows = await res.json();
+    const settledAt = rows?.[0]?.settled_at ? new Date(rows[0].settled_at) : null;
+    const now       = Date.now();
+    const elapsed   = settledAt ? now - settledAt.getTime() : 0;
+    const remaining = CHAT_LOCK_DELAY_MS - elapsed;
+
+    if (remaining <= 0) {
+      // Already past 2 hours — lock immediately
+      _auctionSettled = true;
+      _updateChatInputState();
+      if (roomSub) roomSub.innerHTML = `<span style="font-size:11px">📜</span><span>Archived</span>`;
+    } else {
+      // Still within the window — show time remaining and schedule the lock
+      if (roomSub) roomSub.innerHTML = `<span style="font-size:11px">📜</span><span>Open for ${Math.ceil(remaining / 60000)} min</span>`;
+      clearTimeout(_chatLockTimer);
+      _chatLockTimer = setTimeout(() => {
+        _auctionSettled = true;
+        _updateChatInputState();
+        if (roomSub) roomSub.innerHTML = `<span style="font-size:11px">📜</span><span>Archived</span>`;
+      }, remaining);
+    }
+  } catch(_) {
+    // Supabase unreachable — fall back to a fresh 2-hour timer from now
+    if (roomSub) roomSub.innerHTML = `<span style="font-size:11px">📜</span><span>Open for 2 hrs</span>`;
+    clearTimeout(_chatLockTimer);
+    _chatLockTimer = setTimeout(() => {
+      _auctionSettled = true;
+      _updateChatInputState();
+      if (roomSub) roomSub.innerHTML = `<span style="font-size:11px">📜</span><span>Archived</span>`;
+    }, CHAT_LOCK_DELAY_MS);
+  }
+}
+
 function showSettled(winner, amount) {
   const b = document.getElementById("settled-banner");
   b.classList.add("show");
@@ -3058,12 +3151,9 @@ function showSettled(winner, amount) {
     : `Won by ${shortAddr(winner)} for ${ethers.formatEther(amount)} ETH`;
   document.getElementById("bid-form").style.display = "none";
 
-  // Lock chat — auction concluded (unless admin has manually kept it open)
-  _auctionSettled = true;
-  _updateChatInputState();
-  // Update room header to show "Archived" instead of "Live"
-  const roomSub = document.querySelector(".room-sub");
-  if (roomSub) roomSub.innerHTML = `<span style="font-size:12px">📜</span><span>Archived</span>`;
+  // Schedule chat lock based on actual settled_at from Supabase
+  const contractAddr = _activeCfg()?.contractAddr || "";
+  if (contractAddr) _scheduleChatLock(contractAddr);
 
   aucOnWon(winner, amount);
 }
@@ -3760,49 +3850,6 @@ function setMode(mode) {
   document.getElementById("collector-room").classList.add("show");
   document.getElementById("gavel-panel").classList.toggle("show", mode === "auctioneer");
   _updateChatInputState();
-}
-
-let _auctionSettled      = false;
-let _chatManuallyLocked  = false;  // set from slot.chatLocked config
-
-function _updateChatInputState() {
-  const input        = document.getElementById("room-chat-input");
-  const sendBtn      = document.querySelector(".chat-send-btn");
-  const locked       = document.getElementById("room-locked");
-  const settledLock  = document.getElementById("chat-settled-lock");
-  const lockMsg      = document.getElementById("chat-settled-lock-msg");
-  const inputZone    = document.getElementById("chat-input-zone");
-  const reacts       = document.querySelectorAll(".react-btn-sm");
-  const profilePanel = document.getElementById("profile-panel");
-
-  const chatLocked = _auctionSettled || _chatManuallyLocked;
-
-  if (chatLocked) {
-    if (inputZone)  inputZone.style.display = "none";
-    if (profilePanel) profilePanel.classList.remove("show");
-    if (settledLock) settledLock.classList.add("show");
-    if (lockMsg) lockMsg.textContent = _chatManuallyLocked && !_auctionSettled
-      ? "Chat is temporarily closed — check back soon"
-      : "This auction has concluded — the collector room is now archived";
-    return;
-  }
-
-  if (settledLock) settledLock.classList.remove("show");
-  if (inputZone)   inputZone.style.display = "";
-
-  if (_roomEligible) {
-    if (input)   { input.disabled = false; input.placeholder = "Write as a collector…"; }
-    if (sendBtn) sendBtn.disabled = false;
-    if (locked)  locked.style.display = "none";
-    if (profilePanel) profilePanel.classList.add("show");
-    reacts.forEach(b => b.disabled = false);
-  } else {
-    if (input)   { input.disabled = true; input.placeholder = "Connect eligible wallet to chat…"; }
-    if (sendBtn) sendBtn.disabled = true;
-    if (locked)  locked.style.display = "flex";
-    if (profilePanel) profilePanel.classList.remove("show");
-    reacts.forEach(b => b.disabled = true);
-  }
 }
 
 async function gavCall(type) {
