@@ -103,6 +103,7 @@ function sanitisePiece(p) {
     launchDate:   String(p.launchDate   || "").slice(0, 50),
     status:       ["live","upcoming","off",""].includes(p.status) ? (p.status || "") : "",
     chatLocked:   p.chatLocked === true,
+    chatLockMsg:  String(p.chatLockMsg  || "").slice(0, 300),
   };
 }
 
