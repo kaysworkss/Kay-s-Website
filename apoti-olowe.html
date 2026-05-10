@@ -2574,6 +2574,14 @@ lbPanel.addEventListener('touchend', function(e) {
     const showControls = live.length > 1;
     if (livePrev) livePrev.disabled = !showControls;
     if (liveNext) liveNext.disabled = !showControls;
+
+    // Kick off auto-scroll only when there's more than one card
+    if (live.length > 1) {
+      _stopAutoScroll();
+      _startAutoScroll();
+    } else {
+      _stopAutoScroll();
+    }
   }
 
   function _scrollLiveCarousel(dir) {
@@ -2583,6 +2591,41 @@ lbPanel.addEventListener('touchend', function(e) {
 
   if (livePrev) livePrev.addEventListener("click", function() { _scrollLiveCarousel(-1); });
   if (liveNext) liveNext.addEventListener("click", function() { _scrollLiveCarousel(1); });
+
+  // ── Auto-scroll: only runs when there are multiple cards ──
+  let _autoTimer = null;
+  let _autoPaused = false;
+
+  function _startAutoScroll() {
+    if (_autoTimer) return;
+    _autoTimer = setInterval(function() {
+      if (_autoPaused || !liveTrack) return;
+      const cards = liveTrack.querySelectorAll(".lac-card");
+      if (cards.length <= 1) return;
+      const maxScroll = liveTrack.scrollWidth - liveTrack.clientWidth;
+      // If at (or near) the end, snap back to start; otherwise scroll forward
+      if (liveTrack.scrollLeft >= maxScroll - 4) {
+        liveTrack.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        _scrollLiveCarousel(1);
+      }
+    }, 3000);
+  }
+
+  function _stopAutoScroll() {
+    clearInterval(_autoTimer);
+    _autoTimer = null;
+  }
+
+  if (liveCarousel) {
+    liveCarousel.addEventListener("mouseenter", function() { _autoPaused = true; });
+    liveCarousel.addEventListener("mouseleave", function() { _autoPaused = false; });
+    // Also pause on touch so mobile users can read without it jumping
+    liveCarousel.addEventListener("touchstart", function() { _autoPaused = true; }, { passive: true });
+    liveCarousel.addEventListener("touchend",   function() {
+      setTimeout(function() { _autoPaused = false; }, 2000);
+    }, { passive: true });
+  }
 
   function _fmt(s) {
     const d  = Math.floor(s / 86400);
