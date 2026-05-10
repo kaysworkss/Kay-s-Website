@@ -2899,30 +2899,20 @@
   const banner = document.getElementById('announcement-banner');
   const nav    = document.getElementById('mainNav');
   const closeBtn = document.getElementById('bannerClose');
-  const DISMISSED_KEY = 'kw_banner_apoti_v1';
 
   function hideBanner() {
     banner.classList.add('hidden');
     nav.classList.remove('with-banner');
-    try { sessionStorage.setItem(DISMISSED_KEY, '1'); } catch(_) {}
-  }
-
-  function showBanner() {
-    banner.classList.remove('hidden');
-    nav.classList.add('with-banner');
   }
 
   if (closeBtn) closeBtn.addEventListener('click', hideBanner);
 
-  // Check if dismissed this session
-  try {
-    if (sessionStorage.getItem(DISMISSED_KEY)) {
-      hideBanner();
-    } else {
-      showBanner();
-    }
-  } catch(_) {
-    showBanner();
+  // Always show on load — dismissal only lasts until next refresh
+  showBanner();
+
+  function showBanner() {
+    banner.classList.remove('hidden');
+    nav.classList.add('with-banner');
   }
 }());
 </script>
