@@ -136,6 +136,50 @@
     opacity: 0.35;
   }
 
+  /* ── ANNOUNCEMENT BANNER ── */
+  #announcement-banner {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    background: linear-gradient(90deg, var(--bark) 0%, #3a2418 50%, var(--bark) 100%);
+    border-bottom: 1px solid rgba(201,153,58,0.35);
+    display: flex; align-items: center; justify-content: center;
+    gap: 1.2rem;
+    padding: 0.55rem 3rem;
+    font-family: 'Cinzel', serif; font-size: 0.68rem;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--gold);
+    text-shadow: 0 0 12px rgba(201,153,58,0.4);
+    transition: transform 0.4s ease, opacity 0.4s ease;
+  }
+  #announcement-banner.hidden {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .banner-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--gold);
+    animation: aucLiveDot 1.6s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  .banner-link {
+    color: var(--sand);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(232,213,176,0.35);
+    padding-bottom: 1px;
+    transition: color 0.2s, border-color 0.2s;
+    white-space: nowrap;
+  }
+  .banner-link:hover { color: #fff; border-color: var(--sand); }
+  .banner-close {
+    position: absolute; right: 1.2rem;
+    background: none; border: none; cursor: pointer;
+    color: rgba(201,153,58,0.6);
+    font-size: 0.9rem; line-height: 1;
+    padding: 0.2rem 0.4rem;
+    transition: color 0.2s;
+  }
+  .banner-close:hover { color: var(--gold); }
+
   /* ── NAV ── */
   nav {
     position: fixed; top: 0; width: 100%; z-index: 100;
@@ -148,6 +192,25 @@
     background: var(--nav-scrolled);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid rgba(196,132,90,0.2);
+  }
+  nav.with-banner { top: 32px; }
+  .nav-series-link {
+    font-family: 'Cinzel', serif !important;
+    font-size: 0.72rem !important;
+    letter-spacing: 0.18em !important;
+    color: var(--gold) !important;
+    opacity: 1 !important;
+    border: 1px solid rgba(201,153,58,0.45);
+    padding: 0.3rem 0.7rem;
+    border-radius: 3px;
+    background: rgba(201,153,58,0.08);
+    transition: background 0.2s, border-color 0.2s, color 0.2s !important;
+    white-space: nowrap;
+  }
+  .nav-series-link:hover {
+    background: rgba(201,153,58,0.18) !important;
+    border-color: var(--gold) !important;
+    color: #fff4b0 !important;
   }
   .nav-logo {
     font-family: 'Montserrat', sans-serif;
@@ -677,6 +740,23 @@
     vertical-align: middle;
   }
   .series-explore-link:hover .series-explore-arrow { transform: translate(3px, -3px); }
+
+  /* Primary "Explore Full Series" variant */
+  .series-explore-primary {
+    flex: unset;
+    width: 100%;
+    font-size: 0.75rem !important;
+    letter-spacing: 0.3em !important;
+    padding: 0.9rem 1.4rem !important;
+    background: linear-gradient(135deg, rgba(201,153,58,0.28) 0%, rgba(232,200,112,0.42) 50%, rgba(201,153,58,0.28) 100%) !important;
+    background-size: 200% auto !important;
+    border: 1.5px solid rgba(201,153,58,0.8) !important;
+    box-shadow: 0 0 24px rgba(201,153,58,0.2), inset 0 1px 0 rgba(255,230,150,0.12);
+  }
+  .series-explore-primary:hover {
+    background: linear-gradient(135deg, rgba(201,153,58,0.44) 0%, rgba(232,200,112,0.62) 50%, rgba(201,153,58,0.44) 100%) !important;
+    box-shadow: 0 6px 30px rgba(201,153,58,0.45), 0 0 0 2px rgba(201,153,58,0.22) !important;
+  }
 
   /* ── PORTFOLIO ── */
   #portfolio { background: var(--linen); padding-bottom: 12rem; }
@@ -1647,10 +1727,20 @@
   <div class="cursor-dot" id="cursorDot"></div>
 </div>
 
+<!-- ── ANNOUNCEMENT BANNER ── -->
+<div id="announcement-banner" role="banner" aria-label="New series announcement">
+  <span class="banner-dot" aria-hidden="true"></span>
+  <span>New Series Now Live —</span>
+  <a href="/apoti-olowe" class="banner-link">Àpótí Ọlọ́wẹ̀: a love story in six chapters</a>
+  <span>→ Explore</span>
+  <button class="banner-close" id="bannerClose" aria-label="Dismiss announcement">✕</button>
+</div>
+
 <!-- ── NAV ── -->
 <nav id="mainNav">
   <a href="#" class="nav-logo"><span style="font-weight:600">KAY'S</span> &nbsp; <span style="font-weight:500">WORKS</span></a>
   <ul class="nav-links">
+    <li><a href="/apoti-olowe" class="nav-series-link">Àpótí Ọlọ́wẹ̀</a></li>
     <li><a href="#series">New Series</a></li>
     <li><a href="#portfolio">Portfolio</a></li>
     <li><a href="#commissions">Commissions</a></li>
@@ -1672,6 +1762,7 @@
 <!-- Mobile nav drawer -->
 <div class="mobile-nav" id="mobileNav">
   <button class="mobile-nav-close" id="mobileNavClose" aria-label="Close menu">✕</button>
+  <a href="/apoti-olowe" class="mobile-link" style="font-family:'Cinzel',serif;font-size:1.1rem;letter-spacing:0.15em;color:var(--gold);font-style:normal;">Àpótí Ọlọ́wẹ̀</a>
   <a href="#series" class="mobile-link">New Series</a>
   <a href="#portfolio" class="mobile-link">Portfolio</a>
   <a href="#commissions" class="mobile-link">Commissions</a>
@@ -1777,7 +1868,7 @@
       </div>
 
       <div class="series-explore-row">
-        <a href="/apoti-olowe" class="series-explore-link" aria-label="Explore the full Àpótí Ọlọ́wẹ̀ series page">
+        <a href="/apoti-olowe" class="series-explore-link series-explore-primary" aria-label="Explore the full Àpótí Ọlọ́wẹ̀ series page">
           <span class="series-explore-text">Explore the Full Series</span>
           <span class="series-explore-arrow" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 11L11 2M11 2H4.5M11 2V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
         </a>
@@ -2803,6 +2894,40 @@
 </script>
 
 <script>
+/* ── Announcement banner ── */
+(function() {
+  const banner = document.getElementById('announcement-banner');
+  const nav    = document.getElementById('mainNav');
+  const closeBtn = document.getElementById('bannerClose');
+  const DISMISSED_KEY = 'kw_banner_apoti_v1';
+
+  function hideBanner() {
+    banner.classList.add('hidden');
+    nav.classList.remove('with-banner');
+    try { sessionStorage.setItem(DISMISSED_KEY, '1'); } catch(_) {}
+  }
+
+  function showBanner() {
+    banner.classList.remove('hidden');
+    nav.classList.add('with-banner');
+  }
+
+  if (closeBtn) closeBtn.addEventListener('click', hideBanner);
+
+  // Check if dismissed this session
+  try {
+    if (sessionStorage.getItem(DISMISSED_KEY)) {
+      hideBanner();
+    } else {
+      showBanner();
+    }
+  } catch(_) {
+    showBanner();
+  }
+}());
+</script>
+
+<script>
 /* ── Auction live indicator — index.html ── */
 (function() {
   const AUCTION_API = "/api/auction-config";
@@ -2995,12 +3120,3 @@
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
