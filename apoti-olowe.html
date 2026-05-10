@@ -1015,6 +1015,22 @@
   .lac-title { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; color: var(--text); line-height: 1.2; margin-bottom: 0.25rem; }
   .lac-meta { font-size: 0.82rem; color: var(--text-muted); line-height: 1.45; }
   .lac-cta { margin-top: 0.7rem; font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
+  .lac-card.lac-sold { opacity: 0.72; }
+  .lac-card.lac-sold .lac-img-wrap { position: relative; }
+  .lac-sold-badge {
+    position: absolute; top: 0.5rem; left: 0.5rem;
+    font-family: 'Cinzel', serif; font-size: 0.52rem;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    background: rgba(20,12,8,0.82); color: var(--ash);
+    border: 1px solid rgba(138,112,96,0.45);
+    padding: 0.2rem 0.5rem; border-radius: 2px;
+    pointer-events: none;
+  }
+  .lac-cta-sold {
+    margin-top: 0.7rem; font-family: 'Cinzel', serif; font-size: 0.55rem;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--ash); opacity: 0.6;
+  }
   @keyframes pulseAucLive {
     0%, 100% { box-shadow: 0 0 0 0 rgba(201,153,58,0.7), 0 0 18px rgba(201,153,58,0.25); }
     50%       { box-shadow: 0 0 0 10px rgba(201,153,58,0), 0 0 28px rgba(201,153,58,0.45); }
@@ -2540,8 +2556,12 @@ lbPanel.addEventListener('touchend', function(e) {
 
   function _liveSlots(cfg) {
     const slots = Array.isArray(cfg.auctions) && cfg.auctions.length ? cfg.auctions : [cfg];
-    const live = slots.filter(s => (s._effectiveStatus || s.status || cfg.status) === "live");
-    return live.length ? live : (cfg.status === "live" ? slots : []);
+    // Include live AND settled/sold pieces so the carousel shows the full picture
+    const visible = slots.filter(s => {
+      const st = s._effectiveStatus || s.status || cfg.status || "off";
+      return st === "live" || st === "settled" || st === "sold";
+    });
+    return visible.length ? visible : (cfg.status === "live" ? slots : []);
   }
 
   function _escHtml(value) {
@@ -2555,28 +2575,62 @@ lbPanel.addEventListener('touchend', function(e) {
 
   function _renderLiveCarousel(cfg) {
     if (!liveCarousel || !liveTrack) return;
-    const live = _liveSlots(cfg);
-    liveCarousel.style.display = live.length ? "block" : "none";
-    if (!live.length) return;
+    const slots = _liveSlots(cfg);
+    liveCarousel.style.display = slots.length ? "block" : "none";
+    if (!slots.length) return;
 
-    liveTrack.innerHTML = live.map(function(slot, i) {
-      const title = slot.artTitle || ("Live auction " + (i + 1));
-      const artist = slot.artArtist ? slot.artArtist + " - " : "";
-      const meta = artist + (slot.artMedium || "Chapter auction");
-      const img = _http(slot.artImage) || "images/IjokooB.png";
-      const href = slot.auctionUrl || "/auction";
-      return '<a class="lac-card" href="' + _escHtml(href) + '">' +
-        '<div class="lac-img-wrap"><img src="' + _escHtml(img) + '" alt="' + _escHtml(title) + '"></div>' +
-        '<div class="lac-body"><p class="lac-title">' + _escHtml(title) + '</p>' +
-        '<p class="lac-meta">' + _escHtml(meta) + '</p><span class="lac-cta">Bid now &rarr;</span></div></a>';
+    liveTrack.innerHTML = slots.map(function(slot, i) {
+      const slotStatus = slot._effectiveStatus || slot.status || cfg.status || "off";
+      const isSold     = slotStatus === "settled" || slotStatus === "sold";
+      const title  = slot.artTitle  || ("Auction " + (i + 1));
+      const artist = slot.artArtist ? slot.artArtist + " \u2013 " : "";
+      const meta   = artist + (slot.artMedium || "Chapter auction");
+      const img    = _http(slot.artImage) || "images/IjokooB.png";
+      const href   = slot.auctionUrl || "/auction";
+
+      const imgWrap = isSold
+        ? '<div class="lac-img-wrap" style="position:relative;">' +
+            '<img src="' + _escHtml(img) + '" alt="' + _escHtml(title) + '" style="filter:grayscale(0.55);">' +
+            '<span class="lac-sold-badge">Sold</span>' +
+          '</div>'
+        : '<div class="lac-img-wrap"><img src="' + _escHtml(img) + '" alt="' + _escHtml(title) + '"></div>';
+
+      const ctaHtml = isSold
+        ? '<span class="lac-cta-sold">Auction Settled</span>'
+        : '<span class="lac-cta">Bid now \u2192</span>';
+
+      const cardClass = isSold ? 'lac-card lac-sold' : 'lac-card';
+
+      return '<a class="' + cardClass + '" href="' + _escHtml(href) + '">' +
+        imgWrap +
+        '<div class="lac-body">' +
+          '<p class="lac-title">' + _escHtml(title) + '</p>' +
+          '<p class="lac-meta">'  + _escHtml(meta)  + '</p>' +
+          ctaHtml +
+        '</div></a>';
     }).join("");
 
-    const showControls = live.length > 1;
+    const liveCount = slots.filter(s => {
+      const st = s._effectiveStatus || s.status || cfg.status || "off";
+      return st === "live";
+    }).length;
+    const showControls = slots.length > 1;
     if (livePrev) livePrev.disabled = !showControls;
     if (liveNext) liveNext.disabled = !showControls;
 
-    // Kick off auto-scroll only when there's more than one card
-    if (live.length > 1) {
+    // Update carousel header label to reflect mixed states
+    const lacLabel = liveCarousel.querySelector(".lac-label");
+    if (lacLabel) {
+      if (liveCount > 0) {
+        lacLabel.innerHTML = '<span class="lac-live-dot"></span> Live auctions';
+      } else {
+        lacLabel.innerHTML = 'Auction history';
+        const dot = lacLabel.querySelector(".lac-live-dot");
+        if (dot) dot.style.display = "none";
+      }
+    }
+
+    if (slots.length > 1) {
       _stopAutoScroll();
       _startAutoScroll();
     } else {
