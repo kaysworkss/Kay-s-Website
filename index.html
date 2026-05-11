@@ -358,6 +358,23 @@
   .lac-meta { font-size: 0.82rem; color: rgba(232,213,176,0.7); line-height: 1.45; }
   .lac-foot { margin-top: 0.65rem; display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; font-family: 'Cinzel', serif; font-size: 0.52rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); }
   .lac-foot span:first-child { color: rgba(232,213,176,0.72); letter-spacing: 0.08em; }
+  .lac-card.lac-sold { opacity: 0.72; }
+  .lac-card.lac-sold:hover { transform: none; }
+  .lac-card.lac-sold .lac-img-wrap { position: relative; }
+  .lac-sold-badge {
+    position: absolute; top: 0.5rem; left: 0.5rem;
+    font-family: 'Cinzel', serif; font-size: 0.5rem;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    background: rgba(20,12,8,0.82); color: rgba(232,213,176,0.7);
+    border: 1px solid rgba(138,112,96,0.45);
+    padding: 0.18rem 0.45rem; border-radius: 2px;
+    pointer-events: none;
+  }
+  .lac-cta-sold {
+    margin-top: 0.65rem; font-family: 'Cinzel', serif; font-size: 0.52rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: rgba(232,213,176,0.45);
+  }
   @keyframes pulseAucLive {
     0%, 100% { box-shadow: 0 0 0 0 rgba(201,153,58,0.7), 0 0 18px rgba(201,153,58,0.25); }
     50%       { box-shadow: 0 0 0 10px rgba(201,153,58,0), 0 0 28px rgba(201,153,58,0.45); }
@@ -2945,43 +2962,67 @@
     return src;
   }
 
+  function _slotStatus(slot, cfgStatus) {
+    const explicit = slot._effectiveStatus || slot.status;
+    if (explicit) return explicit;
+    if (slot.endTime && Number(slot.endTime) > 0 && Number(slot.endTime) < Math.floor(Date.now() / 1000)) {
+      return "settled";
+    }
+    return cfgStatus || "off";
+  }
+
   function _liveSlots(cfg) {
     const slots = Array.isArray(cfg.auctions) && cfg.auctions.length ? cfg.auctions : [cfg];
-    const live = slots.filter(slot => (slot._effectiveStatus || slot.status || cfg.status) === "live");
-    return live.length ? live : (cfg.status === "live" ? slots : []);
+    const cfgStatus = cfg.status || "off";
+    const visible = slots.filter(s => {
+      const st = _slotStatus(s, slots.length === 1 ? cfgStatus : null);
+      return st === "live" || st === "settled" || st === "sold";
+    });
+    return visible.length ? visible : (cfgStatus === "live" ? slots : []);
   }
 
   function _renderLiveCarousel(cfg) {
     if (!liveCarousel || !liveTrack) return;
-    const live = _liveSlots(cfg);
-    liveCarousel.classList.toggle("show", live.length > 0);
+    const slots = _liveSlots(cfg);
+    liveCarousel.classList.toggle("show", slots.length > 0);
     liveTrack.innerHTML = "";
-    if (!live.length) return;
+    if (!slots.length) return;
 
-    live.forEach(function(slot, i) {
-      const title = slot.artTitle || slot.title || slot.name || "Live auction";
-      const artist = slot.artArtist || slot.artist || slot.maker || "";
-      const medium = slot.artMedium || slot.medium || slot.category || "";
-      const estimate = slot.estimate || slot.price || slot.currentBid || slot.reserve || "Live bidding";
-      const img = _http(slot.artImage || slot.image || slot.imageUrl || slot.artworkImage || slot.thumbnail || "");
-      const href = slot.auctionUrl || slot.url || "/auction";
-      const meta = [artist, medium].filter(Boolean).join(" - ");
+    slots.forEach(function(slot, i) {
+      const cfgStatus  = cfg.status || "off";
+      const slotStatus = _slotStatus(slot, slots.length === 1 ? cfgStatus : null);
+      const isSold     = slotStatus === "settled" || slotStatus === "sold";
+
+      const title    = slot.artTitle || slot.title || slot.name || "Auction";
+      const artist   = slot.artArtist || slot.artist || slot.maker || "";
+      const medium   = slot.artMedium || slot.medium || slot.category || "";
+      const estimate = slot.estimate || slot.price || slot.currentBid || slot.reserve || (isSold ? "Settled" : "Live bidding");
+      const img      = _http(slot.artImage || slot.image || slot.imageUrl || slot.artworkImage || slot.thumbnail || "");
+      const href     = slot.auctionUrl || slot.url || "/auction";
+      const meta     = [artist, medium].filter(Boolean).join(" – ");
 
       const card = document.createElement("a");
-      card.className = "lac-card";
+      card.className = isSold ? "lac-card lac-sold" : "lac-card";
       card.href = href;
-      card.setAttribute("aria-label", "View live auction: " + title);
+      card.setAttribute("aria-label", (isSold ? "Sold: " : "View live auction: ") + title);
 
+      // Image wrap — with sold badge overlay if settled
       const imgWrap = document.createElement("div");
       imgWrap.className = "lac-img-wrap";
+      imgWrap.style.position = "relative";
       if (img) {
         const image = document.createElement("img");
         image.src = img;
         image.alt = title;
-        image.addEventListener("error", function() {
-          image.style.display = "none";
-        });
+        if (isSold) image.style.filter = "grayscale(0.55)";
+        image.addEventListener("error", function() { image.style.display = "none"; });
         imgWrap.appendChild(image);
+      }
+      if (isSold) {
+        const badge = document.createElement("span");
+        badge.className = "lac-sold-badge";
+        badge.textContent = "Sold";
+        imgWrap.appendChild(badge);
       }
 
       const body = document.createElement("div");
@@ -2995,31 +3036,51 @@
       metaEl.className = "lac-meta";
       metaEl.textContent = meta;
 
-      const foot = document.createElement("div");
-      foot.className = "lac-foot";
+      if (isSold) {
+        const soldCta = document.createElement("span");
+        soldCta.className = "lac-cta-sold";
+        soldCta.textContent = "Auction Settled";
+        body.appendChild(titleEl);
+        if (meta) body.appendChild(metaEl);
+        body.appendChild(soldCta);
+      } else {
+        const foot = document.createElement("div");
+        foot.className = "lac-foot";
+        const estimateEl = document.createElement("span");
+        estimateEl.textContent = estimate;
+        const cta = document.createElement("span");
+        cta.textContent = "Bid now →";
+        foot.appendChild(estimateEl);
+        foot.appendChild(cta);
+        body.appendChild(titleEl);
+        if (meta) body.appendChild(metaEl);
+        body.appendChild(foot);
+      }
 
-      const estimateEl = document.createElement("span");
-      estimateEl.textContent = estimate;
-
-      const cta = document.createElement("span");
-      cta.textContent = "Bid now ->";
-
-      foot.appendChild(estimateEl);
-      foot.appendChild(cta);
-      body.appendChild(titleEl);
-      if (meta) body.appendChild(metaEl);
-      body.appendChild(foot);
       card.appendChild(imgWrap);
       card.appendChild(body);
       liveTrack.appendChild(card);
-
       if (i === 0) card.setAttribute("aria-current", "true");
     });
 
-    const showControls = live.length > 1;
+    const showControls = slots.length > 1;
     if (livePrev) livePrev.style.display = showControls ? "inline-flex" : "none";
     if (liveNext) liveNext.style.display = showControls ? "inline-flex" : "none";
+
+    // Update header label based on whether any slots are still live
+    const lacLabel = liveCarousel.querySelector(".lac-label");
+    if (lacLabel) {
+      const hasLive = slots.some(s => _slotStatus(s, slots.length === 1 ? (cfg.status || "off") : null) === "live");
+      lacLabel.innerHTML = hasLive
+        ? '<span class="lac-live-dot"></span> Live auctions'
+        : 'Auction history';
+    }
+
+    // Auto-scroll when multiple cards
+    _stopAutoScroll();
+    if (slots.length > 1) _startAutoScroll();
   }
+
   function _scrollLiveCarousel(dir) {
     if (!liveTrack) return;
     liveTrack.scrollBy({ left: dir * Math.max(260, liveTrack.clientWidth * 0.82), behavior: "smooth" });
@@ -3027,6 +3088,37 @@
 
   if (livePrev) livePrev.addEventListener("click", function() { _scrollLiveCarousel(-1); });
   if (liveNext) liveNext.addEventListener("click", function() { _scrollLiveCarousel(1); });
+
+  // ── Auto-scroll with hover/touch pause ──
+  let _autoTimer  = null;
+  let _autoPaused = false;
+
+  function _startAutoScroll() {
+    if (_autoTimer) return;
+    _autoTimer = setInterval(function() {
+      if (_autoPaused || !liveTrack) return;
+      const maxScroll = liveTrack.scrollWidth - liveTrack.clientWidth;
+      if (liveTrack.scrollLeft >= maxScroll - 4) {
+        liveTrack.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        _scrollLiveCarousel(1);
+      }
+    }, 3000);
+  }
+
+  function _stopAutoScroll() {
+    clearInterval(_autoTimer);
+    _autoTimer = null;
+  }
+
+  if (liveCarousel) {
+    liveCarousel.addEventListener("mouseenter", function() { _autoPaused = true; });
+    liveCarousel.addEventListener("mouseleave", function() { _autoPaused = false; });
+    liveCarousel.addEventListener("touchstart", function() { _autoPaused = true; }, { passive: true });
+    liveCarousel.addEventListener("touchend",   function() {
+      setTimeout(function() { _autoPaused = false; }, 2000);
+    }, { passive: true });
+  }
 
   function _fmt(s) {
     const d = Math.floor(s / 86400);
