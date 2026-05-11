@@ -2554,14 +2554,26 @@ lbPanel.addEventListener('touchend', function(e) {
     return src;
   }
 
+  function _slotStatus(slot, cfgStatus) {
+    // 1. Explicit per-slot override wins
+    const explicit = slot._effectiveStatus || slot.status;
+    if (explicit) return explicit;
+    // 2. If the slot has its own endTime and it has passed, treat as settled
+    if (slot.endTime && Number(slot.endTime) > 0 && Number(slot.endTime) < Math.floor(Date.now() / 1000)) {
+      return "settled";
+    }
+    // 3. Only inherit the top-level status when there is exactly ONE auction (single-slot mode)
+    return cfgStatus || "off";
+  }
+
   function _liveSlots(cfg) {
     const slots = Array.isArray(cfg.auctions) && cfg.auctions.length ? cfg.auctions : [cfg];
-    // Include live AND settled/sold pieces so the carousel shows the full picture
+    const cfgStatus = cfg.status || "off";
     const visible = slots.filter(s => {
-      const st = s._effectiveStatus || s.status || cfg.status || "off";
+      const st = _slotStatus(s, slots.length === 1 ? cfgStatus : null);
       return st === "live" || st === "settled" || st === "sold";
     });
-    return visible.length ? visible : (cfg.status === "live" ? slots : []);
+    return visible.length ? visible : (cfgStatus === "live" ? slots : []);
   }
 
   function _escHtml(value) {
@@ -2580,7 +2592,7 @@ lbPanel.addEventListener('touchend', function(e) {
     if (!slots.length) return;
 
     liveTrack.innerHTML = slots.map(function(slot, i) {
-      const slotStatus = slot._effectiveStatus || slot.status || cfg.status || "off";
+      const slotStatus = _slotStatus(slot, slots.length === 1 ? (cfg.status || "off") : null);
       const isSold     = slotStatus === "settled" || slotStatus === "sold";
       const title  = slot.artTitle  || ("Auction " + (i + 1));
       const artist = slot.artArtist ? slot.artArtist + " \u2013 " : "";
@@ -2610,10 +2622,7 @@ lbPanel.addEventListener('touchend', function(e) {
         '</div></a>';
     }).join("");
 
-    const liveCount = slots.filter(s => {
-      const st = s._effectiveStatus || s.status || cfg.status || "off";
-      return st === "live";
-    }).length;
+    const liveCount = slots.filter(s => _slotStatus(s, slots.length === 1 ? (cfg.status || "off") : null) === "live").length;
     const showControls = slots.length > 1;
     if (livePrev) livePrev.disabled = !showControls;
     if (liveNext) liveNext.disabled = !showControls;
