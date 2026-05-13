@@ -289,6 +289,27 @@ body.preconnect .page-title-area{display:none}
  </div>
 </div>
 
+<!-- ── SITE NAV (matches kaysworks.com) ── -->
+<nav id="siteNav" class="site-nav">
+ <a href="/" class="site-nav-logo"><span style="font-weight:600">KAY'S</span>&nbsp;<span style="font-weight:500">WORKS</span></a>
+ <ul class="site-nav-links">
+ <li><a href="/">Home</a></li>
+ <li><a href="/apoti-olowe" class="site-nav-series">Àpótí Ọlọ́wẹ̀</a></li>
+ <li><a href="/auction">Auction</a></li>
+ </ul>
+ <div class="site-nav-mobile-controls" id="pinMobileControls">
+ <button class="site-nav-hamburger" id="pinHamburger" aria-label="Menu"><span></span><span></span><span></span></button>
+ </div>
+</nav>
+
+<!-- Mobile nav drawer -->
+<div class="site-mobile-nav" id="pinMobileNav">
+ <button class="site-mobile-nav-close" id="pinMobileNavClose" aria-label="Close menu">&#x2715;</button>
+ <a href="/">Home</a>
+ <a href="/apoti-olowe" style="font-family:'Cinzel',serif;font-size:1.1rem;letter-spacing:0.15em;color:var(--gold);font-style:normal;">Àpótí Ọlọ́wẹ̀</a>
+ <a href="/auction">Auction</a>
+</div>
+
 <div class="wrap">
 
  <header>
@@ -1057,22 +1078,20 @@ fullscreenZoom = 1;
  byContract[address].tokenCount += 1;
  if (token.tokenId !== undefined && byContract[address].sampleTokenIds.length < 5) byContract[address].sampleTokenIds.push(String(token.tokenId));
  });
- // Filter: only keep contracts that have pinning entrypoints
  var candidates = Object.keys(byContract).sort().map(function(address) { return byContract[address]; });
- var pinnable = [];
- for (var i = 0; i < candidates.length; i++) {
- var c = candidates[i];
- try {
- var epUrl = tzktApiBase() + '/v1/contracts/' + encodeURIComponent(c.address) + '/entrypoints';
- var epRes = await fetch(epUrl, { cache:'no-store' });
- if (!epRes.ok) continue;
- var entrypoints = await epRes.json();
+ if (!candidates.length) return [];
+ log('Checking ' + candidates.length + ' FA2 contract' + (candidates.length === 1 ? '' : 's') + ' for pinning support...', 'info');
+ // Check all contracts in parallel
+ var results = await Promise.all(candidates.map(function(c) {
+ return fetch(tzktApiBase() + '/v1/contracts/' + encodeURIComponent(c.address) + '/entrypoints', { cache:'no-store' })
+ .then(function(epRes) { return epRes.ok ? epRes.json() : []; })
+ .then(function(entrypoints) {
  var epNames = Array.isArray(entrypoints) ? entrypoints.map(function(ep) { return ep.name; }) : Object.keys(entrypoints);
- if (epNames.indexOf('pin_token_uri') !== -1) {
- pinnable.push(c);
- }
- } catch(_) {}
- }
+ return epNames.indexOf('pin_token_uri') !== -1 ? c : null;
+ })
+ .catch(function() { return null; });
+ }));
+ var pinnable = results.filter(function(c) { return c !== null; });
  if (pinnable.length === 0 && candidates.length > 0) {
  log('Found ' + candidates.length + ' FA2 collection' + (candidates.length === 1 ? '' : 's') + ' in your wallet, but none support metadata pinning.', 'warn');
  }
