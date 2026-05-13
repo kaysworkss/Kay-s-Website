@@ -763,18 +763,25 @@ function mediaUriFromMetadata(meta, fallbackUri) {
  catch(e) { metadata = { name:'Token #' + tokenId + ' Metadata #' + i, description:'I could not fetch this metadata: ' + errorText(e) }; }
  versions.push({ index:i, uri:uri, metadata:metadata, mediaUri:mediaUriFromMetadata(metadata, uri), isActive:i === activeIndex });
  }
- var rawPinnedIndex = info ? info.pinned_index : undefined;
- // Handle BigNumber, string, Option wrapping from Taquito
+ // Extract pinned_index — handle snake_case, camelCase, Option wrapping, BigNumber
+ var rawPinnedIndex = info ? (info.pinned_index !== undefined ? info.pinned_index : info.pinnedIndex) : undefined;
+ // Unwrap Michelson Option: { Some: value }
+ if (rawPinnedIndex && typeof rawPinnedIndex === 'object' && rawPinnedIndex.Some !== undefined) rawPinnedIndex = rawPinnedIndex.Some;
  var pinnedIndex = null;
  if (rawPinnedIndex !== undefined && rawPinnedIndex !== null) {
  var asStr = (typeof rawPinnedIndex === 'object' && rawPinnedIndex.toString) ? rawPinnedIndex.toString() : String(rawPinnedIndex);
  var asNum = Number(asStr);
  if (!isNaN(asNum) && asNum >= 0) pinnedIndex = asNum;
  }
- // Only trust pinned_index as the source of truth.
- // is_pinned may be true contract-wide; pinned_index tells us WHICH version is pinned.
+ // Also check is_pinned / isPinned as a secondary signal
+ var isPinnedFlag = !!(info && (info.is_pinned || info.isPinned));
+ // Token is pinned if we have a valid pinned_index, OR if is_pinned is true AND pinned_index is exactly 0
  var trulyPinned = pinnedIndex !== null;
- log('Token #' + tokenId + ' pin: is_pinned=' + !!(info && info.is_pinned) + ', raw_index=' + rawPinnedIndex + ', parsed=' + pinnedIndex + ', pinned=' + trulyPinned, 'info');
+ // If is_pinned says yes but we couldn't parse pinned_index, log it but don't fake a pin
+ if (!trulyPinned && isPinnedFlag) {
+ log('Token #' + tokenId + ': is_pinned=true but pinned_index could not be parsed (raw: ' + rawPinnedIndex + '). Showing as unpinned.', 'warn');
+ }
+ log('Token #' + tokenId + ' pin: is_pinned=' + isPinnedFlag + ', raw_index=' + rawPinnedIndex + ' (type: ' + typeof rawPinnedIndex + '), parsed=' + pinnedIndex + ', pinned=' + trulyPinned, 'info');
  versions.forEach(function(v) { v.isPinned = trulyPinned && v.index === pinnedIndex; });
  var activeVersion = versions[activeIndex] || versions[versions.length - 1] || null;
  return { tokenId:tokenId, info:info, activeIndex:activeIndex, pinnedIndex:pinnedIndex, uriCount:count, activeUri:activeUri, uris:versions.map(function(v){ return v.uri; }), versions:versions, metadata:activeVersion ? activeVersion.metadata : {}, mediaUri:activeVersion ? activeVersion.mediaUri : activeUri };
@@ -827,6 +834,8 @@ pinRow +
  function sortedVersions(item) {
  var versions = (item.versions || []).slice();
  versions.sort(function(a, b) {
+ if (a.isPinned && !b.isPinned) return -1;
+ if (!a.isPinned && b.isPinned) return 1;
  if (a.isActive && !b.isActive) return -1;
  if (!a.isActive && b.isActive) return 1;
  return a.index - b.index;
