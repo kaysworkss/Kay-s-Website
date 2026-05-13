@@ -737,7 +737,9 @@ function networkName() { return network === 'ghostnet' ? 'Ghostnet' : 'Mainnet';
  if (/^ipfs\//i.test(uri)) return 'https://ipfs.io/' + uri;
  return uri;
  }
+ var _isRefreshing = false;
  function setGalleryLoading(title, detail) {
+ if (_isRefreshing) return;
 var grid = document.getElementById('collector-grid');
 if (!grid) return;
 grid.innerHTML = '<div class="token-empty token-loading"><div class="sb-spin"></div><div class="token-loading-text"><strong>'+esc(title || 'Loading your tokens')+'</strong><span>'+esc(detail || 'Fetching your collection and token metadata...')+'</span></div></div>';
@@ -835,14 +837,8 @@ function mediaUriFromMetadata(meta, fallbackUri) {
  return 'Media';
  }
  function detailsHtml(item, version) {
-var isPinned = !!(item.versions || []).some(function(v){ return v.isPinned; });
-var pinnedVersion = (item.versions || []).find(function(v){ return v.isPinned; });
-var pinRow = isPinned && pinnedVersion
- ? '<div class="nft-details-row"><span>Pinned metadata</span><span class="detail-pin-val">&#x1F4CC; Metadata #'+pinnedVersion.index+'</span></div>'
- : '<div class="nft-details-row"><span>Pinned metadata</span><span style="color:var(--muted)">None &mdash; shows latest</span></div>';
 return '<div class="nft-details"><div class="nft-details-title">Details</div>' +
 '<div class="nft-details-row"><span>Token ID</span><span>'+item.tokenId+'</span></div>' +
-pinRow +
 '<div class="nft-details-row"><span>Viewing</span><span>'+version.index+(version.isActive ? ' (active)' : '')+'</span></div>' +
 '<div class="nft-details-row"><span>Chain</span><span>Tezos '+esc(network === 'ghostnet' ? 'Ghostnet' : 'Mainnet')+'</span></div>' +
 '<div class="nft-details-row"><span>Contract</span><span>'+esc(shortAddr(ctAddr || document.getElementById('contract-addr').value.trim()))+'</span></div>' +
@@ -902,9 +898,7 @@ pinRow +
  var first = pinnedVersion || versions[0] || { index:0, uri:item.activeUri, mediaUri:item.mediaUri, metadata:item.metadata || {}, isActive:true, isPinned:false };
  versions.forEach(function(version){ version.isSelected = version.index === first.index; });
  var isPinned = !!pinnedVersion;
- var pinStatus = isPinned ? '<div class="token-pin-status">&#x1F4CC; Pinned metadata #'+pinnedVersion.index+'</div>' : '';
  return '<div class="token-card'+(isPinned ? ' active pinned' : '')+'"><div class="token-body">' +
- pinStatus +
  '<div class="js-token-hero-wrap">' + heroHtml(item, first) + '</div>' +
  '<div class="token-version-grid">' + versions.map(function(version){ return versionHtml(item, version); }).join('') + '</div>' +
  '<div class="js-token-details">' + detailsHtml(item, first) + '</div>' +
@@ -1060,8 +1054,8 @@ fullscreenZoom = 1;
  function bindHeroButtons(scope) {
  bindNormalZoom(scope);
  scope.querySelectorAll('.js-fullscreen').forEach(function(btn){ btn.onclick = function(){ var card = btn.closest('.token-card'); var items = fullscreenItemsFromCard(card); var selected = card.querySelector('.js-select-version.active'); var selectedIndex = selected ? items.findIndex(function(item){ return item.index === Number(selected.dataset.index); }) : 0; openFullscreen(btn.dataset.media, items, selectedIndex < 0 ? 0 : selectedIndex); }; });
- scope.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin transaction may have succeeded despite the error. Refreshing...', 'warn'); } loadGallery(); }; });
- scope.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin transaction may have succeeded despite the error. Refreshing...', 'warn'); } loadGallery(); }; });
+ scope.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin transaction may have succeeded despite the error.', 'warn'); } log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
+ scope.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin may have succeeded.', 'warn'); } _isRefreshing = true; log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
  }
 
  function entrypointCall(name, positionalArgs, objectArg) {
@@ -1202,8 +1196,8 @@ fullscreenZoom = 1;
  window._galleryItems = items;
  grid.innerHTML = items.length ? items.map(cardHtml).join('') : '';
  bindVersionViewers(grid);
- grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin transaction may have succeeded despite the error. Refreshing...', 'warn'); } loadGallery(); }; });
- grid.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin transaction may have succeeded despite the error. Refreshing...', 'warn'); } loadGallery(); }; });
+ grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin transaction may have succeeded despite the error.', 'warn'); } log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
+ grid.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin may have succeeded.', 'warn'); } _isRefreshing = true; log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
  }
  if (!items.length) {
  grid.innerHTML = '<div class="token-empty">'+esc(emptyMessage || 'I could not find tokens for you here.')+'</div>';
@@ -1244,8 +1238,8 @@ fullscreenZoom = 1;
  window._galleryItems = items;
  grid.innerHTML = items.length ? items.map(cardHtml).join('') : '';
  bindVersionViewers(grid);
- grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin transaction may have succeeded despite the error. Refreshing...', 'warn'); } loadGallery(); }; });
- grid.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin transaction may have succeeded despite the error. Refreshing...', 'warn'); } loadGallery(); }; });
+ grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin transaction may have succeeded despite the error.', 'warn'); } log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
+ grid.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin may have succeeded.', 'warn'); } _isRefreshing = true; log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
  }
  if (!items.length) {
  grid.innerHTML = '<div class="token-empty">No tokens found in this range.</div>';
@@ -1377,8 +1371,15 @@ if (btn) { btn.innerHTML = orig; btn.disabled = false; }
  };
  document.getElementById('btn-load-gallery').onclick = function() { loadGallery().catch(function(e){ log('I could not show those tokens: ' + errorText(e), 'err'); }); };
  document.getElementById('btn-refresh-pins').onclick = function() {
- log('Refreshing pin status...', 'info');
- loadGallery().catch(function(e){ log('Refresh failed: ' + errorText(e), 'err'); });
+ var rbtn = document.getElementById('btn-refresh-pins');
+ var rorig = rbtn.innerHTML;
+ _isRefreshing = true;
+ rbtn.innerHTML = '<span class="spin"></span> Refreshing...';
+ rbtn.disabled = true;
+ log('Waiting a few seconds for the chain to update...', 'info');
+ setTimeout(function() {
+ loadGallery().catch(function(e){ log('Refresh failed: ' + errorText(e), 'err'); }).finally(function(){ _isRefreshing = false; rbtn.innerHTML = rorig; rbtn.disabled = false; });
+ }, 6000);
  };
 
 
