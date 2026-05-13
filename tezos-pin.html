@@ -179,6 +179,22 @@ body.preconnect .page-title-area{display:none}
 .token-tools{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}.token-tools .field{flex:1;min-width:160px;margin:0}
 /* -- Full token gallery -- */
 .token-grid{display:flex;flex-direction:column;gap:18px;margin-top:16px}
+/* Skeleton shimmer for refresh state */
+@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+.skeleton{background:rgba(196,132,90,.06);background-image:linear-gradient(90deg,rgba(196,132,90,.06) 0%,rgba(196,132,90,.14) 40%,rgba(196,132,90,.06) 80%);background-size:800px 100%;animation:shimmer 1.6s ease-in-out infinite;border-radius:4px}
+.skeleton-card{width:100%;background:rgba(22,16,12,.75);border:1px solid rgba(196,132,90,.15);border-radius:var(--r);overflow:hidden;min-width:0}
+.skeleton-card .skeleton-hero{aspect-ratio:4/3;background:rgba(196,132,90,.04);background-image:linear-gradient(90deg,rgba(196,132,90,.04) 0%,rgba(196,132,90,.10) 40%,rgba(196,132,90,.04) 80%);background-size:800px 100%;animation:shimmer 1.6s ease-in-out infinite}
+.skeleton-card .skeleton-body{padding:16px;display:flex;flex-direction:column;gap:10px}
+.skeleton-card .skeleton-line{height:12px;border-radius:3px}
+.skeleton-card .skeleton-line.w60{width:60%}
+.skeleton-card .skeleton-line.w40{width:40%}
+.skeleton-card .skeleton-line.w80{width:80%}
+.skeleton-card .skeleton-thumbs{display:flex;gap:6px;margin-top:4px}
+.skeleton-card .skeleton-thumb{width:56px;height:56px;border-radius:4px}
+.skeleton-card .skeleton-details{border-top:1px solid rgba(196,132,90,.1);padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.skeleton-card .skeleton-detail-row{display:flex;justify-content:space-between;gap:16px}
+.skeleton-card .skeleton-detail-row .skeleton-line:first-child{width:30%}
+.skeleton-card .skeleton-detail-row .skeleton-line:last-child{width:25%}
 .token-card{width:100%;background:rgba(22,16,12,.75);border:1px solid rgba(196,132,90,.28);border-radius:var(--r);overflow:hidden;min-width:0;cursor:default;box-shadow:0 1px 8px rgba(0,0,0,.25)}
 .token-card:hover{border-color:rgba(196,132,90,.34);box-shadow:none;transform:none}
 .token-card.active,.token-card.pinned{border-color:var(--gold);box-shadow:0 0 0 1px rgba(201,153,58,.22),0 0 28px rgba(201,153,58,.12)}
@@ -737,9 +753,33 @@ function networkName() { return network === 'ghostnet' ? 'Ghostnet' : 'Mainnet';
  if (/^ipfs\//i.test(uri)) return 'https://ipfs.io/' + uri;
  return uri;
  }
+ 
+ function skeletonCardHtml() {
+ return '<div class="skeleton-card"><div class="skeleton-hero skeleton"></div>' +
+ '<div class="skeleton-body">' +
+ '<div class="skeleton skeleton-line w60"></div>' +
+ '<div class="skeleton skeleton-line w40"></div>' +
+ '<div class="skeleton skeleton-line w80"></div>' +
+ '<div class="skeleton-thumbs"><div class="skeleton skeleton-thumb"></div><div class="skeleton skeleton-thumb"></div><div class="skeleton skeleton-thumb"></div></div>' +
+ '</div>' +
+ '<div class="skeleton-details">' +
+ '<div class="skeleton-detail-row"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>' +
+ '<div class="skeleton-detail-row"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>' +
+ '<div class="skeleton-detail-row"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>' +
+ '<div class="skeleton-detail-row"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>' +
+ '</div></div>';
+ }
+ function showSkeletonGrid(count) {
+ var grid = document.getElementById('collector-grid');
+ if (!grid) return;
+ var html = '';
+ for (var s = 0; s < (count || 4); s++) html += skeletonCardHtml();
+ grid.innerHTML = html;
+ }
+
  var _isRefreshing = false;
  function setGalleryLoading(title, detail) {
- if (_isRefreshing) return;
+ if (_isRefreshing) { showSkeletonGrid(window._galleryItems ? window._galleryItems.length : 4); return; }
 var grid = document.getElementById('collector-grid');
 if (!grid) return;
 grid.innerHTML = '<div class="token-empty token-loading"><div class="sb-spin"></div><div class="token-loading-text"><strong>'+esc(title || 'Loading your tokens')+'</strong><span>'+esc(detail || 'Fetching your collection and token metadata...')+'</span></div></div>';
