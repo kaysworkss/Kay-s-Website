@@ -328,8 +328,8 @@ body.preconnect .page-title-area{display:none}
 
  <div class="preconnect-panel">
  <div class="preconnect-eyebrow">FA2 Metadata Pinning &middot; Tezos</div>
- <h1 class="preconnect-title">Choose the Artwork<br><em>You Want to Pin</em></h1>
- <p class="preconnect-copy">Connect your Tezos wallet and this page will find your FA2 collections, load your tokens, and let you pin the metadata version you want displayed.</p>
+ <h1 class="preconnect-title">View Every FA2<br><em>In Your Wallet</em></h1>
+ <p class="preconnect-copy">Connect your Tezos wallet and this page will load every FA2 token it finds first. Custom pinnable collections can still be opened from the collection controls.</p>
  <div class="preconnect-actions">
  <button class="btn btn-acc btn-connect-hero" id="btn-connect-intro" type="button" disabled>Connect Wallet</button>
  </div>
@@ -340,7 +340,7 @@ body.preconnect .page-title-area{display:none}
 
  <div class="page-title-area">
  <div class="tag">Your collector access</div>
- <div class="title">Choose the Artwork <em>You Want to Pin</em></div>
+ <div class="title">All Wallet FA2 Tokens <em>Fast View</em></div>
  </div>
 
  <div id="status-bar" class="loading collector-flow">
@@ -352,17 +352,18 @@ body.preconnect .page-title-area{display:none}
  <div class="card-title">Choose Your Collection</div>
  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
  <div class="field" style="flex:1;min-width:240px;margin:0"><label>Your collection contract</label><input id="contract-addr" placeholder="Paste the KT1 contract address" /></div>
- <button class="btn btn-sec" id="btn-load-contract">Open Collection</button>
+ <button class="btn btn-acc" id="btn-load-contract-fast">Load Tokens</button>
+ <button class="btn btn-sec" id="btn-load-contract">Custom Pin Mode</button>
  </div>
- <div class="hint">Paste your KT1 collection address, or connect your wallet and let this page find the FA2 collections you hold.</div>
+ <div class="hint">Paste a KT1 collection to load only that collection quickly, or use custom pin mode for contracts that support metadata pinning.</div>
  </div>
 
  <div class="card collector-flow" id="fa2-card">
- <div class="card-title">Your FA2 Collections <span class="badge badge-g">Wallet</span></div>
+ <div class="card-title">Your FA2 Tokens <span class="badge badge-g">Wallet</span></div>
  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
- <button class="btn btn-sec" id="btn-discover-fa2">Find My Collections</button>
+ <button class="btn btn-sec" id="btn-discover-fa2">Discover Collections</button>
  </div>
- <div id="discovered-contracts" class="token-empty">Connect your wallet and I will look for your pinnable FA2 collections.</div>
+ <div id="discovered-contracts" class="token-empty">Connect your wallet, then discover collections or paste a KT1 address above.</div>
  </div>
 
  <div id="deployed-banner" class="collector-flow">
@@ -372,7 +373,7 @@ body.preconnect .page-title-area{display:none}
  </div>
 
  <div class="card collector-flow">
- <div class="card-title">Your Token Gallery <span class="badge badge-g">Ready to pin</span></div>
+ <div class="card-title">Your Token Gallery <span class="badge badge-g">All FA2</span></div>
  <div class="token-tools">
  <div class="field"><label>Start at token ID</label><input id="gallery-start" type="number" min="0" value="0" /></div>
  <div class="field"><label>How many tokens do you want to see?</label><input id="gallery-count" type="number" min="1" max="100" value="24" /></div>
@@ -380,8 +381,8 @@ body.preconnect .page-title-area{display:none}
 
 
  </div>
- <div class="hint">You can compare each metadata option before you pin. If you unpin later, your token returns to its latest metadata.</div>
- <div id="collector-grid" class="token-grid"><div class="token-empty">Open your collection to preview your token images.</div></div>
+ <div class="hint">Collections load one at a time so large wallets stay responsive. Open a custom pinnable contract only when you need metadata-version pinning controls.</div>
+ <div id="collector-grid" class="token-grid"><div class="token-empty">Load a collection to preview its tokens.</div></div>
  </div>
 
  <div class="collector-flow" style="margin-top:28px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -839,7 +840,7 @@ return '<div class="nft-details"><div class="nft-details-title">Details</div>' +
 pinRow +
 '<div class="nft-details-row"><span>Viewing</span><span>'+version.index+(version.isActive ? ' (active)' : '')+'</span></div>' +
 '<div class="nft-details-row"><span>Chain</span><span>Tezos '+esc(network === 'ghostnet' ? 'Ghostnet' : 'Mainnet')+'</span></div>' +
-'<div class="nft-details-row"><span>Contract</span><span>'+esc(shortAddr(ctAddr || document.getElementById('contract-addr').value.trim()))+'</span></div>' +
+'<div class="nft-details-row"><span>Contract</span><span>'+esc(shortAddr(item.contract || ctAddr || document.getElementById('contract-addr').value.trim()))+'</span></div>' +
 '<div class="nft-details-row"><span>Type</span><span>FA2</span></div>' +
 '<div class="nft-details-row"><span>Metadata</span><span>'+metadataStorage(version.uri)+'</span></div>' +
 '<div class="nft-details-row"><span>Media</span><span>'+mediaTypeFromUri(version.mediaUri)+'</span></div>' +
@@ -873,6 +874,9 @@ pinRow +
  mediaMarkup(version, 'token-media') + '<div class="token-version-title">'+version.index+'</div>'+(isPinned ? '<div class="token-version-pin"><span class="pin-icon">&#x1F4CC;</span></div>' : '')+'<div class="token-version-body"><div class="token-version-uri">'+esc(version.uri)+'</div></div></button>';
  }
  function metadataActionHtml(item, version) {
+ if (item && item.canPin === false) {
+ return '<div class="token-action-note">Fast FA2 wallet view. Open this custom contract separately to use pinning controls.</div>';
+ }
  var isViewingPinned = !!version.isPinned;
  if (isViewingPinned) {
  return '<button class="btn btn-ghost btn-sm js-unpin" type="button" data-token-id="'+item.tokenId+'">Unpin This Metadata</button><div class="token-action-note">Unpinning will let this token show its latest metadata instead.</div>';
@@ -1088,12 +1092,20 @@ fullscreenZoom = 1;
  return network === 'mainnet' ? 'https://api.tzkt.io' : 'https://api.ghostnet.tzkt.io';
  }
 
- async function discoverFa2Contracts() {
+ async function walletFa2BalanceRows() {
  if (!userAddr) throw new Error('Connect your wallet first.');
+ var cacheKey = network + ':' + userAddr;
+ if (!window._walletFa2RowsCache) window._walletFa2RowsCache = {};
+ if (window._walletFa2RowsCache[cacheKey]) return await window._walletFa2RowsCache[cacheKey];
  var url = tzktApiBase() + '/v1/tokens/balances?account=' + encodeURIComponent(userAddr) + '&balance.ne=0&token.standard=fa2&limit=1000';
- var res = await fetch(url, { cache:'no-store' });
- if (!res.ok) throw new Error('FA2 contract lookup failed (' + res.status + ').');
- var rows = await res.json();
+ window._walletFa2RowsCache[cacheKey] = fetch(url, { cache:'no-store' }).then(function(res) {
+ if (!res.ok) throw new Error('FA2 token lookup failed (' + res.status + ').');
+ return res.json();
+ });
+ return await window._walletFa2RowsCache[cacheKey];
+ }
+ async function discoverFa2Contracts() {
+ var rows = await walletFa2BalanceRows();
  var byContract = {};
  rows.forEach(function(row) {
  var token = row && row.token;
@@ -1105,30 +1117,8 @@ fullscreenZoom = 1;
  if (token.tokenId !== undefined && byContract[address].sampleTokenIds.length < 5) byContract[address].sampleTokenIds.push(String(token.tokenId));
  });
  var candidates = Object.keys(byContract).sort().map(function(address) { return byContract[address]; });
- if (!candidates.length) return [];
- log('Checking ' + candidates.length + ' FA2 contract' + (candidates.length === 1 ? '' : 's') + ' for pinning support...', 'info');
- if (!window._entrypointSupportCache) window._entrypointSupportCache = {};
- var cacheKeyPrefix = network + ':';
- var results = await mapWithConcurrency(candidates, 8, function(c) {
- var cacheKey = cacheKeyPrefix + c.address;
- if (window._entrypointSupportCache[cacheKey] !== undefined) {
- return Promise.resolve(window._entrypointSupportCache[cacheKey] ? c : null);
- }
- return fetch(tzktApiBase() + '/v1/contracts/' + encodeURIComponent(c.address) + '/entrypoints', { cache:'no-store' })
- .then(function(epRes) { return epRes.ok ? epRes.json() : []; })
- .then(function(entrypoints) {
- var epNames = Array.isArray(entrypoints) ? entrypoints.map(function(ep) { return ep.name; }) : Object.keys(entrypoints);
- var supported = epNames.indexOf('pin_token_uri') !== -1;
- window._entrypointSupportCache[cacheKey] = supported;
- return supported ? c : null;
- })
- .catch(function() { window._entrypointSupportCache[cacheKey] = false; return null; });
- });
- var pinnable = results.filter(function(c) { return c !== null; });
- if (pinnable.length === 0 && candidates.length > 0) {
- log('Found ' + candidates.length + ' FA2 collection' + (candidates.length === 1 ? '' : 's') + ' in your wallet, but none support metadata pinning.', 'warn');
- }
- return pinnable;
+ log(candidates.length ? 'Found ' + candidates.length + ' FA2 collection' + (candidates.length === 1 ? '' : 's') + ' in your wallet.' : 'No FA2 tokens found in this wallet.', candidates.length ? 'ok' : 'warn');
+ return candidates;
  }
  function renderDiscoveredContracts(contracts) {
  var box = document.getElementById('discovered-contracts');
@@ -1137,16 +1127,16 @@ fullscreenZoom = 1;
  if (!contracts.length) {
  box.className = 'token-empty';
  if (fa2Card) fa2Card.classList.remove('fa2-found');
- box.innerHTML = 'No pinnable FA2 collections found in your wallet on ' + esc(network) + '. Only custom contracts with <strong>pin_token_uri</strong> support are shown here. Standard Objkt or marketplace collections won\u2019t appear.';
+ box.innerHTML = 'No FA2 tokens were found in this wallet on ' + esc(network) + '.';
  return;
  }
  box.className = 'view-result';
  box.style.display = 'block';
  var heading = '';
  if (contracts.length === 1) {
- heading = '<div style="padding:12px 0 8px;color:var(--sand);font-family:Crimson Pro,serif;font-size:1rem;line-height:1.5">Found your collection! Tap <strong style="color:var(--gold)">Use</strong> to explore your tokens.</div>';
+ heading = '<div style="padding:12px 0 8px;color:var(--sand);font-family:Crimson Pro,serif;font-size:1rem;line-height:1.5">Found one FA2 collection. Load its tokens, or open custom pin mode if it supports pinning.</div>';
  } else {
- heading = '<div style="padding:12px 0 8px;color:var(--sand);font-family:Crimson Pro,serif;font-size:1rem;line-height:1.5">Nice \u2014 you have <strong style="color:var(--gold)">' + contracts.length + ' collections</strong> in this wallet! Which one do you want to explore first?</div>';
+ heading = '<div style="padding:12px 0 8px;color:var(--sand);font-family:Crimson Pro,serif;font-size:1rem;line-height:1.5">Found <strong style="color:var(--gold)">' + contracts.length + ' FA2 collections</strong>. Choose one collection to load.</div>';
  }
  box.innerHTML = heading + contracts.map(function(c) {
  var label = c.alias ? '<span style="color:var(--sand);font-family:Cormorant Garamond,serif;font-size:1.08rem;font-weight:500">' + esc(c.alias) + '</span><br>' : '';
@@ -1154,9 +1144,12 @@ fullscreenZoom = 1;
  var ids = c.sampleTokenIds.length ? ' \u00b7 IDs ' + esc(c.sampleTokenIds.join(', ')) : '';
  return '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bdr);padding:12px 0">' +
  '<div class="token-meta" style="color:var(--tx)">' + label + '<span style="color:var(--muted);font-size:.78rem">' + esc(c.address) + '</span><br><span style="color:var(--clay)">' + tokenLabel + ' you hold' + ids + '</span></div>' +
- '<button class="btn btn-acc btn-sm js-use-fa2" type="button" data-contract="'+esc(c.address)+'">Use</button>' +
+ '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-acc btn-sm js-load-fa2-tokens" type="button" data-contract="'+esc(c.address)+'">Load Tokens</button><button class="btn btn-sec btn-sm js-use-fa2" type="button" data-contract="'+esc(c.address)+'">Pin Mode</button></div>' +
  '</div>';
  }).join('');
+ box.querySelectorAll('.js-load-fa2-tokens').forEach(function(btn) {
+ btn.onclick = function() { loadFa2ContractTokens(btn.dataset.contract).catch(function(e){ log('I could not load that collection: ' + errorText(e), 'err'); }); };
+ });
  box.querySelectorAll('.js-use-fa2').forEach(function(btn) {
  btn.onclick = function() { loadContractAddress(btn.dataset.contract, true); };
  });
@@ -1164,11 +1157,63 @@ fullscreenZoom = 1;
  async function discoverAndMaybeLoadFa2(autoLoadSingle) {
  var box = document.getElementById('discovered-contracts');
  box.className = 'token-empty';
- box.innerHTML = '<div class="token-empty token-loading" style="margin-top:0"><div class="sb-spin"></div><div class="token-loading-text"><strong>Looking for your pinnable collections</strong><span>Scanning your wallet on ' + esc(network) + '...</span></div></div>'; 
+ box.innerHTML = '<div class="token-empty token-loading" style="margin-top:0"><div class="sb-spin"></div><div class="token-loading-text"><strong>Looking for FA2 collections</strong><span>Scanning your wallet on ' + esc(network) + '...</span></div></div>'; 
  var contracts = await discoverFa2Contracts();
  renderDiscoveredContracts(contracts);
- log(contracts.length === 1 ? 'Found your collection!' : 'Found ' + contracts.length + ' collections in your wallet!', contracts.length ? 'ok' : 'warn');
- if (autoLoadSingle && contracts.length === 1 && !ctAddr) await loadContractAddress(contracts[0].address, true);
+ log(contracts.length === 1 ? 'Found one FA2 collection.' : 'Found ' + contracts.length + ' FA2 collections in your wallet.', contracts.length ? 'ok' : 'warn');
+ }
+ function metadataUriFromTzkt(token, metadata) {
+ return (token && (token.metadataUri || token.metadata_uri || token.tokenUri || token.token_uri)) || (metadata && (metadata.uri || metadata.metadataUri || metadata.metadata_uri)) || '';
+ }
+ function walletTokenItemFromRow(row) {
+ var token = row && row.token ? row.token : {};
+ var contract = token.contract || {};
+ var metadata = token.metadata || {};
+ var tokenId = Number(token.tokenId);
+ var uri = metadataUriFromTzkt(token, metadata);
+ var version = { index:0, uri:uri || ('tzkt://' + (contract.address || 'unknown') + '/' + token.tokenId), metadata:metadata, mediaUri:mediaUriFromMetadata(metadata, ''), isActive:true, isPinned:false };
+ return { tokenId:Number.isInteger(tokenId) ? tokenId : 0, contract:contract.address || '', contractAlias:contract.alias || '', balance:row.balance, canPin:false, activeIndex:0, pinnedIndex:null, uriCount:1, activeUri:version.uri, uris:[version.uri], versions:[version], metadata:metadata, mediaUri:version.mediaUri };
+ }
+ async function loadAllFa2Tokens() {
+ reqWalletOnly();
+ var grid = document.getElementById('collector-grid');
+ setGalleryLoading('Loading every FA2 token', 'Reading wallet balances from TzKT and rendering current token metadata...');
+ var rows = await walletFa2BalanceRows();
+ var items = rows.map(walletTokenItemFromRow).filter(function(item) { return item.contract && item.tokenId >= 0; }).sort(function(a, b) {
+ if (a.contract !== b.contract) return a.contract < b.contract ? -1 : 1;
+ return a.tokenId - b.tokenId;
+ });
+ window._galleryItems = items;
+ var detailPanel = document.getElementById('token-detail-panel');
+ if (detailPanel) detailPanel.style.display = 'none';
+ grid.innerHTML = items.length ? items.map(cardHtml).join('') : '<div class="token-empty">No FA2 tokens were found in this wallet.</div>';
+ bindVersionViewers(grid);
+ log('Loaded all FA2 tokens in this wallet: ' + items.length + '.', items.length ? 'ok' : 'warn');
+ }
+ async function loadFa2ContractTokens(addr) {
+ reqWalletOnly();
+ if (!addr || !addr.startsWith('KT1')) throw new Error('Paste a valid KT1 collection address first.');
+ var grid = document.getElementById('collector-grid');
+ setGalleryLoading('Loading collection tokens', 'Reading wallet tokens from ' + shortContract(addr) + '...');
+ var rows = await walletFa2BalanceRows();
+ var filtered = rows.filter(function(row) {
+ var token = row && row.token;
+ var contract = token && token.contract;
+ return contract && contract.address === addr;
+ });
+ var items = filtered.map(walletTokenItemFromRow).filter(function(item) { return item.contract && item.tokenId >= 0; }).sort(function(a, b) { return a.tokenId - b.tokenId; });
+ window._galleryItems = items;
+ document.getElementById('contract-addr').value = addr;
+ document.getElementById('deployed-banner').classList.add('show');
+ document.getElementById('ct-addr-display').textContent = addr;
+ var detailPanel = document.getElementById('token-detail-panel');
+ if (detailPanel) detailPanel.style.display = 'none';
+ grid.innerHTML = items.length ? items.map(cardHtml).join('') : '<div class="token-empty">No tokens from this collection were found in the connected wallet.</div>';
+ bindVersionViewers(grid);
+ log('Loaded ' + items.length + ' token' + (items.length === 1 ? '' : 's') + ' from ' + shortContract(addr) + '.', items.length ? 'ok' : 'warn');
+ }
+ function reqWalletOnly() {
+ if (!userAddr) throw new Error('Connect your wallet first.');
  }
 
  async function ownedTokenIds() {
@@ -1246,7 +1291,7 @@ grid.innerHTML = items.length ? items.map(cardHtml).join('') : '<div class="toke
  Tezos.setWalletProvider(wallet);
  finishConnect(userAddr);
  log('Reconnected from your previous session: ' + userAddr, 'ok');
- if (!ctAddr) discoverAndMaybeLoadFa2(true).catch(function(e){ log('I could not automatically find your FA2 collections: ' + errorText(e), 'warn'); });
+ log('Choose Discover Collections or paste a KT1 address when you are ready to load tokens.', 'info');
  }
  } catch(_) {}
  })();
@@ -1278,8 +1323,8 @@ grid.innerHTML = items.length ? items.map(cardHtml).join('') : '<div class="toke
  userAddr = await wallet.getPKH();
  finishConnect(userAddr);
  log('Your wallet is connected with Beacon: ' + userAddr, 'ok');
- if (!ctAddr) discoverAndMaybeLoadFa2(true).catch(function(e){ log('I could not automatically find your FA2 collections: ' + errorText(e), 'warn'); });
- else loadGallery().catch(function(e){ log('I could not preload your token gallery: ' + errorText(e), 'warn'); });
+ if (ctAddr) loadGallery().catch(function(e){ log('I could not preload your token gallery: ' + errorText(e), 'warn'); });
+ else log('Choose Discover Collections or paste a KT1 address when you are ready to load tokens.', 'info');
  return true;
  } catch(e) {
  log('I could not connect your wallet: ' + errorText(e), 'err');
@@ -1302,8 +1347,8 @@ grid.innerHTML = items.length ? items.map(cardHtml).join('') : '<div class="toke
  if (ctAddr) ct = await Tezos.wallet.at(ctAddr);
  finishConnect(permission.pkh);
  log('Your Temple wallet is connected: ' + permission.pkh, 'ok');
- if (!ctAddr) discoverAndMaybeLoadFa2(true).catch(function(e){ log('I could not automatically find your FA2 collections: ' + errorText(e), 'warn'); });
- else loadGallery().catch(function(e){ log('I could not preload your token gallery: ' + errorText(e), 'warn'); });
+ if (ctAddr) loadGallery().catch(function(e){ log('I could not preload your token gallery: ' + errorText(e), 'warn'); });
+ else log('Choose Discover Collections or paste a KT1 address when you are ready to load tokens.', 'info');
  } catch(e) { log('I could not connect your Temple wallet directly: ' + errorText(e), 'warn'); log('Opening Beacon pairing as a fallback...', 'warn'); await connectWithBeacon(true); }
  };
  document.getElementById('wm-beacon').onclick = function() { connectWithBeacon(true); };
@@ -1319,7 +1364,7 @@ grid.innerHTML = items.length ? items.map(cardHtml).join('') : '<div class="toke
  document.body.classList.add('preconnect');
  document.body.classList.remove('wallet-ready');
  var fa2Card = document.getElementById('fa2-card'); if (fa2Card) fa2Card.classList.remove('fa2-found');
- var grid = document.getElementById('collector-grid'); if (grid) grid.innerHTML = '<div class="token-empty">Open your collection to preview your token images.</div>';
+ var grid = document.getElementById('collector-grid'); if (grid) grid.innerHTML = '<div class="token-empty">Load a collection to preview its tokens.</div>';
  window._galleryItems = [];
  log('Your wallet is disconnected.', 'info');
  };
@@ -1350,10 +1395,14 @@ if (btn) { btn.innerHTML = orig; btn.disabled = false; }
  var addr = document.getElementById('contract-addr').value.trim();
  await loadContractAddress(addr, true);
  };
+ document.getElementById('btn-load-contract-fast').onclick = function() {
+ var addr = document.getElementById('contract-addr').value.trim();
+ loadFa2ContractTokens(addr).catch(function(e){ log('I could not load that collection: ' + errorText(e), 'err'); });
+ };
  document.getElementById('btn-load-gallery').onclick = function() { loadGallery().catch(function(e){ log('I could not show those tokens: ' + errorText(e), 'err'); }); };
 
 
- document.getElementById('btn-discover-fa2').onclick = function() { discoverAndMaybeLoadFa2(false).catch(function(e){ log('I could not find your collections: ' + errorText(e), 'err'); }); };
+ document.getElementById('btn-discover-fa2').onclick = function() { discoverAndMaybeLoadFa2(false).catch(function(e){ log('I could not list your collections: ' + errorText(e), 'err'); }); };
  document.getElementById('btn-clr-log').onclick = function() { logEl.innerHTML = '<span class="linfo">Your activity is clear.</span>'; };
 
  var qs = new URLSearchParams(location.search);
@@ -1373,10 +1422,6 @@ if (btn) { btn.innerHTML = orig; btn.disabled = false; }
 </script>
 </body>
 </html>
-
-
-
-
 
 
 
