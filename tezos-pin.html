@@ -893,7 +893,7 @@ function gatewayUrls(uri) {
  var path = ipfsPath(uri);
  var urls = primary ? [primary] : [];
  if (path) {
- ['https://nftstorage.link/ipfs/','https://dweb.link/ipfs/','https://cloudflare-ipfs.com/ipfs/'].forEach(function(base) {
+ ['https://nftstorage.link/ipfs/','https://dweb.link/ipfs/','https://w3s.link/ipfs/','https://cloudflare-ipfs.com/ipfs/'].forEach(function(base) {
  var alt = base + path;
  if (urls.indexOf(alt) === -1) urls.push(alt);
  });
@@ -940,7 +940,7 @@ function mediaKindFromMime(mime) {
 }
 function mediaKindFromUri(uri) {
  uri = String(uri || '').split('?')[0].split('#')[0].toLowerCase();
- if (/\.(mp4|webm|ogg|mov|m4v)$/.test(uri)) return 'video';
+ if (/\.(mp4|m4v|mov|webm|ogv|ogg)$/.test(uri)) return 'video';
  if (/\.(png|jpg|jpeg|gif|webp|svg)$/.test(uri)) return 'image';
  if (/\.(glb|gltf)$/.test(uri)) return 'model';
  return '';
@@ -976,7 +976,11 @@ function metadataMediaMime(meta, uri) {
  direct = fmt.mimeType || fmt.mime_type || fmt.contentType || fmt.content_type || direct;
  if (direct) break;
  }
- return String(direct || '').toLowerCase();
+ direct = String(direct || '').toLowerCase();
+ if (direct === 'video/quicktime') return 'video/mp4';
+ if (direct === 'video/x-m4v') return 'video/mp4';
+ if (direct === 'video/ogg') return 'video/ogg';
+ return direct;
 }
 function mediaUriFromMetadata(meta, fallbackUri) {
  if (!meta || typeof meta !== 'object') return fallbackUri || '';
@@ -1106,7 +1110,8 @@ function mediaMarkup(version, cls) {
  if (kind === 'video' || /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(url)) {
  var sources = gatewayUrls(version.mediaUri).join('|');
  var attrs = cls === 'token-media' ? 'muted loop playsinline preload="metadata"' : 'controls playsinline preload="metadata"';
- return '<div class="'+cls+'"><video class="js-inline-video" '+attrs+' crossorigin="anonymous" data-sources="'+esc(sources)+'"'+(mime ? ' data-mime="'+esc(mime)+'"' : '')+' src="'+esc(url)+'"></video><div class="token-video-error">Video preview could not load from the available gateways.</div></div>';
+ var poster = gatewayUrl(version.metadata && (version.metadata.thumbnailUri || version.metadata.thumbnail_uri || version.metadata.displayUri || version.metadata.display_uri || version.metadata.image || ''));
+ return '<div class="'+cls+'"><video class="js-inline-video" '+attrs+' crossorigin="anonymous" data-sources="'+esc(sources)+'" data-no-blob="'+(cls === 'token-media' ? '1' : '0')+'"'+(mime ? ' data-mime="'+esc(mime)+'"' : '')+(poster ? ' poster="'+esc(poster)+'"' : '')+' src="'+esc(url)+'"></video><div class="token-video-error">Video preview is trying another gateway...</div></div>';
  }
  if (cls === 'token-hero-media') return '<div class="'+cls+' js-zoom-stage" data-zoom="1" data-pan-x="0" data-pan-y="0"><img class="js-zoom-img" src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy" onerror="this.parentNode.textContent=\'This image is unavailable\'"><div class="token-zoom-tools" aria-label="Artwork zoom controls"><button class="btn btn-sec btn-sm token-zoom-btn js-zoom-out" type="button">-</button><span class="token-zoom-label">100%</span><button class="btn btn-sec btn-sm token-zoom-btn js-zoom-in" type="button">+</button><button class="btn btn-ghost btn-sm token-zoom-reset js-zoom-reset" type="button">Reset</button></div></div>';
  return '<div class="'+cls+'"><img src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy" onerror="this.parentNode.textContent=\'This image is unavailable\'"></div>';
@@ -1168,7 +1173,7 @@ var item = fullscreenItems[fullscreenIndex];
 if (!viewer || !box || !item) return;
 if (item.kind === 'video' || /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(item.media)) {
 var fsSources = gatewayUrls(item.rawMedia || item.media).join('|');
-box.innerHTML = '<video class="js-inline-video" controls autoplay playsinline crossorigin="anonymous" data-sources="'+esc(fsSources)+'"'+(item.mime ? ' data-mime="'+esc(item.mime)+'"' : '')+' src="'+esc(item.media)+'"></video>';
+box.innerHTML = '<video class="js-inline-video" controls autoplay playsinline crossorigin="anonymous" data-sources="'+esc(fsSources)+'"'+(item.mime ? ' data-mime="'+esc(item.mime)+'"' : '')+' src="'+esc(item.media)+'"></video><div class="token-video-error">Video preview is trying another gateway...</div>';
 } else {
 box.innerHTML = '<img src="'+esc(item.media)+'" alt="'+esc(item.title || 'Full screen token preview')+'">';
 }
@@ -1307,27 +1312,64 @@ fullscreenZoom = 1;
  });
  }
 
- function bindInlineVideos(scope) {
+function bindInlineVideos(scope) {
  scope.querySelectorAll('.js-inline-video').forEach(function(video) {
  if (video.dataset.videoBound) return;
  video.dataset.videoBound = '1';
  var sources = (video.dataset.sources || '').split('|').filter(Boolean);
  var idx = Math.max(0, sources.indexOf(video.getAttribute('src') || video.src));
+ if (idx < 0) idx = 0;
+ var blobTried = false;
+ var failed = false;
+ var box = video.closest('.token-media,.token-hero-media');
+ function setMessage(text, show) {
+ if (!box) return;
+ var msg = box.querySelector('.token-video-error');
+ if (msg) msg.textContent = text;
+ box.classList.toggle('video-failed', !!show);
+ }
+ async function loadBlobFallback() {
+ if (video.dataset.noBlob === '1') return false;
+ if (blobTried || !sources.length) return false;
+ blobTried = true;
+ setMessage('Loading video into the preview...', true);
+ for (var i = 0; i < sources.length; i++) {
+ try {
+ var res = await fetch(sources[i], { cache:'force-cache' });
+ if (!res.ok) continue;
+ var blob = await res.blob();
+ if (!blob || !blob.size) continue;
+ var objectUrl = URL.createObjectURL(blob);
+ video.src = objectUrl;
+ video.load();
+ setMessage('', false);
+ return true;
+ } catch(_) {}
+ }
+ return false;
+ }
  video.onerror = function() {
+ if (failed) return;
  var next = idx + 1;
  if (next < sources.length) {
  idx = next;
+ setMessage('Trying another video gateway...', true);
  video.src = sources[idx];
  video.load();
  return;
  }
- var box = video.closest('.token-media,.token-hero-media');
- if (box) box.classList.add('video-failed');
+ loadBlobFallback().then(function(ok) {
+ if (!ok) {
+ failed = true;
+ setMessage('Video preview could not load from the available gateways.', true);
+ }
+ });
  };
  video.onloadedmetadata = function() {
- var box = video.closest('.token-media,.token-hero-media');
- if (box) box.classList.remove('video-failed');
+ setMessage('', false);
  };
+ video.oncanplay = function() { setMessage('', false); };
+ video.onstalled = function() { if (!blobTried) loadBlobFallback(); };
  });
  }
 
@@ -1413,6 +1455,15 @@ function setCollectionBanner(addr, name) {
  } else {
  display.textContent = addr;
  }
+ }
+ function collapseCollectionPicker(addr, name) {
+ var box = document.getElementById('discovered-contracts');
+ if (!box) return;
+ box.className = 'view-result';
+ box.style.display = 'block';
+ box.innerHTML = '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;padding:6px 0"><div class="token-meta" style="color:var(--tx)"><span style="color:var(--gold);font-family:Cinzel,serif;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase">Opened Collection</span><br><span style="color:var(--sand)">'+esc(name || shortContract(addr))+'</span><br><span style="color:var(--muted);font-size:.72rem">'+esc(addr)+'</span></div><button class="btn btn-ghost btn-sm" type="button" id="btn-show-collections">Show Collections</button></div>';
+ var btn = document.getElementById('btn-show-collections');
+ if (btn) btn.onclick = function() { discoverAndMaybeLoadFa2(false).catch(function(e){ log('I could not refresh your collections: ' + errorText(e), 'err'); }); };
  }
  function updateCollectionNameFromItems(items) {
  if (!ctAddr || !items || !items.length) return;
@@ -1736,12 +1787,15 @@ var displayName = knownName || await contractDisplayName(addr);
 document.getElementById('contract-addr').value = addr;
 document.getElementById('deployed-banner').classList.add('show');
 setCollectionBanner(addr, displayName);
+collapseCollectionPicker(addr, displayName);
 log('Your collection is open: ' + (displayName || addr), 'ok');
 if (preferOwned && userAddr) {
  await loadOwnedTokens();
 } else {
  await loadGallery();
 }
+var galleryCard = document.getElementById('collector-grid');
+if (galleryCard && galleryCard.scrollIntoView) setTimeout(function(){ galleryCard.scrollIntoView({ behavior:'smooth', block:'start' }); }, 150);
 } catch(e) {
 setGalleryLoading('I could not open your collection', errorText(e));
 log('I could not open your collection: ' + errorText(e), 'err');
