@@ -746,23 +746,49 @@ function mediaUriFromMetadata(meta, fallbackUri) {
  return meta.displayUri || meta.display_uri || meta.artifactUri || meta.artifact_uri || meta.thumbnailUri || meta.thumbnail_uri || meta.image || meta.imageUri || fallbackUri || '';
  }
  async function fetchJsonMaybe(uri) {
- var res = await fetch(gatewayUrl(uri), { cache:'no-store' });
+ var url = gatewayUrl(uri);
+ if (!window._metadataJsonCache) window._metadataJsonCache = {};
+ if (window._metadataJsonCache[url]) return window._metadataJsonCache[url];
+ var promise = fetch(url, { cache:'no-store' }).then(function(res) {
  if (!res.ok) throw new Error('Metadata fetch failed (' + res.status + ')');
- return await res.json();
+ return res.json();
+ });
+ window._metadataJsonCache[url] = promise;
+ return await promise;
+ }
+ async function mapWithConcurrency(items, limit, worker) {
+ var results = new Array(items.length);
+ var next = 0;
+ limit = Math.max(1, Math.min(Number(limit) || 1, items.length || 1));
+ async function run() {
+ while (next < items.length) {
+ var index = next++;
+ results[index] = await worker(items[index], index);
+ }
+ }
+ var runners = [];
+ for (var i = 0; i < limit; i++) runners.push(run());
+ await Promise.all(runners);
+ return results;
  }
  async function tokenInfo(tokenId) {
- var info = await ct.contractViews.get_token_info(tokenId).executeView({viewCaller:userAddr});
+ var basic = await Promise.all([
+ ct.contractViews.get_token_info(tokenId).executeView({viewCaller:userAddr}),
+ ct.contractViews.get_active_uri(tokenId).executeView({viewCaller:userAddr})
+ ]);
+ var info = basic[0];
  var activeIndex = Number(info.active_index);
  var count = Number(info.uri_count);
- var activeUri = await ct.contractViews.get_active_uri(tokenId).executeView({viewCaller:userAddr});
- var versions = [];
- for (var i = 0; i < count; i++) {
+ var activeUri = basic[1];
+ var indices = [];
+ for (var i = 0; i < count; i++) indices.push(i);
+ var versions = await mapWithConcurrency(indices, 6, async function(i) {
  var uri = await ct.contractViews.get_uri_at({token_id:tokenId,index:i}).executeView({viewCaller:userAddr});
  var metadata;
  try { metadata = await fetchJsonMaybe(uri); }
  catch(e) { metadata = { name:'Token #' + tokenId + ' Metadata #' + i, description:'I could not fetch this metadata: ' + errorText(e) }; }
- versions.push({ index:i, uri:uri, metadata:metadata, mediaUri:mediaUriFromMetadata(metadata, uri), isActive:i === activeIndex });
- }
+ return { index:i, uri:uri, metadata:metadata, mediaUri:mediaUriFromMetadata(metadata, uri), isActive:i === activeIndex };
+ });
  var rawPinnedIndex = info ? info.pinned_index : undefined;
  // Handle BigNumber, string, Option wrapping from Taquito
  var pinnedIndex = null;
@@ -1081,16 +1107,23 @@ fullscreenZoom = 1;
  var candidates = Object.keys(byContract).sort().map(function(address) { return byContract[address]; });
  if (!candidates.length) return [];
  log('Checking ' + candidates.length + ' FA2 contract' + (candidates.length === 1 ? '' : 's') + ' for pinning support...', 'info');
- // Check all contracts in parallel
- var results = await Promise.all(candidates.map(function(c) {
+ if (!window._entrypointSupportCache) window._entrypointSupportCache = {};
+ var cacheKeyPrefix = network + ':';
+ var results = await mapWithConcurrency(candidates, 8, function(c) {
+ var cacheKey = cacheKeyPrefix + c.address;
+ if (window._entrypointSupportCache[cacheKey] !== undefined) {
+ return Promise.resolve(window._entrypointSupportCache[cacheKey] ? c : null);
+ }
  return fetch(tzktApiBase() + '/v1/contracts/' + encodeURIComponent(c.address) + '/entrypoints', { cache:'no-store' })
  .then(function(epRes) { return epRes.ok ? epRes.json() : []; })
  .then(function(entrypoints) {
  var epNames = Array.isArray(entrypoints) ? entrypoints.map(function(ep) { return ep.name; }) : Object.keys(entrypoints);
- return epNames.indexOf('pin_token_uri') !== -1 ? c : null;
+ var supported = epNames.indexOf('pin_token_uri') !== -1;
+ window._entrypointSupportCache[cacheKey] = supported;
+ return supported ? c : null;
  })
- .catch(function() { return null; });
- }));
+ .catch(function() { window._entrypointSupportCache[cacheKey] = false; return null; });
+ });
  var pinnable = results.filter(function(c) { return c !== null; });
  if (pinnable.length === 0 && candidates.length > 0) {
  log('Found ' + candidates.length + ' FA2 collection' + (candidates.length === 1 ? '' : 's') + ' in your wallet, but none support metadata pinning.', 'warn');
@@ -1153,11 +1186,10 @@ fullscreenZoom = 1;
  req();
  var grid = document.getElementById('collector-grid');
  setGalleryLoading('Loading your token metadata', 'Fetching the token images and metadata options you can choose from...');
- var items = [];
- for (var i = 0; i < tokenIds.length; i++) {
- try { items.push(await tokenInfo(tokenIds[i])); }
- catch(e) { log('I could not load token #' + tokenIds[i] + ': ' + errorText(e), 'warn'); }
- }
+ var items = (await mapWithConcurrency(tokenIds, 4, async function(tokenId) {
+ try { return await tokenInfo(tokenId); }
+ catch(e) { log('I could not load token #' + tokenId + ': ' + errorText(e), 'warn'); return null; }
+ })).filter(function(item) { return item !== null; });
  window._galleryItems = items;
  var detailPanel = document.getElementById('token-detail-panel');
  if (detailPanel) detailPanel.style.display = 'none';
@@ -1185,11 +1217,12 @@ fullscreenZoom = 1;
  var count = galleryCount();
  var limit = await discoverTokenLimit(start + count);
  var end = Math.min(start + count, limit || (start + count));
- var items = [];
- for (var id = start; id < end; id++) {
- try { items.push(await tokenInfo(id)); }
- catch(e) { log('I could not load token #' + id + ': ' + errorText(e), 'warn'); }
- }
+ var ids = [];
+ for (var id = start; id < end; id++) ids.push(id);
+ var items = (await mapWithConcurrency(ids, 4, async function(tokenId) {
+ try { return await tokenInfo(tokenId); }
+ catch(e) { log('I could not load token #' + tokenId + ': ' + errorText(e), 'warn'); return null; }
+ })).filter(function(item) { return item !== null; });
   window._galleryItems = items;
  var detailPanel = document.getElementById('token-detail-panel');
  if (detailPanel) detailPanel.style.display = 'none';
@@ -1340,9 +1373,6 @@ if (btn) { btn.innerHTML = orig; btn.disabled = false; }
 </script>
 </body>
 </html>
-
-
-
 
 
 
