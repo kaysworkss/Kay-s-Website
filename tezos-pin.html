@@ -321,7 +321,8 @@ body.preconnect .page-title-area{display:none}
 .token-card.active,.token-card.pinned{border-color:var(--gold);box-shadow:0 0 0 1px rgba(201,153,58,.22),0 0 28px rgba(201,153,58,.12)}
 .token-card .token-media{aspect-ratio:1/1;background:#090605;display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:.62rem;text-align:center;position:relative}
 .token-card .token-media img,.token-card .token-media video{width:100%;height:100%;object-fit:cover;display:block}
-.token-media-fallback{position:absolute;left:10px;bottom:10px;z-index:2;font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sand);background:rgba(14,10,8,.78);border:1px solid rgba(196,132,90,.35);border-radius:4px;padding:5px 8px;text-decoration:none}
+.token-video-error{display:none;position:absolute;left:12px;right:12px;bottom:12px;z-index:2;font-family:'IBM Plex Mono',monospace;font-size:.68rem;line-height:1.35;color:var(--sand);background:rgba(14,10,8,.82);border:1px solid rgba(196,132,90,.35);border-radius:4px;padding:8px 10px;text-align:center}
+.video-failed .token-video-error{display:block}
 .token-card .token-body{padding:14px;text-align:left}
 .token-pin-status{display:inline-flex;align-items:center;gap:6px;margin-bottom:10px;padding:4px 9px;border-radius:999px;border:1px solid rgba(201,153,58,.35);background:rgba(201,153,58,.10);color:var(--gold);font-family:'Cinzel',serif;font-size:.62rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
 .token-pin-status.unpinned{border-color:rgba(196,132,90,.22);background:rgba(232,213,176,.035);color:var(--muted)}
@@ -1103,8 +1104,9 @@ function mediaMarkup(version, cls) {
  cls = cls || 'token-media';
  if (!url) return '<div class="'+cls+'">No media is available for this metadata option</div>';
  if (kind === 'video' || /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(url)) {
- var sources = gatewayUrls(version.mediaUri).map(function(src) { return '<source src="'+esc(src)+'"'+(mime ? ' type="'+esc(mime)+'"' : '')+'>'; }).join('');
- return '<div class="'+cls+'"><video controls playsinline preload="metadata" crossorigin="anonymous">'+sources+'</video><a class="token-media-fallback" href="'+esc(url)+'" target="_blank">Open video</a></div>';
+ var sources = gatewayUrls(version.mediaUri).join('|');
+ var attrs = cls === 'token-media' ? 'muted loop playsinline preload="metadata"' : 'controls playsinline preload="metadata"';
+ return '<div class="'+cls+'"><video class="js-inline-video" '+attrs+' crossorigin="anonymous" data-sources="'+esc(sources)+'"'+(mime ? ' data-mime="'+esc(mime)+'"' : '')+' src="'+esc(url)+'"></video><div class="token-video-error">Video preview could not load from the available gateways.</div></div>';
  }
  if (cls === 'token-hero-media') return '<div class="'+cls+' js-zoom-stage" data-zoom="1" data-pan-x="0" data-pan-y="0"><img class="js-zoom-img" src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy" onerror="this.parentNode.textContent=\'This image is unavailable\'"><div class="token-zoom-tools" aria-label="Artwork zoom controls"><button class="btn btn-sec btn-sm token-zoom-btn js-zoom-out" type="button">-</button><span class="token-zoom-label">100%</span><button class="btn btn-sec btn-sm token-zoom-btn js-zoom-in" type="button">+</button><button class="btn btn-ghost btn-sm token-zoom-reset js-zoom-reset" type="button">Reset</button></div></div>';
  return '<div class="'+cls+'"><img src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy" onerror="this.parentNode.textContent=\'This image is unavailable\'"></div>';
@@ -1165,14 +1167,15 @@ var caption = document.getElementById('fullscreen-caption');
 var item = fullscreenItems[fullscreenIndex];
 if (!viewer || !box || !item) return;
 if (item.kind === 'video' || /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(item.media)) {
-var srcs = gatewayUrls(item.rawMedia || item.media).map(function(src) { return '<source src="'+esc(src)+'"'+(item.mime ? ' type="'+esc(item.mime)+'"' : '')+'>'; }).join('');
-box.innerHTML = '<video controls autoplay playsinline crossorigin="anonymous">'+srcs+'</video>';
+var fsSources = gatewayUrls(item.rawMedia || item.media).join('|');
+box.innerHTML = '<video class="js-inline-video" controls autoplay playsinline crossorigin="anonymous" data-sources="'+esc(fsSources)+'"'+(item.mime ? ' data-mime="'+esc(item.mime)+'"' : '')+' src="'+esc(item.media)+'"></video>';
 } else {
 box.innerHTML = '<img src="'+esc(item.media)+'" alt="'+esc(item.title || 'Full screen token preview')+'">';
 }
 caption.textContent = (fullscreenIndex + 1) + ' / ' + fullscreenItems.length + ' - ' + (item.title || item.uri || 'Token preview');
 viewer.querySelector('.fullscreen-prev').disabled = fullscreenItems.length < 2;
 viewer.querySelector('.fullscreen-next').disabled = fullscreenItems.length < 2;
+bindInlineVideos(box);
 }
  function stepFullscreen(delta) {
  if (!fullscreenItems.length) return;
@@ -1304,7 +1307,32 @@ fullscreenZoom = 1;
  });
  }
 
+ function bindInlineVideos(scope) {
+ scope.querySelectorAll('.js-inline-video').forEach(function(video) {
+ if (video.dataset.videoBound) return;
+ video.dataset.videoBound = '1';
+ var sources = (video.dataset.sources || '').split('|').filter(Boolean);
+ var idx = Math.max(0, sources.indexOf(video.getAttribute('src') || video.src));
+ video.onerror = function() {
+ var next = idx + 1;
+ if (next < sources.length) {
+ idx = next;
+ video.src = sources[idx];
+ video.load();
+ return;
+ }
+ var box = video.closest('.token-media,.token-hero-media');
+ if (box) box.classList.add('video-failed');
+ };
+ video.onloadedmetadata = function() {
+ var box = video.closest('.token-media,.token-hero-media');
+ if (box) box.classList.remove('video-failed');
+ };
+ });
+ }
+
  function bindHeroButtons(scope) {
+ bindInlineVideos(scope);
  bindNormalZoom(scope);
  scope.querySelectorAll('.js-fullscreen').forEach(function(btn){ btn.onclick = function(){ var card = btn.closest('.token-card'); var items = fullscreenItemsFromCard(card); var selected = card.querySelector('.js-select-version.active'); var selectedIndex = selected ? items.findIndex(function(item){ return item.index === Number(selected.dataset.index); }) : 0; if (!items.length && btn.dataset.media) items = [{ media:btn.dataset.media, rawMedia:btn.dataset.mediaUri || btn.dataset.media, kind:btn.dataset.kind || '', mime:btn.dataset.mime || '', title:'Token preview', uri:'' }]; openFullscreen(btn.dataset.media, items, selectedIndex < 0 ? 0 : selectedIndex); }; });
  scope.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin may have succeeded despite the error.', 'warn'); } _isRefreshing = true; showSkeletonGrid(window._galleryItems ? window._galleryItems.length : 4); log('Updating on-chain data...', 'info'); await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
@@ -1347,10 +1375,35 @@ fullscreenZoom = 1;
  var res = await fetch(tzktApiBase() + '/v1/contracts/' + encodeURIComponent(addr), { cache:'no-store' });
  if (!res.ok) return '';
  var data = await res.json();
- return data.alias || (data.metadata && (data.metadata.name || data.metadata.symbol)) || '';
- } catch(_) { return ''; }
+ var name = readableCollectionName(data.metadata && (data.metadata.name || data.metadata.symbol)) || readableCollectionName(data.alias);
+ if (name) return name;
+ } catch(_) {}
+ try {
+ var metaRes = await fetch(tzktApiBase() + '/v1/contracts/' + encodeURIComponent(addr) + '/metadata', { cache:'no-store' });
+ if (metaRes.ok) {
+ var meta = await metaRes.json();
+ return readableCollectionName(meta && (meta.name || meta.symbol || meta.title)) || '';
  }
- function setCollectionBanner(addr, name) {
+ } catch(_) { return ''; }
+ return '';
+ }
+ function readableCollectionName(value) {
+ value = String(value || '').trim();
+ if (!value) return '';
+ if (/^KT1[1-9A-HJ-NP-Za-km-z]{33}$/.test(value)) return '';
+ if (/^tz[1-3][1-9A-HJ-NP-Za-km-z]{33}$/.test(value)) return '';
+ if (/^[a-f0-9]{24,}$/i.test(value)) return '';
+ if (/^[A-Z0-9]{18,}$/i.test(value) && !/\s/.test(value)) return '';
+ return value;
+ }
+ function tokenCollectionName(meta) {
+ if (!meta || typeof meta !== 'object') return '';
+ var collection = meta.collection || meta.collections || meta.collectionName || meta.collection_name;
+ if (typeof collection === 'string') return readableCollectionName(collection);
+ if (collection && typeof collection === 'object') return readableCollectionName(collection.name || collection.title || collection.slug);
+ return readableCollectionName(meta.contractName || meta.contract_name || meta.series || meta.project || '');
+ }
+function setCollectionBanner(addr, name) {
  var display = document.getElementById('ct-addr-display');
  var title = document.querySelector('#deployed-banner .banner-lbl');
  if (title) title.textContent = name ? 'Collection Open' : 'Your Collection Is Open';
@@ -1359,6 +1412,19 @@ fullscreenZoom = 1;
  display.innerHTML = '<span style="font-family:Cormorant Garamond,serif;font-size:1.35rem;color:var(--sand);display:block;margin-bottom:2px">'+esc(name)+'</span><span style="font-family:IBM Plex Mono,monospace;font-size:.72rem;color:var(--muted)">'+esc(addr)+'</span>';
  } else {
  display.textContent = addr;
+ }
+ }
+ function updateCollectionNameFromItems(items) {
+ if (!ctAddr || !items || !items.length) return;
+ var current = document.getElementById('ct-addr-display');
+ var hasName = current && current.querySelector && current.querySelector('span');
+ if (hasName) return;
+ for (var i = 0; i < items.length; i++) {
+ var name = tokenCollectionName(items[i].metadata) || readableCollectionName(items[i].metadata && items[i].metadata.name);
+ if (name) {
+ setCollectionBanner(ctAddr, name);
+ return;
+ }
  }
  }
 
@@ -1374,8 +1440,11 @@ fullscreenZoom = 1;
  var contract = token && token.contract;
  var address = contract && contract.address;
  if (!address || !address.startsWith('KT1')) return;
- if (!byContract[address]) byContract[address] = { address:address, alias:contract.alias || '', tokenCount:0, sampleTokenIds:[], pinSupported:false };
+ if (!byContract[address]) byContract[address] = { address:address, alias:readableCollectionName(contract.alias), tokenName:'', tokenCount:0, sampleTokenIds:[], pinSupported:false, viewsSupported:false };
  byContract[address].tokenCount += 1;
+ var meta = token && token.metadata;
+ if (!byContract[address].alias) byContract[address].alias = tokenCollectionName(meta);
+ if (!byContract[address].tokenName && meta && meta.name) byContract[address].tokenName = readableCollectionName(meta.name);
  if (token.tokenId !== undefined && byContract[address].sampleTokenIds.length < 5) byContract[address].sampleTokenIds.push(String(token.tokenId));
  });
  var candidates = Object.keys(byContract).sort().map(function(address) { return byContract[address]; });
@@ -1398,16 +1467,31 @@ fullscreenZoom = 1;
  }
  return names.filter(Boolean).indexOf('pin_token_uri') !== -1;
  }
+ async function enrichCandidate(c) {
+ var displayName = await contractDisplayName(c.address);
+ if (displayName) c.alias = displayName;
+ try {
+ var candidateContract = await Tezos.wallet.at(c.address);
+ c.pinSupported = c.pinSupported || !!(candidateContract && candidateContract.methodsObject && typeof candidateContract.methodsObject.pin_token_uri === 'function');
+ c.viewsSupported = !!(candidateContract && candidateContract.contractViews && candidateContract.contractViews.get_token_info && candidateContract.contractViews.get_uri_at);
+ } catch(_) {}
+ return c;
+ }
  var results = await Promise.all(candidates.map(function(c) {
  return fetch(tzktApiBase() + '/v1/contracts/' + encodeURIComponent(c.address) + '/entrypoints', { cache:'no-store' })
  .then(function(epRes) { return epRes.ok ? epRes.json() : []; })
- .then(function(entrypoints) {
+ .then(async function(entrypoints) {
  c.pinSupported = hasPinEntrypoint(entrypoints);
- return c;
+ return await enrichCandidate(c);
  })
- .catch(function() { return c; });
+ .catch(function() { return enrichCandidate(c); });
  }));
  var discovered = results.filter(function(c) { return c !== null; });
+ discovered.sort(function(a, b) {
+ if ((a.pinSupported || a.viewsSupported) && !(b.pinSupported || b.viewsSupported)) return -1;
+ if (!(a.pinSupported || a.viewsSupported) && (b.pinSupported || b.viewsSupported)) return 1;
+ return (a.alias || a.tokenName || a.address).localeCompare(b.alias || b.tokenName || b.address);
+ });
  var pinCount = discovered.filter(function(c) { return c.pinSupported; }).length;
  if (discovered.length && pinCount === 0) {
  log('Found ' + discovered.length + ' collection' + (discovered.length === 1 ? '' : 's') + '. Pin support could not be confirmed from TzKT, so I am showing them anyway.', 'warn');
@@ -1433,13 +1517,14 @@ fullscreenZoom = 1;
  heading = '<div style="padding:12px 0 8px;color:var(--sand);font-family:Crimson Pro,serif;font-size:1rem;line-height:1.5">Nice \u2014 you have <strong style="color:var(--gold)">' + contracts.length + ' collections</strong> in this wallet! Which one do you want to explore first?</div>';
  }
  box.innerHTML = heading + contracts.map(function(c) {
- var label = c.alias ? '<span style="color:var(--sand);font-family:Cormorant Garamond,serif;font-size:1.08rem;font-weight:500">' + esc(c.alias) + '</span><br>' : '';
+ var displayName = c.alias || c.tokenName || '';
+ var label = displayName ? '<span style="color:var(--sand);font-family:Cormorant Garamond,serif;font-size:1.08rem;font-weight:500">' + esc(displayName) + '</span><br>' : '';
  var tokenLabel = c.tokenCount === 1 ? '1 token' : c.tokenCount + ' tokens';
- var support = c.pinSupported ? ' · pinning supported' : ' · preview first, pin support checked when opened';
+ var support = c.pinSupported ? ' \u00b7 pinning supported' : (c.viewsSupported ? ' \u00b7 pinnable-style views found' : ' \u00b7 preview first, pin support checked when opened');
  var ids = c.sampleTokenIds.length ? ' \u00b7 IDs ' + esc(c.sampleTokenIds.join(', ')) : '';
  return '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bdr);padding:12px 0">' +
  '<div class="token-meta" style="color:var(--tx)">' + label + '<span style="color:var(--muted);font-size:.78rem">' + esc(c.address) + '</span><br><span style="color:var(--clay)">' + tokenLabel + ' you hold' + ids + esc(support) + '</span></div>' +
- '<button class="btn btn-acc btn-sm js-use-fa2" type="button" data-contract="'+esc(c.address)+'" data-name="'+esc(c.alias || '')+'">Use</button>' +
+ '<button class="btn btn-acc btn-sm js-use-fa2" type="button" data-contract="'+esc(c.address)+'" data-name="'+esc(displayName)+'">Use</button>' +
  '</div>';
  }).join('');
  box.querySelectorAll('.js-use-fa2').forEach(function(btn) {
@@ -1453,9 +1538,12 @@ fullscreenZoom = 1;
  var contracts = await discoverFa2Contracts();
  renderDiscoveredContracts(contracts);
  log(contracts.length === 1 ? 'Found your collection!' : 'Found ' + contracts.length + ' collections in your wallet!', contracts.length ? 'ok' : 'warn');
- if (autoLoadSingle && contracts.length === 1 && !ctAddr) {
- document.getElementById('contract-addr').value = contracts[0].address;
- log('Your pinnable collection is ready \u2014 tap Use or Open Collection to load it.', 'ok');
+ var strong = contracts.filter(function(c) { return c.pinSupported || c.viewsSupported; });
+ if (autoLoadSingle && !ctAddr && (strong.length === 1 || contracts.length === 1)) {
+ var chosen = strong.length === 1 ? strong[0] : contracts[0];
+ document.getElementById('contract-addr').value = chosen.address;
+ log('Your most likely pinnable collection is ready: ' + (chosen.alias || chosen.tokenName || chosen.address), 'ok');
+ await loadContractAddress(chosen.address, true, chosen.alias || chosen.tokenName || '');
  }
  }
 
@@ -1482,6 +1570,7 @@ fullscreenZoom = 1;
  return tokenInfo(id).catch(function(e) { log('I could not load token #' + id + ': ' + errorText(e), 'warn'); return null; });
  }));
  results.forEach(function(item) { if (item) items.push(item); });
+ updateCollectionNameFromItems(items);
  // Progressive render: show what we have so far
  window._galleryItems = items;
  grid.innerHTML = items.length ? items.map(cardHtml).join('') : '';
@@ -1524,6 +1613,7 @@ fullscreenZoom = 1;
  return tokenInfo(id).catch(function(e) { log('I could not load token #' + id + ': ' + errorText(e), 'warn'); return null; });
  }));
  results.forEach(function(item) { if (item) items.push(item); });
+ updateCollectionNameFromItems(items);
  // Progressive render
  window._galleryItems = items;
  grid.innerHTML = items.length ? items.map(cardHtml).join('') : '';
@@ -1726,9 +1816,3 @@ if (btn) { btn.innerHTML = orig; btn.disabled = false; }
 </script>
 </body>
 </html>
-
-
-
-
-
-
