@@ -179,11 +179,17 @@ body.preconnect .page-title-area{display:none}
 .token-tools{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}.token-tools .field{flex:1;min-width:160px;margin:0}
 /* -- Full token gallery -- */
 .token-grid{display:flex;flex-direction:column;gap:18px;margin-top:16px}
-/* Skeleton shimmer for refresh state */
+/* Skeleton glitch effect for refresh state */
 @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
-.skeleton{background:rgba(196,132,90,.06);background-image:linear-gradient(90deg,rgba(196,132,90,.06) 0%,rgba(196,132,90,.14) 40%,rgba(196,132,90,.06) 80%);background-size:800px 100%;animation:shimmer 1.6s ease-in-out infinite;border-radius:4px}
-.skeleton-card{width:100%;background:rgba(22,16,12,.75);border:1px solid rgba(196,132,90,.15);border-radius:var(--r);overflow:hidden;min-width:0}
-.skeleton-card .skeleton-hero{aspect-ratio:4/3;background:rgba(196,132,90,.04);background-image:linear-gradient(90deg,rgba(196,132,90,.04) 0%,rgba(196,132,90,.10) 40%,rgba(196,132,90,.04) 80%);background-size:800px 100%;animation:shimmer 1.6s ease-in-out infinite}
+@keyframes glitchFlicker{0%,100%{opacity:.7;transform:translate(0)}8%{opacity:.4;transform:translate(-2px,1px)}16%{opacity:.85;transform:translate(1px,-1px)}24%{opacity:.5;transform:translate(0)}32%{opacity:.9;transform:translate(2px,0)}40%{opacity:.35;transform:translate(-1px,2px)}48%{opacity:.8;transform:translate(0)}56%{opacity:.45;transform:translate(1px,-2px)}64%{opacity:.75;transform:translate(0)}72%{opacity:.5;transform:translate(-2px,0)}80%{opacity:.85;transform:translate(0)}88%{opacity:.4;transform:translate(2px,1px)}96%{opacity:.7;transform:translate(0)}}
+@keyframes glitchScan{0%{top:-10%}100%{top:110%}}
+@keyframes glitchBar{0%,100%{clip-path:inset(0 0 95% 0)}15%{clip-path:inset(40% 0 30% 0)}30%{clip-path:inset(70% 0 5% 0)}45%{clip-path:inset(10% 0 60% 0)}60%{clip-path:inset(80% 0 0% 0)}75%{clip-path:inset(20% 0 50% 0)}90%{clip-path:inset(55% 0 15% 0)}}
+.skeleton{background:rgba(196,132,90,.06);background-image:linear-gradient(90deg,rgba(196,132,90,.06) 0%,rgba(196,132,90,.14) 40%,rgba(196,132,90,.06) 80%);background-size:800px 100%;animation:shimmer 1.4s ease-in-out infinite;border-radius:4px}
+.skeleton-card{width:100%;background:rgba(22,16,12,.8);border:1px solid rgba(196,132,90,.18);border-radius:var(--r);overflow:hidden;min-width:0;position:relative;animation:glitchFlicker 2.5s steps(1) infinite}
+.skeleton-card::before{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(0deg,transparent 0%,rgba(196,132,90,.06) 50%,transparent 100%);height:30%;width:100%;animation:glitchScan 2s linear infinite;opacity:.7}
+.skeleton-card::after{content:'';position:absolute;inset:0;z-index:3;pointer-events:none;background:rgba(201,153,58,.08);animation:glitchBar 3s steps(1) infinite;mix-blend-mode:overlay}
+.skeleton-card .skeleton-hero{aspect-ratio:4/3;background:rgba(196,132,90,.04);background-image:linear-gradient(90deg,rgba(196,132,90,.04) 0%,rgba(196,132,90,.12) 40%,rgba(196,132,90,.04) 80%);background-size:800px 100%;animation:shimmer 1.4s ease-in-out infinite;position:relative;overflow:hidden}
+.skeleton-card .skeleton-hero::after{content:'UPDATING';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.3em;text-transform:uppercase;color:rgba(201,153,58,.4);text-shadow:0 0 12px rgba(201,153,58,.15)}
 .skeleton-card .skeleton-body{padding:16px;display:flex;flex-direction:column;gap:10px}
 .skeleton-card .skeleton-line{height:12px;border-radius:3px}
 .skeleton-card .skeleton-line.w60{width:60%}
@@ -1094,7 +1100,7 @@ fullscreenZoom = 1;
  function bindHeroButtons(scope) {
  bindNormalZoom(scope);
  scope.querySelectorAll('.js-fullscreen').forEach(function(btn){ btn.onclick = function(){ var card = btn.closest('.token-card'); var items = fullscreenItemsFromCard(card); var selected = card.querySelector('.js-select-version.active'); var selectedIndex = selected ? items.findIndex(function(item){ return item.index === Number(selected.dataset.index); }) : 0; openFullscreen(btn.dataset.media, items, selectedIndex < 0 ? 0 : selectedIndex); }; });
- scope.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin transaction may have succeeded despite the error.', 'warn'); } log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
+ scope.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin may have succeeded despite the error.', 'warn'); } _isRefreshing = true; showSkeletonGrid(window._galleryItems ? window._galleryItems.length : 4); log('Updating on-chain data...', 'info'); await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
  scope.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin may have succeeded.', 'warn'); } _isRefreshing = true; log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
  }
 
@@ -1236,7 +1242,7 @@ fullscreenZoom = 1;
  window._galleryItems = items;
  grid.innerHTML = items.length ? items.map(cardHtml).join('') : '';
  bindVersionViewers(grid);
- grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin transaction may have succeeded despite the error.', 'warn'); } log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
+ grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin may have succeeded despite the error.', 'warn'); } _isRefreshing = true; showSkeletonGrid(window._galleryItems ? window._galleryItems.length : 4); log('Updating on-chain data...', 'info'); await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
  grid.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin may have succeeded.', 'warn'); } _isRefreshing = true; log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
  }
  if (!items.length) {
@@ -1278,7 +1284,7 @@ fullscreenZoom = 1;
  window._galleryItems = items;
  grid.innerHTML = items.length ? items.map(cardHtml).join('') : '';
  bindVersionViewers(grid);
- grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin transaction may have succeeded despite the error.', 'warn'); } log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
+ grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin may have succeeded despite the error.', 'warn'); } _isRefreshing = true; showSkeletonGrid(window._galleryItems ? window._galleryItems.length : 4); log('Updating on-chain data...', 'info'); await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
  grid.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin may have succeeded.', 'warn'); } _isRefreshing = true; log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
  }
  if (!items.length) {
@@ -1414,6 +1420,7 @@ if (btn) { btn.innerHTML = orig; btn.disabled = false; }
  var rbtn = document.getElementById('btn-refresh-pins');
  var rorig = rbtn.innerHTML;
  _isRefreshing = true;
+ showSkeletonGrid(window._galleryItems ? window._galleryItems.length : 4);
  rbtn.innerHTML = '<span class="spin"></span> Refreshing...';
  rbtn.disabled = true;
  log('Waiting a few seconds for the chain to update...', 'info');
