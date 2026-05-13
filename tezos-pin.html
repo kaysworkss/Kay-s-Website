@@ -900,6 +900,46 @@ function gatewayUrls(uri) {
  }
  return urls;
 }
+function objktGraphqlEndpoints() {
+ return network === 'mainnet'
+ ? ['https://data.objkt.com/v3/graphql','https://data.objkt.com/v2/graphql']
+ : ['https://data.objkt.com/v3/graphql','https://data.ghostnet.objkt.com/v3/graphql'];
+}
+async function postGraphql(endpoint, query, variables) {
+ var res = await fetch(endpoint, {
+ method:'POST',
+ headers:{ 'content-type':'application/json' },
+ body:JSON.stringify({ query:query, variables:variables || {} })
+ });
+ if (!res.ok) throw new Error('OBJKT API failed (' + res.status + ')');
+ var json = await res.json();
+ if (json.errors && json.errors.length) throw new Error(json.errors[0].message || 'OBJKT API error');
+ return json.data || {};
+}
+async function objktTokenData(contract, tokenId) {
+ if (network !== 'mainnet' || !contract) return null;
+ var query = 'query Token($contract:String!,$tokenId:String!){ token(where:{fa_contract:{_eq:$contract},token_id:{_eq:$tokenId}},limit:1){ name artifact_uri display_uri thumbnail_uri mime metadata fa{ name short_name collection_id logo token_metadata_view } } }';
+ var endpoints = objktGraphqlEndpoints();
+ for (var i = 0; i < endpoints.length; i++) {
+ try {
+ var data = await postGraphql(endpoints[i], query, { contract:contract, tokenId:String(tokenId) });
+ if (data && data.token && data.token[0]) return data.token[0];
+ } catch(_) {}
+ }
+ return null;
+}
+async function objktCollectionData(contract) {
+ if (network !== 'mainnet' || !contract) return null;
+ var query = 'query Collection($contract:String!){ fa(where:{contract:{_eq:$contract}},limit:1){ name short_name collection_id logo token_metadata_view path } }';
+ var endpoints = objktGraphqlEndpoints();
+ for (var i = 0; i < endpoints.length; i++) {
+ try {
+ var data = await postGraphql(endpoints[i], query, { contract:contract });
+ if (data && data.fa && data.fa[0]) return data.fa[0];
+ } catch(_) {}
+ }
+ return null;
+}
  
  function skeletonCardHtml() {
  return '<div class="skeleton-card"><div class="skeleton-hero skeleton"></div>' +
@@ -982,6 +1022,38 @@ function metadataMediaMime(meta, uri) {
  if (direct === 'video/ogg') return 'video/ogg';
  return direct;
 }
+function normalizeMetadataUri(uri) {
+ var s = String(uri || '').trim();
+ if (!s) return '';
+ if (/^https:\/\/assets\.objkt\.media\//i.test(s)) return s;
+ return s;
+}
+function applyObjktMedia(version, objkt) {
+ if (!version || !objkt) return version;
+ var artifact = normalizeMetadataUri(objkt.artifact_uri);
+ var display = normalizeMetadataUri(objkt.display_uri);
+ var thumb = normalizeMetadataUri(objkt.thumbnail_uri);
+ var mime = String(objkt.mime || '').toLowerCase();
+ if (mime === 'video/quicktime' || mime === 'video/x-m4v') mime = 'video/mp4';
+ var kind = mediaKindFromMime(mime) || metadataMediaKind(version.metadata, version.mediaUri);
+ if (kind === 'video' && artifact) {
+ version.mediaUri = artifact;
+ version.mediaKind = 'video';
+ version.mediaMime = mime || version.mediaMime || 'video/mp4';
+ if (display || thumb) {
+ version.metadata = Object.assign({}, version.metadata || {}, {
+ displayUri: display || version.metadata.displayUri || version.metadata.display_uri,
+ thumbnailUri: thumb || version.metadata.thumbnailUri || version.metadata.thumbnail_uri
+ });
+ }
+ } else if (!version.mediaUri && (display || thumb || artifact)) {
+ version.mediaUri = display || thumb || artifact;
+ version.mediaKind = mediaKindFromMime(mime) || mediaKindFromUri(version.mediaUri);
+ version.mediaMime = mime || version.mediaMime;
+ }
+ if (objkt.name && version.metadata && !version.metadata.name) version.metadata.name = objkt.name;
+ return version;
+}
 function mediaUriFromMetadata(meta, fallbackUri) {
  if (!meta || typeof meta !== 'object') return fallbackUri || '';
  var candidates = [
@@ -1006,6 +1078,8 @@ function mediaUriFromMetadata(meta, fallbackUri) {
  var activeIndex = Number(info.active_index);
  var count = Number(info.uri_count);
  var activeUri = await ct.contractViews.get_active_uri(tokenId).executeView({viewCaller:userAddr || 'tz1burnburnburnburnburnburnburjAYjjX'});
+ var indexedToken = null;
+ try { indexedToken = await objktTokenData(ctAddr, tokenId); } catch(_) {}
  var versions = [];
  for (var i = 0; i < count; i++) {
  var uri = await ct.contractViews.get_uri_at({token_id:tokenId,index:i}).executeView({viewCaller:userAddr || 'tz1burnburnburnburnburnburnburjAYjjX'});
@@ -1013,7 +1087,9 @@ function mediaUriFromMetadata(meta, fallbackUri) {
  try { metadata = await fetchJsonMaybe(uri); }
  catch(e) { metadata = { name:'Token #' + tokenId + ' Metadata #' + i, description:'I could not fetch this metadata: ' + errorText(e) }; }
  var mediaUri = mediaUriFromMetadata(metadata, uri);
- versions.push({ index:i, uri:uri, metadata:metadata, mediaUri:mediaUri, mediaKind:metadataMediaKind(metadata, mediaUri), mediaMime:metadataMediaMime(metadata, mediaUri), isActive:i === activeIndex });
+ var version = { index:i, uri:uri, metadata:metadata, mediaUri:mediaUri, mediaKind:metadataMediaKind(metadata, mediaUri), mediaMime:metadataMediaMime(metadata, mediaUri), isActive:i === activeIndex };
+ if (i === activeIndex) version = applyObjktMedia(version, indexedToken);
+ versions.push(version);
  }
  // Dump all info keys for debugging
  var infoKeys = info ? Object.keys(info) : [];
@@ -1065,7 +1141,7 @@ function mediaUriFromMetadata(meta, fallbackUri) {
  log('Token #' + tokenId + ' pin result: raw=' + JSON.stringify(pinnedRaw) + ', parsed=' + pinnedIndex + ', is_pinned=' + isPinnedFlag + ', trulyPinned=' + trulyPinned, 'info');
  versions.forEach(function(v) { v.isPinned = trulyPinned && v.index === pinnedIndex; });
  var activeVersion = versions[activeIndex] || versions[versions.length - 1] || null;
- return { tokenId:tokenId, info:info, activeIndex:activeIndex, pinnedIndex:pinnedIndex, uriCount:count, activeUri:activeUri, uris:versions.map(function(v){ return v.uri; }), versions:versions, metadata:activeVersion ? activeVersion.metadata : {}, mediaUri:activeVersion ? activeVersion.mediaUri : activeUri, mediaKind:activeVersion ? activeVersion.mediaKind : '', mediaMime:activeVersion ? activeVersion.mediaMime : '' };
+ return { tokenId:tokenId, info:info, objkt:indexedToken, activeIndex:activeIndex, pinnedIndex:pinnedIndex, uriCount:count, activeUri:activeUri, uris:versions.map(function(v){ return v.uri; }), versions:versions, metadata:activeVersion ? activeVersion.metadata : {}, mediaUri:activeVersion ? activeVersion.mediaUri : activeUri, mediaKind:activeVersion ? activeVersion.mediaKind : '', mediaMime:activeVersion ? activeVersion.mediaMime : '' };
  }
  async function discoverTokenLimit(defaultCount) {
  try { var storage = await ct.storage(); if (storage && storage.next_token_id !== undefined) return Number(storage.next_token_id && storage.next_token_id.toString ? storage.next_token_id.toString() : storage.next_token_id); } catch(_) {}
@@ -1414,6 +1490,11 @@ function bindInlineVideos(scope) {
  }
  async function contractDisplayName(addr) {
  try {
+ var objkt = await objktCollectionData(addr);
+ var objktName = objkt && readableCollectionName(objkt.name || objkt.short_name || objkt.collection_id);
+ if (objktName) return objktName;
+ } catch(_) {}
+ try {
  var res = await fetch(tzktApiBase() + '/v1/contracts/' + encodeURIComponent(addr), { cache:'no-store' });
  if (!res.ok) return '';
  var data = await res.json();
@@ -1445,6 +1526,11 @@ function bindInlineVideos(scope) {
  if (collection && typeof collection === 'object') return readableCollectionName(collection.name || collection.title || collection.slug);
  return readableCollectionName(meta.contractName || meta.contract_name || meta.series || meta.project || '');
  }
+ function objktCollectionNameFromToken(item) {
+ var o = item && item.objkt;
+ var fa = o && o.fa;
+ return readableCollectionName(fa && (fa.name || fa.short_name || fa.collection_id));
+ }
 function setCollectionBanner(addr, name) {
  var display = document.getElementById('ct-addr-display');
  var title = document.querySelector('#deployed-banner .banner-lbl');
@@ -1471,7 +1557,7 @@ function setCollectionBanner(addr, name) {
  var hasName = current && current.querySelector && current.querySelector('span');
  if (hasName) return;
  for (var i = 0; i < items.length; i++) {
- var name = tokenCollectionName(items[i].metadata) || readableCollectionName(items[i].metadata && items[i].metadata.name);
+ var name = objktCollectionNameFromToken(items[i]) || tokenCollectionName(items[i].metadata) || readableCollectionName(items[i].metadata && items[i].metadata.name);
  if (name) {
  setCollectionBanner(ctAddr, name);
  return;
@@ -1491,7 +1577,7 @@ function setCollectionBanner(addr, name) {
  var contract = token && token.contract;
  var address = contract && contract.address;
  if (!address || !address.startsWith('KT1')) return;
- if (!byContract[address]) byContract[address] = { address:address, alias:readableCollectionName(contract.alias), tokenName:'', tokenCount:0, sampleTokenIds:[], pinSupported:false, viewsSupported:false };
+ if (!byContract[address]) byContract[address] = { address:address, alias:readableCollectionName(contract.alias), tokenName:'', tokenCount:0, sampleTokenIds:[], pinSupported:false, viewsSupported:false, objktName:'' };
  byContract[address].tokenCount += 1;
  var meta = token && token.metadata;
  if (!byContract[address].alias) byContract[address].alias = tokenCollectionName(meta);
@@ -1521,6 +1607,7 @@ function setCollectionBanner(addr, name) {
  async function enrichCandidate(c) {
  var displayName = await contractDisplayName(c.address);
  if (displayName) c.alias = displayName;
+ c.objktName = displayName || c.objktName || '';
  try {
  var candidateContract = await Tezos.wallet.at(c.address);
  c.pinSupported = c.pinSupported || !!(candidateContract && candidateContract.methodsObject && typeof candidateContract.methodsObject.pin_token_uri === 'function');
