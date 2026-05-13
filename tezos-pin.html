@@ -873,8 +873,8 @@ function networkName() { return network === 'ghostnet' ? 'Ghostnet' : 'Mainnet';
 function gatewayUrl(uri) {
  uri = String(uri || '').trim();
  if (!uri) return '';
- if (/^ipfs:\/\//i.test(uri)) return 'https://ipfs.io/ipfs/' + uri.replace(/^ipfs:\/\//i, '');
- if (/^ipfs\//i.test(uri)) return 'https://ipfs.io/' + uri;
+ if (/^ipfs:\/\//i.test(uri)) return 'https://nftstorage.link/ipfs/' + uri.replace(/^ipfs:\/\//i, '');
+ if (/^ipfs\//i.test(uri)) return 'https://nftstorage.link/' + uri;
  return uri;
  }
 function ipfsPath(uri) {
@@ -888,7 +888,8 @@ function gatewayUrls(uri) {
  var path = ipfsPath(uri);
  var urls = primary ? [primary] : [];
  if (path) {
- ['https://nftstorage.link/ipfs/','https://dweb.link/ipfs/','https://w3s.link/ipfs/','https://cloudflare-ipfs.com/ipfs/'].forEach(function(base) {
+ // Order matters: CDN-backed gateways that serve video with proper CORS first.
+ ['https://w3s.link/ipfs/','https://dweb.link/ipfs/','https://cloudflare-ipfs.com/ipfs/','https://gateway.pinata.cloud/ipfs/','https://ipfs.io/ipfs/','https://cf-ipfs.com/ipfs/'].forEach(function(base) {
  var alt = base + path;
  if (urls.indexOf(alt) === -1) urls.push(alt);
  });
@@ -1142,7 +1143,7 @@ function mediaMarkup(version, cls) {
  var sources = gatewayUrls(version.mediaUri).join('|');
  var attrs = cls === 'token-media' ? 'muted loop playsinline preload="metadata"' : 'controls playsinline preload="metadata"';
  var poster = gatewayUrl(version.metadata && (version.metadata.thumbnailUri || version.metadata.thumbnail_uri || version.metadata.displayUri || version.metadata.display_uri || version.metadata.image || ''));
- return '<div class="'+cls+'"><video class="js-inline-video" '+attrs+' crossorigin="anonymous" data-sources="'+esc(sources)+'" data-no-blob="'+(cls === 'token-media' ? '1' : '0')+'"'+(mime ? ' data-mime="'+esc(mime)+'"' : '')+(poster ? ' poster="'+esc(poster)+'"' : '')+' src="'+esc(url)+'"></video><div class="token-video-error">Video preview is trying another gateway...</div></div>';
+ return '<div class="'+cls+'"><video class="js-inline-video" '+attrs+' data-sources="'+esc(sources)+'" data-no-blob="'+(cls === 'token-media' ? '1' : '0')+'"'+(mime ? ' data-mime="'+esc(mime)+'"' : '')+(poster ? ' poster="'+esc(poster)+'"' : '')+' src="'+esc(url)+'"></video><div class="token-video-error">Video preview is trying another gateway...</div></div>';
  }
  if (cls === 'token-hero-media') return '<div class="'+cls+' js-zoom-stage" data-zoom="1" data-pan-x="0" data-pan-y="0"><img class="js-zoom-img" src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy" onerror="this.parentNode.textContent=\'This image is unavailable\'"><div class="token-zoom-tools" aria-label="Artwork zoom controls"><button class="btn btn-sec btn-sm token-zoom-btn js-zoom-out" type="button">-</button><span class="token-zoom-label">100%</span><button class="btn btn-sec btn-sm token-zoom-btn js-zoom-in" type="button">+</button><button class="btn btn-ghost btn-sm token-zoom-reset js-zoom-reset" type="button">Reset</button></div></div>';
  return '<div class="'+cls+'"><img src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy" onerror="this.parentNode.textContent=\'This image is unavailable\'"></div>';
@@ -1204,7 +1205,7 @@ var item = fullscreenItems[fullscreenIndex];
 if (!viewer || !box || !item) return;
 if (item.kind === 'video' || /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(item.media)) {
 var fsSources = gatewayUrls(item.rawMedia || item.media).join('|');
-box.innerHTML = '<video class="js-inline-video" controls autoplay playsinline crossorigin="anonymous" data-sources="'+esc(fsSources)+'"'+(item.mime ? ' data-mime="'+esc(item.mime)+'"' : '')+' src="'+esc(item.media)+'"></video><div class="token-video-error">Video preview is trying another gateway...</div>';
+box.innerHTML = '<video class="js-inline-video" controls autoplay playsinline data-sources="'+esc(fsSources)+'"'+(item.mime ? ' data-mime="'+esc(item.mime)+'"' : '')+' src="'+esc(item.media)+'"></video><div class="token-video-error">Video preview is trying another gateway...</div>';
 } else {
 box.innerHTML = '<img src="'+esc(item.media)+'" alt="'+esc(item.title || 'Full screen token preview')+'">';
 }
@@ -1353,11 +1354,39 @@ function bindInlineVideos(scope) {
  var blobTried = false;
  var failed = false;
  var box = video.closest('.token-media,.token-hero-media');
+ var stuckTimer = null;
  function setMessage(text, show) {
  if (!box) return;
  var msg = box.querySelector('.token-video-error');
  if (msg) msg.textContent = text;
  box.classList.toggle('video-failed', !!show);
+ }
+ function clearStuck() { if (stuckTimer) { clearTimeout(stuckTimer); stuckTimer = null; } }
+ function armStuck() {
+ clearStuck();
+ // If we don't get loadedmetadata within 6s, treat as failed and try next gateway.
+ stuckTimer = setTimeout(function() {
+ if (failed || video.readyState >= 1) return; // HAVE_METADATA
+ advance();
+ }, 6000);
+ }
+ function advance() {
+ var next = idx + 1;
+ if (next < sources.length) {
+ idx = next;
+ setMessage('Trying another video gateway...', true);
+ video.src = sources[idx];
+ video.load();
+ armStuck();
+ return;
+ }
+ loadBlobFallback().then(function(ok) {
+ if (!ok) {
+ failed = true;
+ clearStuck();
+ setMessage('Video preview could not load from the available gateways.', true);
+ }
+ });
  }
  async function loadBlobFallback() {
  if (video.dataset.noBlob === '1') return false;
@@ -1368,12 +1397,16 @@ function bindInlineVideos(scope) {
  try {
  var res = await fetch(sources[i], { cache:'force-cache' });
  if (!res.ok) continue;
+ var ct = (res.headers.get('content-type') || '').toLowerCase();
+ // Reject HTML responses (gateway error pages disguised as 200).
+ if (ct.indexOf('text/html') === 0 || ct.indexOf('application/json') === 0) continue;
  var blob = await res.blob();
  if (!blob || !blob.size) continue;
  var objectUrl = URL.createObjectURL(blob);
  video.src = objectUrl;
  video.load();
  setMessage('', false);
+ clearStuck();
  return true;
  } catch(_) {}
  }
@@ -1381,26 +1414,16 @@ function bindInlineVideos(scope) {
  }
  video.onerror = function() {
  if (failed) return;
- var next = idx + 1;
- if (next < sources.length) {
- idx = next;
- setMessage('Trying another video gateway...', true);
- video.src = sources[idx];
- video.load();
- return;
- }
- loadBlobFallback().then(function(ok) {
- if (!ok) {
- failed = true;
- setMessage('Video preview could not load from the available gateways.', true);
- }
- });
+ clearStuck();
+ advance();
  };
  video.onloadedmetadata = function() {
+ clearStuck();
  setMessage('', false);
  };
- video.oncanplay = function() { setMessage('', false); };
+ video.oncanplay = function() { clearStuck(); setMessage('', false); };
  video.onstalled = function() { if (!blobTried) loadBlobFallback(); };
+ armStuck();
  });
  }
 
