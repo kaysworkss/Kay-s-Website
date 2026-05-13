@@ -319,8 +319,9 @@ body.preconnect .page-title-area{display:none}
 .token-card{width:100%;background:rgba(22,16,12,.75);border:1px solid rgba(196,132,90,.28);border-radius:var(--r);overflow:hidden;min-width:0;cursor:default;box-shadow:0 1px 8px rgba(0,0,0,.25)}
 .token-card:hover{border-color:rgba(196,132,90,.34);box-shadow:none;transform:none}
 .token-card.active,.token-card.pinned{border-color:var(--gold);box-shadow:0 0 0 1px rgba(201,153,58,.22),0 0 28px rgba(201,153,58,.12)}
-.token-card .token-media{aspect-ratio:1/1;background:#090605;display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:.62rem;text-align:center}
+.token-card .token-media{aspect-ratio:1/1;background:#090605;display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:.62rem;text-align:center;position:relative}
 .token-card .token-media img,.token-card .token-media video{width:100%;height:100%;object-fit:cover;display:block}
+.token-media-fallback{position:absolute;left:10px;bottom:10px;z-index:2;font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sand);background:rgba(14,10,8,.78);border:1px solid rgba(196,132,90,.35);border-radius:4px;padding:5px 8px;text-decoration:none}
 .token-card .token-body{padding:14px;text-align:left}
 .token-pin-status{display:inline-flex;align-items:center;gap:6px;margin-bottom:10px;padding:4px 9px;border-radius:999px;border:1px solid rgba(201,153,58,.35);background:rgba(201,153,58,.10);color:var(--gold);font-family:'Cinzel',serif;font-size:.62rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
 .token-pin-status.unpinned{border-color:rgba(196,132,90,.22);background:rgba(232,213,176,.035);color:var(--muted)}
@@ -873,13 +874,31 @@ function networkName() { return network === 'ghostnet' ? 'Ghostnet' : 'Mainnet';
  if (n < 1 || n > 100) throw new Error('Choose between 1 and 100 tokens to view.');
  return n;
  }
- function gatewayUrl(uri) {
+function gatewayUrl(uri) {
  uri = String(uri || '').trim();
  if (!uri) return '';
  if (/^ipfs:\/\//i.test(uri)) return 'https://ipfs.io/ipfs/' + uri.replace(/^ipfs:\/\//i, '');
  if (/^ipfs\//i.test(uri)) return 'https://ipfs.io/' + uri;
  return uri;
  }
+function ipfsPath(uri) {
+ uri = String(uri || '').trim();
+ if (/^ipfs:\/\//i.test(uri)) return uri.replace(/^ipfs:\/\//i, '').replace(/^ipfs\//i, '');
+ if (/^ipfs\//i.test(uri)) return uri.replace(/^ipfs\//i, '');
+ return '';
+}
+function gatewayUrls(uri) {
+ var primary = gatewayUrl(uri);
+ var path = ipfsPath(uri);
+ var urls = primary ? [primary] : [];
+ if (path) {
+ ['https://nftstorage.link/ipfs/','https://dweb.link/ipfs/','https://cloudflare-ipfs.com/ipfs/'].forEach(function(base) {
+ var alt = base + path;
+ if (urls.indexOf(alt) === -1) urls.push(alt);
+ });
+ }
+ return urls;
+}
  
  function skeletonCardHtml() {
  return '<div class="skeleton-card"><div class="skeleton-hero skeleton"></div>' +
@@ -945,6 +964,19 @@ function metadataMediaKind(meta, uri) {
  }
  return direct || mediaKindFromUri(uri);
 }
+function metadataMediaMime(meta, uri) {
+ if (!meta || typeof meta !== 'object') return '';
+ var direct = meta.mimeType || meta.mime_type || meta.contentType || meta.content_type || '';
+ var formats = metadataFormats(meta);
+ for (var f = 0; f < formats.length; f++) {
+ var fmt = formats[f] || {};
+ var fUri = formatUri(fmt);
+ if (uri && fUri && gatewayUrl(fUri) !== gatewayUrl(uri) && fUri !== uri) continue;
+ direct = fmt.mimeType || fmt.mime_type || fmt.contentType || fmt.content_type || direct;
+ if (direct) break;
+ }
+ return String(direct || '').toLowerCase();
+}
 function mediaUriFromMetadata(meta, fallbackUri) {
  if (!meta || typeof meta !== 'object') return fallbackUri || '';
  var candidates = [
@@ -976,7 +1008,7 @@ function mediaUriFromMetadata(meta, fallbackUri) {
  try { metadata = await fetchJsonMaybe(uri); }
  catch(e) { metadata = { name:'Token #' + tokenId + ' Metadata #' + i, description:'I could not fetch this metadata: ' + errorText(e) }; }
  var mediaUri = mediaUriFromMetadata(metadata, uri);
- versions.push({ index:i, uri:uri, metadata:metadata, mediaUri:mediaUri, mediaKind:metadataMediaKind(metadata, mediaUri), isActive:i === activeIndex });
+ versions.push({ index:i, uri:uri, metadata:metadata, mediaUri:mediaUri, mediaKind:metadataMediaKind(metadata, mediaUri), mediaMime:metadataMediaMime(metadata, mediaUri), isActive:i === activeIndex });
  }
  // Dump all info keys for debugging
  var infoKeys = info ? Object.keys(info) : [];
@@ -1028,7 +1060,7 @@ function mediaUriFromMetadata(meta, fallbackUri) {
  log('Token #' + tokenId + ' pin result: raw=' + JSON.stringify(pinnedRaw) + ', parsed=' + pinnedIndex + ', is_pinned=' + isPinnedFlag + ', trulyPinned=' + trulyPinned, 'info');
  versions.forEach(function(v) { v.isPinned = trulyPinned && v.index === pinnedIndex; });
  var activeVersion = versions[activeIndex] || versions[versions.length - 1] || null;
- return { tokenId:tokenId, info:info, activeIndex:activeIndex, pinnedIndex:pinnedIndex, uriCount:count, activeUri:activeUri, uris:versions.map(function(v){ return v.uri; }), versions:versions, metadata:activeVersion ? activeVersion.metadata : {}, mediaUri:activeVersion ? activeVersion.mediaUri : activeUri };
+ return { tokenId:tokenId, info:info, activeIndex:activeIndex, pinnedIndex:pinnedIndex, uriCount:count, activeUri:activeUri, uris:versions.map(function(v){ return v.uri; }), versions:versions, metadata:activeVersion ? activeVersion.metadata : {}, mediaUri:activeVersion ? activeVersion.mediaUri : activeUri, mediaKind:activeVersion ? activeVersion.mediaKind : '', mediaMime:activeVersion ? activeVersion.mediaMime : '' };
  }
  async function discoverTokenLimit(defaultCount) {
  try { var storage = await ct.storage(); if (storage && storage.next_token_id !== undefined) return Number(storage.next_token_id && storage.next_token_id.toString ? storage.next_token_id.toString() : storage.next_token_id); } catch(_) {}
@@ -1063,13 +1095,17 @@ return '<div class="nft-details"><div class="nft-details-title">Details</div>' +
 '</div>';
 }
 
- function mediaMarkup(version, cls) {
+function mediaMarkup(version, cls) {
  var url = gatewayUrl(version.mediaUri);
  var name = version.metadata && version.metadata.name ? version.metadata.name : 'Token preview';
  var kind = version.mediaKind || metadataMediaKind(version.metadata, version.mediaUri);
+ var mime = version.mediaMime || metadataMediaMime(version.metadata, version.mediaUri);
  cls = cls || 'token-media';
  if (!url) return '<div class="'+cls+'">No media is available for this metadata option</div>';
- if (kind === 'video' || /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(url)) return '<div class="'+cls+'"><video controls playsinline preload="metadata" src="'+esc(url)+'"></video></div>';
+ if (kind === 'video' || /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(url)) {
+ var sources = gatewayUrls(version.mediaUri).map(function(src) { return '<source src="'+esc(src)+'"'+(mime ? ' type="'+esc(mime)+'"' : '')+'>'; }).join('');
+ return '<div class="'+cls+'"><video controls playsinline preload="metadata" crossorigin="anonymous">'+sources+'</video><a class="token-media-fallback" href="'+esc(url)+'" target="_blank">Open video</a></div>';
+ }
  if (cls === 'token-hero-media') return '<div class="'+cls+' js-zoom-stage" data-zoom="1" data-pan-x="0" data-pan-y="0"><img class="js-zoom-img" src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy" onerror="this.parentNode.textContent=\'This image is unavailable\'"><div class="token-zoom-tools" aria-label="Artwork zoom controls"><button class="btn btn-sec btn-sm token-zoom-btn js-zoom-out" type="button">-</button><span class="token-zoom-label">100%</span><button class="btn btn-sec btn-sm token-zoom-btn js-zoom-in" type="button">+</button><button class="btn btn-ghost btn-sm token-zoom-reset js-zoom-reset" type="button">Reset</button></div></div>';
  return '<div class="'+cls+'"><img src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy" onerror="this.parentNode.textContent=\'This image is unavailable\'"></div>';
  }
@@ -1089,7 +1125,7 @@ return '<div class="nft-details"><div class="nft-details-title">Details</div>' +
  var title = meta.name || ('Token #' + item.tokenId + ' Metadata #' + version.index);
  var isPinned = !!version.isPinned;
  var isSelected = version.isSelected !== undefined ? version.isSelected : version.isActive;
- return '<button class="token-version'+(isSelected ? ' active' : '')+(isPinned ? ' pinned' : '')+' js-select-version" type="button" data-token-id="'+item.tokenId+'" data-index="'+version.index+'" data-title="'+esc(title)+'" data-uri="'+esc(version.uri)+'" data-media="'+esc(gatewayUrl(version.mediaUri))+'" data-kind="'+esc(version.mediaKind || metadataMediaKind(meta, version.mediaUri))+'" data-desc="'+esc(meta.description || '')+'">' +
+ return '<button class="token-version'+(isSelected ? ' active' : '')+(isPinned ? ' pinned' : '')+' js-select-version" type="button" data-token-id="'+item.tokenId+'" data-index="'+version.index+'" data-title="'+esc(title)+'" data-uri="'+esc(version.uri)+'" data-media="'+esc(gatewayUrl(version.mediaUri))+'" data-raw-media="'+esc(version.mediaUri || '')+'" data-kind="'+esc(version.mediaKind || metadataMediaKind(meta, version.mediaUri))+'" data-mime="'+esc(version.mediaMime || metadataMediaMime(meta, version.mediaUri))+'" data-desc="'+esc(meta.description || '')+'">' +
  mediaMarkup(version, 'token-media') + '<div class="token-version-title">'+version.index+'</div>'+(isPinned ? '<div class="token-version-pin"><span class="pin-icon">&#x1F4CC;</span></div>' : '')+'<div class="token-version-body"><div class="token-version-uri">'+esc(version.uri)+'</div></div></button>';
  }
  function metadataActionHtml(item, version) {
@@ -1104,7 +1140,7 @@ return '<div class="nft-details"><div class="nft-details-title">Details</div>' +
  var title = meta.name || ('Token #' + item.tokenId + ' Metadata #' + version.index);
  var desc = meta.description ? '<div class="token-meta" style="margin-top:6px">'+esc(meta.description)+'</div>' : '';
  var versionLine = '<div class="token-meta" style="margin-top:6px">Metadata #'+version.index+(version.isActive ? ' \u00b7 active' : '')+(version.isPinned ? ' \u00b7 \uD83D\uDCCC pinned' : '')+'</div>';
- return '<div class="token-hero" data-token-id="'+item.tokenId+'"><div class="js-hero-media">'+mediaMarkup(version, 'token-hero-media')+'</div><div class="token-hero-info"><div><div class="token-hero-title">'+esc(title)+'</div>'+versionLine+desc+'</div><div class="token-hero-actions"><a class="btn btn-ghost btn-sm js-hero-metadata" target="_blank" href="'+esc(gatewayUrl(version.uri))+'">View Metadata</a><button class="btn btn-sec btn-sm js-fullscreen" type="button" data-media="'+esc(gatewayUrl(version.mediaUri))+'" data-kind="'+esc(version.mediaKind || metadataMediaKind(meta, version.mediaUri))+'">View Full Screen</button>' +
+ return '<div class="token-hero" data-token-id="'+item.tokenId+'"><div class="js-hero-media">'+mediaMarkup(version, 'token-hero-media')+'</div><div class="token-hero-info"><div><div class="token-hero-title">'+esc(title)+'</div>'+versionLine+desc+'</div><div class="token-hero-actions"><a class="btn btn-ghost btn-sm js-hero-metadata" target="_blank" href="'+esc(gatewayUrl(version.uri))+'">View Metadata</a><button class="btn btn-sec btn-sm js-fullscreen" type="button" data-media="'+esc(gatewayUrl(version.mediaUri))+'" data-media-uri="'+esc(version.mediaUri || '')+'" data-kind="'+esc(version.mediaKind || metadataMediaKind(meta, version.mediaUri))+'" data-mime="'+esc(version.mediaMime || metadataMediaMime(meta, version.mediaUri))+'">View Full Screen</button>' +
  metadataActionHtml(item, version) +
  '</div></div></div>';
  }
@@ -1129,7 +1165,8 @@ var caption = document.getElementById('fullscreen-caption');
 var item = fullscreenItems[fullscreenIndex];
 if (!viewer || !box || !item) return;
 if (item.kind === 'video' || /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(item.media)) {
-box.innerHTML = '<video controls autoplay src="'+esc(item.media)+'"></video>';
+var srcs = gatewayUrls(item.rawMedia || item.media).map(function(src) { return '<source src="'+esc(src)+'"'+(item.mime ? ' type="'+esc(item.mime)+'"' : '')+'>'; }).join('');
+box.innerHTML = '<video controls autoplay playsinline crossorigin="anonymous">'+srcs+'</video>';
 } else {
 box.innerHTML = '<img src="'+esc(item.media)+'" alt="'+esc(item.title || 'Full screen token preview')+'">';
 }
@@ -1170,7 +1207,7 @@ fullscreenZoom = 1;
  }
  function fullscreenItemsFromCard(card) {
  return Array.from(card.querySelectorAll('.js-select-version')).map(function(btn) {
- return { media:btn.dataset.media, kind:btn.dataset.kind || '', title:btn.dataset.title || ('Metadata #' + btn.dataset.index), uri:btn.dataset.uri, index:Number(btn.dataset.index) };
+ return { media:btn.dataset.media, rawMedia:btn.dataset.rawMedia || btn.dataset.media, kind:btn.dataset.kind || '', mime:btn.dataset.mime || '', title:btn.dataset.title || ('Metadata #' + btn.dataset.index), uri:btn.dataset.uri, index:Number(btn.dataset.index) };
  });
  }
  function bindVersionViewers(grid) {
@@ -1269,7 +1306,7 @@ fullscreenZoom = 1;
 
  function bindHeroButtons(scope) {
  bindNormalZoom(scope);
- scope.querySelectorAll('.js-fullscreen').forEach(function(btn){ btn.onclick = function(){ var card = btn.closest('.token-card'); var items = fullscreenItemsFromCard(card); var selected = card.querySelector('.js-select-version.active'); var selectedIndex = selected ? items.findIndex(function(item){ return item.index === Number(selected.dataset.index); }) : 0; if (!items.length && btn.dataset.media) items = [{ media:btn.dataset.media, kind:btn.dataset.kind || '', title:'Token preview', uri:'' }]; openFullscreen(btn.dataset.media, items, selectedIndex < 0 ? 0 : selectedIndex); }; });
+ scope.querySelectorAll('.js-fullscreen').forEach(function(btn){ btn.onclick = function(){ var card = btn.closest('.token-card'); var items = fullscreenItemsFromCard(card); var selected = card.querySelector('.js-select-version.active'); var selectedIndex = selected ? items.findIndex(function(item){ return item.index === Number(selected.dataset.index); }) : 0; if (!items.length && btn.dataset.media) items = [{ media:btn.dataset.media, rawMedia:btn.dataset.mediaUri || btn.dataset.media, kind:btn.dataset.kind || '', mime:btn.dataset.mime || '', title:'Token preview', uri:'' }]; openFullscreen(btn.dataset.media, items, selectedIndex < 0 ? 0 : selectedIndex); }; });
  scope.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin may have succeeded despite the error.', 'warn'); } _isRefreshing = true; showSkeletonGrid(window._galleryItems ? window._galleryItems.length : 4); log('Updating on-chain data...', 'info'); await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
  scope.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin may have succeeded.', 'warn'); } _isRefreshing = true; log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
  }
@@ -1305,10 +1342,29 @@ fullscreenZoom = 1;
  function tzktApiBase() {
  return network === 'mainnet' ? 'https://api.tzkt.io' : 'https://api.ghostnet.tzkt.io';
  }
+ async function contractDisplayName(addr) {
+ try {
+ var res = await fetch(tzktApiBase() + '/v1/contracts/' + encodeURIComponent(addr), { cache:'no-store' });
+ if (!res.ok) return '';
+ var data = await res.json();
+ return data.alias || (data.metadata && (data.metadata.name || data.metadata.symbol)) || '';
+ } catch(_) { return ''; }
+ }
+ function setCollectionBanner(addr, name) {
+ var display = document.getElementById('ct-addr-display');
+ var title = document.querySelector('#deployed-banner .banner-lbl');
+ if (title) title.textContent = name ? 'Collection Open' : 'Your Collection Is Open';
+ if (!display) return;
+ if (name) {
+ display.innerHTML = '<span style="font-family:Cormorant Garamond,serif;font-size:1.35rem;color:var(--sand);display:block;margin-bottom:2px">'+esc(name)+'</span><span style="font-family:IBM Plex Mono,monospace;font-size:.72rem;color:var(--muted)">'+esc(addr)+'</span>';
+ } else {
+ display.textContent = addr;
+ }
+ }
 
  async function discoverFa2Contracts() {
  if (!userAddr) throw new Error('Connect your wallet first.');
- var url = tzktApiBase() + '/v1/tokens/balances?account=' + encodeURIComponent(userAddr) + '&balance.ne=0&token.standard=fa2&limit=1000';
+ var url = tzktApiBase() + '/v1/tokens/balances?account=' + encodeURIComponent(userAddr) + '&balance.gt=0&limit=1000';
  var res = await fetch(url, { cache:'no-store' });
  if (!res.ok) throw new Error('FA2 contract lookup failed (' + res.status + ').');
  var rows = await res.json();
@@ -1318,14 +1374,14 @@ fullscreenZoom = 1;
  var contract = token && token.contract;
  var address = contract && contract.address;
  if (!address || !address.startsWith('KT1')) return;
- if (!byContract[address]) byContract[address] = { address:address, alias:contract.alias || '', tokenCount:0, sampleTokenIds:[] };
+ if (!byContract[address]) byContract[address] = { address:address, alias:contract.alias || '', tokenCount:0, sampleTokenIds:[], pinSupported:false };
  byContract[address].tokenCount += 1;
  if (token.tokenId !== undefined && byContract[address].sampleTokenIds.length < 5) byContract[address].sampleTokenIds.push(String(token.tokenId));
  });
  var candidates = Object.keys(byContract).sort().map(function(address) { return byContract[address]; });
  if (!candidates.length) return [];
  log('Checking ' + candidates.length + ' FA2 contract' + (candidates.length === 1 ? '' : 's') + ' for pinning support...', 'info');
- // Check all contracts in parallel
+ // Check all contracts in parallel, but keep contracts even when TzKT cannot prove pin support.
  function hasPinEntrypoint(entrypoints) {
  var names = [];
  if (Array.isArray(entrypoints)) {
@@ -1346,15 +1402,17 @@ fullscreenZoom = 1;
  return fetch(tzktApiBase() + '/v1/contracts/' + encodeURIComponent(c.address) + '/entrypoints', { cache:'no-store' })
  .then(function(epRes) { return epRes.ok ? epRes.json() : []; })
  .then(function(entrypoints) {
- return hasPinEntrypoint(entrypoints) ? c : null;
+ c.pinSupported = hasPinEntrypoint(entrypoints);
+ return c;
  })
- .catch(function() { return null; });
+ .catch(function() { return c; });
  }));
- var pinnable = results.filter(function(c) { return c !== null; });
- if (pinnable.length === 0 && candidates.length > 0) {
- log('Found ' + candidates.length + ' FA2 collection' + (candidates.length === 1 ? '' : 's') + ' in your wallet, but none support metadata pinning.', 'warn');
+ var discovered = results.filter(function(c) { return c !== null; });
+ var pinCount = discovered.filter(function(c) { return c.pinSupported; }).length;
+ if (discovered.length && pinCount === 0) {
+ log('Found ' + discovered.length + ' collection' + (discovered.length === 1 ? '' : 's') + '. Pin support could not be confirmed from TzKT, so I am showing them anyway.', 'warn');
  }
- return pinnable;
+ return discovered;
  }
  function renderDiscoveredContracts(contracts) {
  var box = document.getElementById('discovered-contracts');
@@ -1363,7 +1421,7 @@ fullscreenZoom = 1;
  if (!contracts.length) {
  box.className = 'token-empty';
  if (fa2Card) fa2Card.classList.remove('fa2-found');
- box.innerHTML = 'No pinnable FA2 collections found in your wallet on ' + esc(network) + '. Only custom contracts with <strong>pin_token_uri</strong> support are shown here. Standard Objkt or marketplace collections won\u2019t appear.';
+ box.innerHTML = 'No FA2 token balances were found in your wallet on ' + esc(network) + '. If the token was just transferred, wait a minute for the indexer and try again.';
  return;
  }
  box.className = 'view-result';
@@ -1377,14 +1435,15 @@ fullscreenZoom = 1;
  box.innerHTML = heading + contracts.map(function(c) {
  var label = c.alias ? '<span style="color:var(--sand);font-family:Cormorant Garamond,serif;font-size:1.08rem;font-weight:500">' + esc(c.alias) + '</span><br>' : '';
  var tokenLabel = c.tokenCount === 1 ? '1 token' : c.tokenCount + ' tokens';
+ var support = c.pinSupported ? ' · pinning supported' : ' · preview first, pin support checked when opened';
  var ids = c.sampleTokenIds.length ? ' \u00b7 IDs ' + esc(c.sampleTokenIds.join(', ')) : '';
  return '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bdr);padding:12px 0">' +
- '<div class="token-meta" style="color:var(--tx)">' + label + '<span style="color:var(--muted);font-size:.78rem">' + esc(c.address) + '</span><br><span style="color:var(--clay)">' + tokenLabel + ' you hold' + ids + '</span></div>' +
- '<button class="btn btn-acc btn-sm js-use-fa2" type="button" data-contract="'+esc(c.address)+'">Use</button>' +
+ '<div class="token-meta" style="color:var(--tx)">' + label + '<span style="color:var(--muted);font-size:.78rem">' + esc(c.address) + '</span><br><span style="color:var(--clay)">' + tokenLabel + ' you hold' + ids + esc(support) + '</span></div>' +
+ '<button class="btn btn-acc btn-sm js-use-fa2" type="button" data-contract="'+esc(c.address)+'" data-name="'+esc(c.alias || '')+'">Use</button>' +
  '</div>';
  }).join('');
  box.querySelectorAll('.js-use-fa2').forEach(function(btn) {
- btn.onclick = function() { loadContractAddress(btn.dataset.contract, true); };
+ btn.onclick = function() { loadContractAddress(btn.dataset.contract, true, btn.dataset.name || ''); };
  });
  }
  async function discoverAndMaybeLoadFa2(autoLoadSingle) {
@@ -1574,19 +1633,20 @@ fullscreenZoom = 1;
  log('Your wallet is disconnected.', 'info');
  };
 
- async function loadContractAddress(addr, preferOwned) {
+ async function loadContractAddress(addr, preferOwned, knownName) {
 if (!addr || !addr.startsWith('KT1')) { log('Paste a valid KT1 collection address first.', 'err'); return; }
 var btn = document.getElementById('btn-load-contract');
 var orig = btn && btn.innerHTML;
 try {
 if (btn) { btn.innerHTML = '<span class="spin"></span> Opening...'; btn.disabled = true; }
-setGalleryLoading('Opening your collection', 'Preparing token previews from ' + addr + '...');
-log('Opening your collection: ' + addr + '...', 'warn');
+setGalleryLoading('Opening your collection', 'Preparing token previews from ' + (knownName || addr) + '...');
+log('Opening your collection: ' + (knownName || addr) + '...', 'warn');
 ct = await Tezos.wallet.at(addr); ctAddr = addr;
+var displayName = knownName || await contractDisplayName(addr);
 document.getElementById('contract-addr').value = addr;
 document.getElementById('deployed-banner').classList.add('show');
-document.getElementById('ct-addr-display').textContent = addr;
-log('Your collection is open: ' + addr, 'ok');
+setCollectionBanner(addr, displayName);
+log('Your collection is open: ' + (displayName || addr), 'ok');
 if (preferOwned && userAddr) {
  await loadOwnedTokens();
 } else {
@@ -1666,17 +1726,6 @@ if (btn) { btn.innerHTML = orig; btn.disabled = false; }
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
 
 
 
