@@ -1101,8 +1101,28 @@ fullscreenZoom = 1;
  window._walletFa2RowsCache[cacheKey] = fetch(url, { cache:'no-store' }).then(function(res) {
  if (!res.ok) throw new Error('FA2 token lookup failed (' + res.status + ').');
  return res.json();
+ }).catch(function(e) {
+ delete window._walletFa2RowsCache[cacheKey];
+ throw e;
  });
  return await window._walletFa2RowsCache[cacheKey];
+ }
+ async function contractFa2TokenRows(addr, start, count) {
+ if (!addr || !addr.startsWith('KT1')) throw new Error('Paste a valid KT1 collection address first.');
+ start = Math.max(0, Number(start) || 0);
+ count = Math.max(1, Math.min(Number(count) || 24, 100));
+ var cacheKey = network + ':' + addr + ':' + start + ':' + count;
+ if (!window._contractFa2RowsCache) window._contractFa2RowsCache = {};
+ if (window._contractFa2RowsCache[cacheKey]) return await window._contractFa2RowsCache[cacheKey];
+ var url = tzktApiBase() + '/v1/tokens?contract=' + encodeURIComponent(addr) + '&offset=' + encodeURIComponent(start) + '&limit=' + encodeURIComponent(count);
+ window._contractFa2RowsCache[cacheKey] = fetch(url, { cache:'no-store' }).then(function(res) {
+ if (!res.ok) throw new Error('Collection token lookup failed (' + res.status + ').');
+ return res.json();
+ }).catch(function(e) {
+ delete window._contractFa2RowsCache[cacheKey];
+ throw e;
+ });
+ return await window._contractFa2RowsCache[cacheKey];
  }
  async function discoverFa2Contracts() {
  var rows = await walletFa2BalanceRows();
@@ -1174,6 +1194,16 @@ fullscreenZoom = 1;
  var version = { index:0, uri:uri || ('tzkt://' + (contract.address || 'unknown') + '/' + token.tokenId), metadata:metadata, mediaUri:mediaUriFromMetadata(metadata, ''), isActive:true, isPinned:false };
  return { tokenId:Number.isInteger(tokenId) ? tokenId : 0, contract:contract.address || '', contractAlias:contract.alias || '', balance:row.balance, canPin:false, activeIndex:0, pinnedIndex:null, uriCount:1, activeUri:version.uri, uris:[version.uri], versions:[version], metadata:metadata, mediaUri:version.mediaUri };
  }
+ function contractTokenItemFromTzktToken(token, fallbackContract) {
+ token = token || {};
+ var contract = token.contract || {};
+ var metadata = token.metadata || {};
+ var tokenId = Number(token.tokenId);
+ var contractAddr = contract.address || fallbackContract || '';
+ var uri = metadataUriFromTzkt(token, metadata);
+ var version = { index:0, uri:uri || ('tzkt://' + (contractAddr || 'unknown') + '/' + token.tokenId), metadata:metadata, mediaUri:mediaUriFromMetadata(metadata, ''), isActive:true, isPinned:false };
+ return { tokenId:Number.isInteger(tokenId) ? tokenId : 0, contract:contractAddr, contractAlias:contract.alias || '', balance:null, canPin:false, activeIndex:0, pinnedIndex:null, uriCount:1, activeUri:version.uri, uris:[version.uri], versions:[version], metadata:metadata, mediaUri:version.mediaUri };
+ }
  async function loadAllFa2Tokens() {
  reqWalletOnly();
  var grid = document.getElementById('collector-grid');
@@ -1191,24 +1221,36 @@ fullscreenZoom = 1;
  log('Loaded all FA2 tokens in this wallet: ' + items.length + '.', items.length ? 'ok' : 'warn');
  }
  async function loadFa2ContractTokens(addr) {
- reqWalletOnly();
  if (!addr || !addr.startsWith('KT1')) throw new Error('Paste a valid KT1 collection address first.');
  var grid = document.getElementById('collector-grid');
- setGalleryLoading('Loading collection tokens', 'Reading wallet tokens from ' + shortContract(addr) + '...');
+ var start = natFromInput('gallery-start', 'start token ID');
+ var count = galleryCount();
+ setGalleryLoading('Loading collection tokens', 'Reading tokens from ' + shortContract(addr) + '...');
+ var items = [];
+ if (userAddr) {
+ try {
  var rows = await walletFa2BalanceRows();
  var filtered = rows.filter(function(row) {
  var token = row && row.token;
  var contract = token && token.contract;
  return contract && contract.address === addr;
- });
- var items = filtered.map(walletTokenItemFromRow).filter(function(item) { return item.contract && item.tokenId >= 0; }).sort(function(a, b) { return a.tokenId - b.tokenId; });
+ }).map(walletTokenItemFromRow).filter(function(item) { return item.contract && item.tokenId >= start; }).sort(function(a, b) { return a.tokenId - b.tokenId; }).slice(0, count);
+ items = filtered;
+ } catch(e) {
+ log('Wallet token lookup failed, so I am loading the collection directly instead: ' + errorText(e), 'warn');
+ }
+ }
+ if (!items.length) {
+ var tokenRows = await contractFa2TokenRows(addr, start, count);
+ items = tokenRows.map(function(token) { return contractTokenItemFromTzktToken(token, addr); }).filter(function(item) { return item.contract && item.tokenId >= 0; }).sort(function(a, b) { return a.tokenId - b.tokenId; });
+ }
  window._galleryItems = items;
  document.getElementById('contract-addr').value = addr;
  document.getElementById('deployed-banner').classList.add('show');
  document.getElementById('ct-addr-display').textContent = addr;
  var detailPanel = document.getElementById('token-detail-panel');
  if (detailPanel) detailPanel.style.display = 'none';
- grid.innerHTML = items.length ? items.map(cardHtml).join('') : '<div class="token-empty">No tokens from this collection were found in the connected wallet.</div>';
+ grid.innerHTML = items.length ? items.map(cardHtml).join('') : '<div class="token-empty">No tokens were found in this collection range.</div>';
  bindVersionViewers(grid);
  log('Loaded ' + items.length + ' token' + (items.length === 1 ? '' : 's') + ' from ' + shortContract(addr) + '.', items.length ? 'ok' : 'warn');
  }
@@ -1422,8 +1464,6 @@ if (btn) { btn.innerHTML = orig; btn.disabled = false; }
 </script>
 </body>
 </html>
-
-
 
 
 
