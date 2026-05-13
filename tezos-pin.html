@@ -115,6 +115,18 @@ body.light #fullscreen-close{color:var(--bark)}
 body.light .theme-toggle-pin{background:rgba(255,255,255,.95);border-color:rgba(74,50,40,.25);color:var(--bark);box-shadow:0 4px 16px rgba(74,50,40,.15)}
 body.light .theme-toggle-pin:hover{border-color:var(--clay);transform:scale(1.08)}
 
+
+/* Browse mode — view without wallet */
+body.browse-mode .preconnect-panel{display:none}
+body.browse-mode .page-title-area{display:block}
+body.browse-mode .collector-flow{display:block}
+body.browse-mode #fa2-card{display:none}
+body.browse-mode #btn-disconnect{display:none !important}
+body.browse-mode .js-pin-selected,.browse-mode .js-unpin{display:none !important}
+body.browse-mode .token-hero-actions .btn-acc{display:none}
+body.browse-mode .preconnect-actions{display:none}
+body.browse-mode .browse-mode-hint{display:block !important}
+
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--tx);font-family:'Crimson Pro',serif;min-height:100vh;font-size:16px;line-height:1.65;overflow-x:hidden}
 body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E"),radial-gradient(ellipse at 8% 8%,rgba(196,132,90,.10),transparent 42%),radial-gradient(ellipse at 92% 16%,rgba(201,153,58,.06),transparent 38%);opacity:.6}
@@ -462,11 +474,13 @@ body.preconnect .page-title-area{display:none}
  <div class="preconnect-wallets">
  <span id="wallet-hint" class="preconnect-wallet-hint">Detecting wallet&hellip;</span>
  </div>
+ <div style="margin-top:24px"><button class="btn btn-ghost" id="btn-browse-mode" style="font-size:.82rem;padding:10px 22px">Browse a Collection Without a Wallet</button></div>
  </div>
 
  <div class="page-title-area">
  <div class="tag">Your collector access</div>
  <div class="title">Choose the Artwork <em>You Want to Pin</em></div>
+ <div class="browse-mode-hint" style="display:none;font-family:Crimson Pro,serif;font-size:.9rem;color:var(--muted);margin-top:6px">Viewing mode &mdash; connect a wallet to pin metadata</div>
  </div>
 
  <div id="status-bar" class="loading collector-flow">
@@ -844,6 +858,9 @@ function networkName() { return network === 'ghostnet' ? 'Ghostnet' : 'Mainnet';
  }
  function req() {
  if (!ct) throw new Error('Open your collection first.');
+ }
+ function reqWallet() {
+ req();
  if (!userAddr) throw new Error('Connect your wallet first.');
  }
  function natFromInput(id, label) {
@@ -904,13 +921,13 @@ function mediaUriFromMetadata(meta, fallbackUri) {
  return await res.json();
  }
  async function tokenInfo(tokenId) {
- var info = await ct.contractViews.get_token_info(tokenId).executeView({viewCaller:userAddr});
+ var info = await ct.contractViews.get_token_info(tokenId).executeView({viewCaller:userAddr || 'tz1burnburnburnburnburnburnburjAYjjX'});
  var activeIndex = Number(info.active_index);
  var count = Number(info.uri_count);
- var activeUri = await ct.contractViews.get_active_uri(tokenId).executeView({viewCaller:userAddr});
+ var activeUri = await ct.contractViews.get_active_uri(tokenId).executeView({viewCaller:userAddr || 'tz1burnburnburnburnburnburnburjAYjjX'});
  var versions = [];
  for (var i = 0; i < count; i++) {
- var uri = await ct.contractViews.get_uri_at({token_id:tokenId,index:i}).executeView({viewCaller:userAddr});
+ var uri = await ct.contractViews.get_uri_at({token_id:tokenId,index:i}).executeView({viewCaller:userAddr || 'tz1burnburnburnburnburnburnburjAYjjX'});
  var metadata;
  try { metadata = await fetchJsonMaybe(uri); }
  catch(e) { metadata = { name:'Token #' + tokenId + ' Metadata #' + i, description:'I could not fetch this metadata: ' + errorText(e) }; }
@@ -1320,7 +1337,7 @@ fullscreenZoom = 1;
  }
 
  async function ownedTokenIds() {
- req();
+ reqWallet();
  if (!ctAddr) throw new Error('Open your collection first.');
  var url = tzktApiBase() + '/v1/tokens/balances?account=' + encodeURIComponent(userAddr) + '&token.contract=' + encodeURIComponent(ctAddr) + '&balance.ne=0&limit=1000';
  var res = await fetch(url, { cache:'no-store' });
@@ -1565,6 +1582,17 @@ if (btn) { btn.innerHTML = orig; btn.disabled = false; }
  var isLight = document.body.classList.toggle('light');
  btn.innerHTML = isLight ? sunSvg : moonSvg;
  try { localStorage.setItem('tezos-pin-theme', isLight ? 'light' : 'dark'); } catch(_){}
+ });
+ })();
+
+ // ── Browse mode (no wallet) ──
+ (function(){
+ var browseBtn = document.getElementById('btn-browse-mode');
+ if (!browseBtn) return;
+ browseBtn.addEventListener('click', function(){
+ document.body.classList.remove('preconnect');
+ document.body.classList.add('browse-mode');
+ log('Browse mode: paste a KT1 contract address and click Open Collection to view tokens. Connect a wallet to pin.', 'info');
  });
  })();
 </script>
