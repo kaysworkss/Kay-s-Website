@@ -377,6 +377,7 @@ body.preconnect .page-title-area{display:none}
  <div class="field"><label>Start at token ID</label><input id="gallery-start" type="number" min="0" value="0" /></div>
  <div class="field"><label>How many tokens do you want to see?</label><input id="gallery-count" type="number" min="1" max="100" value="24" /></div>
  <button class="btn btn-sec" id="btn-load-gallery">Show These Tokens</button>
+ <button class="btn btn-ghost" id="btn-refresh-pins" style="display:none">&#x1F4CC; Refresh Pin Status</button>
 
 
  </div>
@@ -763,25 +764,54 @@ function mediaUriFromMetadata(meta, fallbackUri) {
  catch(e) { metadata = { name:'Token #' + tokenId + ' Metadata #' + i, description:'I could not fetch this metadata: ' + errorText(e) }; }
  versions.push({ index:i, uri:uri, metadata:metadata, mediaUri:mediaUriFromMetadata(metadata, uri), isActive:i === activeIndex });
  }
- // Extract pinned_index — handle snake_case, camelCase, Option wrapping, BigNumber
- var rawPinnedIndex = info ? (info.pinned_index !== undefined ? info.pinned_index : info.pinnedIndex) : undefined;
- // Unwrap Michelson Option: { Some: value }
- if (rawPinnedIndex && typeof rawPinnedIndex === 'object' && rawPinnedIndex.Some !== undefined) rawPinnedIndex = rawPinnedIndex.Some;
+ // Dump all info keys for debugging
+ var infoKeys = info ? Object.keys(info) : [];
+ log('Token #' + tokenId + ' info keys: ' + infoKeys.join(', '), 'info');
+ // Try every possible field name for the pinned index
  var pinnedIndex = null;
- if (rawPinnedIndex !== undefined && rawPinnedIndex !== null) {
- var asStr = (typeof rawPinnedIndex === 'object' && rawPinnedIndex.toString) ? rawPinnedIndex.toString() : String(rawPinnedIndex);
+ var pinnedRaw = undefined;
+ var pinnedKeyNames = ['pinned_index','pinnedIndex','pinned','pin_index','pinIndex','pinnedUri','pinned_uri_index'];
+ for (var pk = 0; pk < pinnedKeyNames.length; pk++) {
+ if (info && info[pinnedKeyNames[pk]] !== undefined && info[pinnedKeyNames[pk]] !== null) {
+ pinnedRaw = info[pinnedKeyNames[pk]];
+ break;
+ }
+ }
+ // If not found by name, check if any key contains 'pin' (case-insensitive)
+ if (pinnedRaw === undefined && info) {
+ for (var ik = 0; ik < infoKeys.length; ik++) {
+ if (infoKeys[ik].toLowerCase().indexOf('pin') !== -1) {
+ pinnedRaw = info[infoKeys[ik]];
+ log('Token #' + tokenId + ': found pin-related key "' + infoKeys[ik] + '" = ' + pinnedRaw, 'info');
+ break;
+ }
+ }
+ }
+ // Unwrap Michelson Option: { Some: value } or { some: value }
+ if (pinnedRaw !== null && pinnedRaw !== undefined && typeof pinnedRaw === 'object') {
+ if (pinnedRaw.Some !== undefined) pinnedRaw = pinnedRaw.Some;
+ else if (pinnedRaw.some !== undefined) pinnedRaw = pinnedRaw.some;
+ else if (pinnedRaw.c !== undefined && Array.isArray(pinnedRaw.c)) pinnedRaw = pinnedRaw.c[0]; // BigNumber internal
+ }
+ // Parse to number
+ if (pinnedRaw !== undefined && pinnedRaw !== null) {
+ var asStr = (typeof pinnedRaw === 'object' && pinnedRaw.toString) ? pinnedRaw.toString() : String(pinnedRaw);
  var asNum = Number(asStr);
  if (!isNaN(asNum) && asNum >= 0) pinnedIndex = asNum;
  }
- // Also check is_pinned / isPinned as a secondary signal
+ // Also use is_pinned as confirmation if available
  var isPinnedFlag = !!(info && (info.is_pinned || info.isPinned));
- // Token is pinned if we have a valid pinned_index, OR if is_pinned is true AND pinned_index is exactly 0
  var trulyPinned = pinnedIndex !== null;
- // If is_pinned says yes but we couldn't parse pinned_index, log it but don't fake a pin
+ // If is_pinned is true and we couldn't find pinnedIndex, use is_pinned + active_index as last resort
  if (!trulyPinned && isPinnedFlag) {
- log('Token #' + tokenId + ': is_pinned=true but pinned_index could not be parsed (raw: ' + rawPinnedIndex + '). Showing as unpinned.', 'warn');
+ var fallback = info.active_index !== undefined ? Number(info.active_index) : (info.activeIndex !== undefined ? Number(info.activeIndex) : NaN);
+ if (!isNaN(fallback) && fallback >= 0) {
+ pinnedIndex = fallback;
+ trulyPinned = true;
+ log('Token #' + tokenId + ': using is_pinned + active_index fallback, pinnedIndex=' + pinnedIndex, 'warn');
  }
- log('Token #' + tokenId + ' pin: is_pinned=' + isPinnedFlag + ', raw_index=' + rawPinnedIndex + ' (type: ' + typeof rawPinnedIndex + '), parsed=' + pinnedIndex + ', pinned=' + trulyPinned, 'info');
+ }
+ log('Token #' + tokenId + ' pin result: raw=' + JSON.stringify(pinnedRaw) + ', parsed=' + pinnedIndex + ', is_pinned=' + isPinnedFlag + ', trulyPinned=' + trulyPinned, 'info');
  versions.forEach(function(v) { v.isPinned = trulyPinned && v.index === pinnedIndex; });
  var activeVersion = versions[activeIndex] || versions[versions.length - 1] || null;
  return { tokenId:tokenId, info:info, activeIndex:activeIndex, pinnedIndex:pinnedIndex, uriCount:count, activeUri:activeUri, uris:versions.map(function(v){ return v.uri; }), versions:versions, metadata:activeVersion ? activeVersion.metadata : {}, mediaUri:activeVersion ? activeVersion.mediaUri : activeUri };
@@ -1030,8 +1060,8 @@ fullscreenZoom = 1;
  function bindHeroButtons(scope) {
  bindNormalZoom(scope);
  scope.querySelectorAll('.js-fullscreen').forEach(function(btn){ btn.onclick = function(){ var card = btn.closest('.token-card'); var items = fullscreenItemsFromCard(card); var selected = card.querySelector('.js-select-version.active'); var selectedIndex = selected ? items.findIndex(function(item){ return item.index === Number(selected.dataset.index); }) : 0; openFullscreen(btn.dataset.media, items, selectedIndex < 0 ? 0 : selectedIndex); }; });
- scope.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); loadGallery(); }; });
- scope.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); loadGallery(); }; });
+ scope.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin transaction may have succeeded despite the error. Refreshing...', 'warn'); } loadGallery(); }; });
+ scope.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin transaction may have succeeded despite the error. Refreshing...', 'warn'); } loadGallery(); }; });
  }
 
  function entrypointCall(name, positionalArgs, objectArg) {
@@ -1172,8 +1202,8 @@ fullscreenZoom = 1;
  window._galleryItems = items;
  grid.innerHTML = items.length ? items.map(cardHtml).join('') : '';
  bindVersionViewers(grid);
- grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); loadGallery(); }; });
- grid.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); loadGallery(); }; });
+ grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin transaction may have succeeded despite the error. Refreshing...', 'warn'); } loadGallery(); }; });
+ grid.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin transaction may have succeeded despite the error. Refreshing...', 'warn'); } loadGallery(); }; });
  }
  if (!items.length) {
  grid.innerHTML = '<div class="token-empty">'+esc(emptyMessage || 'I could not find tokens for you here.')+'</div>';
@@ -1181,6 +1211,7 @@ fullscreenZoom = 1;
  var detailPanel = document.getElementById('token-detail-panel');
  if (detailPanel) detailPanel.style.display = 'none';
  log('Your wallet token previews are ready: ' + items.length + '.', 'ok');
+ document.getElementById('btn-refresh-pins').style.display = 'inline-flex';
  }
  async function loadOwnedTokens() {
  var ids = await ownedTokenIds();
@@ -1213,8 +1244,8 @@ fullscreenZoom = 1;
  window._galleryItems = items;
  grid.innerHTML = items.length ? items.map(cardHtml).join('') : '';
  bindVersionViewers(grid);
- grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); loadGallery(); }; });
- grid.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); loadGallery(); }; });
+ grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin transaction may have succeeded despite the error. Refreshing...', 'warn'); } loadGallery(); }; });
+ grid.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin transaction may have succeeded despite the error. Refreshing...', 'warn'); } loadGallery(); }; });
  }
  if (!items.length) {
  grid.innerHTML = '<div class="token-empty">No tokens found in this range.</div>';
@@ -1222,6 +1253,7 @@ fullscreenZoom = 1;
  var detailPanel = document.getElementById('token-detail-panel');
  if (detailPanel) detailPanel.style.display = 'none';
  log('Your gallery is ready: ' + items.length + ' token' + (items.length === 1 ? '' : 's') + '.', 'ok');
+ document.getElementById('btn-refresh-pins').style.display = 'inline-flex';
  }
 
  if (!TezosToolkit || !BeaconWallet) {
@@ -1344,6 +1376,10 @@ if (btn) { btn.innerHTML = orig; btn.disabled = false; }
  await loadContractAddress(addr, true);
  };
  document.getElementById('btn-load-gallery').onclick = function() { loadGallery().catch(function(e){ log('I could not show those tokens: ' + errorText(e), 'err'); }); };
+ document.getElementById('btn-refresh-pins').onclick = function() {
+ log('Refreshing pin status...', 'info');
+ loadGallery().catch(function(e){ log('Refresh failed: ' + errorText(e), 'err'); });
+ };
 
 
  document.getElementById('btn-discover-fa2').onclick = function() { discoverAndMaybeLoadFa2(false).catch(function(e){ log('I could not find your collections: ' + errorText(e), 'err'); }); };
