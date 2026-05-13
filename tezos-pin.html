@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://api.tzkt.io https://api.ghostnet.tzkt.io https://rpc.tzkt.io https://*.tezos.marigold.dev https://*.ecadinfra.com https://mainnet.smartpy.io https://ghostnet.smartpy.io https://rpc.tzbeta.net https://mainnet.api.tez.ie https://rpc.ghostnet.teztnets.com https://cloudflare-ipfs.com https://ipfs.io https://gateway.pinata.cloud https://nftstorage.link https://dweb.link https://cf-ipfs.com wss://relay.walletbeacon.io wss://*.walletbeacon.io https://beacon-node-1.sky.sx; frame-ancestors 'none'" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>NFT Collector Pinning &middot; Tezos</title>
 <!-- Self-contained: taquito bundle inlined. No external JS files required. -->
@@ -772,14 +771,9 @@ function mediaUriFromMetadata(meta, fallbackUri) {
  var asNum = Number(asStr);
  if (!isNaN(asNum) && asNum >= 0) pinnedIndex = asNum;
  }
- // Determine pinned state: trust either pinned_index being valid OR is_pinned flag
- var trulyPinned = pinnedIndex !== null || !!(info && info.is_pinned);
- // If is_pinned but pinnedIndex is null, fall back to active_index
- if (trulyPinned && pinnedIndex === null && info && info.is_pinned) {
- var fallbackIdx = Number(info.active_index);
- if (!isNaN(fallbackIdx) && fallbackIdx >= 0) pinnedIndex = fallbackIdx;
- else trulyPinned = false;
- }
+ // Only trust pinned_index as the source of truth.
+ // is_pinned may be true contract-wide; pinned_index tells us WHICH version is pinned.
+ var trulyPinned = pinnedIndex !== null;
  log('Token #' + tokenId + ' pin: is_pinned=' + !!(info && info.is_pinned) + ', raw_index=' + rawPinnedIndex + ', parsed=' + pinnedIndex + ', pinned=' + trulyPinned, 'info');
  versions.forEach(function(v) { v.isPinned = trulyPinned && v.index === pinnedIndex; });
  var activeVersion = versions[activeIndex] || versions[versions.length - 1] || null;
@@ -1136,7 +1130,10 @@ fullscreenZoom = 1;
  var contracts = await discoverFa2Contracts();
  renderDiscoveredContracts(contracts);
  log(contracts.length === 1 ? 'Found your collection!' : 'Found ' + contracts.length + ' collections in your wallet!', contracts.length ? 'ok' : 'warn');
- if (autoLoadSingle && contracts.length >= 1 && !ctAddr) await loadContractAddress(contracts[0].address, true);
+ if (autoLoadSingle && contracts.length === 1 && !ctAddr) {
+ document.getElementById('contract-addr').value = contracts[0].address;
+ log('Your pinnable collection is ready \u2014 tap Use or Open Collection to load it.', 'ok');
+ }
  }
 
  async function ownedTokenIds() {
