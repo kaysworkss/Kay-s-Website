@@ -1472,6 +1472,74 @@ function bindInlineVideos(scope) {
  };
  video.oncanplay = function() { clearStuck(); setMessage('', false); };
  video.onstalled = function() { if (!blobTried) loadBlobFallback(); };
+ // Capture first frame as poster — works even when metadata has no thumbnail.
+ // Strategy: spawn a hidden video that loads the source via fetch→blob (same-origin),
+ // seek to 0.1s, draw to canvas, set data URL as poster on the visible video.
+ // This avoids tainting the main video element with crossorigin restrictions.
+ var posterCaptureStarted = false;
+ async function capturePosterFromBlob() {
+ if (posterCaptureStarted || video.dataset.posterCaptured) return;
+ // Skip blob-heavy capture for small autoplay cards — they show the live video anyway.
+ if (video.dataset.noBlob === '1') return;
+ posterCaptureStarted = true;
+ // Skip if we already have a working poster (data: or blob: means our own; http means probe found one).
+ var existing = video.getAttribute('poster') || '';
+ if (existing.indexOf('data:') === 0 || existing.indexOf('blob:') === 0) return;
+ // Try each gateway until one fetches successfully as a blob.
+ for (var i = 0; i < sources.length; i++) {
+ try {
+ var res = await fetch(sources[i], { cache:'force-cache' });
+ if (!res.ok) continue;
+ var ct = (res.headers.get('content-type') || '').toLowerCase();
+ if (ct.indexOf('text/html') === 0 || ct.indexOf('application/json') === 0) continue;
+ var blob = await res.blob();
+ if (!blob || !blob.size) continue;
+ var objectUrl = URL.createObjectURL(blob);
+ var ok = await new Promise(function(resolve) {
+ var hidden = document.createElement('video');
+ hidden.muted = true;
+ hidden.playsInline = true;
+ hidden.preload = 'auto';
+ hidden.src = objectUrl;
+ var done = false;
+ function finish(success) { if (done) return; done = true; try { URL.revokeObjectURL(objectUrl); } catch(_){} hidden.remove(); resolve(success); }
+ hidden.onloadedmetadata = function() {
+ try {
+ var target = Math.min(0.1, Math.max(0, (hidden.duration || 1) * 0.01));
+ hidden.currentTime = target;
+ } catch (_) {}
+ };
+ hidden.onseeked = function() {
+ try {
+ if (!hidden.videoWidth || !hidden.videoHeight) { finish(false); return; }
+ var canvas = document.createElement('canvas');
+ var maxW = 480;
+ var scale = Math.min(1, maxW / hidden.videoWidth);
+ canvas.width = Math.round(hidden.videoWidth * scale);
+ canvas.height = Math.round(hidden.videoHeight * scale);
+ var ctx = canvas.getContext('2d');
+ ctx.drawImage(hidden, 0, 0, canvas.width, canvas.height);
+ var dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+ video.setAttribute('poster', dataUrl);
+ video.dataset.posterCaptured = '1';
+ finish(true);
+ } catch (err) { finish(false); }
+ };
+ hidden.onerror = function() { finish(false); };
+ // Safety timeout — don't hang forever.
+ setTimeout(function() { finish(false); }, 12000);
+ // Hide it offscreen.
+ hidden.style.position = 'fixed';
+ hidden.style.left = '-9999px';
+ hidden.style.width = '1px';
+ hidden.style.height = '1px';
+ document.body.appendChild(hidden);
+ });
+ if (ok) return;
+ } catch (_) { /* try next gateway */ }
+ }
+ }
+ video.addEventListener('loadedmetadata', capturePosterFromBlob);
  armStuck();
  });
  }
