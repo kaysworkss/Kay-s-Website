@@ -2286,14 +2286,11 @@ async function savePrivateSaleToHoF() {
 async function setSoldOverride(sold) {
   const statusEl  = document.getElementById("sold-override-status");
   const pieceIdx  = parseInt(document.getElementById("sold-override-piece")?.value || "0");
-  const cfg       = await (async () => {
-    try { const r = await apiFetch("GET"); return r.config || {}; } catch(e) { return {}; }
-  })();
 
-  const pieces = Array.isArray(cfg.auctions) ? cfg.auctions : [cfg];
-  const piece  = pieces[pieceIdx] || {};
-  const contractAddr = piece.contractAddr || cfg.contractAddr || "";
-  const artTitle     = piece.artTitle     || cfg.artTitle     || "Piece " + (pieceIdx + 1);
+  // Read directly from in-memory _pieces — always accurate, no API round-trip
+  const piece        = _pieces[pieceIdx] || {};
+  const contractAddr = piece.contractAddr || "";
+  const artTitle     = piece.artTitle     || "Piece " + (pieceIdx + 1);
 
   if (!contractAddr) {
     statusEl.className = "hof-status err";
