@@ -2066,22 +2066,24 @@ async function _pollAllTabBids() {
     const soldEl = document.getElementById("tab-sold-" + i);
     const dotEl  = document.getElementById("tab-dot-"  + i);
 
-    // Check manual_sold flag from Supabase first (works even without a contract)
-    if (slot.contractAddr) {
-      try {
-        const sbRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(slot.contractAddr.toLowerCase())}&select=manual_sold&limit=1`,
-          { headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON } }
-        );
-        const sbRows = await sbRes.json();
-        if (Array.isArray(sbRows) && sbRows.length > 0 && sbRows[0].manual_sold === true) {
-          if (bidEl)  bidEl.style.display  = "none";
-          if (soldEl) soldEl.style.display = "";
-          if (dotEl)  dotEl.style.display  = "none";
-          continue; // skip contract read — manual override wins
-        }
-      } catch(_) {}
-    }
+    // Check sold_overrides table first — completely separate from auction_results
+    // so a sold badge never accidentally creates a Hall of Fame entry.
+    try {
+      const pieceKey = slot.contractAddr
+        ? slot.contractAddr.toLowerCase()
+        : "manual-" + (slot.artTitle || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40) + "-" + i;
+      const sbRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/sold_overrides?piece_key=eq.${encodeURIComponent(pieceKey)}&select=piece_key&limit=1`,
+        { headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON } }
+      );
+      const sbRows = await sbRes.json();
+      if (Array.isArray(sbRows) && sbRows.length > 0) {
+        if (bidEl)  bidEl.style.display  = "none";
+        if (soldEl) soldEl.style.display = "";
+        if (dotEl)  dotEl.style.display  = "none";
+        continue; // manual override wins — skip contract read
+      }
+    } catch(_) {}
 
     if (!slot.contractAddr || !ethers.isAddress(slot.contractAddr)) continue;
     try {
