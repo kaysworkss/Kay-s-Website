@@ -2284,60 +2284,45 @@ async function savePrivateSaleToHoF() {
 // ─── Manual Sold Override ────────────────────────────────────────────────────
 
 async function setSoldOverride(sold) {
-  const statusEl  = document.getElementById("sold-override-status");
-  const pieceIdx  = parseInt(document.getElementById("sold-override-piece")?.value || "0");
+  const statusEl = document.getElementById("sold-override-status");
+  const pieceIdx = parseInt(document.getElementById("sold-override-piece")?.value || "0");
 
   // Read directly from in-memory _pieces — always accurate, no API round-trip
-  const piece        = _pieces[pieceIdx] || {};
-  const contractAddr = piece.contractAddr || "";
-  const artTitle     = piece.artTitle     || "Piece " + (pieceIdx + 1);
+  const piece    = _pieces[pieceIdx] || {};
+  const artTitle = piece.artTitle || "Piece " + (pieceIdx + 1);
 
-  if (!contractAddr) {
-    statusEl.className = "hof-status err";
-    statusEl.textContent = "No contract address for this piece — fill in the auction config first.";
-    return;
-  }
+  // Stable piece key — uses contract address if present, else title+index slug.
+  // Stored in the SEPARATE `sold_overrides` table, never in auction_results,
+  // so it cannot accidentally appear in the Hall of Fame.
+  const pieceKey = piece.contractAddr
+    ? piece.contractAddr.toLowerCase()
+    : "manual-" + artTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40) + "-" + pieceIdx;
 
   statusEl.className = "hof-status"; statusEl.textContent = "Saving override…";
 
   try {
-    // Store the manual sold override as a config flag in the piece config
-    // We patch the existing auction_results row if it exists, else insert a minimal one
-    const auctionId = contractAddr.toLowerCase();
-    const existsRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(auctionId)}&select=auction_id`,
-      { headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON } }
-    );
-    const existing = await existsRes.json();
-    const alreadyExists = Array.isArray(existing) && existing.length > 0;
-
-    // Insert a minimal stub if it doesn't exist yet, so we can attach the flag
-    if (!alreadyExists) {
-      await fetch(`${SUPABASE_URL}/rest/v1/auction_results`, {
+    if (sold) {
+      // Upsert into sold_overrides — completely separate from auction_results
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/sold_overrides`, {
         method: "POST",
         headers: {
           apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON,
-          "Content-Type": "application/json", "Prefer": "return=minimal"
+          "Content-Type": "application/json",
+          "Prefer": "resolution=merge-duplicates,return=minimal"
         },
-        body: JSON.stringify({
-          auction_id:    auctionId,
-          art_title:     artTitle,
-          art_artist:    piece.artArtist || cfg.artArtist || "",
-          art_image:     piece.artImage  || cfg.artImage  || "",
-          contract_addr: contractAddr,
-          manual_sold:   sold,
-          settled_at:    new Date().toISOString(),
-        }),
+        body: JSON.stringify({ piece_key: pieceKey, art_title: artTitle, updated_at: new Date().toISOString() }),
       });
+      if (!res.ok) throw new Error("Supabase error: " + await res.text());
     } else {
-      await fetch(`${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(auctionId)}`, {
-        method: "PATCH",
-        headers: {
-          apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON,
-          "Content-Type": "application/json", "Prefer": "return=minimal"
-        },
-        body: JSON.stringify({ manual_sold: sold }),
-      });
+      // Delete from sold_overrides
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/sold_overrides?piece_key=eq.${encodeURIComponent(pieceKey)}`,
+        {
+          method: "DELETE",
+          headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON }
+        }
+      );
+      if (!res.ok) throw new Error("Supabase error: " + await res.text());
     }
 
     statusEl.className   = "hof-status ok";
