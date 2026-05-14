@@ -2062,6 +2062,27 @@ async function _buildPieceSelector() {
 async function _pollAllTabBids() {
   for (let i = 0; i < _auctions.length; i++) {
     const slot = _auctions[i];
+    const bidEl  = document.getElementById("tab-bid-"  + i);
+    const soldEl = document.getElementById("tab-sold-" + i);
+    const dotEl  = document.getElementById("tab-dot-"  + i);
+
+    // Check manual_sold flag from Supabase first (works even without a contract)
+    if (slot.contractAddr) {
+      try {
+        const sbRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(slot.contractAddr.toLowerCase())}&select=manual_sold&limit=1`,
+          { headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON } }
+        );
+        const sbRows = await sbRes.json();
+        if (Array.isArray(sbRows) && sbRows.length > 0 && sbRows[0].manual_sold === true) {
+          if (bidEl)  bidEl.style.display  = "none";
+          if (soldEl) soldEl.style.display = "";
+          if (dotEl)  dotEl.style.display  = "none";
+          continue; // skip contract read — manual override wins
+        }
+      } catch(_) {}
+    }
+
     if (!slot.contractAddr || !ethers.isAddress(slot.contractAddr)) continue;
     try {
       let c = _contractCache[slot.contractAddr];
@@ -2069,9 +2090,6 @@ async function _pollAllTabBids() {
       const s       = await c.auctionState();
       const bid     = s[6]; // _highestBid
       const settled = s[2]; // _settled
-      const bidEl   = document.getElementById("tab-bid-"  + i);
-      const soldEl  = document.getElementById("tab-sold-" + i);
-      const dotEl   = document.getElementById("tab-dot-"  + i);
       if (settled) {
         if (bidEl)  bidEl.style.display  = "none";
         if (soldEl) soldEl.style.display = "";
