@@ -873,8 +873,8 @@ function networkName() { return network === 'ghostnet' ? 'Ghostnet' : 'Mainnet';
 function gatewayUrl(uri) {
  uri = String(uri || '').trim();
  if (!uri) return '';
- if (/^ipfs:\/\//i.test(uri)) return 'https://nftstorage.link/ipfs/' + uri.replace(/^ipfs:\/\//i, '');
- if (/^ipfs\//i.test(uri)) return 'https://nftstorage.link/' + uri;
+ if (/^ipfs:\/\//i.test(uri)) return 'https://ipfs.io/ipfs/' + uri.replace(/^ipfs:\/\//i, '');
+ if (/^ipfs\//i.test(uri)) return 'https://ipfs.io/' + uri;
  return uri;
  }
 function ipfsPath(uri) {
@@ -888,8 +888,8 @@ function gatewayUrls(uri) {
  var path = ipfsPath(uri);
  var urls = primary ? [primary] : [];
  if (path) {
- // Order matters: CDN-backed gateways that serve video with proper CORS first.
- ['https://w3s.link/ipfs/','https://dweb.link/ipfs/','https://cloudflare-ipfs.com/ipfs/','https://gateway.pinata.cloud/ipfs/','https://ipfs.io/ipfs/','https://cf-ipfs.com/ipfs/'].forEach(function(base) {
+ // Reliable, well-CORSed gateways first. ipfs.io is primary; others are fallbacks.
+ ['https://cloudflare-ipfs.com/ipfs/','https://dweb.link/ipfs/','https://gateway.pinata.cloud/ipfs/','https://w3s.link/ipfs/','https://nftstorage.link/ipfs/','https://cf-ipfs.com/ipfs/'].forEach(function(base) {
  var alt = base + path;
  if (urls.indexOf(alt) === -1) urls.push(alt);
  });
@@ -1029,9 +1029,32 @@ function mediaUriFromMetadata(meta, fallbackUri) {
  return candidates[0] || '';
 }
  async function fetchJsonMaybe(uri) {
- var res = await fetch(gatewayUrl(uri), { cache:'no-store' });
- if (!res.ok) throw new Error('Metadata fetch failed (' + res.status + ')');
- return await res.json();
+ // Race all known gateways in parallel; first valid JSON wins.
+ var urls = gatewayUrls(uri);
+ if (!urls.length) throw new Error('Empty URI');
+ var ac = new AbortController();
+ var attempts = urls.map(function(url) {
+ return new Promise(function(resolve, reject) {
+ var timer = setTimeout(function(){ reject(new Error('Timeout: ' + url)); }, 10000);
+ fetch(url, { cache:'no-store', signal: ac.signal }).then(function(res) {
+ clearTimeout(timer);
+ if (!res.ok) { reject(new Error('HTTP ' + res.status + ' ' + url)); return; }
+ var ct = (res.headers.get('content-type') || '').toLowerCase();
+ // Reject gateway error pages disguised as 200 OK.
+ if (ct.indexOf('text/html') === 0) { reject(new Error('HTML response from ' + url)); return; }
+ res.json().then(resolve, reject);
+ }).catch(function(e) { clearTimeout(timer); reject(e); });
+ });
+ });
+ try {
+ var first = await Promise.any(attempts);
+ ac.abort(); // cancel remaining requests
+ return first;
+ } catch (aggErr) {
+ // Promise.any throws AggregateError when all reject. Surface a clean message.
+ var errs = (aggErr && aggErr.errors) || [aggErr];
+ throw new Error('All gateways failed: ' + errs.map(function(e){ return (e && e.message) || String(e); }).join(' | '));
+ }
  }
  async function tokenInfo(tokenId) {
  var info = await ct.contractViews.get_token_info(tokenId).executeView({viewCaller:userAddr || 'tz1burnburnburnburnburnburnburjAYjjX'});
