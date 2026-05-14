@@ -753,6 +753,13 @@ body {
               <input id="prv-winner-name" placeholder="e.g. Adebayo" />
             </div>
           </div>
+          <div class="field" style="margin-bottom:10px">
+            <label>Buyer avatar URL (optional)</label>
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+              <input id="prv-winner-avatar" placeholder="https://…" oninput="previewPrvAvatar()" style="flex:1" />
+              <img id="prv-avatar-preview" class="profile-entry-avatar" src="" alt="" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid var(--divider);display:none;flex-shrink:0;">
+            </div>
+          </div>
           <div class="field" style="margin-bottom:4px">
             <label>Sale date</label>
             <input type="datetime-local" id="prv-settled-at" />
@@ -859,6 +866,48 @@ body {
         <div id="profile-list-wrap" style="margin-top:16px;display:none;">
           <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Saved profiles</div>
           <div class="profile-list" id="profile-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- USD Backfill -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-head">
+        <div class="card-title">Backfill USD Values</div>
+        <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(196,132,90,0.1);color:var(--clay);border:1px solid rgba(196,132,90,0.3)">Historical records</span>
+      </div>
+      <div class="card-body">
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:6px">
+          Find all Hall of Fame records that have no USD value logged and fill them using today's Coinbase spot rate.
+          Since the free Coinbase API doesn't provide historical prices, these will be marked <em>estimated</em> — honest about the fact that rates have moved since settlement.
+        </p>
+        <p style="font-family:'Crimson Pro',serif;font-size:0.82rem;color:var(--text-muted);font-style:italic;margin-bottom:16px">
+          If you have the actual USD value at time of sale for any record, you can also enter it manually below.
+        </p>
+
+        <!-- Auto backfill -->
+        <button class="btn-hof" id="backfill-btn" onclick="backfillUsd()">
+          ◈ &nbsp;Backfill all missing USD values
+        </button>
+        <div class="hof-status" id="backfill-status" style="margin-top:10px"></div>
+
+        <!-- Manual single-record override -->
+        <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--divider)">
+          <div style="font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px">Set USD value manually for one record</div>
+          <div class="row2" style="margin-bottom:10px">
+            <div class="field">
+              <label>Auction ID or contract address</label>
+              <input id="manual-usd-id" placeholder="0x… or op… or prv-…" />
+              <div class="field-hint">Paste the auction_id exactly as it appears in Supabase</div>
+            </div>
+            <div class="field">
+              <label>USD value at time of sale</label>
+              <input id="manual-usd-value" type="number" step="1" min="0" placeholder="e.g. 1250" />
+              <div class="field-hint">Whole dollars — no $ sign</div>
+            </div>
+          </div>
+          <button class="btn btn-outline" onclick="setManualUsd()" style="width:100%;justify-content:center">Set USD value →</button>
+          <div class="hof-status" id="manual-usd-status" style="margin-top:8px"></div>
         </div>
       </div>
     </div>
@@ -1613,6 +1662,18 @@ async function saveConfig() {
 
 // ─── Clear ────────────────────────────────────────────────────────────────────
 
+// ─── Live rate helper — fetches spot price from Coinbase at time of save ────────
+
+async function _fetchUsdAtSave(chain) {
+  const pair = chain === "tezos" ? "XTZ-USD" : "ETH-USD";
+  try {
+    const res  = await fetch(`https://api.coinbase.com/v2/prices/${pair}/spot`);
+    const data = await res.json();
+    const rate = parseFloat(data?.data?.amount);
+    return rate > 0 ? rate : null;
+  } catch(_) { return null; }
+}
+
 // ─── Hall of Fame — manual save ──────────────────────────────────────────────
 
 const SUPABASE_URL  = "https://haijshusgcbdexfueunr.supabase.co";
@@ -1681,7 +1742,12 @@ async function saveToHallOfFame() {
       throw new Error("No winner found — the auction may not have received any bids.");
     }
 
-    statusEl.textContent = `Winner confirmed: ${highestBidder.slice(0,6)}…${highestBidder.slice(-4)} · ${winningBid.toFixed(4)} ETH. Saving…`;
+    statusEl.textContent = `Winner confirmed: ${highestBidder.slice(0,6)}…${highestBidder.slice(-4)} · ${winningBid.toFixed(4)} ETH. Fetching rate…`;
+
+    // Fetch live ETH/USD rate at moment of save
+    const ethUsdRate = await _fetchUsdAtSave("eth");
+    const winningBidUsd = ethUsdRate ? Math.round(winningBid * ethUsdRate) : null;
+    if (winningBidUsd) statusEl.textContent = `Winner confirmed: ${highestBidder.slice(0,6)}…${highestBidder.slice(-4)} · ${winningBid.toFixed(4)} ETH · ≈ $${winningBidUsd.toLocaleString()}. Saving…`;
 
     // Count bids from Supabase
     let bidCount = 0;
@@ -1714,6 +1780,7 @@ async function saveToHallOfFame() {
       winner_display_name: winnerNameOverride,
       winner_avatar_url:   winnerAvatarOverride,
       winning_bid:         winningBid,
+      winning_bid_usd:     winningBidUsd,
       bid_count:           bidCount,
       contract_addr:       contractAddr,
       settled_at:          new Date().toISOString(),
@@ -1768,7 +1835,7 @@ async function saveToHallOfFame() {
 
     const winnerLabel = winnerNameOverride || `${highestBidder.slice(0,6)}…${highestBidder.slice(-4)}`;
     statusEl.className   = "hof-status ok";
-    statusEl.textContent = `✓ Saved — ${cfg.artTitle||"Auction"} · ${winningBid.toFixed(4)} ETH · ${winnerLabel}`;
+    statusEl.textContent = `✓ Saved — ${cfg.artTitle||"Auction"} · ${winningBid.toFixed(4)} ETH${winningBidUsd ? " · ≈ $"+winningBidUsd.toLocaleString() : ""} · ${winnerLabel}`;
     toast("ok", "Hall of Fame updated", "The auction result has been recorded.");
 
   } catch(e) {
@@ -1992,6 +2059,15 @@ async function lookupProfile() {
   }
 }
 
+function previewPrvAvatar() {
+  const url     = document.getElementById("prv-winner-avatar").value.trim();
+  const preview = document.getElementById("prv-avatar-preview");
+  if (url) {
+    preview.src = url; preview.style.display = "block";
+    preview.onerror = () => { preview.style.display = "none"; };
+  } else { preview.style.display = "none"; }
+}
+
 function previewAvatar() {
   const url     = document.getElementById("pef-avatar").value.trim();
   const preview = document.getElementById("pef-avatar-preview");
@@ -2129,6 +2205,10 @@ async function saveTezosSaleToHoF() {
   // Use op hash as the auction_id so it's uniquely identified
   const auctionId = opHash || contractAddr || `tez-${Date.now()}`;
 
+  // Fetch live XTZ/USD rate at moment of save
+  const xtzUsdRate   = await _fetchUsdAtSave("tezos");
+  const winBidUsd    = xtzUsdRate ? Math.round(winBid * xtzUsdRate) : null;
+
   const record = {
     auction_id:          auctionId.toLowerCase(),
     chain:               "tezos",
@@ -2141,6 +2221,7 @@ async function saveTezosSaleToHoF() {
     winner_display_name: winnerName,
     winner_avatar_url:   winnerAvatar,
     winning_bid:         winBid,
+    winning_bid_usd:     winBidUsd,
     tezos_op_hash:       opHash,
     contract_addr:       contractAddr,
     bid_count:           null,
@@ -2171,7 +2252,7 @@ async function saveTezosSaleToHoF() {
     if (!saveRes.ok) throw new Error("Supabase error: " + await saveRes.text());
 
     statusEl.className   = "hof-status ok";
-    statusEl.textContent = `✓ Saved — ${artTitle} · ${winBid.toFixed(2)} XTZ · ${winnerName || winner}`;
+    statusEl.textContent = `✓ Saved — ${artTitle} · ${winBid.toFixed(2)} XTZ${winBidUsd ? " · ≈ $"+winBidUsd.toLocaleString() : ""} · ${winnerName || winner}`;
     toast("ok", "Hall of Fame updated", "Tezos auction recorded.");
   } catch(e) {
     statusEl.className   = "hof-status err";
@@ -2208,8 +2289,9 @@ async function savePrivateSaleToHoF() {
   const winBid      = parseFloat(document.getElementById("prv-winning-bid").value) || 0;
   const txHash      = document.getElementById("prv-tx-hash").value.trim();
   const winner      = document.getElementById("prv-winner").value.trim();
-  const winnerName  = document.getElementById("prv-winner-name").value.trim();
-  const settledAt   = document.getElementById("prv-settled-at").value;
+  const winnerName   = document.getElementById("prv-winner-name").value.trim();
+  const winnerAvatar = document.getElementById("prv-winner-avatar").value.trim();
+  const settledAt    = document.getElementById("prv-settled-at").value;
 
   if (!artTitle) {
     statusEl.className = "hof-status err"; statusEl.textContent = "Artwork title is required.";
@@ -2226,6 +2308,10 @@ async function savePrivateSaleToHoF() {
 
   const auctionId = `prv-${txHash.toLowerCase().slice(0, 40)}`;
 
+  // Fetch live rate at moment of save
+  const prvUsdRate  = await _fetchUsdAtSave(chain);
+  const winBidUsd   = prvUsdRate ? Math.round(winBid * prvUsdRate) : null;
+
   const record = {
     auction_id:          auctionId,
     chain:               chain,
@@ -2237,8 +2323,9 @@ async function savePrivateSaleToHoF() {
     art_medium:          artMedium,
     winner:              winner.toLowerCase(),
     winner_display_name: winnerName,
-    winner_avatar_url:   null,
+    winner_avatar_url:   winnerAvatar || null,
     winning_bid:         winBid,
+    winning_bid_usd:     winBidUsd,
     tezos_op_hash:       chain === "tezos" ? txHash : null,
     contract_addr:       chain === "eth"   ? txHash : null,
     bid_count:           null,
@@ -2270,7 +2357,7 @@ async function savePrivateSaleToHoF() {
 
     const currency = chain === "tezos" ? "XTZ" : "ETH";
     statusEl.className   = "hof-status ok";
-    statusEl.textContent = `✓ Saved — ${artTitle} · ${winBid.toFixed(chain === "tezos" ? 2 : 4)} ${currency} · Private sale`;
+    statusEl.textContent = `✓ Saved — ${artTitle} · ${winBid.toFixed(chain === "tezos" ? 2 : 4)} ${currency}${winBidUsd ? " · ≈ $"+winBidUsd.toLocaleString() : ""} · Private sale`;
     toast("ok", "Hall of Fame updated", "Private sale recorded.");
   } catch(e) {
     statusEl.className   = "hof-status err";
@@ -2333,6 +2420,111 @@ async function setSoldOverride(sold) {
   } catch(e) {
     statusEl.className   = "hof-status err";
     statusEl.textContent = "Error: " + (e.message || "Unknown error");
+  }
+}
+
+// ─── USD Backfill ────────────────────────────────────────────────────────────
+
+async function backfillUsd() {
+  const btn      = document.getElementById("backfill-btn");
+  const statusEl = document.getElementById("backfill-status");
+  btn.disabled   = true;
+  statusEl.className = "hof-status"; statusEl.textContent = "Loading records…";
+
+  try {
+    const res  = await fetch(
+      `${SUPABASE_URL}/rest/v1/auction_results?winning_bid_usd=is.null&select=auction_id,chain,winning_bid&limit=200`,
+      { headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON } }
+    );
+    const rows = await res.json();
+    if (!Array.isArray(rows) || rows.length === 0) {
+      statusEl.className = "hof-status ok";
+      statusEl.textContent = "✓ All records already have USD values — nothing to backfill.";
+      btn.disabled = false; return;
+    }
+
+    statusEl.textContent = `Found ${rows.length} record${rows.length === 1 ? "" : "s"} — fetching rates…`;
+
+    const [ethRate, xtzRate] = await Promise.all([
+      _fetchUsdAtSave("eth"),
+      _fetchUsdAtSave("tezos"),
+    ]);
+
+    if (!ethRate && !xtzRate) {
+      statusEl.className = "hof-status err";
+      statusEl.textContent = "Could not reach Coinbase — check your connection and try again.";
+      btn.disabled = false; return;
+    }
+
+    statusEl.textContent = `ETH $${ethRate?.toLocaleString() || "?"} · XTZ $${xtzRate?.toFixed(4) || "?"} — updating ${rows.length} records…`;
+
+    let updated = 0, failed = 0;
+    for (const row of rows) {
+      const isTezos = row.chain === "tezos";
+      const rate    = isTezos ? xtzRate : ethRate;
+      if (!rate || !row.winning_bid) { failed++; continue; }
+      const usd = Math.round(parseFloat(row.winning_bid) * rate);
+      try {
+        const patchRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(row.auction_id)}`,
+          {
+            method: "PATCH",
+            headers: {
+              apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON,
+              "Content-Type": "application/json", "Prefer": "return=minimal"
+            },
+            body: JSON.stringify({ winning_bid_usd: usd }),
+          }
+        );
+        if (patchRes.ok) updated++; else failed++;
+      } catch(_) { failed++; }
+    }
+
+    statusEl.className = "hof-status ok";
+    statusEl.textContent = `✓ Updated ${updated} record${updated === 1 ? "" : "s"} using today's rates (estimated).${failed ? " " + failed + " could not be updated." : ""}`;
+    toast("ok", "USD backfill complete", `${updated} records updated`);
+  } catch(e) {
+    statusEl.className = "hof-status err";
+    statusEl.textContent = "Error: " + (e.message || "Unknown");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function setManualUsd() {
+  const statusEl  = document.getElementById("manual-usd-status");
+  const auctionId = document.getElementById("manual-usd-id").value.trim();
+  const usdVal    = parseFloat(document.getElementById("manual-usd-value").value);
+
+  if (!auctionId) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Auction ID is required."; return;
+  }
+  if (!usdVal || usdVal <= 0) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Please enter a valid USD amount."; return;
+  }
+
+  statusEl.className = "hof-status"; statusEl.textContent = "Saving…";
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(auctionId)}`,
+      {
+        method: "PATCH",
+        headers: {
+          apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON,
+          "Content-Type": "application/json", "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({ winning_bid_usd: Math.round(usdVal) }),
+      }
+    );
+    if (!res.ok) throw new Error(await res.text());
+    statusEl.className   = "hof-status ok";
+    statusEl.textContent = `✓ Set to $${Math.round(usdVal).toLocaleString()} for ${auctionId.slice(0, 24)}…`;
+    document.getElementById("manual-usd-id").value    = "";
+    document.getElementById("manual-usd-value").value = "";
+    toast("ok", "USD value set", "$" + Math.round(usdVal).toLocaleString());
+  } catch(e) {
+    statusEl.className   = "hof-status err";
+    statusEl.textContent = "Error: " + (e.message || "Unknown");
   }
 }
 
