@@ -362,6 +362,16 @@ body {
   color: var(--clay); margin-bottom: 12px;
 }
 
+/* HoF tab buttons */
+.hof-tab-btn {
+  font-family: 'Cinzel', serif; font-size: 0.52rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--text-muted); background: transparent;
+  border: none; border-bottom: 2px solid transparent;
+  padding: 10px 16px; cursor: pointer; transition: color .2s, border-color .2s;
+}
+.hof-tab-btn:hover { color: var(--clay); }
+.hof-tab-btn.active { color: var(--sand); border-bottom-color: var(--clay); }
+
 /* Hall of fame card */
 .hof-status { font-family:'Crimson Pro',serif; font-size:0.85rem; font-style:italic; color:var(--text-muted); margin-top:10px; min-height:1.4em; }
 .hof-status.ok  { color:var(--moss); }
@@ -579,29 +589,204 @@ body {
         <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(201,153,58,0.12);color:var(--gold);border:1px solid rgba(201,153,58,0.3)">Permanent record</span>
       </div>
       <div class="card-body">
+
+        <!-- ── Tab switcher ── -->
+        <div style="display:flex;border-bottom:1px solid var(--divider);margin-bottom:18px;gap:0;">
+          <button id="hof-tab-eth"     class="hof-tab-btn active" onclick="hofSwitchTab('eth')">⟠ &nbsp;ETH Auction</button>
+          <button id="hof-tab-tezos"   class="hof-tab-btn"        onclick="hofSwitchTab('tezos')">ꜩ &nbsp;Tezos Auction</button>
+          <button id="hof-tab-private" class="hof-tab-btn"        onclick="hofSwitchTab('private')">⊛ &nbsp;Private Sale</button>
+        </div>
+
+        <!-- ════ ETH panel ════ -->
+        <div id="hof-panel-eth">
+          <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">
+            Reads the final state from the on-chain ETH contract and saves it to the Hall of Fame. Winner and bid are pulled automatically.
+          </p>
+          <div class="field" style="margin-bottom:10px" id="hof-piece-field">
+            <label>Select piece to save</label>
+            <select id="hof-piece-select" style="width:100%;background:var(--bg-alt);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:8px 10px;outline:none;">
+              <option value="0">Piece 1</option>
+            </select>
+            <div class="field-hint">Which auction piece to record in the Hall of Fame</div>
+          </div>
+          <div class="field" style="margin-bottom:10px">
+            <label>Winner display name (optional override)</label>
+            <input id="hof-winner-name" placeholder="e.g. Adebayo — leave blank to use their wallet address" />
+            <div class="field-hint">Overrides the collector's own profile name in the Hall of Fame for this auction only.</div>
+          </div>
+          <div class="field" style="margin-bottom:14px">
+            <label>Winner avatar URL (optional override)</label>
+            <input id="hof-winner-avatar" placeholder="https://… — leave blank to use their profile avatar" />
+          </div>
+          <button class="btn-hof" id="hof-btn" onclick="saveToHallOfFame()">
+            ◇ &nbsp;Save ETH auction to Hall of Fame
+          </button>
+          <div class="hof-status" id="hof-status"></div>
+        </div>
+
+        <!-- ════ Tezos panel ════ -->
+        <div id="hof-panel-tezos" style="display:none">
+          <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">
+            Log a Tezos auction result manually. Paste the on-chain operation hash so the record links to tzkt.io for verification.
+          </p>
+          <div class="row2">
+            <div class="field">
+              <label>Artwork title</label>
+              <input id="tez-art-title" placeholder="e.g. ìgbáradì" />
+            </div>
+            <div class="field">
+              <label>Artist name</label>
+              <input id="tez-art-artist" placeholder="e.g. Kayode Oyeniyi" />
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Year</label>
+              <input id="tez-art-year" placeholder="2025" />
+            </div>
+            <div class="field">
+              <label>Medium</label>
+              <input id="tez-art-medium" placeholder="Digital painting" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Image URL</label>
+            <input id="tez-art-image" placeholder="https://… or ipfs://…" />
+          </div>
+          <div class="field">
+            <label>Winning bid (XTZ)</label>
+            <input id="tez-winning-bid" type="number" step="0.01" min="0" placeholder="e.g. 42.5" />
+            <div class="field-hint">Amount in XTZ — not mutez.</div>
+          </div>
+          <div class="field">
+            <label>Operation hash (on-chain proof)</label>
+            <input id="tez-op-hash" placeholder="oo… or op… Tezos operation hash from tzkt.io" />
+            <div class="field-hint">The settlement transaction hash — used to auto-link the record to tzkt.io so the price is publicly verifiable.</div>
+          </div>
+          <div class="field">
+            <label>Contract / FA2 address (optional)</label>
+            <input id="tez-contract-addr" placeholder="KT1… — optional, links to the token on tzkt" />
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Winner wallet / alias</label>
+              <input id="tez-winner" placeholder="tz1… or .tez alias" />
+            </div>
+            <div class="field">
+              <label>Winner display name</label>
+              <input id="tez-winner-name" placeholder="e.g. Adebayo" />
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:14px">
+            <label>Winner avatar URL (optional)</label>
+            <input id="tez-winner-avatar" placeholder="https://…" />
+          </div>
+          <div class="field" style="margin-bottom:4px">
+            <label>Settlement date</label>
+            <input type="datetime-local" id="tez-settled-at" />
+          </div>
+          <button class="btn-hof" id="tez-hof-btn" onclick="saveTezosSaleToHoF()" style="margin-top:14px">
+            ꜩ &nbsp;Save Tezos auction to Hall of Fame
+          </button>
+          <div class="hof-status" id="tez-hof-status"></div>
+        </div>
+
+        <!-- ════ Private sale panel ════ -->
+        <div id="hof-panel-private" style="display:none">
+          <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">
+            Record a private off-auction sale. Paste the on-chain transaction hash as the verifiable proof of payment — it will be linked publicly so the price is auditable.
+          </p>
+          <div class="row2">
+            <div class="field">
+              <label>Artwork title</label>
+              <input id="prv-art-title" placeholder="e.g. ìgbáradì" />
+            </div>
+            <div class="field">
+              <label>Artist name</label>
+              <input id="prv-art-artist" placeholder="e.g. Kayode Oyeniyi" />
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Year</label>
+              <input id="prv-art-year" placeholder="2025" />
+            </div>
+            <div class="field">
+              <label>Medium</label>
+              <input id="prv-art-medium" placeholder="Digital painting" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Image URL</label>
+            <input id="prv-art-image" placeholder="https://… or ipfs://…" />
+          </div>
+          <div class="field">
+            <label>Chain</label>
+            <div class="piece-status-row" id="prv-chain-row">
+              <button type="button" class="piece-status-btn active-live" id="prv-chain-eth" onclick="setPrvChain('eth')">⟠ Ethereum</button>
+              <button type="button" class="piece-status-btn" id="prv-chain-tezos" onclick="setPrvChain('tezos')">ꜩ Tezos</button>
+            </div>
+            <input type="hidden" id="prv-chain" value="eth" />
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Sale price</label>
+              <input id="prv-winning-bid" type="number" step="0.0001" min="0" placeholder="e.g. 0.85" />
+            </div>
+            <div class="field">
+              <label>Currency</label>
+              <input id="prv-currency-hint" value="ETH" readonly style="color:var(--text-muted);background:var(--bg-alt)" />
+            </div>
+          </div>
+          <div class="field">
+            <label>On-chain payment proof (tx / op hash)</label>
+            <input id="prv-tx-hash" placeholder="0x… (ETH) or op… / oo… (Tezos) — the settlement transaction" />
+            <div class="field-hint">Paste the transaction hash that proves payment. This will be linked on the public record so collectors can verify the price on-chain.</div>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Buyer wallet</label>
+              <input id="prv-winner" placeholder="0x… or tz1…" />
+            </div>
+            <div class="field">
+              <label>Buyer display name</label>
+              <input id="prv-winner-name" placeholder="e.g. Adebayo" />
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:4px">
+            <label>Sale date</label>
+            <input type="datetime-local" id="prv-settled-at" />
+          </div>
+          <button class="btn-hof" id="prv-hof-btn" onclick="savePrivateSaleToHoF()" style="margin-top:14px">
+            ⊛ &nbsp;Save private sale to Hall of Fame
+          </button>
+          <div class="hof-status" id="prv-hof-status"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Manual sold override -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-head">
+        <div class="card-title">Manual Sold Override</div>
+        <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(107,124,92,0.12);color:var(--moss);border:1px solid rgba(107,124,92,0.3)">Auction display</span>
+      </div>
+      <div class="card-body">
         <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">
-          Save an auction's final result to the public Hall of Fame. The winner and bid are read from the contract. Optionally override the winner's name and avatar below.
+          Force the "Sold" badge to appear on a piece tab — useful when a piece was settled privately or via a different mechanism and the contract hasn't been updated.
         </p>
-        <div class="field" style="margin-bottom:10px" id="hof-piece-field">
-          <label>Select piece to save</label>
-          <select id="hof-piece-select" style="width:100%;background:var(--bg-alt);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:8px 10px;outline:none;">
+        <div class="field" style="margin-bottom:10px">
+          <label>Select piece</label>
+          <select id="sold-override-piece" style="width:100%;background:var(--bg-alt);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:8px 10px;outline:none;">
             <option value="0">Piece 1</option>
           </select>
-          <div class="field-hint">Which auction piece to record in the Hall of Fame</div>
         </div>
-        <div class="field" style="margin-bottom:10px">
-          <label>Winner display name (optional override)</label>
-          <input id="hof-winner-name" placeholder="e.g. Adebayo — leave blank to use their wallet address" />
-          <div class="field-hint">Overrides the collector's own profile name in the Hall of Fame for this auction only.</div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-outline" style="flex:1;justify-content:center" onclick="setSoldOverride(true)">✓ &nbsp;Mark as Sold</button>
+          <button class="btn btn-danger"  style="flex:1;justify-content:center" onclick="setSoldOverride(false)">✕ &nbsp;Remove Sold badge</button>
         </div>
-        <div class="field" style="margin-bottom:14px">
-          <label>Winner avatar URL (optional override)</label>
-          <input id="hof-winner-avatar" placeholder="https://… — leave blank to use their profile avatar" />
-        </div>
-        <button class="btn-hof" id="hof-btn" onclick="saveToHallOfFame()">
-          ◇ &nbsp;Save auction to Hall of Fame
-        </button>
-        <div class="hof-status" id="hof-status"></div>
+        <div class="hof-status" id="sold-override-status"></div>
       </div>
     </div>
 
@@ -1243,13 +1428,13 @@ function populateForm(cfg) {
 }
 
 function _populateHofSelect() {
-  const sel   = document.getElementById("hof-piece-select");
-  const field = document.getElementById("hof-piece-field");
-  if (!sel) return;
-  sel.innerHTML = _pieces.map((p, i) =>
-    `<option value="${i}">${p.artTitle || "Piece " + (i+1)}</option>`
-  ).join("");
-  if (field) field.style.display = _pieces.length > 1 ? "block" : "none";
+  const sel        = document.getElementById("hof-piece-select");
+  const field      = document.getElementById("hof-piece-field");
+  const soldSel    = document.getElementById("sold-override-piece");
+  const opts       = _pieces.map((p, i) => `<option value="${i}">${p.artTitle || "Piece " + (i+1)}</option>`).join("");
+  if (sel)     sel.innerHTML    = opts;
+  if (soldSel) soldSel.innerHTML = opts;
+  if (field)   field.style.display = _pieces.length > 1 ? "block" : "none";
 }
 
 // ─── Status toggle ────────────────────────────────────────────────────────────
@@ -1898,7 +2083,276 @@ async function clearConfig() {
   }
 }
 
-// ─── Preview bar ──────────────────────────────────────────────────────────────
+// ─── HoF Tab Switcher ────────────────────────────────────────────────────────
+
+function hofSwitchTab(tab) {
+  ["eth","tezos","private"].forEach(t => {
+    document.getElementById(`hof-tab-${t}`).classList.toggle("active", t === tab);
+    document.getElementById(`hof-panel-${t}`).style.display = t === tab ? "" : "none";
+  });
+}
+
+// ─── Tezos HoF Save ──────────────────────────────────────────────────────────
+
+async function saveTezosSaleToHoF() {
+  const btn      = document.getElementById("tez-hof-btn");
+  const statusEl = document.getElementById("tez-hof-status");
+  btn.disabled   = true;
+  statusEl.className = "hof-status"; statusEl.textContent = "Saving…";
+
+  const artTitle    = document.getElementById("tez-art-title").value.trim();
+  const artArtist   = document.getElementById("tez-art-artist").value.trim();
+  const artYear     = document.getElementById("tez-art-year").value.trim();
+  const artMedium   = document.getElementById("tez-art-medium").value.trim();
+  const artImage    = document.getElementById("tez-art-image").value.trim();
+  const winBid      = parseFloat(document.getElementById("tez-winning-bid").value) || 0;
+  const opHash      = document.getElementById("tez-op-hash").value.trim();
+  const contractAddr= document.getElementById("tez-contract-addr").value.trim();
+  const winner      = document.getElementById("tez-winner").value.trim();
+  const winnerName  = document.getElementById("tez-winner-name").value.trim();
+  const winnerAvatar= document.getElementById("tez-winner-avatar").value.trim();
+  const settledAt   = document.getElementById("tez-settled-at").value;
+
+  if (!artTitle) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Artwork title is required.";
+    btn.disabled = false; return;
+  }
+  if (!winner) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Winner wallet / alias is required.";
+    btn.disabled = false; return;
+  }
+  if (!opHash && !contractAddr) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Please provide at least an op hash or contract address as on-chain proof.";
+    btn.disabled = false; return;
+  }
+
+  // Use op hash as the auction_id so it's uniquely identified
+  const auctionId = opHash || contractAddr || `tez-${Date.now()}`;
+
+  const record = {
+    auction_id:          auctionId.toLowerCase(),
+    chain:               "tezos",
+    art_title:           artTitle,
+    art_artist:          artArtist || "Kayode Oyeniyi",
+    art_image:           artImage,
+    art_year:            artYear,
+    art_medium:          artMedium,
+    winner:              winner.toLowerCase(),
+    winner_display_name: winnerName,
+    winner_avatar_url:   winnerAvatar,
+    winning_bid:         winBid,
+    tezos_op_hash:       opHash,
+    contract_addr:       contractAddr,
+    bid_count:           null,
+    settled_at:          settledAt ? new Date(settledAt).toISOString() : new Date().toISOString(),
+  };
+
+  try {
+    const existsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(record.auction_id)}&select=auction_id`,
+      { headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON } }
+    );
+    const existing = await existsRes.json();
+    const alreadyExists = Array.isArray(existing) && existing.length > 0;
+
+    const saveRes = await fetch(
+      alreadyExists
+        ? `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(record.auction_id)}`
+        : `${SUPABASE_URL}/rest/v1/auction_results`,
+      {
+        method: alreadyExists ? "PATCH" : "POST",
+        headers: {
+          apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON,
+          "Content-Type": "application/json", "Prefer": "return=minimal"
+        },
+        body: JSON.stringify(record),
+      }
+    );
+    if (!saveRes.ok) throw new Error("Supabase error: " + await saveRes.text());
+
+    statusEl.className   = "hof-status ok";
+    statusEl.textContent = `✓ Saved — ${artTitle} · ${winBid.toFixed(2)} XTZ · ${winnerName || winner}`;
+    toast("ok", "Hall of Fame updated", "Tezos auction recorded.");
+  } catch(e) {
+    statusEl.className   = "hof-status err";
+    statusEl.textContent = "Error: " + (e.message || "Unknown error");
+    toast("err", "Save failed", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─── Private Sale HoF Save ───────────────────────────────────────────────────
+
+let _prvChain = "eth";
+function setPrvChain(chain) {
+  _prvChain = chain;
+  document.getElementById("prv-chain").value = chain;
+  document.getElementById("prv-chain-eth").className   = "piece-status-btn " + (chain === "eth"   ? "active-live" : "");
+  document.getElementById("prv-chain-tezos").className = "piece-status-btn " + (chain === "tezos" ? "active-live" : "");
+  document.getElementById("prv-currency-hint").value   = chain === "tezos" ? "XTZ" : "ETH";
+}
+
+async function savePrivateSaleToHoF() {
+  const btn      = document.getElementById("prv-hof-btn");
+  const statusEl = document.getElementById("prv-hof-status");
+  btn.disabled   = true;
+  statusEl.className = "hof-status"; statusEl.textContent = "Saving…";
+
+  const chain       = document.getElementById("prv-chain").value || "eth";
+  const artTitle    = document.getElementById("prv-art-title").value.trim();
+  const artArtist   = document.getElementById("prv-art-artist").value.trim();
+  const artYear     = document.getElementById("prv-art-year").value.trim();
+  const artMedium   = document.getElementById("prv-art-medium").value.trim();
+  const artImage    = document.getElementById("prv-art-image").value.trim();
+  const winBid      = parseFloat(document.getElementById("prv-winning-bid").value) || 0;
+  const txHash      = document.getElementById("prv-tx-hash").value.trim();
+  const winner      = document.getElementById("prv-winner").value.trim();
+  const winnerName  = document.getElementById("prv-winner-name").value.trim();
+  const settledAt   = document.getElementById("prv-settled-at").value;
+
+  if (!artTitle) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Artwork title is required.";
+    btn.disabled = false; return;
+  }
+  if (!winner) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Buyer wallet is required.";
+    btn.disabled = false; return;
+  }
+  if (!txHash) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "On-chain payment proof (tx hash) is required to log a private sale.";
+    btn.disabled = false; return;
+  }
+
+  const auctionId = `prv-${txHash.toLowerCase().slice(0, 40)}`;
+
+  const record = {
+    auction_id:          auctionId,
+    chain:               chain,
+    is_private_sale:     true,
+    art_title:           artTitle,
+    art_artist:          artArtist || "Kayode Oyeniyi",
+    art_image:           artImage,
+    art_year:            artYear,
+    art_medium:          artMedium,
+    winner:              winner.toLowerCase(),
+    winner_display_name: winnerName,
+    winner_avatar_url:   null,
+    winning_bid:         winBid,
+    tezos_op_hash:       chain === "tezos" ? txHash : null,
+    contract_addr:       chain === "eth"   ? txHash : null,
+    bid_count:           null,
+    settled_at:          settledAt ? new Date(settledAt).toISOString() : new Date().toISOString(),
+  };
+
+  try {
+    const existsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(auctionId)}&select=auction_id`,
+      { headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON } }
+    );
+    const existing = await existsRes.json();
+    const alreadyExists = Array.isArray(existing) && existing.length > 0;
+
+    const saveRes = await fetch(
+      alreadyExists
+        ? `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(auctionId)}`
+        : `${SUPABASE_URL}/rest/v1/auction_results`,
+      {
+        method: alreadyExists ? "PATCH" : "POST",
+        headers: {
+          apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON,
+          "Content-Type": "application/json", "Prefer": "return=minimal"
+        },
+        body: JSON.stringify(record),
+      }
+    );
+    if (!saveRes.ok) throw new Error("Supabase error: " + await saveRes.text());
+
+    const currency = chain === "tezos" ? "XTZ" : "ETH";
+    statusEl.className   = "hof-status ok";
+    statusEl.textContent = `✓ Saved — ${artTitle} · ${winBid.toFixed(chain === "tezos" ? 2 : 4)} ${currency} · Private sale`;
+    toast("ok", "Hall of Fame updated", "Private sale recorded.");
+  } catch(e) {
+    statusEl.className   = "hof-status err";
+    statusEl.textContent = "Error: " + (e.message || "Unknown error");
+    toast("err", "Save failed", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─── Manual Sold Override ────────────────────────────────────────────────────
+
+async function setSoldOverride(sold) {
+  const statusEl  = document.getElementById("sold-override-status");
+  const pieceIdx  = parseInt(document.getElementById("sold-override-piece")?.value || "0");
+  const cfg       = await (async () => {
+    try { const r = await apiFetch("GET"); return r.config || {}; } catch(e) { return {}; }
+  })();
+
+  const pieces = Array.isArray(cfg.auctions) ? cfg.auctions : [cfg];
+  const piece  = pieces[pieceIdx] || {};
+  const contractAddr = piece.contractAddr || cfg.contractAddr || "";
+  const artTitle     = piece.artTitle     || cfg.artTitle     || "Piece " + (pieceIdx + 1);
+
+  if (!contractAddr) {
+    statusEl.className = "hof-status err";
+    statusEl.textContent = "No contract address for this piece — fill in the auction config first.";
+    return;
+  }
+
+  statusEl.className = "hof-status"; statusEl.textContent = "Saving override…";
+
+  try {
+    // Store the manual sold override as a config flag in the piece config
+    // We patch the existing auction_results row if it exists, else insert a minimal one
+    const auctionId = contractAddr.toLowerCase();
+    const existsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(auctionId)}&select=auction_id`,
+      { headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON } }
+    );
+    const existing = await existsRes.json();
+    const alreadyExists = Array.isArray(existing) && existing.length > 0;
+
+    // Insert a minimal stub if it doesn't exist yet, so we can attach the flag
+    if (!alreadyExists) {
+      await fetch(`${SUPABASE_URL}/rest/v1/auction_results`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON,
+          "Content-Type": "application/json", "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({
+          auction_id:    auctionId,
+          art_title:     artTitle,
+          art_artist:    piece.artArtist || cfg.artArtist || "",
+          art_image:     piece.artImage  || cfg.artImage  || "",
+          contract_addr: contractAddr,
+          manual_sold:   sold,
+          settled_at:    new Date().toISOString(),
+        }),
+      });
+    } else {
+      await fetch(`${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(auctionId)}`, {
+        method: "PATCH",
+        headers: {
+          apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON,
+          "Content-Type": "application/json", "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({ manual_sold: sold }),
+      });
+    }
+
+    statusEl.className   = "hof-status ok";
+    statusEl.textContent = sold
+      ? `✓ "${artTitle}" marked as Sold — badge will appear on the auction page`
+      : `✓ Sold badge removed from "${artTitle}"`;
+    toast("ok", sold ? "Marked as Sold" : "Sold badge removed", artTitle);
+  } catch(e) {
+    statusEl.className   = "hof-status err";
+    statusEl.textContent = "Error: " + (e.message || "Unknown error");
+  }
+}
 
 function updatePreviewBar() {
   const bar  = document.getElementById("preview-bar");
