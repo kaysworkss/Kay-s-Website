@@ -1480,18 +1480,29 @@ function bindInlineVideos(scope) {
  async function capturePosterFromBlob() {
  if (posterCaptureStarted || video.dataset.posterCaptured) return;
  posterCaptureStarted = true;
+ var tag = '[poster-cap]';
+ try { console.log(tag, 'start', { src: video.getAttribute('src'), sources: sources.length, noBlob: video.dataset.noBlob }); } catch(_){}
  // Skip if we already have a working poster (data: or blob: means our own; http means probe found one).
  var existing = video.getAttribute('poster') || '';
- if (existing.indexOf('data:') === 0 || existing.indexOf('blob:') === 0) return;
+ if (existing.indexOf('data:') === 0 || existing.indexOf('blob:') === 0) {
+ try { console.log(tag, 'skip: already have data/blob poster'); } catch(_){}
+ return;
+ }
+ if (!sources.length) {
+ try { console.log(tag, 'skip: no sources'); } catch(_){}
+ return;
+ }
  // Try each gateway until one fetches successfully as a blob.
  for (var i = 0; i < sources.length; i++) {
  try {
+ try { console.log(tag, 'fetch attempt', i, sources[i]); } catch(_){}
  var res = await fetch(sources[i], { cache:'force-cache' });
- if (!res.ok) continue;
+ if (!res.ok) { try { console.log(tag, 'http', res.status); } catch(_){}; continue; }
  var ct = (res.headers.get('content-type') || '').toLowerCase();
- if (ct.indexOf('text/html') === 0 || ct.indexOf('application/json') === 0) continue;
+ if (ct.indexOf('text/html') === 0 || ct.indexOf('application/json') === 0) { try { console.log(tag, 'rejected ct', ct); } catch(_){}; continue; }
  var blob = await res.blob();
- if (!blob || !blob.size) continue;
+ if (!blob || !blob.size) { try { console.log(tag, 'empty blob'); } catch(_){}; continue; }
+ try { console.log(tag, 'got blob', blob.size, 'bytes, ct=', ct || blob.type); } catch(_){}
  var objectUrl = URL.createObjectURL(blob);
  var ok = await new Promise(function(resolve) {
  var hidden = document.createElement('video');
@@ -1500,7 +1511,7 @@ function bindInlineVideos(scope) {
  hidden.preload = 'auto';
  hidden.src = objectUrl;
  var done = false;
- function finish(success) { if (done) return; done = true; try { URL.revokeObjectURL(objectUrl); } catch(_){} hidden.remove(); resolve(success); }
+ function finish(success, reason) { if (done) return; done = true; try { console.log(tag, 'finish', success, reason||''); } catch(_){}; try { URL.revokeObjectURL(objectUrl); } catch(_){} hidden.remove(); resolve(success); }
  hidden.onloadedmetadata = function() {
  try {
  var target = Math.min(0.1, Math.max(0, (hidden.duration || 1) * 0.01));
@@ -1509,7 +1520,7 @@ function bindInlineVideos(scope) {
  };
  hidden.onseeked = function() {
  try {
- if (!hidden.videoWidth || !hidden.videoHeight) { finish(false); return; }
+ if (!hidden.videoWidth || !hidden.videoHeight) { finish(false, 'no dimensions'); return; }
  var canvas = document.createElement('canvas');
  var maxW = 480;
  var scale = Math.min(1, maxW / hidden.videoWidth);
@@ -1520,12 +1531,12 @@ function bindInlineVideos(scope) {
  var dataUrl = canvas.toDataURL('image/jpeg', 0.82);
  video.setAttribute('poster', dataUrl);
  video.dataset.posterCaptured = '1';
- finish(true);
- } catch (err) { finish(false); }
+ finish(true, 'captured ' + canvas.width + 'x' + canvas.height);
+ } catch (err) { finish(false, 'draw error: ' + (err && err.message)); }
  };
- hidden.onerror = function() { finish(false); };
+ hidden.onerror = function() { finish(false, 'hidden video onerror'); };
  // Safety timeout — don't hang forever.
- setTimeout(function() { finish(false); }, 12000);
+ setTimeout(function() { finish(false, 'timeout'); }, 12000);
  // Hide it offscreen.
  hidden.style.position = 'fixed';
  hidden.style.left = '-9999px';
@@ -1534,10 +1545,14 @@ function bindInlineVideos(scope) {
  document.body.appendChild(hidden);
  });
  if (ok) return;
- } catch (_) { /* try next gateway */ }
+ } catch (e) { try { console.log(tag, 'fetch threw', e && e.message); } catch(_){} }
  }
+ try { console.log(tag, 'all gateways exhausted'); } catch(_){}
  }
  video.addEventListener('loadedmetadata', capturePosterFromBlob);
+ // Also kick it off immediately — small/offscreen videos on mobile may never fire loadedmetadata,
+ // and capture has its own self-contained gateway list, so it doesn't depend on the main video.
+ capturePosterFromBlob();
  armStuck();
  });
  }
