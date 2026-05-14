@@ -7,10 +7,11 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/images/kayslog02.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/kayslogo3.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hall of Fame — Kaysworks</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Auction Admin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap');
+
 :root {
   --clay:      #c4845a;
   --rust:      #9e4f2e;
@@ -18,333 +19,426 @@
   --linen:     #f5ede0;
   --bark:      #4a3228;
   --moss:      #6b7c5c;
+  --ash:       #8a7060;
+  --ink:       #1e1410;
   --gold:      #c9993a;
-  --gold-dim:  rgba(201,153,58,0.18);
-  --bg:        #160f0a;
-  --bg-alt:    #1e1510;
-  --bg-card:   #1c1208;
-  --bg-chat:   #141009;
+  --parchment: #ede0c8;
+  --bg:        #1e1510;
+  --bg-alt:    #2a1c14;
   --text:      #e8d5b0;
-  --text-muted:#9a8070;
-  --divider:   rgba(196,132,90,0.14);
+  --text-muted: #9a8070;
+  --divider:   rgba(196,132,90,0.18);
+  --rule:      rgba(196,132,90,0.25);
+  --accent:    #9e4f2e;
+  --success:   #6b7c5c;
+  --warn:      #c9993a;
+  --r: 3px;
 }
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
 
-/* ── Custom cursor ── */
-html, body, * { cursor: none !important; }
-.cursor { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999; }
-.cursor-dot {
-  width: 10px; height: 10px; background: var(--sand);
-  border-radius: 50%; position: absolute;
-  transform: translate(-50%, -50%);
-  transition: background 0.3s ease, transform 0.1s ease;
-}
-.cursor-ring {
-  width: 36px; height: 36px; border: 1.5px solid var(--sand);
-  border-radius: 50%; position: absolute;
-  transform: translate(-50%, -50%);
-  transition: width 0.25s, height 0.25s, border-color 0.3s ease;
-  opacity: 0.8;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  background: var(--bg); color: var(--text);
+  background: var(--bg);
+  color: var(--text);
   font-family: 'Crimson Pro', 'Cormorant Garamond', serif;
-  font-size: 16px; line-height: 1.7; min-height: 100vh; overflow-x: hidden;
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+  padding: 48px 20px 80px;
 }
-body::before {
-  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+
+.page { max-width: 660px; margin: 0 auto; }
+
+/* Header */
+.header { border-bottom: 1px solid var(--divider); padding-bottom: 20px; margin-bottom: 36px; }
+.header-eye {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.3em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 8px;
+}
+.header h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2.6rem; font-weight: 300; line-height: 1.05;
+  color: var(--text);
+}
+.header h1 em { font-style: italic; color: var(--clay); }
+.header p {
+  margin-top: 8px; font-family: 'Crimson Pro', serif;
+  font-size: 0.95rem; color: var(--text-muted);
+}
+
+/* Auth gate */
+.auth-gate {
+  background: var(--bg-alt); border: 1px solid var(--divider);
+  border-radius: var(--r); padding: 28px 24px; margin-bottom: 28px;
+}
+.auth-gate p {
+  font-size: 0.88rem; color: var(--text-muted); margin-bottom: 14px;
+}
+.auth-row { display: flex; gap: 10px; }
+.auth-row input {
+  flex: 1; background: var(--bg); border: 1px solid var(--divider);
+  border-radius: var(--r); color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+  padding: 9px 12px; outline: none; transition: border-color .2s;
+}
+.auth-row input:focus { border-color: var(--clay); }
+
+/* Cards */
+.card {
+  background: var(--bg-alt); border: 1px solid var(--divider);
+  border-radius: var(--r); margin-bottom: 16px; overflow: hidden;
+}
+.card-head {
+  padding: 12px 18px; border-bottom: 1px solid var(--divider);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-title {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
+}
+.card-badge { font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.1em; padding: 2px 8px; border-radius: 2px; }
+.badge-live     { background: rgba(107,124,92,0.2); color: var(--moss); border: 1px solid rgba(107,124,92,0.4); }
+.badge-upcoming { background: rgba(201,153,58,0.15); color: var(--gold); border: 1px solid rgba(201,153,58,0.35); }
+.badge-off      { background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid var(--divider); }
+.card-body { padding: 18px; }
+
+/* Fields */
+.field { margin-bottom: 14px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: block; font-family: 'Cinzel', serif;
+  font-size: 0.58rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+}
+.field input, .field textarea, .field select {
+  width: 100%; background: var(--bg); border: 1px solid var(--divider);
+  border-radius: var(--r); color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+  padding: 9px 12px; outline: none; transition: border-color .2s;
+}
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--clay); }
+.field input::placeholder, .field textarea::placeholder { color: rgba(196,132,90,0.3); }
+.field textarea { resize: vertical; min-height: 90px; }
+.field-hint {
+  font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+  color: var(--text-muted); margin-top: 5px; font-style: italic;
+}
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ── Rich-text editor ── */
+.rte-wrap {
+  border: 1px solid var(--divider);
+  border-radius: var(--r);
+  background: var(--bg);
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.rte-wrap:focus-within { border-color: var(--clay); }
+.rte-toolbar {
+  display: flex; gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--divider);
+}
+.rte-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--text-muted);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.95rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  min-width: 30px;
+  transition: background .15s, color .15s, border-color .15s;
+  user-select: none;
+}
+.rte-btn:hover { background: rgba(196,132,90,0.08); color: var(--text); }
+.rte-btn.active {
+  background: rgba(196,132,90,0.15);
+  border-color: rgba(196,132,90,0.35);
+  color: var(--clay);
+}
+.rte-btn b      { font-weight: 700; }
+.rte-btn .rte-i { font-style: italic; }
+.rte-btn .rte-u { text-decoration: underline; }
+.rte-content {
+  width: 100%;
+  min-height: 110px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 9px 12px;
+  color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+  line-height: 1.65;
+  outline: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.rte-content:empty::before {
+  content: attr(data-placeholder);
+  color: rgba(196,132,90,0.3);
+  pointer-events: none;
+}
+.rte-content p { margin: 0 0 0.6em; }
+.rte-content p:last-child { margin-bottom: 0; }
+.rte-content strong, .rte-content b { color: var(--clay); font-weight: 600; }
+.rte-content em, .rte-content i { font-style: italic; }
+.rte-content u { text-decoration: underline; text-decoration-color: rgba(196,132,90,0.5); }
+
+/* Status toggle */
+.status-group { display: flex; gap: 6px; }
+.status-btn {
+  flex: 1; padding: 9px;
+  border: 1px solid var(--divider); border-radius: var(--r);
+  background: var(--bg);
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  cursor: pointer; transition: all .18s; color: var(--text-muted);
+}
+.status-btn.active-live {
+  background: rgba(107,124,92,0.15);
+  border-color: rgba(107,124,92,0.5); color: var(--moss);
+}
+.status-btn.active-upcoming {
+  background: rgba(201,153,58,0.12);
+  border-color: rgba(201,153,58,0.4); color: var(--gold);
+}
+.status-btn.active-off {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(196,132,90,0.35); color: var(--text);
+}
+
+/* Piece tab drag-to-reorder */
+.piece-tab-btn {
+  cursor: grab;
+  user-select: none;
+}
+.piece-tab-btn:active { cursor: grabbing; }
+.piece-tab-btn.drag-over {
+  border-left: 2px solid var(--clay) !important;
+  background: rgba(196,132,90,0.08);
+}
+.piece-tab-btn.dragging {
   opacity: 0.4;
 }
-
-/* Nav */
-nav {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  padding: 18px 40px; display: flex; align-items: center; justify-content: space-between;
-  border-bottom: 1px solid var(--divider); background: rgba(22,15,10,0.88);
-  backdrop-filter: blur(12px);
+.piece-tab-drag-hint {
+  font-family: 'Crimson Pro', serif; font-size: 0.75rem;
+  color: var(--text-muted); font-style: italic;
+  padding: 4px 14px 8px;
+  display: none;
 }
-.nav-logo { font-family:'Montserrat',sans-serif; font-size:1.1rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--clay); text-decoration:none; display:flex; align-items:center; -webkit-tap-highlight-color:transparent; }
-.nav-links { display:flex; gap:28px; }
-.nav-link { font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--text-muted); text-decoration:none; transition:color .2s; }
-.nav-link:hover { color:var(--clay); }
-.nav-link.active { color:var(--gold); }
+.piece-tab-drag-hint.show { display: block; }
 
-/* Hamburger */
-.nav-hamburger { display:none; flex-direction:column; justify-content:center; gap:5px; width:32px; height:32px; background:transparent; border:none; cursor:pointer; padding:4px; }
-.nav-hamburger span { display:block; width:100%; height:1.5px; background:var(--clay); border-radius:1px; transition:transform .25s ease, opacity .2s ease; transform-origin:center; }
-.nav-hamburger.open span:nth-child(1) { transform:translateY(6.5px) rotate(45deg); }
-.nav-hamburger.open span:nth-child(2) { opacity:0; transform:scaleX(0); }
-.nav-hamburger.open span:nth-child(3) { transform:translateY(-6.5px) rotate(-45deg); }
-
-/* Mobile drawer */
-.nav-drawer {
-  display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:99;
-  background:rgba(22,15,10,0.97); backdrop-filter:blur(16px);
-  flex-direction:column; align-items:center; justify-content:center; gap:36px;
-  opacity:0; transition:opacity .25s ease;
+/* Chat lock toggle */
+.chat-lock-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.chat-lock-toggle {
+  position: relative; width: 36px; height: 20px; flex-shrink: 0;
+  background: var(--bg); border: 1px solid var(--divider); border-radius: 10px;
+  cursor: pointer; transition: background .2s, border-color .2s;
 }
-.nav-drawer.open { display:flex; opacity:1; }
-.nav-drawer .nav-link { font-size:0.7rem; letter-spacing:0.3em; }
-
-/* Hero */
-.hero { position:relative; z-index:1; padding:160px 40px 80px; text-align:center; border-bottom:1px solid var(--divider); }
-.hero-eyebrow { font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.35em; text-transform:uppercase; color:var(--gold); margin-bottom:20px; display:flex; align-items:center; justify-content:center; gap:14px; }
-.hero-eyebrow::before,.hero-eyebrow::after { content:''; display:block; width:40px; height:1px; background:var(--gold-dim); }
-.hero-title { font-family:'Cormorant Garamond',serif; font-size:clamp(3rem,7vw,5.5rem); font-weight:300; line-height:1.05; color:var(--text); margin-bottom:16px; }
-.hero-title em { font-style:italic; color:var(--clay); }
-.hero-sub { font-family:'Crimson Pro',serif; font-size:1.1rem; color:var(--text-muted); max-width:520px; margin:0 auto; line-height:1.8; }
-.hero-rule { width:1px; height:60px; background:linear-gradient(to bottom,var(--clay),transparent); margin:40px auto 0; }
-
-/* Stats */
-.stats-bar { position:relative; z-index:1; display:none; border-bottom:1px solid var(--divider); background:var(--bg-alt); }
-.stats-bar.show { display:flex; }
-.stat-item { flex:1; padding:26px 24px; text-align:center; border-right:1px solid var(--divider); }
-.stat-item:last-child { border-right:none; }
-.stat-num { font-family:'Cormorant Garamond',serif; font-size:2.2rem; font-weight:600; color:var(--clay); line-height:1; }
-.stat-label { font-family:'Cinzel',serif; font-size:0.48rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--text-muted); margin-top:6px; }
-
-/* Main */
-main { position:relative; z-index:1; max-width:1060px; margin:0 auto; padding:80px 40px 120px; }
-
-/* States */
-.loading-state { text-align:center; padding:100px 20px; }
-.loading-glyph { font-family:'Cormorant Garamond',serif; font-size:3rem; color:var(--clay); opacity:.3; animation:loadPulse 1.8s ease-in-out infinite; }
-@keyframes loadPulse { 0%,100%{opacity:.3} 50%{opacity:.7} }
-.loading-text { font-family:'Cinzel',serif; font-size:0.55rem; letter-spacing:0.25em; text-transform:uppercase; color:var(--text-muted); margin-top:16px; }
-.empty-state { text-align:center; padding:100px 20px; display:none; }
-.empty-glyph { font-family:'Cormorant Garamond',serif; font-size:5rem; color:var(--clay); opacity:.12; }
-.empty-title { font-family:'Cormorant Garamond',serif; font-size:1.8rem; font-weight:300; color:var(--text-muted); margin-top:14px; }
-.empty-sub { font-family:'Crimson Pro',serif; font-size:0.95rem; color:var(--text-muted); font-style:italic; margin-top:6px; }
-
-/* Results list */
-.results-list { display:none; flex-direction:column; gap:28px; }
-.results-list.show { display:flex; }
-
-/* Auction record */
-.auction-record { background:var(--bg-card); border:1px solid var(--divider); border-radius:4px; overflow:hidden; animation:cardReveal .5s ease forwards; opacity:0; transition:border-color .3s; }
-@keyframes cardReveal { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
-.auction-record:hover { border-color:rgba(196,132,90,.28); }
-
-/* Top: image + details */
-.record-top {
-  display:grid;
-  grid-template-columns:320px 1fr;
-  align-items:stretch;
+.chat-lock-toggle.on { background: rgba(158,79,46,0.35); border-color: rgba(158,79,46,0.6); }
+.chat-lock-toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--text-muted); transition: transform .2s, background .2s;
 }
-/* Portrait images get a narrower column; landscape images get a wider one.
-   JS adds .img-portrait / .img-landscape to .record-top after load. */
-.record-top.img-portrait { grid-template-columns:260px 1fr; }
-.record-top.img-landscape { grid-template-columns:420px 1fr; }
+.chat-lock-toggle.on::after { transform: translateX(16px); background: var(--clay); }
+.chat-lock-label { font-family: 'Crimson Pro', serif; font-size: 0.88rem; color: var(--text-muted); }
+.chat-lock-label.on { color: var(--clay); }
+.chat-lock-msg-wrap { margin-top: 10px; display: none; }
+.chat-lock-msg-wrap.show { display: block; }
 
-.record-img-wrap {
-  position:relative; overflow:hidden;
-  background:#0f0a06;          /* near-black — neutral mat for any image */
-  display:flex; align-items:center; justify-content:center;
-  min-height:280px;
+/* Per-piece status picker (smaller version inside each piece form) */
+.piece-status-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.piece-status-btn {
+  flex: 1; min-width: 100px; padding: 7px 10px;
+  border: 1px solid var(--divider); border-radius: var(--r);
+  background: var(--bg);
+  font-family: 'Cinzel', serif; font-size: 0.55rem;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  cursor: pointer; transition: all .18s; color: var(--text-muted);
 }
-.record-img {
-  /* contain: never crop, always show the full image */
-  width:100%; height:100%;
-  object-fit:contain;
-  object-position:center center;
-  position:absolute; inset:0;
-  opacity:0;
-  transition:opacity .4s ease, transform .6s ease;
+.piece-status-btn:hover { color: var(--text); }
+.piece-status-btn.active-live    { background: rgba(107,124,92,0.15); border-color: rgba(107,124,92,0.5); color: var(--moss); }
+.piece-status-btn.active-upcoming{ background: rgba(201,153,58,0.12); border-color: rgba(201,153,58,0.4); color: var(--gold); }
+.piece-status-btn.active-off     { background: rgba(255,255,255,0.06); border-color: rgba(196,132,90,0.35); color: var(--text); }
+.piece-status-btn.active-inherit { background: rgba(255,255,255,0.04); border-color: var(--divider); color: var(--text); font-style: italic; }
+
+/* Status dot on piece tabs */
+.piece-tab-status-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  margin-right: 6px; vertical-align: middle;
 }
-.record-img.loaded { opacity:1; }
-/* Subtle zoom on hover — gentler since we're not cropping */
-.auction-record:hover .record-img { transform:scale(1.025); }
-.record-img-placeholder {
-  width:100%; height:100%;
-  display:flex; align-items:center; justify-content:center;
-  font-family:'Cormorant Garamond',serif; font-size:3.5rem;
-  color:var(--clay); opacity:.1; transition:opacity .4s ease;
+.piece-tab-status-dot.live     { background: var(--moss); box-shadow: 0 0 4px rgba(107,124,92,0.6); }
+.piece-tab-status-dot.upcoming { background: var(--gold); }
+.piece-tab-status-dot.off      { background: var(--text-muted); opacity: 0.5; }
+
+/* Buttons */
+.btn {
+  font-family: 'Cinzel', serif; font-size: 0.62rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  padding: 10px 18px; border-radius: var(--r);
+  border: 1px solid; cursor: pointer; transition: all .18s;
+  display: inline-flex; align-items: center; gap: 8px;
 }
-.record-img-placeholder.hidden { opacity:0; }
-.edition-badge { position:absolute; top:12px; left:12px; font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.18em; text-transform:uppercase; background:rgba(22,15,10,.82); color:var(--gold); border:1px solid rgba(201,153,58,.38); border-radius:2px; padding:4px 8px; backdrop-filter:blur(6px); }
-
-.record-details { padding:28px 32px; display:flex; flex-direction:column; justify-content:space-between; border-left:1px solid var(--divider); }
-.record-series { margin-bottom:10px; }
-.series-logo { display:block; width:110px; height:auto; color:var(--clay); opacity:0.75; transition:opacity .3s; }
-.auction-record:hover .series-logo { opacity:1; }
-.record-title { font-family:'Cormorant Garamond',serif; font-size:1.9rem; font-weight:600; line-height:1.1; color:var(--text); margin-bottom:3px; }
-.record-artist { font-family:'Crimson Pro',serif; font-size:0.92rem; color:var(--text-muted); font-style:italic; margin-bottom:14px; }
-.record-about { font-family:'Crimson Pro',serif; font-size:0.92rem; color:var(--text-muted); line-height:1.75; flex:1; }
-.record-about.clamped { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-.read-more-btn { font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--clay); background:transparent; border:none; cursor:pointer; padding:6px 0 0; display:block; transition:color .2s; }
-.read-more-btn:hover { color:var(--sand); }
-
-.record-stats { margin-top:22px; padding-top:20px; border-top:1px solid var(--divider); display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
-.rs-label { font-family:'Cinzel',serif; font-size:0.46rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px; }
-.rs-val { font-family:'Cormorant Garamond',serif; font-size:1.35rem; font-weight:600; line-height:1; color:var(--text); }
-.rs-val.gold { color:var(--gold); }
-.rs-sub { font-family:'Crimson Pro',serif; font-size:0.78rem; color:var(--text-muted); font-style:italic; margin-top:2px; }
-
-.record-footer { margin-top:20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-/* ── Winner celebration ── */
-.winner-pill {
-  display:inline-flex; align-items:center; gap:8px;
-  font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.18em; text-transform:uppercase;
-  color:#d4c080;
-  background:linear-gradient(135deg, rgba(201,153,58,0.18) 0%, rgba(201,153,58,0.06) 100%);
-  border:1px solid rgba(201,153,58,0.45);
-  border-radius:3px; padding:7px 13px;
-  box-shadow:0 0 14px rgba(201,153,58,0.12);
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary {
+  background: var(--rust); border-color: var(--rust);
+  color: var(--linen); width: 100%; justify-content: center; padding: 13px;
 }
-.winner-pill::before {
-  content:'✦';
-  font-size:0.55rem; color:var(--gold); opacity:0.85; flex-shrink:0;
+.btn-primary:hover:not(:disabled) { background: var(--bark); border-color: var(--bark); }
+.btn-outline {
+  background: transparent;
+  border-color: rgba(196,132,90,0.35); color: var(--text-muted);
 }
-.winner-dot { width:6px; height:6px; border-radius:50%; background:var(--gold); flex-shrink:0; box-shadow:0 0 6px rgba(201,153,58,0.6); }
-.etherscan-link { display:inline-flex; align-items:center; gap:4px; font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); text-decoration:none; border:1px solid var(--divider); border-radius:2px; padding:5px 10px; transition:color .2s,border-color .2s; }
-.etherscan-link:hover { color:var(--clay); border-color:var(--clay); }
+.btn-outline:hover { border-color: var(--clay); color: var(--clay); }
+.btn-danger  { background: transparent; border-color: rgba(158,79,46,0.45); color: var(--clay); }
+.btn-danger:hover:not(:disabled)  { background: var(--rust); border-color: var(--rust); color: var(--linen); }
 
-/* Chat section */
-.record-chat { border-top:1px solid var(--divider); background:var(--bg-chat); }
-.chat-toggle { width:100%; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; background:transparent; border:none; cursor:pointer; transition:background .2s; }
-.chat-toggle:hover { background:rgba(196,132,90,.04); }
-.chat-toggle-label { font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--text-muted); display:flex; align-items:center; gap:10px; }
-.chat-count-pill { background:rgba(196,132,90,.12); border:1px solid var(--divider); border-radius:10px; padding:2px 8px; font-family:'Crimson Pro',serif; font-size:0.75rem; color:var(--clay); font-style:normal; letter-spacing:0; }
-.chat-toggle-arrow { font-size:0.7rem; color:var(--text-muted); transition:transform .3s; }
-.chat-toggle.open .chat-toggle-arrow { transform:rotate(180deg); }
-.chat-body { display:none; padding:0 24px 20px; max-height:420px; overflow-y:auto; }
-.chat-body.open { display:block; }
-.chat-body::-webkit-scrollbar { width:3px; }
-.chat-body::-webkit-scrollbar-thumb { background:var(--divider); border-radius:2px; }
-.chat-loading,.chat-empty { font-family:'Crimson Pro',serif; font-size:0.88rem; color:var(--text-muted); font-style:italic; padding:16px 0; text-align:center; }
-
-/* Messages */
-.chat-item { display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:1px solid rgba(196,132,90,.06); }
-.chat-item:last-child { border-bottom:none; }
-.chat-avatar { width:24px; height:24px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-family:'Cinzel',serif; font-size:0.42rem; font-weight:600; margin-top:1px; }
-.chat-avatar.auc { background:rgba(196,132,90,.15); border:1px solid rgba(196,132,90,.3); color:var(--clay); }
-.chat-bubble { flex:1; min-width:0; }
-.chat-meta { display:flex; align-items:baseline; gap:8px; margin-bottom:2px; }
-.chat-name { font-family:'Cinzel',serif; font-size:0.46rem; letter-spacing:0.1em; text-transform:uppercase; }
-.chat-name.auc { color:var(--clay); }
-.chat-time { font-family:'Crimson Pro',serif; font-size:0.72rem; color:var(--text-muted); font-style:italic; }
-.chat-text { font-family:'Crimson Pro',serif; font-size:0.9rem; color:var(--text); line-height:1.5; }
-.chat-text.bid { color:var(--clay); font-weight:600; }
-.bid-tag { display:inline-block; font-family:'Cinzel',serif; font-size:0.42rem; letter-spacing:0.1em; text-transform:uppercase; background:rgba(107,124,92,.15); border:1px solid rgba(107,124,92,.3); border-radius:2px; padding:1px 5px; color:var(--moss); margin-left:5px; vertical-align:middle; }
-.reaction-item { display:flex; align-items:center; gap:6px; padding:4px 0; }
-.reaction-emoji { font-size:1rem; line-height:1; }
-.reaction-count { font-family:'Crimson Pro',serif; font-size:0.78rem; color:var(--text-muted); }
-
-/* Image shimmer */
-@keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
-.img-shimmer {
-  position:absolute; inset:0;
-  background:linear-gradient(90deg, var(--bg-alt) 25%, rgba(196,132,90,0.06) 50%, var(--bg-alt) 75%);
-  background-size:400px 100%;
-  animation:shimmer 1.4s ease-in-out infinite;
-  transition:opacity .4s ease;
+/* Loading overlay */
+.loading-bar {
+  height: 2px; background: var(--divider); border-radius: 1px;
+  overflow: hidden; margin-bottom: 20px; display: none;
 }
-.record-img { display:block; opacity:0; transition:opacity .4s ease; }
-.record-img.loaded { opacity:1; }
-
-/* Lightbox */
-.lightbox {
-  display:none; position:fixed; inset:0; z-index:999;
-  background:rgba(14,9,5,0.96); backdrop-filter:blur(8px);
-  align-items:center; justify-content:center;
-  cursor:zoom-out;
+.loading-bar.show { display: block; }
+.loading-fill {
+  height: 100%; width: 0%; background: var(--clay);
+  animation: loading-anim 1.4s ease-in-out infinite;
 }
-.lightbox.open { display:flex; }
-.lightbox-img {
-  max-width:92vw; max-height:90vh;
-  object-fit:contain; border-radius:2px;
-  box-shadow:0 32px 80px rgba(0,0,0,.8);
-  animation:lbReveal .22s ease;
-}
-@keyframes lbReveal { from{opacity:0;transform:scale(.96)} to{opacity:1;transform:none} }
-.lightbox-close {
-  position:absolute; top:20px; right:24px;
-  font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.2em; text-transform:uppercase;
-  color:var(--text-muted); background:transparent; border:none; cursor:pointer;
-  transition:color .2s;
-}
-.lightbox-close:hover { color:var(--clay); }
-.lightbox-caption {
-  position:absolute; bottom:24px; left:50%; transform:translateX(-50%);
-  font-family:'Crimson Pro',serif; font-size:0.88rem; font-style:italic;
-  color:var(--text-muted); white-space:nowrap;
-}
-.record-img-wrap { cursor:zoom-in; }
-
-/* Chain filter bar */
-.chain-filter-bar { position:relative; z-index:1; border-bottom:1px solid var(--divider); background:var(--bg); padding:0 40px; }
-.chain-filter-inner { display:flex; gap:0; max-width:1060px; margin:0 auto; }
-.chain-filter-btn { font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--text-muted); background:transparent; border:none; border-bottom:2px solid transparent; cursor:pointer; padding:14px 20px; transition:color .2s, border-color .2s; display:flex; align-items:center; gap:6px; }
-.chain-filter-btn:hover { color:var(--clay); }
-.chain-filter-btn.active { color:var(--sand); border-bottom-color:var(--clay); }
-.chain-icon { font-size:0.85rem; line-height:1; }
-.chain-icon.eth { color:#627eea; }
-.chain-icon.tezos { color:#2c7df7; }
-
-/* Chain badge on cards */
-.chain-badge { display:inline-flex; align-items:center; gap:5px; font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.16em; text-transform:uppercase; border-radius:2px; padding:3px 8px; border:1px solid; flex-shrink:0; }
-.chain-badge.eth { color:#627eea; border-color:rgba(98,126,234,0.4); background:rgba(98,126,234,0.08); }
-.chain-badge.tezos { color:#2c7df7; border-color:rgba(44,125,247,0.4); background:rgba(44,125,247,0.08); }
-.chain-badge-icon { font-size:0.8rem; line-height:1; }
-
-/* Tezos explorer link */
-.tzkt-link { display:inline-flex; align-items:center; gap:4px; font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); text-decoration:none; border:1px solid var(--divider); border-radius:2px; padding:5px 10px; transition:color .2s,border-color .2s; }
-.tzkt-link:hover { color:#2c7df7; border-color:#2c7df7; }
-
-/* Private sale badge */
-.private-badge { display:inline-flex; align-items:center; gap:5px; font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold); border:1px solid rgba(201,153,58,0.4); background:rgba(201,153,58,0.08); border-radius:2px; padding:3px 8px; }
-
-/* Stat sub label */
-.stat-sub { font-family:'Crimson Pro',serif; font-size:0.72rem; color:var(--text-muted); font-style:italic; margin-top:3px; }
-
-/* Chain tag inline */
-.chain-tag { font-family:'Cinzel',serif; font-size:0.42rem; letter-spacing:0.14em; text-transform:uppercase; border-radius:2px; padding:2px 6px; border:1px solid; vertical-align:middle; }
-.chain-tag.eth { color:#627eea; border-color:rgba(98,126,234,0.4); background:rgba(98,126,234,0.08); }
-.chain-tag.tezos { color:#2c7df7; border-color:rgba(44,125,247,0.4); background:rgba(44,125,247,0.08); }
-
-/* Footer */
-footer { position:relative; z-index:1; text-align:center; padding:40px; border-top:1px solid var(--divider); font-family:'Crimson Pro',serif; font-size:0.85rem; color:var(--text-muted); font-style:italic; }
-footer a { color:var(--clay); text-decoration:none; }
-
-@media (max-width:680px) {
-  nav { padding:16px 20px; }
-  .nav-links { display:none; }
-  .nav-hamburger { display:flex; }
-  .hero { padding:120px 24px 56px; }
-  .stats-bar { flex-wrap:wrap; }
-  .stat-item { min-width:50%; border-right:none; border-bottom:1px solid var(--divider); }
-  main { padding:40px 16px 80px; }
-
-  /* Stack: image above details */
-  .record-top,
-  .record-top.img-portrait,
-  .record-top.img-landscape { grid-template-columns:1fr; }
-
-  /* Image wrap fills full card width on mobile — no max-height cap, let aspect-ratio control height */
-  .record-img-wrap { min-height:0; width:100%; }
-  .record-top.img-portrait  .record-img-wrap { aspect-ratio:3/4; max-height:none; }
-  .record-top.img-landscape .record-img-wrap { aspect-ratio:16/9; max-height:none; }
-  /* Fallback before orientation detected */
-  .record-top:not(.img-portrait):not(.img-landscape) .record-img-wrap { aspect-ratio:16/9; }
-
-  /* On mobile the wrap is a block container with known dimensions,
-     so the absolutely-positioned image can fill and centre correctly */
-  .record-img-wrap { position:relative; }
-
-  .record-details { border-left:none; border-top:1px solid var(--divider); padding:20px; }
-  .record-stats { grid-template-columns:1fr 1fr; }
-  .chat-toggle,.chat-body { padding-left:16px; padding-right:16px; }
+@keyframes loading-anim {
+  0%   { width: 0%;   margin-left: 0; }
+  50%  { width: 60%;  margin-left: 20%; }
+  100% { width: 0%;   margin-left: 100%; }
 }
 
-/* Landscape mobile phone — keep side-by-side but shorter */
-@media (max-width:900px) and (orientation:landscape) and (max-height:500px) {
-  .record-top,
-  .record-top.img-portrait,
-  .record-top.img-landscape { grid-template-columns:200px 1fr; }
-  .record-img-wrap { min-height:160px; aspect-ratio:unset; max-height:none; }
+/* Preview bar */
+.preview-bar {
+  background: var(--bg-alt); border: 1px solid var(--divider);
+  border-radius: var(--r); padding: 13px 16px;
+  align-items: center; justify-content: space-between;
+  margin-bottom: 20px; display: none;
 }
+.preview-bar.show { display: flex; }
+.preview-url {
+  font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+  color: var(--text-muted); word-break: break-all;
+}
+
+/* Sync badge */
+.sync-badge {
+  font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.15em;
+  text-transform: uppercase; padding: 3px 8px; border-radius: 2px;
+  border: 1px solid var(--divider); color: var(--text-muted);
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.sync-badge.synced { color: var(--moss); border-color: rgba(107,124,92,0.4); }
+.sync-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--bark); color: var(--sand);
+  border-radius: var(--r); padding: 12px 16px;
+  font-family: 'Crimson Pro', serif; font-size: 0.9rem;
+  max-width: 300px; z-index: 99; display: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  border: 1px solid var(--divider);
+}
+.toast.show { display: block; }
+.toast-title { font-weight: 600; margin-bottom: 3px; }
+.toast-title.ok  { color: #a8d4a0; }
+.toast-title.err { color: var(--clay); }
+
+/* Danger zone */
+.danger-zone {
+  border: 1px solid rgba(158,79,46,0.35);
+  border-radius: var(--r); padding: 16px 18px; margin-top: 32px;
+}
+.danger-title {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 12px;
+}
+
+/* HoF tab buttons */
+.hof-tab-btn {
+  font-family: 'Cinzel', serif; font-size: 0.52rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--text-muted); background: transparent;
+  border: none; border-bottom: 2px solid transparent;
+  padding: 10px 16px; cursor: pointer; transition: color .2s, border-color .2s;
+}
+.hof-tab-btn:hover { color: var(--clay); }
+.hof-tab-btn.active { color: var(--sand); border-bottom-color: var(--clay); }
+
+/* Hall of fame card */
+.hof-status { font-family:'Crimson Pro',serif; font-size:0.85rem; font-style:italic; color:var(--text-muted); margin-top:10px; min-height:1.4em; }
+.hof-status.ok  { color:var(--moss); }
+.hof-status.err { color:var(--clay); }
+.btn-hof {
+  font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.18em; text-transform:uppercase;
+  background:rgba(201,153,58,0.12); border:1px solid rgba(201,153,58,0.4);
+  color:var(--gold); border-radius:var(--r); padding:10px 18px;
+  cursor:pointer; transition:all .18s; width:100%; text-align:center;
+}
+.btn-hof:hover:not(:disabled) { background:rgba(201,153,58,0.22); border-color:var(--gold); }
+.btn-hof:disabled { opacity:0.45; cursor:not-allowed; }
+
+/* Collector profiles card */
+.profile-list { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+.profile-entry { display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:center; padding:10px 12px; background:var(--bg); border:1px solid var(--divider); border-radius:var(--r); }
+.profile-entry-addr { font-family:'Crimson Pro',serif; font-size:0.8rem; color:var(--clay); font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.profile-entry-name { font-family:'Crimson Pro',serif; font-size:0.88rem; color:var(--text); }
+.profile-entry-avatar { width:28px; height:28px; border-radius:50%; object-fit:cover; border:1px solid var(--divider); display:none; }
+.profile-entry-avatar.show { display:block; }
+.btn-profile-save { font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.14em; text-transform:uppercase; background:transparent; border:1px solid rgba(107,124,92,.4); color:var(--moss); border-radius:var(--r); padding:5px 10px; cursor:pointer; transition:all .18s; white-space:nowrap; }
+.btn-profile-save:hover { background:rgba(107,124,92,.15); }
+.profile-search-row { display:flex; gap:8px; }
+.profile-status { font-family:'Crimson Pro',serif; font-size:0.82rem; font-style:italic; color:var(--text-muted); margin-top:8px; min-height:1.2em; }
+.profile-status.ok { color:var(--moss); }
+.profile-status.err { color:var(--clay); }
+
+/* Piece tabs */
+.piece-tab-btn {
+  font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.14em; text-transform:uppercase;
+  padding:10px 16px; border:none; background:transparent; color:var(--text-muted);
+  cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap;
+  transition:color .2s, border-color .2s; flex-shrink:0;
+}
+.piece-tab-btn:hover { color:var(--clay); }
+.piece-tab-btn.active { color:var(--sand); border-bottom-color:var(--clay); }
+.piece-remove-btn {
+  font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.1em; text-transform:uppercase;
+  background:transparent; border:1px solid rgba(158,79,46,.35); color:var(--clay);
+  border-radius:var(--r); padding:3px 8px; cursor:pointer; margin-left:4px; transition:all .18s;
+}
+.piece-remove-btn:hover { background:var(--rust); color:var(--linen); border-color:var(--rust); }
+
+/* Preview card */
+.preview-card { background: rgba(201,153,58,0.05); border: 1px solid rgba(201,153,58,0.25); border-radius: var(--r); padding: 16px 18px; margin-top: 16px; }
+.preview-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.preview-card-title { font-family:'Cinzel',serif; font-size: 0.56rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); }
+.preview-desc { font-family:'Crimson Pro',serif; font-size: 0.88rem; color: var(--text-muted); font-style: italic; margin-bottom: 14px; line-height: 1.5; }
+.btn-preview { display: inline-flex; align-items: center; gap: 8px; font-family:'Cinzel',serif; font-size: 0.52rem; letter-spacing: 0.18em; text-transform: uppercase; background: transparent; border: 1px solid rgba(201,153,58,0.5); color: var(--gold); border-radius: var(--r); padding: 9px 16px; cursor: pointer; text-decoration: none; transition: all .2s; width: 100%; justify-content: center; }
+.btn-preview:hover { background: rgba(201,153,58,0.1); border-color: var(--gold); }
+.preview-piece-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.preview-piece-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: var(--bg); border: 1px solid var(--divider); border-radius: var(--r); }
+.preview-piece-name { font-size: 0.85rem; color: var(--text); }
+.btn-preview-piece { font-family:'Cinzel',serif; font-size: 0.44rem; letter-spacing: 0.12em; text-transform: uppercase; background: transparent; border: 1px solid rgba(201,153,58,0.35); color: var(--gold); border-radius: var(--r); padding: 4px 10px; cursor: pointer; white-space: nowrap; transition: all .18s; text-decoration: none; }
+.btn-preview-piece:hover { background: rgba(201,153,58,0.1); }
+
+/* Preview-as toggle (segmented) */
+.preview-as-wrap { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.preview-as-label { font-family:'Cinzel',serif; font-size:0.46rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); }
+.preview-as-seg { display:inline-flex; border:1px solid rgba(201,153,58,0.35); border-radius:var(--r); overflow:hidden; }
+.preview-as-seg button { font-family:'Cinzel',serif; font-size:0.46rem; letter-spacing:0.14em; text-transform:uppercase; background:transparent; color:var(--text-muted); border:0; padding:5px 12px; cursor:pointer; transition: all .18s; }
+.preview-as-seg button + button { border-left:1px solid rgba(201,153,58,0.25); }
+.preview-as-seg button:hover { color:var(--gold); }
+.preview-as-seg button.active { background:rgba(201,153,58,0.15); color:var(--gold); }
+
+/* Main content hidden until authed */
+#main-content { display: none; }
 </style>
 <!-- Vercel Web Analytics -->
 <script>
@@ -353,549 +447,2117 @@ footer a { color:var(--clay); text-decoration:none; }
 <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
+<div class="page">
 
-<nav>
-  <a href="/" class="nav-logo"><span style="font-weight:600">KAY'S</span>&nbsp;&nbsp;<span style="font-weight:500">WORKS</span></a>
-  <div class="nav-links">
-    <a href="/" class="nav-link">Home</a>
-    <a href="/apoti-olowe" class="nav-link">Àpótí Ọlọ́wẹ̀</a>
-    <a href="/auction" class="nav-link">Auction</a>
-    <a href="/hall-of-fame" class="nav-link active">Hall of Fame</a>
+  <div class="header">
+    <div class="header-eye">// Admin Panel</div>
+    <h1>Auction<br><em>Control</em></h1>
+    <p>Configure what collectors see on the auction page. Changes are saved to the server and take effect immediately.</p>
   </div>
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu" onclick="_toggleMenu()">
-    <span></span><span></span><span></span>
-  </button>
-</nav>
 
-<!-- Mobile drawer -->
-<div class="nav-drawer" id="nav-drawer">
-  <a href="/" class="nav-link" onclick="_toggleMenu()">Home</a>
-  <a href="/apoti-olowe" class="nav-link" onclick="_toggleMenu()">Àpótí Ọlọ́wẹ̀</a>
-  <a href="/auction" class="nav-link" onclick="_toggleMenu()">Auction</a>
-  <a href="/hall-of-fame" class="nav-link active">Hall of Fame</a>
-</div>
-
-<div class="hero">
-  <div class="hero-eyebrow">Àpótí Ọlọ́wẹ̀ Series</div>
-  <h1 class="hero-title">Hall of <em>Fame</em></h1>
-  <p class="hero-sub">A permanent record of every settled auction — the collectors, the conversations, and the works that found their homes.</p>
-  <div class="hero-rule"></div>
-</div>
-
-<div class="stats-bar" id="stats-bar">
-  <div class="stat-item"><div class="stat-num" id="stat-auctions">—</div><div class="stat-label">Auctions Settled</div></div>
-  <div class="stat-item">
-    <div class="stat-num" id="stat-volume">—</div>
-    <div class="stat-label">Total Volume</div>
-    <div class="stat-sub" id="stat-volume-sub"></div>
-  </div>
-  <div class="stat-item">
-    <div style="display:flex;align-items:baseline;gap:7px;justify-content:center">
-      <div class="stat-num" id="stat-top">—</div>
-      <span class="chain-tag" id="stat-top-chain" style="display:none"></span>
+  <!-- Auth gate -->
+  <div class="auth-gate" id="auth-gate">
+    <div class="card-title" style="margin-bottom:10px">Admin password</div>
+    <p>Enter your admin password to load and edit the auction configuration.</p>
+    <div class="auth-row">
+      <input type="password" id="admin-pw" placeholder="••••••••••••" onkeydown="if(event.key==='Enter')authenticate()" />
+      <button class="btn btn-outline" onclick="authenticate()">Unlock →</button>
     </div>
-    <div class="stat-label">Highest Sale</div>
   </div>
-  <div class="stat-item"><div class="stat-num" id="stat-collectors">—</div><div class="stat-label">Unique Collectors</div></div>
+
+  <div class="loading-bar" id="loading-bar"><div class="loading-fill"></div></div>
+
+  <!-- Main content (shown after auth) -->
+  <div id="main-content">
+
+    <!-- Status -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Auction status</div>
+        <div class="card-badge badge-off" id="status-badge">Off</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>Collector-facing status</label>
+          <div class="status-group">
+            <button class="status-btn active-off" id="btn-off"      onclick="setStatus('off')">Off</button>
+            <button class="status-btn"             id="btn-upcoming" onclick="setStatus('upcoming')">Upcoming</button>
+            <button class="status-btn"             id="btn-live"     onclick="setStatus('live')">Live</button>
+          </div>
+        </div>
+        <div class="field-hint">
+          Sets the default for all pieces. Any piece set to <em>Inherit global</em> will follow this exactly.<br>
+          Individual piece overrides still apply — a piece set to <b>Upcoming</b> stays upcoming even when this is Live.
+        </div>
+      </div>
+    </div>
+
+    <!-- Auction config -->
+    <!-- ── Multi-auction editor ── -->
+    <div class="card" id="auction-card">
+      <div class="card-head">
+        <div class="card-title">Auction pieces</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span id="piece-count-badge" class="card-badge badge-off">1 piece</span>
+          <button class="btn btn-outline" onclick="addPiece()" style="padding:4px 10px;font-size:0.5rem">+ Add piece</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0">
+        <!-- Piece tabs -->
+        <div id="piece-tabs" style="display:flex;border-bottom:1px solid var(--divider);overflow-x:auto;"></div>
+        <div class="piece-tab-drag-hint" id="piece-drag-hint">Drag tabs to reorder pieces</div>
+        <!-- Piece forms — one per piece -->
+        <div id="piece-forms" style="padding:18px"></div>
+      </div>
+    </div>
+
+    <!-- Launch date (upcoming) -->
+    <div class="card" id="upcoming-date-field" style="display:none">
+      <div class="card-head"><div class="card-title">Upcoming countdown — global fallback</div></div>
+      <div class="card-body">
+        <div class="field">
+          <label>Launch date &amp; time</label>
+          <input type="datetime-local" id="launch-date" />
+          <div class="field-hint">Used by any piece that doesn't have its own launch date set. Leave blank if every piece has its own.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Off-state landing countdown -->
+    <div class="card" id="landing-countdown-field" style="display:none">
+      <div class="card-head"><div class="card-title">Off-state countdown</div></div>
+      <div class="card-body">
+        <div class="field">
+          <label>Reveal date &amp; time (optional)</label>
+          <input type="datetime-local" id="landing-countdown-date" />
+          <div class="field-hint">Adds a static countdown beneath the "Check back soon" text on the landing page. Leave blank to hide it. Use this to build anticipation before revealing artworks.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RPC -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Network</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>RPC URL (optional — uses MetaMask if blank)</label>
+          <input id="rpc-url" placeholder="https://eth-mainnet.g.alchemy.com/v2/…" />
+          <div class="field-hint">Provide a public RPC so collectors without MetaMask can view auction state read-only</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save -->
+    <button class="btn btn-primary" id="save-btn" onclick="saveConfig()">Save &amp; publish</button>
+
+    <!-- Preview bar -->
+    <div class="preview-bar" id="preview-bar" style="margin-top:16px">
+      <div>
+        <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px">Collector page</div>
+        <div class="preview-url" id="preview-url"></div>
+      </div>
+      <a id="preview-link" href="https://www.kaysworks.com/auction" target="_blank" class="btn btn-outline" style="white-space:nowrap;text-decoration:none">Open →</a>
+    </div>
+
+    <!-- Preview mode -->
+    <div class="preview-card" id="preview-launch-card" style="display:none">
+      <div class="preview-card-head">
+        <span class="preview-card-title">◈ &nbsp;Preview mode</span>
+        <span style="font-family:'Cinzel',serif;font-size:0.44rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(201,153,58,0.1);color:var(--gold);border:1px solid rgba(201,153,58,0.25)">Admin only</span>
+      </div>
+      <div class="preview-desc">Inspect the full live auction UI with your current config before making it public. Opens in a new tab — only you can see it. Status remains <em>Off</em> for collectors.</div>
+      <!-- Preview-as toggle — only relevant when status is 'upcoming' (lets admin preview either UI) -->
+      <div class="preview-as-wrap" id="preview-as-wrap" style="display:none">
+        <span class="preview-as-label">Preview as</span>
+        <div class="preview-as-seg" role="group" aria-label="Preview as">
+          <button type="button" id="preview-as-upcoming" class="active" onclick="setPreviewAs('upcoming')">Upcoming</button>
+          <button type="button" id="preview-as-live" onclick="setPreviewAs('live')">Live</button>
+        </div>
+      </div>
+      <div class="preview-piece-list" id="preview-piece-list"></div>
+      <button class="btn-preview" onclick="launchPreview()">
+        ◈ &nbsp;Preview all pieces
+      </button>
+    </div>
+
+    <!-- Hall of Fame -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-head">
+        <div class="card-title">Hall of Fame</div>
+        <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(201,153,58,0.12);color:var(--gold);border:1px solid rgba(201,153,58,0.3)">Permanent record</span>
+      </div>
+      <div class="card-body">
+
+        <!-- ── Tab switcher ── -->
+        <div style="display:flex;border-bottom:1px solid var(--divider);margin-bottom:18px;gap:0;">
+          <button id="hof-tab-eth"     class="hof-tab-btn active" onclick="hofSwitchTab('eth')">⟠ &nbsp;ETH Auction</button>
+          <button id="hof-tab-tezos"   class="hof-tab-btn"        onclick="hofSwitchTab('tezos')">ꜩ &nbsp;Tezos Auction</button>
+          <button id="hof-tab-private" class="hof-tab-btn"        onclick="hofSwitchTab('private')">⊛ &nbsp;Private Sale</button>
+        </div>
+
+        <!-- ════ ETH panel ════ -->
+        <div id="hof-panel-eth">
+          <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">
+            Reads the final state from the on-chain ETH contract and saves it to the Hall of Fame. Winner and bid are pulled automatically.
+          </p>
+          <div class="field" style="margin-bottom:10px" id="hof-piece-field">
+            <label>Select piece to save</label>
+            <select id="hof-piece-select" style="width:100%;background:var(--bg-alt);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:8px 10px;outline:none;">
+              <option value="0">Piece 1</option>
+            </select>
+            <div class="field-hint">Which auction piece to record in the Hall of Fame</div>
+          </div>
+          <div class="field" style="margin-bottom:10px">
+            <label>Winner display name (optional override)</label>
+            <input id="hof-winner-name" placeholder="e.g. Adebayo — leave blank to use their wallet address" />
+            <div class="field-hint">Overrides the collector's own profile name in the Hall of Fame for this auction only.</div>
+          </div>
+          <div class="field" style="margin-bottom:14px">
+            <label>Winner avatar URL (optional override)</label>
+            <input id="hof-winner-avatar" placeholder="https://… — leave blank to use their profile avatar" />
+          </div>
+          <button class="btn-hof" id="hof-btn" onclick="saveToHallOfFame()">
+            ◇ &nbsp;Save ETH auction to Hall of Fame
+          </button>
+          <div class="hof-status" id="hof-status"></div>
+        </div>
+
+        <!-- ════ Tezos panel ════ -->
+        <div id="hof-panel-tezos" style="display:none">
+          <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">
+            Log a Tezos auction result manually. Paste the on-chain operation hash so the record links to tzkt.io for verification.
+          </p>
+          <div class="row2">
+            <div class="field">
+              <label>Artwork title</label>
+              <input id="tez-art-title" placeholder="e.g. ìgbáradì" />
+            </div>
+            <div class="field">
+              <label>Artist name</label>
+              <input id="tez-art-artist" placeholder="e.g. Kayode Oyeniyi" />
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Year</label>
+              <input id="tez-art-year" placeholder="2025" />
+            </div>
+            <div class="field">
+              <label>Medium</label>
+              <input id="tez-art-medium" placeholder="Digital painting" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Image URL</label>
+            <input id="tez-art-image" placeholder="https://… or ipfs://…" />
+          </div>
+          <div class="field">
+            <label>Winning bid (XTZ)</label>
+            <input id="tez-winning-bid" type="number" step="0.01" min="0" placeholder="e.g. 42.5" />
+            <div class="field-hint">Amount in XTZ — not mutez.</div>
+          </div>
+          <div class="field">
+            <label>Operation hash (on-chain proof)</label>
+            <input id="tez-op-hash" placeholder="oo… or op… Tezos operation hash from tzkt.io" />
+            <div class="field-hint">The settlement transaction hash — used to auto-link the record to tzkt.io so the price is publicly verifiable.</div>
+          </div>
+          <div class="field">
+            <label>Contract / FA2 address (optional)</label>
+            <input id="tez-contract-addr" placeholder="KT1… — optional, links to the token on tzkt" />
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Winner wallet / alias</label>
+              <input id="tez-winner" placeholder="tz1… or .tez alias" />
+            </div>
+            <div class="field">
+              <label>Winner display name</label>
+              <input id="tez-winner-name" placeholder="e.g. Adebayo" />
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:14px">
+            <label>Winner avatar URL (optional)</label>
+            <input id="tez-winner-avatar" placeholder="https://…" />
+          </div>
+          <div class="field" style="margin-bottom:4px">
+            <label>Settlement date</label>
+            <input type="datetime-local" id="tez-settled-at" />
+          </div>
+          <button class="btn-hof" id="tez-hof-btn" onclick="saveTezosSaleToHoF()" style="margin-top:14px">
+            ꜩ &nbsp;Save Tezos auction to Hall of Fame
+          </button>
+          <div class="hof-status" id="tez-hof-status"></div>
+        </div>
+
+        <!-- ════ Private sale panel ════ -->
+        <div id="hof-panel-private" style="display:none">
+          <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">
+            Record a private off-auction sale. Paste the on-chain transaction hash as the verifiable proof of payment — it will be linked publicly so the price is auditable.
+          </p>
+          <div class="row2">
+            <div class="field">
+              <label>Artwork title</label>
+              <input id="prv-art-title" placeholder="e.g. ìgbáradì" />
+            </div>
+            <div class="field">
+              <label>Artist name</label>
+              <input id="prv-art-artist" placeholder="e.g. Kayode Oyeniyi" />
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Year</label>
+              <input id="prv-art-year" placeholder="2025" />
+            </div>
+            <div class="field">
+              <label>Medium</label>
+              <input id="prv-art-medium" placeholder="Digital painting" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Image URL</label>
+            <input id="prv-art-image" placeholder="https://… or ipfs://…" />
+          </div>
+          <div class="field">
+            <label>Chain</label>
+            <div class="piece-status-row" id="prv-chain-row">
+              <button type="button" class="piece-status-btn active-live" id="prv-chain-eth" onclick="setPrvChain('eth')">⟠ Ethereum</button>
+              <button type="button" class="piece-status-btn" id="prv-chain-tezos" onclick="setPrvChain('tezos')">ꜩ Tezos</button>
+            </div>
+            <input type="hidden" id="prv-chain" value="eth" />
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Sale price</label>
+              <input id="prv-winning-bid" type="number" step="0.0001" min="0" placeholder="e.g. 0.85" />
+            </div>
+            <div class="field">
+              <label>Currency</label>
+              <input id="prv-currency-hint" value="ETH" readonly style="color:var(--text-muted);background:var(--bg-alt)" />
+            </div>
+          </div>
+          <div class="field">
+            <label>On-chain payment proof (tx / op hash)</label>
+            <input id="prv-tx-hash" placeholder="0x… (ETH) or op… / oo… (Tezos) — the settlement transaction" />
+            <div class="field-hint">Paste the transaction hash that proves payment. This will be linked on the public record so collectors can verify the price on-chain.</div>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Buyer wallet</label>
+              <input id="prv-winner" placeholder="0x… or tz1…" />
+            </div>
+            <div class="field">
+              <label>Buyer display name</label>
+              <input id="prv-winner-name" placeholder="e.g. Adebayo" />
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:10px">
+            <label>Buyer avatar URL (optional)</label>
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+              <input id="prv-winner-avatar" placeholder="https://…" oninput="previewPrvAvatar()" style="flex:1" />
+              <img id="prv-avatar-preview" class="profile-entry-avatar" src="" alt="" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid var(--divider);display:none;flex-shrink:0;">
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:4px">
+            <label>Sale date</label>
+            <input type="datetime-local" id="prv-settled-at" />
+          </div>
+          <button class="btn-hof" id="prv-hof-btn" onclick="savePrivateSaleToHoF()" style="margin-top:14px">
+            ⊛ &nbsp;Save private sale to Hall of Fame
+          </button>
+          <div class="hof-status" id="prv-hof-status"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Manual sold override -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-head">
+        <div class="card-title">Manual Sold Override</div>
+        <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(107,124,92,0.12);color:var(--moss);border:1px solid rgba(107,124,92,0.3)">Auction display</span>
+      </div>
+      <div class="card-body">
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">
+          Force the "Sold" badge to appear on a piece tab — useful when a piece was settled privately or via a different mechanism and the contract hasn't been updated.
+        </p>
+        <div class="field" style="margin-bottom:10px">
+          <label>Select piece</label>
+          <select id="sold-override-piece" style="width:100%;background:var(--bg-alt);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:8px 10px;outline:none;">
+            <option value="0">Piece 1</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-outline" style="flex:1;justify-content:center" onclick="setSoldOverride(true)">✓ &nbsp;Mark as Sold</button>
+          <button class="btn btn-danger"  style="flex:1;justify-content:center" onclick="setSoldOverride(false)">✕ &nbsp;Remove Sold badge</button>
+        </div>
+        <div class="hof-status" id="sold-override-status"></div>
+      </div>
+    </div>
+
+    <!-- Auctioneer Profile -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-head">
+        <div class="card-title">Auctioneer Profile</div>
+        <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(196,132,90,0.1);color:var(--clay);border:1px solid rgba(196,132,90,0.3)">Kay · Host</span>
+      </div>
+      <div class="card-body">
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">
+          Set your display name and avatar as the auctioneer. This appears next to every message you send in the collector room and in the Hall of Fame chat archive.
+        </p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);">
+          <img id="auc-avatar-preview" class="profile-entry-avatar" src="" alt="" style="width:40px;height:40px;">
+          <div>
+            <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--clay);margin-bottom:2px">Kay · Auctioneer</div>
+            <div id="auc-current-name" style="font-family:'Crimson Pro',serif;font-size:0.88rem;color:var(--text-muted);font-style:italic">Loading…</div>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:8px">
+          <label>Display name</label>
+          <input id="auc-name" placeholder="e.g. Kayode Oyeniyi" maxlength="40" style="width:100%;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:9px 12px;outline:none;transition:border-color .2s;" />
+        </div>
+        <div class="field" style="margin-bottom:14px">
+          <label>Avatar URL</label>
+          <input id="auc-avatar" placeholder="https://…" maxlength="300" oninput="previewAucAvatar()" style="width:100%;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:9px 12px;outline:none;transition:border-color .2s;" />
+        </div>
+        <button class="btn btn-outline" id="auc-save-btn" onclick="saveAuctioneerProfile()" style="width:100%;justify-content:center;">Save auctioneer profile</button>
+        <div class="profile-status" id="auc-profile-status"></div>
+      </div>
+    </div>
+
+    <!-- Collector Profiles -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-head">
+        <div class="card-title">Collector Profiles</div>
+        <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(107,124,92,0.1);color:var(--moss);border:1px solid rgba(107,124,92,0.3)">Name &amp; Avatar</span>
+      </div>
+      <div class="card-body">
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:14px">
+          Assign a display name and avatar to any participating wallet. These appear in the Hall of Fame chat archive and the live collector room.
+        </p>
+        <div class="profile-search-row">
+          <input id="profile-wallet-input" style="flex:1;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:9px 12px;outline:none;transition:border-color .2s;" placeholder="0x… wallet address" onkeydown="if(event.key==='Enter')lookupProfile()" />
+          <button class="btn btn-outline" onclick="lookupProfile()" style="white-space:nowrap">Look up →</button>
+        </div>
+        <div class="profile-status" id="profile-lookup-status"></div>
+
+        <div id="profile-edit-form" style="display:none;margin-top:14px;padding:14px;background:var(--bg);border:1px solid var(--divider);border-radius:var(--r);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <img id="pef-avatar-preview" class="profile-entry-avatar" src="" alt="">
+            <div>
+              <div id="pef-addr" style="font-family:'Crimson Pro',serif;font-size:0.8rem;color:var(--clay);font-style:italic;"></div>
+              <div id="pef-existing" style="font-family:'Crimson Pro',serif;font-size:0.78rem;color:var(--text-muted);font-style:italic;"></div>
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:8px">
+            <label>Display name</label>
+            <input id="pef-name" placeholder="e.g. Adebayo" maxlength="40" style="width:100%;background:var(--bg-alt);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:8px 10px;outline:none;" />
+          </div>
+          <div class="field" style="margin-bottom:12px">
+            <label>Avatar URL</label>
+            <input id="pef-avatar" placeholder="https://…" maxlength="300" oninput="previewAvatar()" style="width:100%;background:var(--bg-alt);border:1px solid var(--divider);border-radius:var(--r);color:var(--text);font-family:'Crimson Pro',serif;font-size:0.95rem;padding:8px 10px;outline:none;" />
+          </div>
+          <button class="btn btn-outline" id="pef-save-btn" onclick="saveProfile()" style="width:100%;justify-content:center;">Save profile</button>
+          <div class="profile-status" id="pef-status"></div>
+        </div>
+
+        <div id="profile-list-wrap" style="margin-top:16px;display:none;">
+          <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Saved profiles</div>
+          <div class="profile-list" id="profile-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- USD Backfill -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-head">
+        <div class="card-title">Backfill USD Values</div>
+        <span style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:rgba(196,132,90,0.1);color:var(--clay);border:1px solid rgba(196,132,90,0.3)">Historical records</span>
+      </div>
+      <div class="card-body">
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);margin-bottom:6px">
+          Find all Hall of Fame records that have no USD value logged and fill them using today's Coinbase spot rate.
+          Since the free Coinbase API doesn't provide historical prices, these will be marked <em>estimated</em> — honest about the fact that rates have moved since settlement.
+        </p>
+        <p style="font-family:'Crimson Pro',serif;font-size:0.82rem;color:var(--text-muted);font-style:italic;margin-bottom:16px">
+          If you have the actual USD value at time of sale for any record, you can also enter it manually below.
+        </p>
+
+        <!-- Auto backfill -->
+        <button class="btn-hof" id="backfill-btn" onclick="backfillUsd()">
+          ◈ &nbsp;Backfill all missing USD values
+        </button>
+        <div class="hof-status" id="backfill-status" style="margin-top:10px"></div>
+
+        <!-- Manual single-record override -->
+        <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--divider)">
+          <div style="font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px">Set USD value manually for one record</div>
+          <div class="row2" style="margin-bottom:10px">
+            <div class="field">
+              <label>Auction ID or contract address</label>
+              <input id="manual-usd-id" placeholder="0x… or op… or prv-…" />
+              <div class="field-hint">Paste the auction_id exactly as it appears in Supabase</div>
+            </div>
+            <div class="field">
+              <label>USD value at time of sale</label>
+              <input id="manual-usd-value" type="number" step="1" min="0" placeholder="e.g. 1250" />
+              <div class="field-hint">Whole dollars — no $ sign</div>
+            </div>
+          </div>
+          <button class="btn btn-outline" onclick="setManualUsd()" style="width:100%;justify-content:center">Set USD value →</button>
+          <div class="hof-status" id="manual-usd-status" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger zone -->
+    <div class="danger-zone">
+      <div class="danger-title">Danger zone</div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Clear all saved configuration. The collector page will show the landing state.</p>
+      <button class="btn btn-danger" id="clear-btn" onclick="clearConfig()">Clear all configuration</button>
+    </div>
+
+  </div><!-- /main-content -->
+</div><!-- /page -->
+
+<div class="toast" id="toast">
+  <div class="toast-title" id="toast-title"></div>
+  <div id="toast-body" style="font-size:11px;color:rgba(245,240,232,.6)"></div>
 </div>
-
-<!-- Chain filter -->
-<div class="chain-filter-bar" id="chain-filter-bar" style="display:none">
-  <div class="chain-filter-inner">
-    <button class="chain-filter-btn active" data-chain="all" onclick="setChainFilter('all')">All</button>
-    <button class="chain-filter-btn" data-chain="eth" onclick="setChainFilter('eth')">
-      <span class="chain-icon eth">⟠</span> Ethereum
-    </button>
-    <button class="chain-filter-btn" data-chain="tezos" onclick="setChainFilter('tezos')">
-      <span class="chain-icon tezos">ꜩ</span> Tezos
-    </button>
-  </div>
-</div>
-
-<main>
-  <div class="loading-state" id="loading-state">
-    <div class="loading-glyph">⬡</div>
-    <div class="loading-text">Retrieving records</div>
-  </div>
-  <div class="empty-state" id="empty-state">
-    <div class="empty-glyph">◇</div>
-    <div class="empty-title">No records yet</div>
-    <div class="empty-sub">The first settled auction will appear here — permanently.</div>
-  </div>
-  <div class="results-list" id="results-list"></div>
-</main>
-
-<footer>
-  The bids are on-chain. The conversations are ours to keep. Both are permanent. &nbsp;·&nbsp; <a href="https://kaysworks.com">kaysworks.com</a>
-</footer>
 
 <script>
-const SUPABASE_URL  = "https://haijshusgcbdexfueunr.supabase.co";
-const SUPABASE_ANON = "sb_publishable_nImf-_e3-CBB8tL_EQGBCw_m_VoHbVb";
-const SB            = { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON };
+// ─── Config ───────────────────────────────────────────────────────────────────
+// The API endpoint — adjust if your Vercel project uses a custom domain.
+const API_URL = "/api/auction-config";
 
-// ── Profile cache ──
-const _profiles = {};
-async function _getProfile(wallet) {
-  if (!wallet) return null;
-  const key = wallet.toLowerCase();
-  if (_profiles[key] !== undefined) return _profiles[key];
+// Admin password is kept only in memory for the session; never persisted.
+let adminPassword = "";
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+async function authenticate() {
+  const pw = document.getElementById("admin-pw").value;
+  if (!pw) { toast("err", "Password required", "Please enter your admin password"); return; }
+
+  setLoading(true);
   try {
-    const res  = await fetch(`${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(key)}&limit=1`, { headers: SB });
-    const rows = await res.json();
-    _profiles[key] = (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
-  } catch(_) { _profiles[key] = null; }
-  return _profiles[key];
-}
-
-async function _loadAucProfile() {
-  if (_profiles["__auc__"] !== undefined) return;
-  try {
-    const res  = await fetch(`${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent("0x72a04d812494cf3f6880483c6269291ce5751a83")}&limit=1`, { headers: SB });
-    const rows = await res.json();
-    _profiles["__auc__"] = (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
-  } catch(_) { _profiles["__auc__"] = null; }
-}
-
-function shortAddr(a) { return (!a||a.length<10) ? (a||"—") : a.slice(0,6)+"…"+a.slice(-4); }
-function fmtDate(iso) { return iso ? new Date(iso).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}) : "—"; }
-function fmtTime(iso) { return iso ? new Date(iso).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}) : ""; }
-function fmtEth(n)   { return (n==null) ? "—" : parseFloat(n).toFixed(3).replace(/\.?0+$/,""); }
-function toHTTP(url) {
-  if (!url) return "";
-  if (url.startsWith("ipfs://")) return "https://cloudflare-ipfs.com/ipfs/"+url.slice(7);
-  if (url.startsWith("ar://"))   return "https://arweave.net/"+url.slice(5);
-  return url;
-}
-function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-function addrColor(a) {
-  const p=["#c4845a","#c9993a","#6b7c5c","#8a7060","#9e4f2e","#b07d4a"];
-  let n=0; for(let i=0;i<Math.min((a||"").length,8);i++) n+=a.charCodeAt(i);
-  return p[n%p.length];
-}
-
-async function loadMessages(auctionId, chatBody) {
-  chatBody.innerHTML = `<div class="chat-loading">Loading conversation…</div>`;
-  try {
-    const res  = await fetch(
-      `${SUPABASE_URL}/rest/v1/collector_messages?auction_id=ilike.${encodeURIComponent(auctionId)}&order=created_at.asc&limit=200`,
-      { headers: SB }
-    );
-    const rows = await res.json();
-    if (!Array.isArray(rows)||rows.length===0) {
-      chatBody.innerHTML=`<div class="chat-empty">No messages were recorded for this auction.</div>`; return;
-    }
-
-    // Tally reactions, keep first occurrence only
-    const reactCount={}, seenReact=new Set();
-    rows.filter(r=>r.type==="reaction").forEach(r=>{ reactCount[r.message]=(reactCount[r.message]||0)+1; });
-
-    // Pre-fetch all unique collector profiles + auctioneer profile
-    const uniqueWallets = [...new Set(rows.filter(r=>r.type!=="reaction"&&r.type!=="auctioneer").map(r=>r.wallet_address).filter(Boolean))];
-    await Promise.all([_loadAucProfile(), ...uniqueWallets.map(w => _getProfile(w))]);
-
-    const rendered = [];
-    for (const row of rows) {
-      if (row.type==="reaction") {
-        if (seenReact.has(row.message)) continue;
-        seenReact.add(row.message);
-        const c=reactCount[row.message]||1;
-        rendered.push(`<div class="reaction-item"><span class="reaction-emoji">${esc(row.message)}</span>${c>1?`<span class="reaction-count">× ${c}</span>`:""}</div>`);
-        continue;
-      }
-      const isAuc   = row.type==="auctioneer";
-      const isBid   = row.is_bid;
-      const addr    = row.wallet_address||"";
-      const color   = isAuc ? "var(--clay)" : addrColor(addr);
-      const aucProf = _profiles["__auc__"] || null;
-      const init    = isAuc ? (aucProf?.display_name?.slice(0,2).toUpperCase() || "KA") : addr.slice(2,4).toUpperCase();
-      const profile = isAuc ? null : (_profiles[addr.toLowerCase()] || null);
-      const name    = isAuc ? (aucProf?.display_name || "Kay · Auctioneer") : (profile?.display_name || shortAddr(addr));
-      const avatUrl = isAuc ? (aucProf?.avatar_url || null) : (profile?.avatar_url || null);
-      const avatHtml = isAuc
-        ? (avatUrl
-            ? `<img src="${avatUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" data-init="${init}" onerror="_hofAucAvatFallback(this)">`
-            : `<div class="chat-avatar auc">${init}</div>`)
-        : avatUrl
-          ? `<img src="${avatUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" data-init="${init}" data-color="${color}" onerror="_avatarFallback(this)">`
-          : `<div class="chat-avatar" style="background:${color}22;color:${color}">${init}</div>`;
-      const bidTag  = isBid ? `<span class="bid-tag">Bid</span>` : "";
-      const roleTag = isAuc ? `<span style="font-family:'Cinzel',serif;font-size:0.4rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--clay);opacity:0.7;margin-left:5px">Auctioneer</span>` : "";
-      rendered.push(`<div class="chat-item">
-        ${avatHtml}
-        <div class="chat-bubble">
-          <div class="chat-meta">
-            <span class="chat-name ${isAuc?"auc":""}" ${isAuc?"":"style='color:"+color+"'"}>${esc(name)}${roleTag}</span>
-            <span class="chat-time">${fmtTime(row.created_at)}</span>
-          </div>
-          <div class="chat-text ${isBid?"bid":""}">${esc(row.message)}${bidTag}</div>
-        </div>
-      </div>`);
-    }
-    chatBody.innerHTML = rendered.join("");
-  } catch(e) {
-    chatBody.innerHTML=`<div class="chat-empty">Could not load messages.</div>`;
-  }
-}
-
-function toggleChat(btn, chatBody, auctionId, state) {
-  const isOpen = chatBody.classList.contains("open");
-  chatBody.classList.toggle("open", !isOpen);
-  btn.classList.toggle("open", !isOpen);
-  if (!isOpen && !state.loaded) {
-    state.loaded = true;
-    loadMessages(auctionId, chatBody);
-  }
-}
-
-// ── Chain filter ──
-let _currentChainFilter = "all";
-let _allRows = [];
-
-function setChainFilter(chain) {
-  _currentChainFilter = chain;
-  document.querySelectorAll(".chain-filter-btn").forEach(b => {
-    b.classList.toggle("active", b.dataset.chain === chain);
-  });
-  _renderFiltered();
-}
-
-function _renderFiltered() {
-  const list  = document.getElementById("results-list");
-  const empty = document.getElementById("empty-state");
-  if (!_allRows || _allRows.length === 0) return;
-
-  const filtered = _currentChainFilter === "all"
-    ? _allRows
-    : _allRows.filter(r => (r.chain || "eth") === _currentChainFilter);
-
-  list.innerHTML = "";
-  if (filtered.length === 0) {
-    list.classList.remove("show");
-    empty.style.display = "block";
-    return;
-  }
-  empty.style.display = "none";
-  list.classList.add("show");
-  filtered.forEach((row, i) => _renderCard(row, i, list));
-}
-
-// ── SVG logo snippet (shared) ──
-const SERIES_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 418.67 272.4" style="width:100%;height:100%;display:block;" aria-label="Àpótí Ọlọ́wẹ̀ Series" role="img"><g fill="currentColor"><path d="M14.08,72.64c-0.44-9.9,5.61-6.3,11.45-9.62c9.59-3.38,18.94-7.61,27.47-13.13c19.43-21.68,31.42-19.48,57.05-19.74c3.65-0.04,7.16,1.61,9.31,4.55c2.04,2.79,3.64,6.51,4.12,10.64c0.89,7.54,0.29,14.4,0.73,23.41c1.4,29.04-1.84,58.54,2.34,86.97c1.57,2.93,1.09,3.64-2.23,3.65c-7.4,0.02-14.79,0.04-22.19,0.06c-2.19,0-2.49-0.24-2.31-2.39c0.57-6.97-0.3-13.9-0.53-20.84c-0.91-7.25,1.69-15.86-3.29-21.91c-5.56-0.69-11.74,1.29-17.48,1.54c-0.85,0.1-0.75,0.65-0.75,1.21c0.04,13.63,0.04,27.27,0.04,40.9c0.22,3.59-20.09,0.65-23.9,1.55c-2.94-0.15-5.4-0.75-5.11-4.25c0-24.98,0.48-49.97-0.02-74.95c-0.6-8.12-28.54-0.18-35.09-7.56C13.83,72.7,13.96,72.67,14.08,72.64z M75.85,68.56c-0.06,0-0.11,0-0.17,0.01c0.2,5.75,0.34,11.5,0.63,17.24c1.4,7.74,12.49,2.88,17.99,3.87c1.06-0.03,4.37-1.56,4.31-2.61c-0.64-11.32-0.25-21.68-1.64-32.95c-1.44-7.61-14.4-2.83-19.61-3.29C73.41,50.03,76.54,65.46,75.85,68.56z"/><path d="M318.37,154.26c-0.03,2.9-2.39,5.25-5.3,5.26c-32.05,0.1-22.68,4.63-24.91-31.66c-0.38-22.06,0.05-44.13-0.94-66.17c-1.12-10.67-12.93-6.84-20.09-7.7c-3.14-0.35-8.83,3.37-8.92-1.94c-0.52-5.42-0.75-10.84-0.87-16.28c-0.07-3.03,2.42-5.5,5.45-5.41c29.08,0.79,58.96-3.03,87.44,1.87c0.59,0.1,1.15,0.3,1.67,0.59c4.83,2.64,9.79,5.24,14.13,8.66c0.27,0.21,0.52,0.44,0.74,0.7c2.73,3.12,4.07,7.31,7.82,9.52c0.46,0.27,0.88,0.61,1.21,1.03c8.41,10.55,23.82,9,29.58,13.52c0.91,0.71,1.56,1.74,1.78,2.88c1.57,8.49-20.83,6.63-26.78,7.17c-0.19,0.02-0.37,0.1-0.57,0.09c-14.47-0.5-14.95-16.97-28.29-18.97c-8.28-1.24-14.44-1.61-21.67-2.34c-4.7-0.37-11.68-1.55-10.96,5.37C318.65,91.72,318.7,122.99,318.37,154.26z"/><path d="M137.88,30.42c36.49,0,72.92,0,109.47,0c0.14,2.64,0.36,5.22,0.38,7.81c0.04,4.47,0.12,8.95-0.16,13.4c-0.13,1.97-0.87,4.01-1.78,5.79c-0.58,1.14-1.84,2.1-3.01,2.76c-6.27,3.51-12.52,7.07-18.93,10.31c-16.89,8.52-33.84,16.93-50.82,25.27c-2.81,1.38-5.87,2.27-8.86,3.25c-1.27,0.41-1.91,1.09-2.17,2.37c-0.81,4.04-0.73,8.05-0.36,12.15c0.54,5.84,0.58,11.73,0.86,17.59c0.31,6.5,0.66,13,0.99,19.5c0.03,0.56,0.08,1.12,0.03,1.67c-0.13,1.54,0.25,2.9,1.11,4.19c0.54,0.81,0.87,1.75,1.37,2.8c-0.58,0.04-0.92,0.09-1.26,0.09c-7.11,0.03-14.23,0.06-21.34,0.08c-2.08,0.01-2.28-0.26-2.6-2.24c-1.34-8.33-1.16-16.73-1.18-25.12c-0.04-13.67,0.14-27.34-0.07-41c-0.14-9.15-0.9-18.28-1.17-27.43c-0.32-10.74-0.41-21.5-0.59-32.24C137.79,31.11,137.84,30.8,137.88,30.42z M192.52,49.84c0-0.05,0-0.1,0-0.14c-10.02,0.21-20.05,0.42-30.07,0.64c-1.72,0.04-2.38,0.59-2.69,2.26c-0.09,0.47-0.11,0.95-0.17,1.43c-0.59,5.12-0.01,10.21,0.55,15.29c0.19,1.71,0.34,3.42,0.68,5.1c0.39,1.96,1.68,2.7,3.54,2.09c1.05-0.35,2.03-0.91,3.05-1.36c2.58-1.14,5.1-2.49,7.78-3.36c4.82-1.57,9.66-3,14.31-5.07c6.99-3.12,14-6.22,21.14-9c5.53-2.15,11.26-3.8,16.9-5.67c0.63-0.21,1.23-0.55,0.96-1.24c-0.16-0.42-0.79-0.91-1.24-0.94c-3.42-0.24-6.86-0.53-10.29-0.5C208.81,49.44,200.67,49.68,192.52,49.84z"/><path d="M225.17,159.31c-14.75,0-29.5,0-44.25,0c-1.75,0-2-0.38-2.38-2.28c-1.95-9.54-1.91-19.21-2.01-28.88c-0.06-5.54-0.62-11.08-0.99-16.62c-0.1-1.47,0.38-2.54,1.89-3.27c2.55-1.23,5.16-2.35,7.73-3.54c24.11-11.19,48.21-22.4,72.32-33.59c1.45-0.67,2.9-1.35,4.4-1.89c4.74-1.72,10.03,1.35,10.03,6.72c-0.03,26.46,0.05,52.92,0.08,79.38c0,3.82-0.12,3.93-3.99,3.93c-14.27,0-28.54,0-42.81,0C225.17,159.28,225.17,159.3,225.17,159.31z"/><path d="M126.44,216.95c0,9.07,0,18.15-0.01,27.22c0,0.92-0.02,1.84-0.14,2.75c-0.36,2.78-2.43,4.59-5.22,4.59c-9.47,0.01-18.95-0.02-28.42,0.01c-11.87,0.03-23.73,0.11-35.6,0.16c-3.91,0.02-5.44-1.57-5.69-5.47c-0.15-2.38-0.58-4.75-0.99-7.11c-0.54-3.17-0.63-6.33-0.48-9.55c0.35-7.54,0.53-15.09,0.76-22.64c0.19-6.27,0.22-12.55,0.58-18.81c0.16-2.76,0.9-5.5,1.49-8.23c0.25-1.16,1.11-1.99,2.27-2.27c4.33-1.07,8.64-2.37,13.04-3c3.61-0.52,7.34-0.25,11.01-0.24c11.99,0.03,23.98,0.1,35.97,0.17c0.92,0.01,1.84,0.05,2.75,0.16c2.85,0.36,4.95,1.82,6.36,4.35c1.79,3.22,2.6,6.67,2.6,10.34c0,9.19,0,18.39,0,27.58C126.63,216.95,126.54,216.95,126.44,216.95z"/><path d="M282.34,247.55c-10.91,0-21.82,0.02-32.74-0.02c-1.35,0-2.71-0.21-4.03-0.48c-1.3-0.27-2.27-1.08-2.51-2.44c-0.33-1.88-0.77-3.78-0.78-5.67c-0.05-19.43-0.02-38.86-0.02-58.28c0-1.52-0.05-3.04-0.07-4.56c-0.01-1,0.38-1.54,1.5-1.53c4.6,0.02,9.19,0.02,13.79-0.07c1.3-0.03,1.55,0.59,1.57,1.66c0.18,7.35,0.47,14.7,0.54,22.05c0.1,10.39,0.04,20.79,0.05,31.18c0,1.75,0.12,1.82,1.85,1.77c4.75-0.14,9.51-0.27,14.26-0.4c1.49-0.04,1.58-0.11,1.58-1.57c0-15.67,0-31.34-0.02-47.01c0-1.96-0.16-3.91-0.2-5.87c-0.03-1.43,0.25-1.7,1.63-1.71c3.52-0.02,7.04-0.02,10.55-0.08c1.04-0.02,1.42,0.33,1.57,1.41c1.2,8.78,1.29,17.61,1.11,26.45c-0.16,8.09,0.71,16.12,1.57,24.15c0.08,0.75,0.17,1.51,0.29,2.26c0.18,1.1,0.86,1.73,1.96,1.75c3.28,0.06,6.55,0.06,9.83,0.07c0.92,0,0.96-0.63,0.96-1.32c0-3.08,0-6.16,0.02-9.23c0.07-13.11,0.14-26.22,0.21-39.33c0.01-1.08,0.06-2.16,0.14-3.23c0.09-1.19,0.73-2.11,1.84-2.43c1.44-0.41,2.94-0.75,4.42-0.8c2.03-0.06,4.06,0.26,6.1,0.27c1.11,0.01,1.46,0.39,1.48,1.46c0.22,9.99,0.53,19.98,0.71,29.97c0.2,11.35,0.32,22.7,0.43,34.05c0.02,2.46-0.85,4.7-2.25,6.7c-0.91,1.3-2.19,1.89-3.81,1.85c-11.19-0.25-22.38-0.48-33.57-0.71C282.34,247.74,282.34,247.64,282.34,247.55z"/><path d="M193.08,250.19c-9.95-0.2-19.9-0.4-29.85-0.59c-0.71-0.01-1.45,0.04-2.13,0.23c-2.59,0.74-5.19,0.66-7.84,0.35c-2.69-0.31-5.4-0.37-8.1-0.61c-0.93-0.09-1.91-0.26-2.73-0.67c-0.99-0.5-1.35-1.54-1.32-2.65c0.21-7.87,0.5-15.74,0.61-23.61c0.1-6.91,0.11-13.83-0.07-20.74c-0.08-3.14-0.95-6.25-1.07-9.39c-0.22-5.55-0.14-11.11-0.19-16.66c-0.01-0.82,0.39-1.28,1.22-1.31c1.08-0.04,2.16-0.07,3.23-0.07c3.72-0.02,7.43-0.02,11.15-0.02c1.76,0,2.13,0.27,2.61,1.98c1.34,4.73,1.51,9.61,1.96,14.46c1.16,12.75,1.44,25.53,1.9,38.31c0.06,1.63,0.36,3.25,0.54,4.88c0.12,1.08,0.79,1.35,1.76,1.32c4.71-0.15,9.43-0.34,14.14-0.41c15.43-0.23,30.85-0.42,46.28-0.6c0.51-0.01,1.03,0.11,1.54,0.21c0.94,0.19,1.5,0.75,1.49,1.74c-0.01,3.28,0.08,6.56-0.1,9.83c-0.17,3.15-1.82,4.52-5.19,4.48c-8.91-0.11-17.82-0.28-26.74-0.43c-1.04-0.02-2.08,0-3.12,0C193.08,250.21,193.08,250.2,193.08,250.19z"/><path d="M200.88,174.47c8.11,0,16.22,0,24.33,0c0.72,0,1.44,0.01,2.16,0.01c1.05-0.01,1.52,0.52,1.49,1.56c-0.04,1.84-0.07,3.68-0.08,5.51c-0.11,13.66-0.22,27.33-0.33,40.99c0,0.16,0,0.32,0,0.48c-0.02,1.99-0.28,2.25-2.31,2.27c-2.88,0.03-5.75,0.06-8.63,0.08c-13.62,0.1-27.25,0.19-40.87,0.28c-2.78,0.02-4.14-1.27-4.24-4.32c-0.34-9.82-0.67-19.64-0.89-29.47c-0.11-4.75,0.02-9.51,0.06-14.26c0.02-2.14,1.01-3.13,3.18-3.13C183.46,174.46,192.17,174.46,200.88,174.47z"/><path d="M362.7,160.89c-9.16,0-18.26,0-27.48,0c0-0.45-0.01-0.88,0-1.3c0.26-12.86,0.56-25.72,0.77-38.59c0.24-14.07,0.39-28.13,0.59-42.2c0.01-0.84,0.09-1.67,0.14-2.51c0.06-1.04,0.66-1.43,1.61-1.22c2.29,0.52,4.6,1.02,6.85,1.67c2.24,0.65,3.82,2.1,5.03,4.15c1.33,2.26,2.76,4.56,4.6,6.39c1.65,1.64,3.92,2.64,5.86,4c0.35,0.25,0.62,0.87,0.63,1.33c0.17,8.83,0.32,17.66,0.42,26.49c0.08,6.83,0.08,13.67,0.13,20.5c0,0.43,0.08,0.87,0.13,1.3c0.27,2.37,0.71,4.74,0.78,7.12c0.11,4.03-0.01,8.07-0.03,12.1C362.74,160.37,362.72,160.6,362.7,160.89z"/><path d="M370.45,195.82c0,5.04,0,9.82,0,14.71c-2.76,0.19-5.46,0.37-8.16,0.55c-1.27,0.08-2.56,0.06-3.82,0.24c-2.98,0.43-5.03,2.77-4.77,5.74c0.25,2.89,0.75,5.78,1.3,8.63c0.35,1.81,1.81,2.88,3.89,2.93c3.39,0.08,6.79,0.01,10.19,0.01c0.39,0,0.79,0,1.32,0c0.04,0.65,0.1,1.23,0.09,1.81c-0.02,3.44,0,6.87-0.1,10.31c-0.03,1.09-0.27,2.23-0.64,3.26c-0.95,2.6-2.17,3.22-4.9,3.21c-5.59-0.03-11.19,0.09-16.78,0.1c-2.52,0.01-5.04-0.04-7.55-0.17c-2.06-0.1-2.85-0.8-3.16-2.88c-0.33-2.21-0.65-4.44-0.68-6.67c-0.23-20.62-0.39-41.24-0.57-61.86c0-0.32,0-0.64,0-1.11c0.71-0.03,1.37-0.09,2.03-0.09c10.11-0.01,20.22-0.01,30.33,0c2.09,0,2.22,0.16,2.21,2.27c-0.01,3.12-0.01,6.23,0,9.35c0,1.82-0.26,2.1-2.04,2.12c-4.52,0.03-9.03,0.06-13.55,0.09c-1.84,0.01-2.05,0.32-1.79,2.15c0.23,1.66,0.39,3.33,0.51,5c0.07,1.04,0.56,1.4,1.55,1.31c4.02-0.35,8.04-0.7,12.06-1.01C368.39,195.75,369.38,195.82,370.45,195.82z"/></g></svg>`;
-
-async function _renderCard(row, i, list) {
-  const chain     = row.chain || "eth";
-  const isTezos   = chain === "tezos";
-  const isPrivate = !!row.is_private_sale;
-  const currency  = isTezos ? "XTZ" : "ETH";
-  const decimals  = isTezos ? 2 : 3;
-
-  const el = document.createElement("div");
-  el.className = "auction-record";
-  el.style.animationDelay = `${i * 0.08}s`;
-
-  const imgUrl   = toHTTP(row.art_image);
-  const imgTitle = esc(row.art_title || "");
-  const shimId   = `shimmer-hof-${i}`;
-  const imgHtml  = imgUrl
-    ? `<div class="img-shimmer" id="${shimId}"></div>
-       <img class="record-img" loading="lazy" src="${imgUrl}" alt="${imgTitle}"
-         onclick="event.stopPropagation();_openLightbox('${imgUrl}','${imgTitle}')"
-         onload="this.classList.add('loaded');const s=document.getElementById('${shimId}');if(s)s.style.opacity='0';const p=this.parentElement.querySelector('.record-img-placeholder');if(p)p.classList.add('hidden');const rt=this.closest('.record-top');if(rt){rt.classList.remove('img-portrait','img-landscape');rt.classList.add(this.naturalWidth>=this.naturalHeight?'img-landscape':'img-portrait');}"
-         onerror="this.style.display='none'">`
-    : "";
-
-  const meta = [row.art_year, row.art_medium].filter(Boolean).join(" · ");
-
-  // Chain badge
-  const chainBadge = `<span class="chain-badge ${chain}">
-    <span class="chain-badge-icon">${isTezos ? "ꜩ" : "⟠"}</span>${isTezos ? "Tezos" : "Ethereum"}
-  </span>`;
-
-  // On-chain link — Tezos uses tzkt, ETH uses etherscan
-  let onChainEl = "";
-  if (row.contract_addr && !isTezos) {
-    onChainEl = `<a class="etherscan-link" href="https://etherscan.io/address/${row.contract_addr}" target="_blank" rel="noopener">View on Etherscan ↗</a>`;
-  } else if (row.tezos_op_hash) {
-    onChainEl = `<a class="tzkt-link" href="https://tzkt.io/${row.tezos_op_hash}" target="_blank" rel="noopener">View on tzkt ↗</a>`;
-  } else if (row.contract_addr && isTezos) {
-    onChainEl = `<a class="tzkt-link" href="https://tzkt.io/${row.contract_addr}" target="_blank" rel="noopener">View on tzkt ↗</a>`;
-  }
-
-  // Private sale badge
-  const privateBadge = isPrivate
-    ? `<span class="private-badge">⊛ Private Sale</span>` : "";
-
-  // Winner
-  const winnerProfile  = await _getProfile(row.winner);
-  const winnerName     = row.winner_display_name || winnerProfile?.display_name || shortAddr(row.winner);
-  const winnerAvatar   = row.winner_avatar_url   || winnerProfile?.avatar_url   || null;
-  const winnerAvatHtml = winnerAvatar
-    ? `<img src="${winnerAvatar}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;flex-shrink:0;" onerror="_winnerAvatFallback(this)">`
-    : `<span class="winner-dot"></span>`;
-
-  // Bid display
-  const bidDisplay = row.winning_bid != null
-    ? `${parseFloat(row.winning_bid).toFixed(decimals)} <span style="font-size:.6em;color:var(--text-muted)">${currency}</span>`
-    : "—";
-
-  // Bid count or "Private" label
-  const bidCountDisplay = isPrivate
-    ? `<div class="rs-val" style="font-size:.85rem;padding-top:3px;color:var(--gold)">Private</div>`
-    : `<div class="rs-val">${row.bid_count || "—"}</div>`;
-
-  el.innerHTML = `
-    <div class="record-top">
-      <div class="record-img-wrap">
-        <div class="record-img-placeholder">◇</div>
-        ${imgHtml}
-        <div class="edition-badge">1/1</div>
-      </div>
-      <div class="record-details">
-        <div>
-          <div class="record-series">
-            <span class="series-logo">${SERIES_SVG}</span>
-            ${meta ? `<span style="font-family:'Cinzel',serif;font-size:0.44rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted);display:block;margin-top:4px">${meta}</span>` : ""}
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
-            ${chainBadge}
-            ${privateBadge}
-          </div>
-          <div class="record-title">${esc(row.art_title || "Untitled")}</div>
-          <div class="record-artist">${esc(row.art_artist || "Kayode Oyeniyi")}</div>
-          ${row.art_about ? `<div class="record-about clamped" id="about-hof-${i}">${row.art_about}</div><button class="read-more-btn" id="readmore-hof-${i}" onclick="(function(){const a=document.getElementById('about-hof-${i}');const b=document.getElementById('readmore-hof-${i}');const nowClamped=a.classList.toggle('clamped');b.textContent=nowClamped?'Read more ↓':'Read less ↑';})()">Read more ↓</button>` : ""}
-        </div>
-        <div>
-          <div class="record-stats">
-            <div>
-              <div class="rs-label">Winning Bid</div>
-              <div class="rs-val gold">${bidDisplay}</div>
-              <div class="rs-sub">Final price</div>
-            </div>
-            <div>
-              <div class="rs-label">${isPrivate ? "Sale Type" : "Total Bids"}</div>
-              ${bidCountDisplay}
-              <div class="rs-sub">${isPrivate ? "Off-auction" : "In auction"}</div>
-            </div>
-            <div>
-              <div class="rs-label">Settled</div>
-              <div class="rs-val" style="font-size:.95rem;padding-top:3px">${fmtDate(row.settled_at)}</div>
-            </div>
-          </div>
-          <div class="record-footer">
-            <div style="width:100%;margin-bottom:6px;">
-              <div style="font-family:'Cinzel',serif;font-size:0.44rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Collector</div>
-              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <div class="winner-pill">${winnerAvatHtml}${esc(winnerName)}</div>
-                ${onChainEl}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="record-chat">
-      <button class="chat-toggle">
-        <span class="chat-toggle-label">
-          Collector Room — Live Chat Archive
-          <span class="chat-count-pill" id="cpill-hof-${i}">loading…</span>
-        </span>
-        <span class="chat-toggle-arrow">▾</span>
-      </button>
-      <div class="chat-body" id="cbody-hof-${i}"></div>
-    </div>`;
-
-  list.appendChild(el);
-
-  const btn      = el.querySelector(".chat-toggle");
-  const chatBody = el.querySelector(`#cbody-hof-${i}`);
-  const pill     = el.querySelector(`#cpill-hof-${i}`);
-  const state    = { loaded: false };
-
-  // Only fetch message count if there's an auction_id to query
-  if (row.auction_id) {
-    fetch(`${SUPABASE_URL}/rest/v1/collector_messages?auction_id=ilike.${encodeURIComponent(row.auction_id)}&select=id`,
-      { headers: { ...SB, "Prefer": "count=exact", "Range": "0-0" } }
-    ).then(r => {
-      const count = r.headers.get("Content-Range")?.split("/")?.[1];
-      pill.textContent = count && count !== "0" ? count + " messages" : "view";
-    }).catch(() => { pill.textContent = "view"; });
-  } else {
-    pill.textContent = "archived";
-  }
-
-  btn.addEventListener("click", () => toggleChat(btn, chatBody, row.auction_id, state));
-}
-
-async function loadResults() {
-  try {
-    const res  = await fetch(`${SUPABASE_URL}/rest/v1/auction_results?order=settled_at.desc&limit=100`, { headers: SB });
-    const rows = await res.json();
-
-    document.getElementById("loading-state").style.display = "none";
-    if (!Array.isArray(rows) || rows.length === 0) {
-      document.getElementById("empty-state").style.display = "block";
+    // Verify the password by attempting a POST with no-op data
+    const res = await apiFetch("GET");
+    if (res.status === 401) {
+      toast("err", "Wrong password", "Admin password is incorrect");
       return;
     }
+    adminPassword = pw;
+    document.getElementById("auth-gate").style.display = "none";
+    document.getElementById("main-content").style.display = "block";
+    populateForm(res.config);
+    updatePreviewBar();
+    loadAuctioneerProfile();
+    toast("ok", "Unlocked", "Configuration loaded from server");
+  } catch (err) {
+    toast("err", "Connection error", err.message);
+  } finally {
+    setLoading(false);
+  }
+}
 
-    _allRows = rows;
+// ─── API helpers ──────────────────────────────────────────────────────────────
 
-    // ── Stats ──
-    const ethRows = rows.filter(r => !r.chain || r.chain === "eth");
-    const xtzRows = rows.filter(r => r.chain === "tezos");
-    const totalEth = ethRows.reduce((s, r) => s + (parseFloat(r.winning_bid) || 0), 0);
-    const totalXtz = xtzRows.reduce((s, r) => s + (parseFloat(r.winning_bid) || 0), 0);
-    const topRow   = rows.reduce((best, r) => (!best || (parseFloat(r.winning_bid)||0) > (parseFloat(best.winning_bid)||0)) ? r : best, null);
-    const uniqueWallets = new Set(rows.map(r => r.winner).filter(Boolean));
+async function apiFetch(method, body) {
+  const opts = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Password": adminPassword,
+    },
+  };
+  if (body) opts.body = JSON.stringify(body);
 
-    document.getElementById("stat-auctions").textContent   = rows.length;
-    document.getElementById("stat-collectors").textContent = uniqueWallets.size;
+  const res = await fetch(API_URL, opts);
+  const json = await res.json();
+  if (!json.ok && res.status !== 401) throw new Error(json.error || "Unknown error");
+  json.status = res.status;
+  return json;
+}
 
-    const volEl    = document.getElementById("stat-volume");
-    const volSubEl = document.getElementById("stat-volume-sub");
-    if (ethRows.length > 0 && xtzRows.length > 0) {
-      volEl.textContent    = totalEth.toFixed(3) + " ETH";
-      volSubEl.textContent = "+ " + totalXtz.toFixed(2) + " XTZ";
-    } else if (xtzRows.length > 0) {
-      volEl.textContent = totalXtz.toFixed(2) + " XTZ";
+// ─── Populate form from config object ────────────────────────────────────────
+
+// ─── Multi-auction piece editor ──────────────────────────────────────────────
+
+let _pieces = []; // array of piece objects
+let _activePieceIdx = 0;
+// Expose for console debugging
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "_pieces", { get: () => _pieces });
+  Object.defineProperty(window, "_activePieceIdx", { get: () => _activePieceIdx });
+}
+
+function _pieceFieldId(idx, field) { return `piece-${idx}-${field}`; }
+
+function _buildPieceForm(idx) {
+  const d = _pieces[idx] || {};
+  const pieceStatus = d.status || "";  // empty = inherit from global cfg.status
+  return `
+    <div class="field">
+      <label>Status for this piece</label>
+      <div class="piece-status-row" id="${_pieceFieldId(idx,'statusRow')}">
+        <button type="button" class="piece-status-btn ${pieceStatus===''      ? 'active-inherit'  : ''}" onclick="setPieceStatus(${idx},'')">Inherit global</button>
+        <button type="button" class="piece-status-btn ${pieceStatus==='off'   ? 'active-off'      : ''}" onclick="setPieceStatus(${idx},'off')">Off</button>
+        <button type="button" class="piece-status-btn ${pieceStatus==='upcoming' ? 'active-upcoming' : ''}" onclick="setPieceStatus(${idx},'upcoming')">Upcoming</button>
+        <button type="button" class="piece-status-btn ${pieceStatus==='live'  ? 'active-live'     : ''}" onclick="setPieceStatus(${idx},'live')">Live</button>
+      </div>
+      <input type="hidden" id="${_pieceFieldId(idx,'status')}" value="${pieceStatus}"/>
+      <div id="${_pieceFieldId(idx,'effectiveHint')}" class="field-hint" style="margin-top:6px"></div>
+    </div>
+    <div class="field">
+      <label>Contract address</label>
+      <input id="${_pieceFieldId(idx,'contractAddr')}" placeholder="0x…" value="${d.contractAddr||''}"
+        oninput="(function(el){el.style.borderColor=el.value&&!ethers.isAddress(el.value.trim())?'var(--accent)':''})(this)"/>
+      <div class="field-hint">Your deployed FlexAuction contract address for this piece</div>
+    </div>
+    <div class="field">
+      <label>Title</label>
+      <input id="${_pieceFieldId(idx,'artTitle')}" placeholder="e.g. ìgbáradì" value="${d.artTitle||''}"/>
+    </div>
+    <div class="field">
+      <label>Artist name</label>
+      <input id="${_pieceFieldId(idx,'artArtist')}" placeholder="e.g. Kayode Oyeniyi" value="${d.artArtist||''}"/>
+    </div>
+    <div class="field">
+      <label>About the artwork</label>
+      <div class="rte-wrap" data-rte-id="${_pieceFieldId(idx,'artAbout')}">
+        <div class="rte-toolbar" role="toolbar" aria-label="Text formatting">
+          <button type="button" class="rte-btn" data-cmd="bold"      title="Bold (Ctrl+B)"      onmousedown="event.preventDefault()" onclick="rteCmd(this,'bold')"><b>B</b></button>
+          <button type="button" class="rte-btn" data-cmd="italic"    title="Italic (Ctrl+I)"    onmousedown="event.preventDefault()" onclick="rteCmd(this,'italic')"><span class="rte-i">I</span></button>
+          <button type="button" class="rte-btn" data-cmd="underline" title="Underline (Ctrl+U)" onmousedown="event.preventDefault()" onclick="rteCmd(this,'underline')"><span class="rte-u">U</span></button>
+        </div>
+        <div id="${_pieceFieldId(idx,'artAbout')}"
+             class="rte-content"
+             contenteditable="true"
+             data-placeholder="Describe the artwork…"
+             oninput="rteSync(this)"
+             onkeyup="rteUpdateButtons(this)"
+             onmouseup="rteUpdateButtons(this)"
+             onfocus="rteUpdateButtons(this)"
+             onpaste="rtePaste(event)"></div>
+      </div>
+      <div class="field-hint">Select text and use <b>B</b>, <i>I</i>, <u>U</u> to format. Keyboard: Ctrl/⌘ + B / I / U.</div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Year</label>
+        <input id="${_pieceFieldId(idx,'artYear')}" placeholder="2025" value="${d.artYear||''}"/></div>
+      <div class="field"><label>Medium</label>
+        <input id="${_pieceFieldId(idx,'artMedium')}" placeholder="Digital painting" value="${d.artMedium||''}"/></div>
+    </div>
+    <div class="field">
+      <label>Image URL</label>
+      <input id="${_pieceFieldId(idx,'artImage')}" placeholder="https://… or ipfs://…" value="${d.artImage||''}"/>
+      <div class="field-hint">Leave blank to auto-fetch from the NFT contract</div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Gate token name</label>
+        <input id="${_pieceFieldId(idx,'gateName')}" placeholder="e.g. Entry Token" value="${d.gateName||''}"/></div>
+      <div class="field"><label>Gate link</label>
+        <input id="${_pieceFieldId(idx,'gateLink')}" placeholder="https://…" value="${d.gateLink||''}"/></div>
+    </div>
+    <div class="field">
+      <label>Launch date for this piece</label>
+      <input type="datetime-local" id="${_pieceFieldId(idx,'launchDate')}" value="${d.launchDate||''}"/>
+      <div class="field-hint">Optional — if set, the upcoming-view countdown for this piece uses this date. Leave blank to fall back to the global launch date below.</div>
+    </div>
+    <div class="field">
+      <label>Collector room chat</label>
+      <div class="chat-lock-row">
+        <button type="button"
+          class="chat-lock-toggle ${d.chatLocked ? 'on' : ''}"
+          id="${_pieceFieldId(idx,'chatLockToggle')}"
+          onclick="toggleChatLock(${idx})"></button>
+        <span class="chat-lock-label ${d.chatLocked ? 'on' : ''}" id="${_pieceFieldId(idx,'chatLockLabel')}">
+          ${d.chatLocked ? '🔒 Chat locked' : 'Chat open'}
+        </span>
+        <input type="hidden" id="${_pieceFieldId(idx,'chatLocked')}" value="${d.chatLocked ? 'true' : 'false'}"/>
+      </div>
+      <div class="chat-lock-msg-wrap ${d.chatLocked ? 'show' : ''}" id="${_pieceFieldId(idx,'chatLockMsgWrap')}">
+        <input id="${_pieceFieldId(idx,'chatLockMsg')}"
+          placeholder="e.g. The room is now closed. Thank you all for being here."
+          value="${d.chatLockMsg||''}"
+          style="margin-top:0"/>
+      </div>
+      <div class="field-hint">Lock to close the room. The message above will be shown to collectors instead of the input.</div>
+    </div>`;
+}
+
+function _effectivePieceStatus(piece) {
+  // Returns the status the piece will actually use: its own if set, else global, else 'off'
+  if (piece && piece.status) return piece.status;
+  // Global status (read live from the DOM toggle, since the user may have changed it without saving)
+  const globalBtn = document.querySelector('.status-btn.active-live, .status-btn.active-upcoming, .status-btn.active-off');
+  if (globalBtn) {
+    if (globalBtn.id === 'btn-live')     return 'live';
+    if (globalBtn.id === 'btn-upcoming') return 'upcoming';
+  }
+  return 'off';
+}
+
+function _normalisePieceStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  return ["live","upcoming","off"].includes(value) ? value : "";
+}
+
+function toggleChatLock(idx) {
+  const next    = !(_pieces[idx].chatLocked || false);
+  _pieces[idx].chatLocked = next;
+  const toggle  = document.getElementById(_pieceFieldId(idx, 'chatLockToggle'));
+  const label   = document.getElementById(_pieceFieldId(idx, 'chatLockLabel'));
+  const hidden  = document.getElementById(_pieceFieldId(idx, 'chatLocked'));
+  const msgWrap = document.getElementById(_pieceFieldId(idx, 'chatLockMsgWrap'));
+  if (toggle)  toggle.classList.toggle('on', next);
+  if (label)   { label.classList.toggle('on', next); label.textContent = next ? '🔒 Chat locked' : 'Chat open'; }
+  if (hidden)  hidden.value = next ? 'true' : 'false';
+  if (msgWrap) msgWrap.classList.toggle('show', next);
+}
+
+function _renderPieceTabs() {
+  const tabs  = document.getElementById("piece-tabs");
+  const forms = document.getElementById("piece-forms");
+  const hint  = document.getElementById("piece-drag-hint");
+  if (!tabs || !forms) return;
+
+  tabs.innerHTML = _pieces.map((p, i) => {
+    const eff = _effectivePieceStatus(p);
+    const dotTitle = p.status ? `Status: ${eff}` : `Status: ${eff} (inherited)`;
+    return `
+    <button class="piece-tab-btn ${i===_activePieceIdx?'active':''}" data-idx="${i}" draggable="true" onclick="selectPiece(${i})">
+      <span class="piece-tab-status-dot ${eff}" title="${dotTitle}"></span>${p.artTitle || 'Piece '+(i+1)}
+      ${_pieces.length > 1 ? `<button class="piece-remove-btn" onclick="event.stopPropagation();removePiece(${i})">✕</button>` : ''}
+    </button>`;
+  }).join("");
+
+  // Show drag hint only when there are multiple pieces
+  if (hint) hint.classList.toggle("show", _pieces.length > 1);
+
+  // Wire up drag-to-reorder
+  if (_pieces.length > 1) _initTabDrag(tabs);
+
+  forms.innerHTML = _buildPieceForm(_activePieceIdx);
+
+  // Populate the rich-text editor's content via DOM API, NOT via the form
+  // template. Embedding sanitized HTML inside a larger innerHTML string can
+  // confuse the HTML parser on edge cases (block elements inside block
+  // elements, etc.), and we've seen that drop chunks of pasted content.
+  const editor = document.getElementById(_pieceFieldId(_activePieceIdx, 'artAbout'));
+  const piece  = _pieces[_activePieceIdx] || {};
+  if (editor) {
+    editor.innerHTML = _rteSanitize(piece.artAbout || "");
+  }
+
+  const badge = document.getElementById("piece-count-badge");
+  if (badge) badge.textContent = _pieces.length + " piece" + (_pieces.length===1?"":"s");
+  _showPreviewCard();
+  // Populate the effective-status hint for the newly rendered form
+  if (typeof _updateEffectiveHint === "function") _updateEffectiveHint(_activePieceIdx);
+}
+
+// ─── Drag-to-reorder piece tabs ───────────────────────────────────────────────
+
+let _dragSrcIdx = null;
+
+function _initTabDrag(container) {
+  const btns = container.querySelectorAll(".piece-tab-btn[draggable]");
+
+  btns.forEach(btn => {
+    btn.addEventListener("dragstart", e => {
+      _dragSrcIdx = parseInt(btn.dataset.idx, 10);
+      btn.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", _dragSrcIdx);
+    });
+
+    btn.addEventListener("dragend", () => {
+      btn.classList.remove("dragging");
+      container.querySelectorAll(".piece-tab-btn").forEach(b => b.classList.remove("drag-over"));
+    });
+
+    btn.addEventListener("dragover", e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      container.querySelectorAll(".piece-tab-btn").forEach(b => b.classList.remove("drag-over"));
+      const targetIdx = parseInt(btn.dataset.idx, 10);
+      if (targetIdx !== _dragSrcIdx) btn.classList.add("drag-over");
+    });
+
+    btn.addEventListener("dragleave", () => {
+      btn.classList.remove("drag-over");
+    });
+
+    btn.addEventListener("drop", e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const targetIdx = parseInt(btn.dataset.idx, 10);
+      if (_dragSrcIdx === null || _dragSrcIdx === targetIdx) return;
+
+      // Save current form before reordering
+      _savePieceFormValues(_activePieceIdx);
+
+      // Reorder _pieces array
+      const moved = _pieces.splice(_dragSrcIdx, 1)[0];
+      _pieces.splice(targetIdx, 0, moved);
+
+      // Keep the active piece selected after reorder
+      if (_activePieceIdx === _dragSrcIdx) {
+        _activePieceIdx = targetIdx;
+      } else if (_dragSrcIdx < _activePieceIdx && targetIdx >= _activePieceIdx) {
+        _activePieceIdx--;
+      } else if (_dragSrcIdx > _activePieceIdx && targetIdx <= _activePieceIdx) {
+        _activePieceIdx++;
+      }
+
+      _dragSrcIdx = null;
+      _renderPieceTabs();
+      toast("ok", "Reordered", "Save to publish the new order");
+    });
+  });
+}
+
+function selectPiece(idx) {
+  // Save current form values before switching
+  _savePieceFormValues(_activePieceIdx);
+  _activePieceIdx = idx;
+  _renderPieceTabs();
+}
+
+// ─── Rich-text editor helpers ────────────────────────────────────────────────
+// Sanitize HTML for the About-the-artwork field. Whitelist b/strong, i/em, u, br, p, div.
+// Strips all attributes, scripts, links, and unknown tags.
+// Block-level elements (h1-h6, li, blockquote, etc.) are converted to <p> so
+// pasted content from Word/Google Docs/web pages keeps its line structure.
+function _rteSanitize(html) {
+  if (html == null) return "";
+  const str = String(html);
+  if (!/<[a-z!\/]/i.test(str)) {
+    const tmp = document.createElement("div");
+    tmp.textContent = str;
+    return tmp.innerHTML;
+  }
+  // Tags we keep as-is
+  const ALLOWED = new Set(["B","STRONG","I","EM","U","BR","P","DIV"]);
+  // Block-level tags we convert to <p> so each becomes its own line
+  const BLOCK_TO_P = new Set(["H1","H2","H3","H4","H5","H6","LI","BLOCKQUOTE","ARTICLE","SECTION","HEADER","FOOTER","ASIDE"]);
+  // Wrappers we strip but recurse into to keep their children
+  // (UL, OL, SPAN, FONT, A, etc. fall through to the unwrap path below)
+  // Tags whose entire subtree should be DROPPED (not unwrapped)
+  const DROP_SUBTREE = new Set(["SCRIPT","STYLE","IFRAME","OBJECT","EMBED","NOSCRIPT","HEAD","META","LINK","TITLE"]);
+
+  // Use a real <body> via DOMParser-equivalent; <template> can swallow things
+  // like <li> that are not valid as direct children of a fragment.
+  const root = document.createElement("div");
+  root.innerHTML = str;
+
+  // Recursive sanitize-in-place. Returns the next node to process.
+  function sanitize(node) {
+    if (node.nodeType === 8) { // comment
+      const next = node.nextSibling;
+      node.remove();
+      return next;
+    }
+    if (node.nodeType !== 1) return node.nextSibling;
+
+    const tag = node.tagName;
+
+    if (DROP_SUBTREE.has(tag)) {
+      const next = node.nextSibling;
+      node.remove();
+      return next;
+    }
+
+    // Sanitize all children first (depth-first)
+    let child = node.firstChild;
+    while (child) child = sanitize(child);
+
+    if (ALLOWED.has(tag)) {
+      // Strip every attribute
+      while (node.attributes.length) node.removeAttribute(node.attributes[0].name);
+      return node.nextSibling;
+    }
+
+    if (BLOCK_TO_P.has(tag)) {
+      const p = document.createElement("p");
+      while (node.firstChild) p.appendChild(node.firstChild);
+      node.replaceWith(p);
+      return p.nextSibling;
+    }
+
+    // Default: unwrap (move children up, drop the tag itself)
+    const parent = node.parentNode;
+    const next = node.nextSibling;
+    while (node.firstChild) parent.insertBefore(node.firstChild, node);
+    node.remove();
+    return next;
+  }
+
+  let n = root.firstChild;
+  while (n) n = sanitize(n);
+
+  return root.innerHTML;
+}
+
+// Apply a formatting command (bold/italic/underline) to the current selection
+function rteCmd(btn, cmd) {
+  const wrap = btn.closest(".rte-wrap");
+  if (!wrap) return;
+  const content = wrap.querySelector(".rte-content");
+  if (!content) return;
+  content.focus();
+  document.execCommand(cmd, false, null);
+  rteUpdateButtons(content);
+  rteSync(content);
+}
+
+// Sync the current piece's artAbout value as the user types
+function rteSync(content) {
+  if (typeof _activePieceIdx !== "number") return;
+  if (_activePieceIdx < 0 || _activePieceIdx >= _pieces.length) return;
+  _pieces[_activePieceIdx].artAbout = _rteSanitize(content.innerHTML || "").trim();
+}
+
+// Reflect active formatting state on the toolbar buttons
+function rteUpdateButtons(content) {
+  const wrap = content.closest(".rte-wrap");
+  if (!wrap) return;
+  const cmds = ["bold","italic","underline"];
+  cmds.forEach(cmd => {
+    const btn = wrap.querySelector(`.rte-btn[data-cmd="${cmd}"]`);
+    if (!btn) return;
+    let active = false;
+    try { active = document.queryCommandState(cmd); } catch(_) {}
+    btn.classList.toggle("active", active);
+  });
+}
+
+// Paste handler — strip formatting from clipboard but preserve line breaks.
+// We deliberately use text/plain (not text/html) so we don't pull in arbitrary
+// styles, but we convert newlines into proper <br> elements so multi-paragraph
+// pastes don't collapse into one line.
+function rtePaste(e) {
+  e.preventDefault();
+  const cd = e.clipboardData || window.clipboardData;
+  if (!cd) return;
+  // Prefer plain text — it's the cleanest. If it's empty (rare; some apps
+  // only put HTML on the clipboard) fall back to extracting text from the HTML.
+  let text = cd.getData("text/plain") || "";
+  if (!text) {
+    const html = cd.getData("text/html") || "";
+    if (html) {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      text = tmp.textContent || tmp.innerText || "";
+    }
+  }
+  if (!text) return;
+
+  // Insert as a real DOM fragment so multi-line content keeps its breaks.
+  // execCommand("insertText") swallows newlines on some browsers; building
+  // the fragment ourselves avoids that.
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+
+  const lines = text.split(/\r\n|\r|\n/);
+  const frag = document.createDocumentFragment();
+  lines.forEach((line, i) => {
+    if (i > 0) frag.appendChild(document.createElement("br"));
+    if (line) frag.appendChild(document.createTextNode(line));
+  });
+  // Track the last node so we can place the caret after it
+  const lastChild = frag.lastChild;
+  range.insertNode(frag);
+  if (lastChild) {
+    const newRange = document.createRange();
+    newRange.setStartAfter(lastChild);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  }
+
+  // Notify rteSync explicitly because our manual DOM ops don't always trigger
+  // the `input` event on every browser.
+  const editor = e.target && e.target.closest ? e.target.closest(".rte-content") : null;
+  if (editor) {
+    rteSync(editor);
+    rteUpdateButtons(editor);
+  }
+}
+
+// Keyboard shortcuts (Ctrl/⌘ + B / I / U) — execCommand handles these natively in
+// contenteditable, but we still want to refresh button state after.
+document.addEventListener("keyup", (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = (e.key || "").toLowerCase();
+  if (k !== "b" && k !== "i" && k !== "u") return;
+  const target = e.target;
+  if (target && target.classList && target.classList.contains("rte-content")) {
+    rteUpdateButtons(target);
+    rteSync(target);
+  }
+});
+
+function _savePieceFormValues(idx) {
+  if (idx < 0 || idx >= _pieces.length) return;
+  const fields = ["contractAddr","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status","chatLocked","chatLockMsg"];
+  fields.forEach(f => {
+    const el = document.getElementById(_pieceFieldId(idx, f));
+    if (!el) return;
+    if (f === "artAbout") {
+      _pieces[idx][f] = _rteSanitize(el.innerHTML || "").trim();
+    } else if (f === "chatLocked") {
+      _pieces[idx][f] = el.value === "true";
     } else {
-      volEl.textContent = fmtEth(totalEth) + " ETH";
+      _pieces[idx][f] = (el.value || "").trim();
     }
+  });
+  _pieces[idx].status = _normalisePieceStatus(_pieces[idx].status);
+}
 
-    if (topRow) {
-      const isXtz = topRow.chain === "tezos";
-      const dec   = isXtz ? 2 : 4;
-      document.getElementById("stat-top").textContent = parseFloat(topRow.winning_bid||0).toFixed(dec) + (isXtz ? " XTZ" : " ETH");
-      const tagEl = document.getElementById("stat-top-chain");
-      tagEl.className   = "chain-tag " + (isXtz ? "tezos" : "eth");
-      tagEl.textContent = isXtz ? "ꜩ Tezos" : "⟠ ETH";
-      tagEl.style.display = "";
+function addPiece() {
+  _savePieceFormValues(_activePieceIdx);
+  _pieces.push({});
+  _activePieceIdx = _pieces.length - 1;
+  _renderPieceTabs();
+}
+
+function removePiece(idx) {
+  if (_pieces.length <= 1) return;
+  if (!confirm("Remove this piece from the auction?")) return;
+  _savePieceFormValues(idx);
+  _pieces.splice(idx, 1);
+  _activePieceIdx = Math.min(_activePieceIdx, _pieces.length - 1);
+  _renderPieceTabs();
+}
+
+function _readAllPieces() {
+  _savePieceFormValues(_activePieceIdx);
+  _pieces.forEach(p => { p.status = _normalisePieceStatus(p.status); });
+  return _pieces;
+}
+
+function populateForm(cfg) {
+  if (!cfg) return;
+
+  // Multi-auction: auctions array
+  if (Array.isArray(cfg.auctions) && cfg.auctions.length > 0) {
+    _pieces = cfg.auctions.map(a => ({...a}));
+  } else if (cfg.contractAddr) {
+    // Legacy single-auction
+    _pieces = [{
+      contractAddr: cfg.contractAddr || "",
+      artTitle:     cfg.artTitle     || "",
+      artArtist:    cfg.artArtist    || "",
+      artAbout:     cfg.artAbout     || "",
+      artYear:      cfg.artYear      || "",
+      artMedium:    cfg.artMedium    || "",
+      artImage:     cfg.artImage     || "",
+      gateName:     cfg.gateName     || "",
+      gateLink:     cfg.gateLink     || "",
+    }];
+  } else {
+    _pieces = [{}];
+  }
+  _activePieceIdx = 0;
+  _renderPieceTabs();
+
+  if (document.getElementById("rpc-url"))    document.getElementById("rpc-url").value    = cfg.rpcUrl    || "";
+  if (document.getElementById("launch-date")) document.getElementById("launch-date").value = cfg.launchDate || "";
+  if (document.getElementById("landing-countdown-date")) document.getElementById("landing-countdown-date").value = cfg.landingCountdown || "";
+  setStatus(cfg.status || "off", false);
+  _populateHofSelect();
+  _showPreviewCard();
+}
+
+function _populateHofSelect() {
+  const sel        = document.getElementById("hof-piece-select");
+  const field      = document.getElementById("hof-piece-field");
+  const soldSel    = document.getElementById("sold-override-piece");
+  const opts       = _pieces.map((p, i) => `<option value="${i}">${p.artTitle || "Piece " + (i+1)}</option>`).join("");
+  if (sel)     sel.innerHTML    = opts;
+  if (soldSel) soldSel.innerHTML = opts;
+  if (field)   field.style.display = _pieces.length > 1 ? "block" : "none";
+}
+
+// ─── Status toggle ────────────────────────────────────────────────────────────
+
+function setStatus(s, updateUI = true) {
+  const ids = ["off","upcoming","live"];
+  const classes = { off: "active-off", upcoming: "active-upcoming", live: "active-live" };
+  const labels  = { off: "Off", upcoming: "Upcoming", live: "Live" };
+  const badges  = { off: "badge-off", upcoming: "badge-upcoming", live: "badge-live" };
+
+  ids.forEach(id => {
+    const btn = document.getElementById("btn-" + id);
+    btn.className = "status-btn" + (id === s ? " " + classes[id] : "");
+  });
+
+  const badge = document.getElementById("status-badge");
+  badge.textContent = labels[s];
+  badge.className = "card-badge " + badges[s];
+
+  const udf = document.getElementById("upcoming-date-field");
+  if (udf) udf.style.display = s === "upcoming" ? "block" : "none";
+
+  const lcf = document.getElementById("landing-countdown-field");
+  if (lcf) lcf.style.display = s === "off" ? "block" : "none";
+
+  // Show the 'Preview as' toggle only when status is 'upcoming' (only case where it matters)
+  const wrap = document.getElementById("preview-as-wrap");
+  if (wrap) {
+    wrap.style.display = s === "upcoming" ? "flex" : "none";
+    // Reset to the default ('upcoming') whenever the toggle becomes relevant
+    if (s === "upcoming" && typeof setPreviewAs === "function") setPreviewAs("upcoming");
+  }
+
+  // The global status change affects the dots on tabs of pieces that are set to "Inherit global"
+  if (typeof _renderPieceTabs === "function" && _pieces && _pieces.length) {
+    // Re-render only the tabs (not the form) to refresh the inherited-status dots
+    _renderTabsOnly();
+  }
+  // Update the effective-status hint in the active piece form
+  if (typeof _updateAllEffectiveHints === "function") _updateAllEffectiveHints();
+}
+
+// Re-render just the tab strip without rebuilding the form (avoids losing in-progress edits)
+function _renderTabsOnly() {
+  const tabs = document.getElementById("piece-tabs");
+  if (!tabs) return;
+  tabs.innerHTML = _pieces.map((p, i) => {
+    const eff = _effectivePieceStatus(p);
+    const dotTitle = p.status ? `Status: ${eff}` : `Status: ${eff} (inherited)`;
+    return `
+    <button class="piece-tab-btn ${i===_activePieceIdx?'active':''}" onclick="selectPiece(${i})">
+      <span class="piece-tab-status-dot ${eff}" title="${dotTitle}"></span>${p.artTitle || 'Piece '+(i+1)}
+      ${_pieces.length > 1 ? `<button class="piece-remove-btn" onclick="event.stopPropagation();removePiece(${i})">✕</button>` : ''}
+    </button>`;
+  }).join("");
+}
+
+// Per-piece status setter — called from the buttons inside each piece form
+function setPieceStatus(idx, s) {
+  if (!_pieces[idx]) return;
+  s = _normalisePieceStatus(s);
+  // Save in piece data (empty string = inherit from global)
+  _pieces[idx].status = s;
+  // Sync the hidden input so _savePieceFormValues picks it up
+  const hidden = document.getElementById(_pieceFieldId(idx, 'status'));
+  if (hidden) hidden.value = s;
+  // Update the visible button states inside the form
+  const row = document.getElementById(_pieceFieldId(idx, 'statusRow'));
+  if (row) {
+    row.querySelectorAll('.piece-status-btn').forEach(b => {
+      b.className = 'piece-status-btn';
+    });
+    const map = { '': 'active-inherit', 'off': 'active-off', 'upcoming': 'active-upcoming', 'live': 'active-live' };
+    const btns = row.querySelectorAll('.piece-status-btn');
+    // Order: Inherit, Off, Upcoming, Live (matches _buildPieceForm)
+    const order = ['', 'off', 'upcoming', 'live'];
+    const targetIdx = order.indexOf(s);
+    if (targetIdx >= 0 && btns[targetIdx]) btns[targetIdx].classList.add(map[s]);
+  }
+  // Refresh the tab strip so the status dot updates
+  _renderTabsOnly();
+  // Update the effective-status hint in the currently visible form
+  _updateEffectiveHint(_activePieceIdx);
+}
+
+// ── Effective-status hint ─────────────────────────────────────────────────────
+// Shows the collector-facing result for the active piece inline in the form,
+// so the admin always knows what a piece will actually display.
+
+function _getGlobalStatus() {
+  if (document.getElementById("btn-live")?.className.includes("active"))     return "live";
+  if (document.getElementById("btn-upcoming")?.className.includes("active")) return "upcoming";
+  return "off";
+}
+
+function _updateEffectiveHint(idx) {
+  const hintEl = document.getElementById(_pieceFieldId(idx, 'effectiveHint'));
+  if (!hintEl) return;
+  const piece  = _pieces[idx] || {};
+  const global = _getGlobalStatus();
+  const eff    = piece.status || global;  // mirrors auction.html's _effectiveStatus logic
+
+  const labels = { live: "Live — bidding enabled", upcoming: "Upcoming — countdown only", off: "Off — hidden from collectors" };
+  const colors = { live: "var(--moss)", upcoming: "var(--gold)", off: "var(--text-muted)" };
+
+  const isInherited = !piece.status;
+  const suffix = isInherited ? ` <em>(inherited from global)</em>` : "";
+  const extraNote = (!piece.status && global === "live")
+    ? " · Set to <b>Upcoming</b> to show this piece's countdown while others are live."
+    : "";
+
+  hintEl.innerHTML = `<span style="color:${colors[eff]}">● ${labels[eff] || eff}</span>${suffix}${extraNote}`;
+}
+
+// Called by setStatus so the hint updates when the global toggle changes
+function _updateAllEffectiveHints() {
+  _updateEffectiveHint(_activePieceIdx);
+}
+
+// ─── Contract validation ─────────────────────────────────────────────────────
+// Validation is now handled inline in each piece form (see _buildPieceForm)
+function onContractInput() {}
+
+// ─── Save ─────────────────────────────────────────────────────────────────────
+
+async function saveConfig() {
+  const pieces = _readAllPieces();
+
+  // Validate all contract addresses
+  for (let i = 0; i < pieces.length; i++) {
+    const addr = pieces[i].contractAddr;
+    if (addr && !ethers.isAddress(addr)) {
+      toast("err", "Invalid address", `Piece ${i+1}: "${addr}" is not a valid Ethereum address`);
+      selectPiece(i); return;
     }
+  }
 
-    document.getElementById("stats-bar").classList.add("show");
+  const status = ["live","upcoming","off"].find(s =>
+    document.getElementById("btn-" + s).className.includes("active")
+  ) || "off";
 
-    if (ethRows.length > 0 && xtzRows.length > 0) {
-      document.getElementById("chain-filter-bar").style.display = "";
-    }
+  // Keep legacy single-auction fields populated for backward compat
+  const primary = pieces[0] || {};
+  const cfg = {
+    status,
+    // Legacy fields (first piece) so old API readers still work
+    contractAddr: primary.contractAddr || "",
+    artTitle:     primary.artTitle     || "",
+    artArtist:    primary.artArtist    || "",
+    artAbout:     primary.artAbout     || "",
+    artYear:      primary.artYear      || "",
+    artMedium:    primary.artMedium    || "",
+    artImage:     primary.artImage     || "",
+    gateName:     primary.gateName     || "",
+    gateLink:     primary.gateLink     || "",
+    // Multi-auction array
+    auctions:     pieces,
+    rpcUrl:       document.getElementById("rpc-url").value.trim(),
+    launchDate:   document.getElementById("launch-date")?.value || "",
+    landingCountdown: document.getElementById("landing-countdown-date")?.value || "",
+  };
 
-    _renderFiltered();
-
-  } catch(e) {
-    console.error("Hall of fame error:", e);
-    document.getElementById("loading-state").style.display = "none";
-    document.getElementById("empty-state").style.display   = "block";
+  setLoading(true);
+  setBusy(true);
+  try {
+    await apiFetch("POST", cfg);
+    updatePreviewBar();
+    toast("ok", "Saved", `${pieces.length} piece${pieces.length===1?"":"s"} published — changes are live`);
+  } catch (err) {
+    toast("err", "Save failed", err.message);
+  } finally {
+    setLoading(false);
+    setBusy(false);
   }
 }
 
-// ── Lightbox ──
-function _openLightbox(src, caption) {
-  document.getElementById("lightbox-img").src     = src;
-  document.getElementById("lightbox-caption").textContent = caption || "";
-  document.getElementById("lightbox").classList.add("open");
-  document.body.style.overflow = "hidden";
+// ─── Clear ────────────────────────────────────────────────────────────────────
+
+// ─── Live rate helper — fetches spot price from Coinbase at time of save ────────
+
+async function _fetchUsdAtSave(chain) {
+  const pair = chain === "tezos" ? "XTZ-USD" : "ETH-USD";
+  try {
+    const res  = await fetch(`https://api.coinbase.com/v2/prices/${pair}/spot`);
+    const data = await res.json();
+    const rate = parseFloat(data?.data?.amount);
+    return rate > 0 ? rate : null;
+  } catch(_) { return null; }
 }
-function _closeLightbox() {
-  document.getElementById("lightbox").classList.remove("open");
-  document.getElementById("lightbox-img").src = "";
-  document.body.style.overflow = "";
-}
-document.addEventListener("keydown", e => {
-  if (e.key === "Escape") {
-    _closeLightbox();
-    // also close nav drawer if open
-    const drawer = document.getElementById("nav-drawer");
-    if (drawer?.classList.contains("open")) _toggleMenu();
+
+// ─── Hall of Fame — manual save ──────────────────────────────────────────────
+
+const SUPABASE_URL  = "https://haijshusgcbdexfueunr.supabase.co";
+const SUPABASE_ANON = "sb_publishable_nImf-_e3-CBB8tL_EQGBCw_m_VoHbVb";
+
+async function saveToHallOfFame() {
+  const btn      = document.getElementById("hof-btn");
+  const statusEl = document.getElementById("hof-status");
+  const cfg      = await (async () => {
+    try { const r = await apiFetch("GET"); return r.config || {}; } catch(e) { return {}; }
+  })();
+
+  // Determine which piece to save
+  const hofPieceIdx  = parseInt(document.getElementById("hof-piece-select")?.value || "0") || 0;
+  const hofPiece     = (Array.isArray(cfg.auctions) ? cfg.auctions[hofPieceIdx] : null) || {};
+  const contractAddr = hofPiece.contractAddr || cfg.contractAddr || "";
+  const rpcUrl       = cfg.rpcUrl || document.getElementById("rpc-url")?.value?.trim() || "";
+
+  if (!contractAddr) {
+    statusEl.className = "hof-status err";
+    statusEl.textContent = "No contract address found — fill in the auction configuration first.";
+    return;
   }
-});
-
-// ── Avatar fallback helpers — avoids broken inline HTML injection ──
-function _avatarFallback(img) {
-  const init  = img.dataset.init  || "??";
-  const color = img.dataset.color || "var(--clay)";
-  const div   = document.createElement("div");
-  div.className = "chat-avatar";
-  div.style.cssText = `background:${color}22;color:${color}`;
-  div.textContent = init;
-  img.replaceWith(div);
-}
-function _winnerAvatFallback(img) {
-  const dot = document.createElement("span");
-  dot.className = "winner-dot";
-  img.replaceWith(dot);
-}
-
-loadResults();
-
-// ── Hamburger menu ──
-function _toggleMenu() {
-  const btn    = document.getElementById("nav-hamburger");
-  const drawer = document.getElementById("nav-drawer");
-  const open   = drawer.classList.toggle("open");
-  btn.classList.toggle("open", open);
-  document.body.style.overflow = open ? "hidden" : "";
-}
-
-// Close on escape key
-document.addEventListener("keydown", e => {
-  if (e.key === "Escape") {
-    const drawer = document.getElementById("nav-drawer");
-    if (drawer.classList.contains("open")) _toggleMenu();
-  }
-});
-</script>
-<!-- Lightbox -->
-<div class="lightbox" id="lightbox" onclick="_closeLightbox()">
-  <button class="lightbox-close" onclick="_closeLightbox()">Close ✕</button>
-  <img class="lightbox-img" id="lightbox-img" src="" alt="">
-  <div class="lightbox-caption" id="lightbox-caption"></div>
-</div>
-
-<!-- Custom cursor -->
-<div class="cursor" id="cursor" style="opacity:0;transition:opacity 0.3s;">
-  <div class="cursor-ring" id="cursorRing"></div>
-  <div class="cursor-dot"  id="cursorDot"></div>
-</div>
-
-<script>
-(function() {
-  const cursorEl = document.getElementById('cursor');
-  const ring     = document.getElementById('cursorRing');
-  const dot      = document.getElementById('cursorDot');
-  if (!cursorEl) return;
-
-  const isTouch = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-  if (isTouch()) {
-    cursorEl.style.display = 'none';
-    const s = document.createElement('style');
-    s.textContent = 'html, body, * { cursor: auto !important; }';
-    document.head.appendChild(s);
+  if (!rpcUrl) {
+    statusEl.className = "hof-status err";
+    statusEl.textContent = "No RPC URL found — add one in the Network section so we can read the contract.";
     return;
   }
 
-  let mx = 0, my = 0, rx = 0, ry = 0;
+  btn.disabled = true;
+  statusEl.className = "hof-status";
+  statusEl.textContent = "Reading final state from contract…";
 
-  document.addEventListener('mousemove', e => {
-    mx = e.clientX; my = e.clientY;
-    cursorEl.style.opacity = '1';
-  });
+  try {
+    // Read auctionState() via raw JSON-RPC — no ethers needed
+    const payload = {
+      jsonrpc:"2.0", id:1, method:"eth_call",
+      params:[{ to:contractAddr, data:"0x7fb45099" },"latest"]
+    };
+    const rpcRes = await fetch(rpcUrl, {
+      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)
+    });
+    const rpcData = await rpcRes.json();
 
-  function animCursor() {
-    rx += (mx - rx) * 0.12;
-    ry += (my - ry) * 0.12;
-    dot.style.left  = mx + 'px'; dot.style.top  = my + 'px';
-    ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
-    requestAnimationFrame(animCursor);
+    if (!rpcData.result || rpcData.result === "0x") {
+      throw new Error("Contract returned no data — is this the correct contract address?");
+    }
+
+    // Decode FlexAuction auctionState() — 12 x 32-byte words:
+    // [0] deposited, [1] live, [2] settled, [3] endTime, [4] timeRemaining,
+    // [5] highestBidder, [6] highestBid, [7] minNextBid, [8] mode, [9] isOpen,
+    // [10] buyNowPrice, [11] buyNowAvailable
+    const hex           = rpcData.result.slice(2);
+    const settled       = parseInt(hex.slice(2 * 64, 3 * 64), 16) === 1;
+    const highestBidder = "0x" + hex.slice(5 * 64 + 24, 5 * 64 + 64);  // word 5, last 20 bytes
+    const highestBidHex = hex.slice(6 * 64, 7 * 64);
+    // Use BigInt for the bid amount — parseInt loses precision above ~0.009 ETH
+    const highestBidWei = BigInt("0x" + highestBidHex);
+    const winningBid    = Number(highestBidWei) / 1e18;
+    const highestBid    = Number(highestBidWei);  // kept for backward compat below
+
+    if (!settled) {
+      throw new Error("Auction is not yet settled — the contract has not been settled on-chain.");
+    }
+    if (!highestBidder || highestBidder === "0x0000000000000000000000000000000000000000") {
+      throw new Error("No winner found — the auction may not have received any bids.");
+    }
+
+    statusEl.textContent = `Winner confirmed: ${highestBidder.slice(0,6)}…${highestBidder.slice(-4)} · ${winningBid.toFixed(4)} ETH. Fetching rate…`;
+
+    // Fetch live ETH/USD rate at moment of save
+    const ethUsdRate = await _fetchUsdAtSave("eth");
+    const winningBidUsd = ethUsdRate ? Math.round(winningBid * ethUsdRate) : null;
+    if (winningBidUsd) statusEl.textContent = `Winner confirmed: ${highestBidder.slice(0,6)}…${highestBidder.slice(-4)} · ${winningBid.toFixed(4)} ETH · ≈ $${winningBidUsd.toLocaleString()}. Saving…`;
+
+    // Count bids from Supabase
+    let bidCount = 0;
+    try {
+      const sbRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/collector_messages?auction_id=eq.${encodeURIComponent(contractAddr.toLowerCase())}&is_bid=eq.true&select=id`,
+        { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON, "Prefer":"count=exact", "Range":"0-0" } }
+      );
+      const cr = sbRes.headers.get("Content-Range");
+      bidCount = parseInt(cr?.split("/")?.[1] || "0") || 0;
+    } catch(_) {}
+
+    // Read optional winner overrides from admin fields
+    const winnerNameOverride   = document.getElementById("hof-winner-name")?.value.trim()   || "";
+    const winnerAvatarOverride = document.getElementById("hof-winner-avatar")?.value.trim() || "";
+
+    // Find the matching piece from the auctions array, or fall back to legacy cfg fields
+    const matchingPiece = (Array.isArray(cfg.auctions) ? cfg.auctions : [])
+      .find(p => p.contractAddr?.toLowerCase() === contractAddr.toLowerCase()) || {};
+
+    const record = {
+      auction_id:          contractAddr.toLowerCase(),
+      art_title:           matchingPiece.artTitle  || cfg.artTitle  || "",
+      art_artist:          matchingPiece.artArtist || cfg.artArtist || "",
+      art_image:           matchingPiece.artImage  || cfg.artImage  || "",
+      art_about:           matchingPiece.artAbout  || cfg.artAbout  || "",
+      art_year:            matchingPiece.artYear   || cfg.artYear   || "",
+      art_medium:          matchingPiece.artMedium || cfg.artMedium || "",
+      winner:              highestBidder.toLowerCase(),
+      winner_display_name: winnerNameOverride,
+      winner_avatar_url:   winnerAvatarOverride,
+      winning_bid:         winningBid,
+      winning_bid_usd:     winningBidUsd,
+      bid_count:           bidCount,
+      contract_addr:       contractAddr,
+      settled_at:          new Date().toISOString(),
+    };
+
+    // Check if record already exists — use PATCH to update, POST to insert
+    const existsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(record.auction_id)}&select=auction_id`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const existing = await existsRes.json();
+    const alreadyExists = Array.isArray(existing) && existing.length > 0;
+
+    const saveRes = await fetch(
+      alreadyExists
+        ? `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(record.auction_id)}`
+        : `${SUPABASE_URL}/rest/v1/auction_results`,
+      {
+        method: alreadyExists ? "PATCH" : "POST",
+        headers:{
+          apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
+          "Content-Type":"application/json",
+          "Prefer":"return=minimal"
+        },
+        body:JSON.stringify(record),
+      }
+    );
+
+    if (!saveRes.ok) {
+      const err = await saveRes.text();
+      throw new Error("Supabase save failed: " + err);
+    }
+
+    // If admin provided overrides, also upsert collector_profiles so it shows
+    // in the live chat and everywhere else too
+    if (winnerNameOverride || winnerAvatarOverride) {
+      await fetch(`${SUPABASE_URL}/rest/v1/collector_profiles`, {
+        method:"POST",
+        headers:{
+          apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
+          "Content-Type":"application/json",
+          "Prefer":"resolution=merge-duplicates,return=minimal"
+        },
+        body: JSON.stringify({
+          wallet:       highestBidder.toLowerCase(),
+          display_name: winnerNameOverride  || undefined,
+          avatar_url:   winnerAvatarOverride || undefined,
+          updated_at:   new Date().toISOString(),
+        }),
+      });
+    }
+
+    const winnerLabel = winnerNameOverride || `${highestBidder.slice(0,6)}…${highestBidder.slice(-4)}`;
+    statusEl.className   = "hof-status ok";
+    statusEl.textContent = `✓ Saved — ${cfg.artTitle||"Auction"} · ${winningBid.toFixed(4)} ETH${winningBidUsd ? " · ≈ $"+winningBidUsd.toLocaleString() : ""} · ${winnerLabel}`;
+    toast("ok", "Hall of Fame updated", "The auction result has been recorded.");
+
+  } catch(e) {
+    statusEl.className   = "hof-status err";
+    statusEl.textContent = "Error: " + (e.message || "Unknown error");
+    toast("err", "Save failed", e.message);
+  } finally {
+    btn.disabled = false;
   }
-  animCursor();
+}
 
-  document.querySelectorAll('a, button, input, .chat-toggle, .read-more-btn, .record-img-wrap').forEach(el => {
-    el.addEventListener('mouseenter', () => { ring.style.width = '56px'; ring.style.height = '56px'; });
-    el.addEventListener('mouseleave', () => { ring.style.width = '36px'; ring.style.height = '36px'; });
+// ─── Preview mode ────────────────────────────────────────────────────────────
+
+// Tracks which UI to render in preview ('upcoming' or 'live').
+// Only meaningful when status === 'upcoming' — for 'live' or 'off' status,
+// preview always shows the live UI (since 'upcoming' UI requires a launch date).
+let _previewAs = "upcoming";
+
+function setPreviewAs(mode) {
+  if (mode !== "upcoming" && mode !== "live") return;
+  _previewAs = mode;
+  const upBtn   = document.getElementById("preview-as-upcoming");
+  const liveBtn = document.getElementById("preview-as-live");
+  if (upBtn)   upBtn.classList.toggle("active", mode === "upcoming");
+  if (liveBtn) liveBtn.classList.toggle("active", mode === "live");
+}
+
+function _showPreviewCard() {
+  const card = document.getElementById("preview-launch-card");
+  const list = document.getElementById("preview-piece-list");
+  if (!card || !list) return;
+  card.style.display = "block";
+
+  // Show the preview-as toggle only when status is 'upcoming' (only case where it matters)
+  const wrap = document.getElementById("preview-as-wrap");
+  if (wrap) {
+    const isUpcoming = document.getElementById("btn-upcoming")?.className.includes("active");
+    wrap.style.display = isUpcoming ? "flex" : "none";
+    // Reset toggle to 'upcoming' default whenever it becomes relevant
+    if (isUpcoming) setPreviewAs("upcoming");
+  }
+
+  // Render one row per piece for individual piece preview
+  list.innerHTML = _pieces.length > 1
+    ? _pieces.map((p, i) => `
+        <div class="preview-piece-row">
+          <span class="preview-piece-name">${p.artTitle || "Piece " + (i+1)}</span>
+          <a class="btn-preview-piece" onclick="launchPreviewPiece(${i})">Preview →</a>
+        </div>`).join("")
+    : "";
+}
+
+function _buildPreviewPayload(forcePieceIdx) {
+  // Read current form values without saving to server
+  const pieces = _readAllPieces();
+  const primary = forcePieceIdx !== undefined ? pieces[forcePieceIdx] : pieces[0] || {};
+  // Determine which UI to preview:
+  //  - status 'upcoming' → use the admin's _previewAs choice (upcoming or live)
+  //  - status 'live'     → preview live UI
+  //  - status 'off'      → preview live UI (landing page isn't useful to preview)
+  const selectedStatus = ["live","upcoming","off"].find(s =>
+    document.getElementById("btn-" + s)?.className.includes("active")
+  ) || "live";
+  let previewStatus;
+  if (forcePieceIdx !== undefined) {
+    const pieceStatus = primary.status || selectedStatus;
+    previewStatus = pieceStatus === "off" ? "live" : pieceStatus;
+  } else if (selectedStatus === "upcoming") previewStatus = _previewAs;  // admin's choice
+  else if (selectedStatus === "live") previewStatus = "live";
+  else                                previewStatus = "live";     // 'off' → live UI
+  return {
+    status:      previewStatus,
+    _preview:    true,      // flag for auction.html to detect
+    _pieceIdx:   forcePieceIdx !== undefined ? forcePieceIdx : 0,
+    auctions:    pieces,
+    contractAddr: primary.contractAddr || "",
+    artTitle:    primary.artTitle  || "",
+    artArtist:   primary.artArtist || "",
+    artAbout:    primary.artAbout  || "",
+    artYear:     primary.artYear   || "",
+    artMedium:   primary.artMedium || "",
+    artImage:    primary.artImage  || "",
+    gateName:    primary.gateName  || "",
+    gateLink:    primary.gateLink  || "",
+    rpcUrl:      document.getElementById("rpc-url")?.value?.trim() || "",
+    launchDate:  document.getElementById("launch-date")?.value || "",
+    landingCountdown: document.getElementById("landing-countdown-date")?.value || "",
+  };
+}
+
+function launchPreview(forcePieceIdx) {
+  const payload = _buildPreviewPayload(forcePieceIdx);
+  try {
+    localStorage.setItem("kw_preview_cfg", JSON.stringify(payload));
+  } catch(e) {
+    toast("err", "Preview failed", "Could not write to localStorage: " + e.message);
+    return;
+  }
+  window.open("/auction?preview=1", "_blank");
+  toast("ok", "Preview launched", "Opening auction page in preview mode — only visible to you");
+}
+
+function launchPreviewPiece(idx) {
+  launchPreview(idx);
+}
+
+// ─── Auctioneer Profile ──────────────────────────────────────────────────────
+
+const KAY_WALLET = "0x72a04d812494cf3f6880483c6269291ce5751a83";
+
+async function loadAuctioneerProfile() {
+  try {
+    const res  = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(KAY_WALLET)}&limit=1`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const rows = await res.json();
+    const p    = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    const nameEl   = document.getElementById("auc-current-name");
+    const nameInp  = document.getElementById("auc-name");
+    const avatInp  = document.getElementById("auc-avatar");
+    if (p) {
+      if (nameEl)  nameEl.textContent  = p.display_name || "No name set";
+      if (nameInp) nameInp.value       = p.display_name || "";
+      if (avatInp) avatInp.value       = p.avatar_url   || "";
+      previewAucAvatar();
+    } else {
+      if (nameEl) nameEl.textContent = "No profile set yet";
+    }
+  } catch(e) { console.log("loadAuctioneerProfile:", e); }
+}
+
+function previewAucAvatar() {
+  const url     = document.getElementById("auc-avatar").value.trim();
+  const preview = document.getElementById("auc-avatar-preview");
+  if (!preview) return;
+  if (url) {
+    preview.src = url;
+    preview.style.display = "block";
+    preview.onerror = () => { preview.style.display = "none"; };
+  } else {
+    preview.style.display = "none";
+  }
+}
+
+async function saveAuctioneerProfile() {
+  const btn      = document.getElementById("auc-save-btn");
+  const statusEl = document.getElementById("auc-profile-status");
+  const name     = document.getElementById("auc-name").value.trim().slice(0, 40);
+  const avatar   = document.getElementById("auc-avatar").value.trim().slice(0, 300);
+  btn.disabled   = true; btn.textContent = "Saving…";
+  statusEl.className = "profile-status"; statusEl.textContent = "";
+  try {
+    // Check if exists
+    const chkRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(KAY_WALLET)}&select=wallet`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const chk    = await chkRes.json();
+    const exists = Array.isArray(chk) && chk.length > 0;
+    const record = { wallet:KAY_WALLET, display_name:name, avatar_url:avatar, updated_at:new Date().toISOString() };
+    await fetch(
+      exists
+        ? `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(KAY_WALLET)}`
+        : `${SUPABASE_URL}/rest/v1/collector_profiles`,
+      {
+        method: exists ? "PATCH" : "POST",
+        headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
+          "Content-Type":"application/json", "Prefer":"return=minimal" },
+        body: JSON.stringify(record),
+      }
+    );
+    document.getElementById("auc-current-name").textContent = name || "Kay · Auctioneer";
+    statusEl.className   = "profile-status ok";
+    statusEl.textContent = "✓ Auctioneer profile saved";
+    btn.textContent      = "Saved ✓";
+    setTimeout(() => { btn.textContent = "Save auctioneer profile"; btn.disabled = false; }, 2000);
+    toast("ok", "Profile saved", name ? name : "Auctioneer profile updated");
+  } catch(e) {
+    statusEl.className   = "profile-status err";
+    statusEl.textContent = "Error: " + e.message;
+    btn.textContent      = "Save auctioneer profile"; btn.disabled = false;
+  }
+}
+
+// ─── Collector Profiles ──────────────────────────────────────────────────────
+
+let _currentProfileWallet = null;
+
+async function lookupProfile() {
+  const input    = document.getElementById("profile-wallet-input");
+  const statusEl = document.getElementById("profile-lookup-status");
+  const form     = document.getElementById("profile-edit-form");
+  const wallet   = input.value.trim().toLowerCase();
+  if (!wallet || wallet.length < 10) {
+    statusEl.className = "profile-status err";
+    statusEl.textContent = "Please enter a valid wallet address."; return;
+  }
+  statusEl.className = "profile-status"; statusEl.textContent = "Looking up…";
+  form.style.display = "none";
+  try {
+    const res  = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(wallet)}&limit=1`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const rows = await res.json();
+    const existing = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    _currentProfileWallet = wallet;
+    document.getElementById("pef-addr").textContent     = wallet.slice(0,8)+"…"+wallet.slice(-6);
+    document.getElementById("pef-existing").textContent = existing
+      ? "Existing: "+( existing.display_name || "no name") : "No profile yet — creating new";
+    document.getElementById("pef-name").value   = existing?.display_name || "";
+    document.getElementById("pef-avatar").value = existing?.avatar_url   || "";
+    previewAvatar();
+    form.style.display = "block";
+    statusEl.textContent = "";
+    loadAllProfiles();
+  } catch(e) {
+    statusEl.className = "profile-status err";
+    statusEl.textContent = "Error: "+e.message;
+  }
+}
+
+function previewPrvAvatar() {
+  const url     = document.getElementById("prv-winner-avatar").value.trim();
+  const preview = document.getElementById("prv-avatar-preview");
+  if (url) {
+    preview.src = url; preview.style.display = "block";
+    preview.onerror = () => { preview.style.display = "none"; };
+  } else { preview.style.display = "none"; }
+}
+
+function previewAvatar() {
+  const url     = document.getElementById("pef-avatar").value.trim();
+  const preview = document.getElementById("pef-avatar-preview");
+  if (url) {
+    preview.src = url; preview.classList.add("show");
+    preview.onerror = () => preview.classList.remove("show");
+  } else { preview.classList.remove("show"); }
+}
+
+async function saveProfile() {
+  if (!_currentProfileWallet) return;
+  const btn      = document.getElementById("pef-save-btn");
+  const statusEl = document.getElementById("pef-status");
+  const name     = document.getElementById("pef-name").value.trim().slice(0,40);
+  const avatar   = document.getElementById("pef-avatar").value.trim().slice(0,300);
+  btn.disabled = true; btn.textContent = "Saving…";
+  statusEl.className = "profile-status"; statusEl.textContent = "";
+  try {
+    const checkRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(_currentProfileWallet)}&select=wallet`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const chk = await checkRes.json();
+    const exists = Array.isArray(chk) && chk.length > 0;
+    const record = { wallet:_currentProfileWallet, display_name:name, avatar_url:avatar, updated_at:new Date().toISOString() };
+    await fetch(
+      exists
+        ? `${SUPABASE_URL}/rest/v1/collector_profiles?wallet=eq.${encodeURIComponent(_currentProfileWallet)}`
+        : `${SUPABASE_URL}/rest/v1/collector_profiles`,
+      { method:exists?"PATCH":"POST",
+        headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON,
+          "Content-Type":"application/json", "Prefer":"return=minimal" },
+        body:JSON.stringify(record) }
+    );
+    statusEl.className = "profile-status ok";
+    statusEl.textContent = "✓ Saved — "+(name || _currentProfileWallet.slice(0,8)+"…");
+    document.getElementById("pef-existing").textContent = "Profile saved: "+(name||"no name");
+    btn.textContent = "Saved ✓";
+    setTimeout(() => { btn.textContent = "Save profile"; btn.disabled = false; }, 2000);
+    loadAllProfiles();
+    toast("ok","Profile saved", name ? name+" · "+_currentProfileWallet.slice(0,8)+"…" : "Profile updated");
+  } catch(e) {
+    statusEl.className = "profile-status err";
+    statusEl.textContent = "Error: "+e.message;
+    btn.textContent = "Save profile"; btn.disabled = false;
+  }
+}
+
+async function loadAllProfiles() {
+  const wrap = document.getElementById("profile-list-wrap");
+  const list = document.getElementById("profile-list");
+  try {
+    const res  = await fetch(
+      `${SUPABASE_URL}/rest/v1/collector_profiles?order=updated_at.desc&limit=50`,
+      { headers:{ apikey:SUPABASE_ANON, Authorization:"Bearer "+SUPABASE_ANON } }
+    );
+    const rows = await res.json();
+    if (!Array.isArray(rows)||rows.length===0) { wrap.style.display="none"; return; }
+    wrap.style.display = "block";
+    list.innerHTML = rows.map(r => `
+      <div class="profile-entry">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+          ${r.avatar_url
+            ? `<img src="${r.avatar_url}" class="profile-entry-avatar show" onerror="this.style.display='none'">`
+            : `<div style="width:28px;height:28px;border-radius:50%;background:rgba(196,132,90,.1);border:1px solid var(--divider);flex-shrink:0;"></div>`}
+          <div class="profile-entry-addr" title="${r.wallet}">${r.wallet.slice(0,8)}…${r.wallet.slice(-6)}</div>
+        </div>
+        <div class="profile-entry-name">${r.display_name||'<span style="color:var(--text-muted);font-style:italic">No name</span>'}</div>
+        <button class="btn-profile-save" onclick="document.getElementById('profile-wallet-input').value='${r.wallet}';lookupProfile()">Edit</button>
+      </div>`).join("");
+  } catch(e) { wrap.style.display = "none"; }
+}
+
+
+async function clearConfig() {
+  if (!confirm("Clear all configuration? The collector page will reset to the landing state.")) return;
+  setLoading(true);
+  setBusy(true);
+  try {
+    const res = await apiFetch("DELETE");
+    populateForm(res.config);
+    document.getElementById("preview-bar").classList.remove("show");
+    toast("ok", "Cleared", "All configuration has been removed");
+  } catch (err) {
+    toast("err", "Clear failed", err.message);
+  } finally {
+    setLoading(false);
+    setBusy(false);
+  }
+}
+
+// ─── HoF Tab Switcher ────────────────────────────────────────────────────────
+
+function hofSwitchTab(tab) {
+  ["eth","tezos","private"].forEach(t => {
+    document.getElementById(`hof-tab-${t}`).classList.toggle("active", t === tab);
+    document.getElementById(`hof-panel-${t}`).style.display = t === tab ? "" : "none";
   });
+}
 
-  document.addEventListener('mouseleave', () => { cursorEl.style.opacity = '0'; });
-  document.addEventListener('mouseenter', () => { cursorEl.style.opacity = '1'; });
-}());
+// ─── Tezos HoF Save ──────────────────────────────────────────────────────────
+
+async function saveTezosSaleToHoF() {
+  const btn      = document.getElementById("tez-hof-btn");
+  const statusEl = document.getElementById("tez-hof-status");
+  btn.disabled   = true;
+  statusEl.className = "hof-status"; statusEl.textContent = "Saving…";
+
+  const artTitle    = document.getElementById("tez-art-title").value.trim();
+  const artArtist   = document.getElementById("tez-art-artist").value.trim();
+  const artYear     = document.getElementById("tez-art-year").value.trim();
+  const artMedium   = document.getElementById("tez-art-medium").value.trim();
+  const artImage    = document.getElementById("tez-art-image").value.trim();
+  const winBid      = parseFloat(document.getElementById("tez-winning-bid").value) || 0;
+  const opHash      = document.getElementById("tez-op-hash").value.trim();
+  const contractAddr= document.getElementById("tez-contract-addr").value.trim();
+  const winner      = document.getElementById("tez-winner").value.trim();
+  const winnerName  = document.getElementById("tez-winner-name").value.trim();
+  const winnerAvatar= document.getElementById("tez-winner-avatar").value.trim();
+  const settledAt   = document.getElementById("tez-settled-at").value;
+
+  if (!artTitle) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Artwork title is required.";
+    btn.disabled = false; return;
+  }
+  if (!winner) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Winner wallet / alias is required.";
+    btn.disabled = false; return;
+  }
+  if (!opHash && !contractAddr) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Please provide at least an op hash or contract address as on-chain proof.";
+    btn.disabled = false; return;
+  }
+
+  // Use op hash as the auction_id so it's uniquely identified
+  const auctionId = opHash || contractAddr || `tez-${Date.now()}`;
+
+  // Fetch live XTZ/USD rate at moment of save
+  const xtzUsdRate   = await _fetchUsdAtSave("tezos");
+  const winBidUsd    = xtzUsdRate ? Math.round(winBid * xtzUsdRate) : null;
+
+  const record = {
+    auction_id:          auctionId.toLowerCase(),
+    chain:               "tezos",
+    art_title:           artTitle,
+    art_artist:          artArtist || "Kayode Oyeniyi",
+    art_image:           artImage,
+    art_year:            artYear,
+    art_medium:          artMedium,
+    winner:              winner.toLowerCase(),
+    winner_display_name: winnerName,
+    winner_avatar_url:   winnerAvatar,
+    winning_bid:         winBid,
+    winning_bid_usd:     winBidUsd,
+    tezos_op_hash:       opHash,
+    contract_addr:       contractAddr,
+    bid_count:           null,
+    settled_at:          settledAt ? new Date(settledAt).toISOString() : new Date().toISOString(),
+  };
+
+  try {
+    const existsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(record.auction_id)}&select=auction_id`,
+      { headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON } }
+    );
+    const existing = await existsRes.json();
+    const alreadyExists = Array.isArray(existing) && existing.length > 0;
+
+    const saveRes = await fetch(
+      alreadyExists
+        ? `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(record.auction_id)}`
+        : `${SUPABASE_URL}/rest/v1/auction_results`,
+      {
+        method: alreadyExists ? "PATCH" : "POST",
+        headers: {
+          apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON,
+          "Content-Type": "application/json", "Prefer": "return=minimal"
+        },
+        body: JSON.stringify(record),
+      }
+    );
+    if (!saveRes.ok) throw new Error("Supabase error: " + await saveRes.text());
+
+    statusEl.className   = "hof-status ok";
+    statusEl.textContent = `✓ Saved — ${artTitle} · ${winBid.toFixed(2)} XTZ${winBidUsd ? " · ≈ $"+winBidUsd.toLocaleString() : ""} · ${winnerName || winner}`;
+    toast("ok", "Hall of Fame updated", "Tezos auction recorded.");
+  } catch(e) {
+    statusEl.className   = "hof-status err";
+    statusEl.textContent = "Error: " + (e.message || "Unknown error");
+    toast("err", "Save failed", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─── Private Sale HoF Save ───────────────────────────────────────────────────
+
+let _prvChain = "eth";
+function setPrvChain(chain) {
+  _prvChain = chain;
+  document.getElementById("prv-chain").value = chain;
+  document.getElementById("prv-chain-eth").className   = "piece-status-btn " + (chain === "eth"   ? "active-live" : "");
+  document.getElementById("prv-chain-tezos").className = "piece-status-btn " + (chain === "tezos" ? "active-live" : "");
+  document.getElementById("prv-currency-hint").value   = chain === "tezos" ? "XTZ" : "ETH";
+}
+
+async function savePrivateSaleToHoF() {
+  const btn      = document.getElementById("prv-hof-btn");
+  const statusEl = document.getElementById("prv-hof-status");
+  btn.disabled   = true;
+  statusEl.className = "hof-status"; statusEl.textContent = "Saving…";
+
+  const chain       = document.getElementById("prv-chain").value || "eth";
+  const artTitle    = document.getElementById("prv-art-title").value.trim();
+  const artArtist   = document.getElementById("prv-art-artist").value.trim();
+  const artYear     = document.getElementById("prv-art-year").value.trim();
+  const artMedium   = document.getElementById("prv-art-medium").value.trim();
+  const artImage    = document.getElementById("prv-art-image").value.trim();
+  const winBid      = parseFloat(document.getElementById("prv-winning-bid").value) || 0;
+  const txHash      = document.getElementById("prv-tx-hash").value.trim();
+  const winner      = document.getElementById("prv-winner").value.trim();
+  const winnerName   = document.getElementById("prv-winner-name").value.trim();
+  const winnerAvatar = document.getElementById("prv-winner-avatar").value.trim();
+  const settledAt    = document.getElementById("prv-settled-at").value;
+
+  if (!artTitle) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Artwork title is required.";
+    btn.disabled = false; return;
+  }
+  if (!winner) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Buyer wallet is required.";
+    btn.disabled = false; return;
+  }
+  if (!txHash) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "On-chain payment proof (tx hash) is required to log a private sale.";
+    btn.disabled = false; return;
+  }
+
+  const auctionId = `prv-${txHash.toLowerCase().slice(0, 40)}`;
+
+  // Fetch live rate at moment of save
+  const prvUsdRate  = await _fetchUsdAtSave(chain);
+  const winBidUsd   = prvUsdRate ? Math.round(winBid * prvUsdRate) : null;
+
+  const record = {
+    auction_id:          auctionId,
+    chain:               chain,
+    is_private_sale:     true,
+    art_title:           artTitle,
+    art_artist:          artArtist || "Kayode Oyeniyi",
+    art_image:           artImage,
+    art_year:            artYear,
+    art_medium:          artMedium,
+    winner:              winner.toLowerCase(),
+    winner_display_name: winnerName,
+    winner_avatar_url:   winnerAvatar || null,
+    winning_bid:         winBid,
+    winning_bid_usd:     winBidUsd,
+    tezos_op_hash:       chain === "tezos" ? txHash : null,
+    contract_addr:       chain === "eth"   ? txHash : null,
+    bid_count:           null,
+    settled_at:          settledAt ? new Date(settledAt).toISOString() : new Date().toISOString(),
+  };
+
+  try {
+    const existsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(auctionId)}&select=auction_id`,
+      { headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON } }
+    );
+    const existing = await existsRes.json();
+    const alreadyExists = Array.isArray(existing) && existing.length > 0;
+
+    const saveRes = await fetch(
+      alreadyExists
+        ? `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(auctionId)}`
+        : `${SUPABASE_URL}/rest/v1/auction_results`,
+      {
+        method: alreadyExists ? "PATCH" : "POST",
+        headers: {
+          apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON,
+          "Content-Type": "application/json", "Prefer": "return=minimal"
+        },
+        body: JSON.stringify(record),
+      }
+    );
+    if (!saveRes.ok) throw new Error("Supabase error: " + await saveRes.text());
+
+    const currency = chain === "tezos" ? "XTZ" : "ETH";
+    statusEl.className   = "hof-status ok";
+    statusEl.textContent = `✓ Saved — ${artTitle} · ${winBid.toFixed(chain === "tezos" ? 2 : 4)} ${currency}${winBidUsd ? " · ≈ $"+winBidUsd.toLocaleString() : ""} · Private sale`;
+    toast("ok", "Hall of Fame updated", "Private sale recorded.");
+  } catch(e) {
+    statusEl.className   = "hof-status err";
+    statusEl.textContent = "Error: " + (e.message || "Unknown error");
+    toast("err", "Save failed", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─── Manual Sold Override ────────────────────────────────────────────────────
+
+async function setSoldOverride(sold) {
+  const statusEl = document.getElementById("sold-override-status");
+  const pieceIdx = parseInt(document.getElementById("sold-override-piece")?.value || "0");
+
+  // Read directly from in-memory _pieces — always accurate, no API round-trip
+  const piece    = _pieces[pieceIdx] || {};
+  const artTitle = piece.artTitle || "Piece " + (pieceIdx + 1);
+
+  // Stable piece key — uses contract address if present, else title+index slug.
+  // Stored in the SEPARATE `sold_overrides` table, never in auction_results,
+  // so it cannot accidentally appear in the Hall of Fame.
+  const pieceKey = piece.contractAddr
+    ? piece.contractAddr.toLowerCase()
+    : "manual-" + artTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40) + "-" + pieceIdx;
+
+  statusEl.className = "hof-status"; statusEl.textContent = "Saving override…";
+
+  try {
+    if (sold) {
+      // Upsert into sold_overrides — completely separate from auction_results
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/sold_overrides`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON,
+          "Content-Type": "application/json",
+          "Prefer": "resolution=merge-duplicates,return=minimal"
+        },
+        body: JSON.stringify({ piece_key: pieceKey, art_title: artTitle, updated_at: new Date().toISOString() }),
+      });
+      if (!res.ok) throw new Error("Supabase error: " + await res.text());
+    } else {
+      // Delete from sold_overrides
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/sold_overrides?piece_key=eq.${encodeURIComponent(pieceKey)}`,
+        {
+          method: "DELETE",
+          headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON }
+        }
+      );
+      if (!res.ok) throw new Error("Supabase error: " + await res.text());
+    }
+
+    statusEl.className   = "hof-status ok";
+    statusEl.textContent = sold
+      ? `✓ "${artTitle}" marked as Sold — badge will appear on the auction page`
+      : `✓ Sold badge removed from "${artTitle}"`;
+    toast("ok", sold ? "Marked as Sold" : "Sold badge removed", artTitle);
+  } catch(e) {
+    statusEl.className   = "hof-status err";
+    statusEl.textContent = "Error: " + (e.message || "Unknown error");
+  }
+}
+
+// ─── USD Backfill ────────────────────────────────────────────────────────────
+
+async function backfillUsd() {
+  const btn      = document.getElementById("backfill-btn");
+  const statusEl = document.getElementById("backfill-status");
+  btn.disabled   = true;
+  statusEl.className = "hof-status"; statusEl.textContent = "Loading records…";
+
+  try {
+    const res  = await fetch(
+      `${SUPABASE_URL}/rest/v1/auction_results?winning_bid_usd=is.null&select=auction_id,chain,winning_bid&limit=200`,
+      { headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON } }
+    );
+    const rows = await res.json();
+    if (!Array.isArray(rows) || rows.length === 0) {
+      statusEl.className = "hof-status ok";
+      statusEl.textContent = "✓ All records already have USD values — nothing to backfill.";
+      btn.disabled = false; return;
+    }
+
+    statusEl.textContent = `Found ${rows.length} record${rows.length === 1 ? "" : "s"} — fetching rates…`;
+
+    const [ethRate, xtzRate] = await Promise.all([
+      _fetchUsdAtSave("eth"),
+      _fetchUsdAtSave("tezos"),
+    ]);
+
+    if (!ethRate && !xtzRate) {
+      statusEl.className = "hof-status err";
+      statusEl.textContent = "Could not reach Coinbase — check your connection and try again.";
+      btn.disabled = false; return;
+    }
+
+    statusEl.textContent = `ETH $${ethRate?.toLocaleString() || "?"} · XTZ $${xtzRate?.toFixed(4) || "?"} — updating ${rows.length} records…`;
+
+    let updated = 0, failed = 0;
+    for (const row of rows) {
+      const isTezos = row.chain === "tezos";
+      const rate    = isTezos ? xtzRate : ethRate;
+      if (!rate || !row.winning_bid) { failed++; continue; }
+      const usd = Math.round(parseFloat(row.winning_bid) * rate);
+      try {
+        const patchRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(row.auction_id)}`,
+          {
+            method: "PATCH",
+            headers: {
+              apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON,
+              "Content-Type": "application/json", "Prefer": "return=minimal"
+            },
+            body: JSON.stringify({ winning_bid_usd: usd }),
+          }
+        );
+        if (patchRes.ok) updated++; else failed++;
+      } catch(_) { failed++; }
+    }
+
+    statusEl.className = "hof-status ok";
+    statusEl.textContent = `✓ Updated ${updated} record${updated === 1 ? "" : "s"} using today's rates (estimated).${failed ? " " + failed + " could not be updated." : ""}`;
+    toast("ok", "USD backfill complete", `${updated} records updated`);
+  } catch(e) {
+    statusEl.className = "hof-status err";
+    statusEl.textContent = "Error: " + (e.message || "Unknown");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function setManualUsd() {
+  const statusEl  = document.getElementById("manual-usd-status");
+  const auctionId = document.getElementById("manual-usd-id").value.trim();
+  const usdVal    = parseFloat(document.getElementById("manual-usd-value").value);
+
+  if (!auctionId) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Auction ID is required."; return;
+  }
+  if (!usdVal || usdVal <= 0) {
+    statusEl.className = "hof-status err"; statusEl.textContent = "Please enter a valid USD amount."; return;
+  }
+
+  statusEl.className = "hof-status"; statusEl.textContent = "Saving…";
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/auction_results?auction_id=eq.${encodeURIComponent(auctionId)}`,
+      {
+        method: "PATCH",
+        headers: {
+          apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON,
+          "Content-Type": "application/json", "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({ winning_bid_usd: Math.round(usdVal) }),
+      }
+    );
+    if (!res.ok) throw new Error(await res.text());
+    statusEl.className   = "hof-status ok";
+    statusEl.textContent = `✓ Set to $${Math.round(usdVal).toLocaleString()} for ${auctionId.slice(0, 24)}…`;
+    document.getElementById("manual-usd-id").value    = "";
+    document.getElementById("manual-usd-value").value = "";
+    toast("ok", "USD value set", "$" + Math.round(usdVal).toLocaleString());
+  } catch(e) {
+    statusEl.className   = "hof-status err";
+    statusEl.textContent = "Error: " + (e.message || "Unknown");
+  }
+}
+
+function updatePreviewBar() {
+  const bar  = document.getElementById("preview-bar");
+  const url  = document.getElementById("preview-url");
+  const link = document.getElementById("preview-link");
+  const fullUrl = "https://www.kaysworks.com/auction";
+  url.textContent = fullUrl;
+  link.href = fullUrl;
+  bar.classList.add("show");
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+
+function setLoading(on) {
+  document.getElementById("loading-bar").classList.toggle("show", on);
+}
+
+function setBusy(on) {
+  document.getElementById("save-btn").disabled  = on;
+  document.getElementById("clear-btn").disabled = on;
+}
+
+let toastTimer;
+function toast(type, title, body) {
+  clearTimeout(toastTimer);
+  document.getElementById("toast-title").textContent = title;
+  document.getElementById("toast-title").className   = "toast-title " + type;
+  document.getElementById("toast-body").textContent  = body || "";
+  document.getElementById("toast").classList.add("show");
+  toastTimer = setTimeout(() => document.getElementById("toast").classList.remove("show"), 4500);
+}
 </script>
 </body>
 </html>
