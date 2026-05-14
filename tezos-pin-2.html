@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NFT Collector Pinning &middot; Tezos</title>
+<!-- Self-contained: taquito bundle inlined. No external JS files required. -->
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+ --clay:#c4845a;--rust:#b85a30;--sand:#e8d5b0;--linen:#f5ede0;--bark:#4a3228;--moss:#6b7c5c;--ash:#b09888;--ink:#1e1410;--gold:#c9993a;--parchment:#ede0c8;
+ --bg:#0c0908;--s1:#1a1310;--s2:#241a14;--s3:#2f2118;--s4:#382920;--bdr:rgba(196,132,90,.25);--acc:#c4845a;--acc2:#c9993a;--warn:#d4aa50;--err:#d86b58;--tx:#e8d5b0;--muted:#9a8070;--r:10px;
+}
+
+/* ── LIGHT MODE ── */
+body.light{--bg:#f5ede0;--s1:#ede0c8;--s2:#e4d4b8;--s3:#d9c8a8;--s4:#cebb96;--bdr:rgba(74,50,40,.2);--acc:#9e4f2e;--acc2:#8a6d2e;--warn:#8a6d2e;--err:#b84430;--tx:#1e1410;--muted:#6b5545;--gold:#8a6d2e;--clay:#9e4f2e;--rust:#7a3a1a;--sand:#1e1410;--linen:#f5ede0;--ink:#1e1410;--bark:#4a3228;--parchment:#ede0c8}
+body.light{background:var(--bg);color:var(--tx)}
+body.light::before{opacity:.15}
+body.light::after{background:linear-gradient(180deg,rgba(245,237,224,.02),rgba(245,237,224,.35))}
+body.light .site-nav{background:rgba(245,237,224,.92);border-bottom-color:rgba(74,50,40,.15)}
+body.light .site-nav-logo{color:var(--bark)}
+body.light .site-nav-links a{color:var(--bark);opacity:.7}
+body.light .site-nav-links a:hover{color:var(--rust);opacity:1}
+body.light .site-nav-active{color:var(--rust) !important;border-bottom-color:var(--rust)}
+body.light .site-nav-series{color:var(--gold) !important;border-color:rgba(138,109,46,.4);background:rgba(138,109,46,.06)}
+body.light .site-nav-hamburger span{background:var(--bark)}
+body.light .site-mobile-nav{background:rgba(245,237,224,.97)}
+body.light .site-mobile-nav a{color:var(--bark)}
+body.light .site-mobile-nav a:hover{color:var(--rust)}
+body.light .site-mobile-nav-close{color:var(--bark)}
+body.light header{border-bottom-color:rgba(74,50,40,.15)}
+body.light .logo-text{color:var(--bark)}
+body.light .logo-text em{color:var(--rust)}
+body.light select.net{background:rgba(255,255,255,.7);border-color:rgba(74,50,40,.2);color:var(--bark)}
+body.light .addr-pill{background:rgba(255,255,255,.6);border-color:rgba(138,109,46,.25);color:var(--gold)}
+body.light .card{background:rgba(255,255,255,.65);border-color:rgba(74,50,40,.15);box-shadow:0 2px 12px rgba(74,50,40,.08)}
+body.light .collector-flow.card{border-left-color:rgba(158,79,46,.4)}
+body.light #fa2-card{background:rgba(255,255,255,.7)}
+body.light .card:has(#collector-grid){background:rgba(255,255,255,.55);border-color:rgba(74,50,40,.12)}
+body.light .card-title{color:var(--bark)}
+body.light .field label{color:var(--muted)}
+body.light .field input,.light .field textarea{background:rgba(255,255,255,.85);border-color:rgba(74,50,40,.18);color:var(--ink)}
+body.light .field input:focus{border-color:var(--clay);box-shadow:0 0 0 3px rgba(158,79,46,.1)}
+body.light .hint{color:var(--muted)}
+body.light .btn-sec{background:rgba(74,50,40,.05);color:var(--bark);border-color:rgba(74,50,40,.22)}
+body.light .btn-sec:hover:not(:disabled){border-color:var(--rust);color:var(--rust);background:rgba(158,79,46,.06)}
+body.light .btn-ghost{color:var(--muted);border-color:rgba(74,50,40,.2)}
+body.light .btn-ghost:hover:not(:disabled){color:var(--bark);border-color:var(--clay)}
+body.light .btn-acc{background:var(--rust);color:#fff}
+body.light .btn-acc:hover:not(:disabled){background:#6d2e10}
+body.light #deployed-banner{background:linear-gradient(135deg,rgba(138,109,46,.1),rgba(255,255,255,.7));border-color:rgba(138,109,46,.3)}
+body.light .view-result{background:rgba(255,255,255,.7);border-color:rgba(74,50,40,.15)}
+body.light .log{background:rgba(255,255,255,.7);border-color:rgba(74,50,40,.12);color:var(--muted)}
+body.light .lok{color:#2e6b3a}
+body.light .lerr{color:#b83020}
+body.light .lwarn{color:#8a6d2e}
+body.light .linfo{color:var(--muted)}
+body.light .tabs{background:rgba(74,50,40,.05);border-color:rgba(74,50,40,.12)}
+body.light .tab{color:var(--muted)}
+body.light .tab.active{background:rgba(255,255,255,.8);color:var(--bark);border-color:rgba(74,50,40,.15)}
+body.light #status-bar{border-color:rgba(74,50,40,.15)}
+body.light #status-bar.ok{border-color:rgba(138,109,46,.35);color:var(--gold);background:rgba(138,109,46,.06)}
+body.light #status-bar.loading{background:rgba(255,255,255,.5);color:var(--muted);border-color:rgba(74,50,40,.12)}
+body.light .badge{border-color:rgba(74,50,40,.18);color:var(--muted);background:rgba(74,50,40,.05)}
+body.light .badge-g{border-color:rgba(138,109,46,.3);color:var(--gold);background:rgba(138,109,46,.06)}
+body.light .token-card{background:rgba(255,255,255,.75);border-color:rgba(74,50,40,.15);box-shadow:0 1px 8px rgba(74,50,40,.08)}
+body.light .token-card.active,.light .token-card.pinned{border-color:var(--gold);box-shadow:0 0 0 1px rgba(138,109,46,.18),0 0 20px rgba(138,109,46,.08)}
+body.light .token-card .token-media{background:#e8ddd0}
+body.light .token-card .token-body{color:var(--ink)}
+body.light .token-hero{background:#e8ddd0;border-color:rgba(74,50,40,.15)}
+body.light .token-hero-media{background:#ddd0c0}
+body.light .token-hero-title{color:var(--bark)}
+body.light .token-hero-info{border-top-color:rgba(74,50,40,.1)}
+body.light .token-meta{color:var(--muted)}
+body.light .nft-details{background:rgba(74,50,40,.03);border-top-color:rgba(74,50,40,.1)}
+body.light .nft-details-title{color:var(--clay)}
+body.light .nft-details-row{border-top-color:rgba(74,50,40,.06)}
+body.light .nft-details-row span:first-child{color:var(--muted)}
+body.light .nft-details-row span:last-child{color:var(--bark)}
+body.light .token-version{border-color:rgba(74,50,40,.18);background:rgba(0,0,0,.04)}
+body.light .token-version.selected{border-color:var(--clay);box-shadow:0 0 0 1px rgba(158,79,46,.2)}
+body.light .token-version.pinned{border-color:var(--gold);box-shadow:0 0 0 1px rgba(138,109,46,.25)}
+body.light .token-version-pin{background:rgba(255,255,255,.92);border-color:rgba(138,109,46,.4);color:var(--gold)}
+body.light .token-version-title{background:rgba(74,50,40,.7);color:#fff}
+body.light .token-detail-panel{background:rgba(255,255,255,.85);border-color:rgba(74,50,40,.15)}
+body.light .token-detail-media-col{border-right-color:rgba(74,50,40,.1)}
+body.light .token-detail-desc{color:rgba(30,20,16,.65)}
+body.light .token-detail-actions{border-top-color:rgba(74,50,40,.1)}
+body.light .token-pinned-notice{color:var(--gold);background:rgba(138,109,46,.06);border-color:rgba(138,109,46,.2)}
+body.light .preconnect-panel::before,.light .preconnect-panel::after{background:linear-gradient(90deg,transparent,rgba(74,50,40,.18),transparent)}
+body.light .preconnect-eyebrow{color:var(--clay)}
+body.light .preconnect-eyebrow::after{background:var(--clay)}
+body.light .preconnect-title{color:var(--bark)}
+body.light .preconnect-title em{color:var(--rust)}
+body.light .preconnect-copy{color:rgba(30,20,16,.55)}
+body.light .skeleton-card{background:rgba(255,255,255,.6);border-color:rgba(74,50,40,.12)}
+body.light .skeleton{background:rgba(74,50,40,.06);background-image:linear-gradient(90deg,rgba(74,50,40,.06) 0%,rgba(74,50,40,.12) 40%,rgba(74,50,40,.06) 80%);background-size:800px 100%}
+body.light .skeleton-card .skeleton-hero{background:rgba(74,50,40,.04);background-image:linear-gradient(90deg,rgba(74,50,40,.04) 0%,rgba(74,50,40,.1) 40%,rgba(74,50,40,.04) 80%);background-size:800px 100%}
+body.light .skeleton-card .skeleton-hero::after{color:rgba(74,50,40,.3)}
+body.light .skeleton-card::after{background:rgba(74,50,40,.04)}
+body.light .wm-backdrop{background:rgba(245,237,224,.6)}
+body.light .wm-box{background:#f5ede0;border-color:rgba(74,50,40,.2);box-shadow:0 20px 60px rgba(74,50,40,.15)}
+body.light .wm-title{color:var(--bark)}
+body.light .wm-option{background:rgba(255,255,255,.6);border-color:rgba(74,50,40,.15);color:var(--bark)}
+body.light .wm-option:hover{border-color:var(--clay);background:rgba(255,255,255,.9)}
+body.light .spin{border-color:rgba(74,50,40,.18);border-top-color:var(--bark)}
+body.light .sb-spin{border-color:rgba(138,109,46,.15);border-top-color:var(--gold)}
+body.light .tag{color:var(--clay)}
+body.light #fullscreen-viewer{background:rgba(245,237,224,.95)}
+body.light #fullscreen-close{color:var(--bark)}
+/* Theme toggle button */
+.theme-toggle-pin{position:fixed;bottom:1.5rem;right:1.5rem;z-index:99;width:48px;height:48px;border-radius:50%;border:1px solid rgba(196,132,90,.4);background:rgba(36,26,20,.95);color:var(--sand);font-size:1.2rem;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .3s,border-color .3s,color .3s,transform .2s;backdrop-filter:blur(8px);box-shadow:0 4px 16px rgba(0,0,0,.35),0 0 0 1px rgba(196,132,90,.1)}
+.theme-toggle-pin:hover{border-color:var(--clay);transform:scale(1.08);box-shadow:0 6px 24px rgba(0,0,0,.4)}
+body.light .theme-toggle-pin{background:rgba(255,255,255,.95);border-color:rgba(74,50,40,.25);color:var(--bark);box-shadow:0 4px 16px rgba(74,50,40,.15)}
+body.light .theme-toggle-pin:hover{border-color:var(--clay);transform:scale(1.08)}
+
+
+/* Browse mode — view without wallet */
+body.browse-mode .preconnect-panel{display:none}
+body.browse-mode .page-title-area{display:block}
+body.browse-mode .collector-flow{display:block}
+body.browse-mode #fa2-card{display:none}
+body.browse-mode #btn-disconnect{display:none !important}
+body.browse-mode .js-pin-selected,.browse-mode .js-unpin{display:none !important}
+body.browse-mode .token-hero-actions .btn-acc{display:none}
+body.browse-mode .preconnect-actions{display:none}
+body.browse-mode .browse-mode-hint{display:block !important}
+
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--tx);font-family:'Crimson Pro',serif;min-height:100vh;font-size:16px;line-height:1.65;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E"),radial-gradient(ellipse at 8% 8%,rgba(196,132,90,.10),transparent 42%),radial-gradient(ellipse at 92% 16%,rgba(201,153,58,.06),transparent 38%);opacity:.6}
+body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:linear-gradient(180deg,rgba(12,9,8,.05),rgba(12,9,8,.5))}
+button,input,select,textarea{font:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--clay);outline-offset:3px}
+.wrap{position:relative;z-index:1;width:min(100% - 48px,1100px);margin:0 auto;padding:0 0 80px}
+body.preconnect .collector-flow{display:none!important}
+body.wallet-ready .preconnect-panel{display:none}
+body.wallet-ready .collector-flow{display:block}
+
+/* -- Entry / preconnect screen -- */
+.preconnect-panel{
+  position:relative;
+  min-height:calc(100vh - 120px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;
+  padding:clamp(48px,8vh,96px) clamp(20px,6vw,64px);
+  overflow:hidden;
+}
+/* Subtle top-down warmth on the preconnect screen */
+.preconnect-panel::before{
+  content:'';position:absolute;
+  top:0;left:50%;transform:translateX(-50%);
+  width:min(560px,80vw);height:1px;
+  background:linear-gradient(90deg,transparent,rgba(196,132,90,.28),transparent);
+  pointer-events:none;
+}
+.preconnect-panel::after{
+  content:'';position:absolute;
+  bottom:0;left:50%;transform:translateX(-50%);
+  width:min(560px,80vw);height:1px;
+  background:linear-gradient(90deg,transparent,rgba(196,132,90,.16),transparent);
+  pointer-events:none;
+}
+.preconnect-eyebrow{
+  font-family:'Cinzel',serif;font-size:.65rem;font-weight:600;
+  letter-spacing:.32em;text-transform:uppercase;
+  color:var(--clay);opacity:.85;margin-bottom:26px;
+  position:relative;padding-bottom:18px;
+}
+.preconnect-eyebrow::after{
+  content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  width:32px;height:1px;background:var(--clay);opacity:.45;
+}
+.preconnect-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(2.4rem,7vw,5rem);
+  font-weight:400;line-height:1.05;
+  color:var(--sand);margin-bottom:24px;
+}
+.preconnect-title em{color:var(--rust);font-style:italic}
+.preconnect-copy{
+  color:rgba(232,213,176,.62);font-size:.975rem;line-height:1.75;
+  max-width:480px;margin:0 auto 36px;
+}
+.preconnect-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:center;margin-bottom:20px}
+.btn-connect-hero{padding:14px 36px;font-size:.78rem;letter-spacing:.2em;min-height:52px}
+.preconnect-wallets{display:flex;align-items:center;justify-content:center;gap:6px;min-height:22px}
+.preconnect-wallet-hint{font-family:'Cinzel',serif;font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.preconnect-wallet-hint.ready{color:var(--clay)}
+
+/* -- FA2 glow -- */
+.card.fa2-found{border-color:rgba(201,153,58,.6);box-shadow:0 0 0 1px rgba(201,153,58,.18),0 0 28px rgba(201,153,58,.14);animation:fa2Glow 2.4s ease-in-out infinite alternate}
+.card.fa2-found .card-title{color:var(--gold)}
+@keyframes fa2Glow{from{box-shadow:0 0 0 1px rgba(201,153,58,.14),0 0 10px rgba(201,153,58,.06)}to{box-shadow:0 0 0 1px rgba(201,153,58,.52),0 0 36px rgba(201,153,58,.2)}}
+
+/* -- Header -- */
+/* ── SITE NAV ── */
+.site-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:1.1rem 4rem;background:rgba(12,9,8,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(196,132,90,.2);transition:background .4s}
+.site-nav-logo{font-family:'Montserrat',sans-serif;font-size:1.1rem;letter-spacing:.15em;color:var(--sand);text-decoration:none;text-transform:uppercase;display:flex;align-items:center}
+.site-nav-links{display:flex;gap:2.2rem;list-style:none;align-items:center;padding:0;margin:0}
+.site-nav-links a{font-family:'Crimson Pro',serif;font-size:.88rem;letter-spacing:.1em;text-transform:uppercase;color:var(--sand);text-decoration:none;opacity:.75;transition:opacity .2s,color .2s;line-height:1}
+.site-nav-links a:hover{opacity:1;color:var(--clay)}
+.site-nav-active{opacity:1 !important;color:var(--clay) !important;border-bottom:1px solid var(--clay);padding-bottom:2px}
+.site-nav-series{font-family:'Cinzel',serif !important;font-size:.7rem !important;letter-spacing:.18em !important;color:var(--gold) !important;opacity:1 !important;border:1px solid rgba(201,153,58,.45);padding:.25rem .6rem;border-radius:3px;background:rgba(201,153,58,.08);transition:background .2s,border-color .2s}
+.site-nav-series:hover{background:rgba(201,153,58,.18) !important;border-color:var(--gold) !important}
+.site-nav-mobile-controls{display:none;align-items:center;gap:.8rem}
+.site-nav-hamburger{background:none;border:none;display:flex;flex-direction:column;gap:5px;padding:6px;cursor:pointer}
+.site-nav-hamburger span{display:block;width:22px;height:1.5px;background:var(--sand);border-radius:1px;transition:transform .3s}
+.site-mobile-nav{position:fixed;inset:0;z-index:150;background:rgba(12,9,8,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.2rem;opacity:0;pointer-events:none;transition:opacity .35s}
+.site-mobile-nav.open{opacity:1;pointer-events:all}
+.site-mobile-nav a{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;font-style:italic;color:var(--sand);text-decoration:none;letter-spacing:.05em;transition:color .2s}
+.site-mobile-nav a:hover{color:var(--clay)}
+.site-mobile-nav-close{position:absolute;top:1.8rem;right:1.8rem;background:none;border:none;font-size:1.5rem;color:var(--sand);cursor:pointer;opacity:.6;transition:opacity .2s,transform .2s;line-height:1}
+.site-mobile-nav-close:hover{opacity:1;transform:rotate(90deg)}
+@media(max-width:900px){.site-nav-links{display:none}.site-nav-mobile-controls{display:flex}.site-nav{padding:1rem 1.5rem}}
+
+/* Push page content below fixed site nav */
+.wrap{padding-top:70px}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:24px 0 28px;border-bottom:1px solid rgba(196,132,90,.28);margin-bottom:38px;gap:18px}
+.logo{display:flex;align-items:center}
+.logo-text{font-family:'Cinzel',serif;font-size:.76rem;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--sand)}.logo-text em{color:var(--clay);font-style:normal}
+.hdr-right{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+select.net{background:rgba(30,21,16,.95);border:1px solid rgba(196,132,90,.32);color:var(--sand);border-radius:4px;padding:9px 14px;font-family:'Cinzel',serif;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;outline:none;cursor:pointer}
+.addr-pill{font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--gold);padding:7px 12px;background:rgba(30,21,16,.88);border:1px solid rgba(201,153,58,.22);border-radius:4px;display:none}.addr-pill.show{display:inline-flex}
+
+/* -- Buttons -- */
+.btn{display:inline-flex;align-items:center;gap:7px;font-family:'Cinzel',serif;font-weight:600;font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;border:none;border-radius:5px;padding:11px 20px;min-height:44px;cursor:pointer;transition:background .22s,border-color .22s,color .22s,transform .18s,box-shadow .22s;white-space:nowrap;justify-content:center;text-decoration:none}
+.btn:disabled{opacity:.38;cursor:not-allowed}.btn:hover:not(:disabled){transform:translateY(-1px)}.btn-acc{background:var(--rust);color:var(--linen);box-shadow:0 2px 0 rgba(0,0,0,.28)}.btn-acc:hover:not(:disabled){background:#b85330;box-shadow:0 5px 20px rgba(196,80,40,.3)}
+.btn-sec{background:rgba(232,213,176,.06);color:var(--sand);border:1px solid rgba(196,132,90,.38)}.btn-sec:hover:not(:disabled){border-color:var(--clay);color:var(--clay);background:rgba(196,132,90,.08)}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid rgba(196,132,90,.28);padding:9px 13px;font-size:.66rem;min-height:38px}.btn-ghost:hover:not(:disabled){color:var(--sand);border-color:var(--clay)}.btn-sm{padding:8px 12px;font-size:.65rem;min-height:36px}
+
+/* -- Page title area (shown only after wallet connects) -- */
+.tag{font-family:'Cinzel',serif;font-size:.68rem;color:var(--clay);letter-spacing:.32em;text-transform:uppercase;margin-bottom:10px;opacity:.9}
+.title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.8rem,4vw,2.9rem);font-weight:400;line-height:1.1;color:var(--sand);margin-bottom:28px}
+.title em{color:var(--rust);font-style:italic}
+body.preconnect .page-title-area{display:none}
+
+/* -- Cards � three visual levels -- */
+.card{background:rgba(36,26,20,.92);border:1px solid rgba(196,132,90,.3);border-radius:var(--r);padding:22px 24px;margin-bottom:16px;backdrop-filter:blur(6px);box-shadow:0 2px 12px rgba(0,0,0,.35),0 0 0 1px rgba(196,132,90,.06)}
+/* Collector-flow cards get a subtle left accent stripe */
+.collector-flow.card{border-left:3px solid rgba(196,132,90,.55)}
+/* FA2 discovery card � slightly brighter bg */
+#fa2-card{background:rgba(42,30,20,.94)}
+/* Gallery card � darkest, most content-heavy */
+.card:has(#collector-grid){background:rgba(30,22,16,.94);border-color:rgba(196,132,90,.24)}
+
+.card-title{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:1.22rem;line-height:1.15;color:var(--sand);margin-bottom:16px;display:flex;align-items:center;gap:9px}
+.badge{font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:.14em;text-transform:uppercase;padding:3px 7px;border-radius:3px;border:1px solid}
+.badge-g{border-color:rgba(201,153,58,.42);color:var(--gold);background:rgba(201,153,58,.08)}
+
+/* -- Fields -- */
+.field{margin-bottom:13px}
+.field label{display:block;font-family:'Cinzel',serif;font-size:.66rem;font-weight:600;color:var(--clay);margin-bottom:6px;text-transform:uppercase;letter-spacing:.16em}
+.field input,.field textarea{width:100%;background:rgba(12,9,7,.95);border:1px solid rgba(196,132,90,.28);border-radius:5px;color:var(--sand);font-family:'IBM Plex Mono',monospace;font-size:.88rem;padding:11px 13px;min-height:44px;outline:none;transition:border-color .15s,box-shadow .15s;resize:vertical}
+.field input:focus,.field textarea:focus{border-color:var(--clay);box-shadow:0 0 0 3px rgba(196,132,90,.1)}
+.field .hint,.hint{font-size:.9rem;color:var(--muted);margin-top:7px;line-height:1.5}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* -- URI list -- */
+.uri-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}.uri-row{display:flex;gap:6px}.uri-row input{flex:1}.uri-del{background:transparent;border:1px solid var(--bdr);color:var(--muted);border-radius:4px;padding:0 10px;cursor:pointer;flex-shrink:0}.uri-del:hover{border-color:var(--err);color:var(--err)}
+
+/* -- Steps -- */
+.steps{display:flex;margin-bottom:26px}.step{flex:1;text-align:center;position:relative}.step::after{content:'';position:absolute;top:12px;left:50%;width:100%;height:1px;background:var(--bdr)}.step:last-child::after{display:none}.step-num{width:24px;height:24px;border-radius:50%;background:var(--s2);border:1px solid var(--bdr);display:inline-flex;align-items:center;justify-content:center;font-size:.65rem;font-family:'IBM Plex Mono',monospace;position:relative;z-index:1;margin-bottom:4px}.step.done .step-num{background:var(--clay);border-color:var(--clay);color:var(--ink)}.step.active .step-num{border-color:var(--gold);color:var(--gold)}.step-lbl{font-family:'Cinzel',serif;font-size:.55rem;color:var(--muted);letter-spacing:.16em;text-transform:uppercase}
+
+/* -- Deployed banner -- */
+#deployed-banner{display:none;background:linear-gradient(135deg,rgba(201,153,58,.14),rgba(42,30,20,.85));border:1px solid rgba(201,153,58,.45);border-radius:var(--r);padding:16px 20px;margin-bottom:20px;box-shadow:0 2px 16px rgba(201,153,58,.08)}
+#deployed-banner.show{display:block}
+.banner-lbl{font-family:'Cinzel',serif;font-size:.62rem;color:var(--gold);letter-spacing:.2em;margin-bottom:5px;text-transform:uppercase}
+.banner-addr{font-family:'IBM Plex Mono',monospace;font-size:.78rem;word-break:break-all;color:var(--sand)}.banner-acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+
+/* -- Tabs -- */
+.tabs{display:flex;gap:2px;background:rgba(14,10,8,.7);border:1px solid var(--bdr);border-radius:var(--r);padding:4px;margin-bottom:18px}
+.tab{flex:1;font-family:'Cinzel',serif;font-weight:600;font-size:.65rem;letter-spacing:.13em;text-transform:uppercase;padding:9px 8px;border:none;border-radius:5px;background:transparent;color:var(--muted);cursor:pointer;text-align:center;transition:background .2s,color .2s}
+.tab.active{background:rgba(196,132,90,.11);color:var(--sand);border:1px solid rgba(196,132,90,.28)}.panel{display:none}.panel.active{display:block}
+
+/* -- Log / result -- */
+.view-result{background:rgba(20,14,10,.82);border:1px solid rgba(196,132,90,.28);border-radius:var(--r);padding:13px;margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:.78rem;display:none}
+.log{font-family:'IBM Plex Mono',monospace;font-size:.75rem;background:rgba(20,14,10,.88);border:1px solid rgba(196,132,90,.22);border-radius:var(--r);padding:12px 14px;max-height:180px;overflow-y:auto;line-height:1.85;color:var(--muted)}
+.lok{color:var(--gold)}.linfo{color:var(--clay)}.lerr{color:var(--err)}.lwarn{color:var(--warn)}
+
+/* -- Spinner -- */
+.spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(245,237,224,.28);border-top-color:var(--linen);border-radius:50%;animation:spin .7s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+
+/* -- Status bar -- */
+#status-bar{padding:11px 16px;border-radius:var(--r);margin-bottom:20px;font-family:'Cinzel',serif;font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;border:1px solid;display:flex;align-items:center;gap:9px}
+#status-bar.loading{border-color:rgba(196,132,90,.25);color:var(--muted);background:rgba(30,22,16,.92)}
+#status-bar.ok{border-color:rgba(201,153,58,.45);color:var(--gold);background:rgba(201,153,58,.1)}
+#status-bar.err{border-color:var(--err);color:var(--err);background:rgba(216,107,88,.07)}
+.sb-spin{width:13px;height:13px;border:2px solid rgba(201,153,58,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+
+/* -- Token grid & cards -- */
+.token-tools{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}.token-tools .field{flex:1;min-width:160px;margin:0}
+/* -- Full token gallery -- */
+.token-grid{display:flex;flex-direction:column;gap:18px;margin-top:16px}
+/* Skeleton glitch effect for refresh state */
+@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+@keyframes glitchFlicker{0%,100%{opacity:.7;transform:translate(0)}8%{opacity:.4;transform:translate(-2px,1px)}16%{opacity:.85;transform:translate(1px,-1px)}24%{opacity:.5;transform:translate(0)}32%{opacity:.9;transform:translate(2px,0)}40%{opacity:.35;transform:translate(-1px,2px)}48%{opacity:.8;transform:translate(0)}56%{opacity:.45;transform:translate(1px,-2px)}64%{opacity:.75;transform:translate(0)}72%{opacity:.5;transform:translate(-2px,0)}80%{opacity:.85;transform:translate(0)}88%{opacity:.4;transform:translate(2px,1px)}96%{opacity:.7;transform:translate(0)}}
+@keyframes glitchScan{0%{top:-10%}100%{top:110%}}
+@keyframes glitchBar{0%,100%{clip-path:inset(0 0 95% 0)}15%{clip-path:inset(40% 0 30% 0)}30%{clip-path:inset(70% 0 5% 0)}45%{clip-path:inset(10% 0 60% 0)}60%{clip-path:inset(80% 0 0% 0)}75%{clip-path:inset(20% 0 50% 0)}90%{clip-path:inset(55% 0 15% 0)}}
+.skeleton{background:rgba(196,132,90,.06);background-image:linear-gradient(90deg,rgba(196,132,90,.06) 0%,rgba(196,132,90,.14) 40%,rgba(196,132,90,.06) 80%);background-size:800px 100%;animation:shimmer 1.4s ease-in-out infinite;border-radius:4px}
+.skeleton-card{width:100%;background:rgba(22,16,12,.8);border:1px solid rgba(196,132,90,.18);border-radius:var(--r);overflow:hidden;min-width:0;position:relative;animation:glitchFlicker 2.5s steps(1) infinite}
+.skeleton-card::before{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(0deg,transparent 0%,rgba(196,132,90,.06) 50%,transparent 100%);height:30%;width:100%;animation:glitchScan 2s linear infinite;opacity:.7}
+.skeleton-card::after{content:'';position:absolute;inset:0;z-index:3;pointer-events:none;background:rgba(201,153,58,.08);animation:glitchBar 3s steps(1) infinite;mix-blend-mode:overlay}
+.skeleton-card .skeleton-hero{aspect-ratio:4/3;background:rgba(196,132,90,.04);background-image:linear-gradient(90deg,rgba(196,132,90,.04) 0%,rgba(196,132,90,.12) 40%,rgba(196,132,90,.04) 80%);background-size:800px 100%;animation:shimmer 1.4s ease-in-out infinite;position:relative;overflow:hidden}
+.skeleton-card .skeleton-hero::after{content:'UPDATING';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.3em;text-transform:uppercase;color:rgba(201,153,58,.4);text-shadow:0 0 12px rgba(201,153,58,.15)}
+.skeleton-card .skeleton-body{padding:16px;display:flex;flex-direction:column;gap:10px}
+.skeleton-card .skeleton-line{height:12px;border-radius:3px}
+.skeleton-card .skeleton-line.w60{width:60%}
+.skeleton-card .skeleton-line.w40{width:40%}
+.skeleton-card .skeleton-line.w80{width:80%}
+.skeleton-card .skeleton-thumbs{display:flex;gap:6px;margin-top:4px}
+.skeleton-card .skeleton-thumb{width:56px;height:56px;border-radius:4px}
+.skeleton-card .skeleton-details{border-top:1px solid rgba(196,132,90,.1);padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.skeleton-card .skeleton-detail-row{display:flex;justify-content:space-between;gap:16px}
+.skeleton-card .skeleton-detail-row .skeleton-line:first-child{width:30%}
+.skeleton-card .skeleton-detail-row .skeleton-line:last-child{width:25%}
+.token-card{width:100%;background:rgba(22,16,12,.75);border:1px solid rgba(196,132,90,.28);border-radius:var(--r);overflow:hidden;min-width:0;cursor:default;box-shadow:0 1px 8px rgba(0,0,0,.25)}
+.token-card:hover{border-color:rgba(196,132,90,.34);box-shadow:none;transform:none}
+.token-card.active,.token-card.pinned{border-color:var(--gold);box-shadow:0 0 0 1px rgba(201,153,58,.22),0 0 28px rgba(201,153,58,.12)}
+.token-card .token-media{aspect-ratio:1/1;background:#090605;display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:.62rem;text-align:center;position:relative}
+.token-card .token-media img,.token-card .token-media video{width:100%;height:100%;object-fit:cover;display:block}
+.token-video-error{display:none;position:absolute;left:12px;right:12px;bottom:12px;z-index:2;font-family:'IBM Plex Mono',monospace;font-size:.68rem;line-height:1.35;color:var(--sand);background:rgba(14,10,8,.82);border:1px solid rgba(196,132,90,.35);border-radius:4px;padding:8px 10px;text-align:center}
+.video-failed .token-video-error{display:block}
+.token-card .token-body{padding:14px;text-align:left}
+.token-pin-status{display:inline-flex;align-items:center;gap:6px;margin-bottom:10px;padding:4px 9px;border-radius:999px;border:1px solid rgba(201,153,58,.35);background:rgba(201,153,58,.10);color:var(--gold);font-family:'Cinzel',serif;font-size:.62rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+.token-pin-status.unpinned{border-color:rgba(196,132,90,.22);background:rgba(232,213,176,.035);color:var(--muted)}
+/* -- Detail panel (shown below grid when a card is selected) -- */
+.token-detail-panel{margin-top:16px;border:1px solid rgba(196,132,90,.28);border-radius:var(--r);background:rgba(14,9,6,.9);overflow:hidden;animation:panelIn .2s ease}
+@keyframes panelIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.token-detail-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);min-height:420px}
+.token-detail-media-col{border-right:1px solid rgba(196,132,90,.16);display:flex;flex-direction:column}
+.token-detail-info-col{display:flex;flex-direction:column;padding:22px 24px;overflow-y:auto;max-height:600px}
+.token-detail-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.4rem,2.8vw,2rem);font-weight:400;color:var(--sand);line-height:1.1;margin-bottom:6px;word-break:break-word}
+.token-detail-meta{font-family:'IBM Plex Mono',monospace;font-size:.75rem;color:var(--muted);margin-bottom:14px;line-height:1.6}
+.token-detail-desc{font-family:'Crimson Pro',serif;font-size:.95rem;color:rgba(232,213,176,.7);line-height:1.65;margin-bottom:18px}
+.token-detail-versions{margin-bottom:18px}
+.token-detail-versions-label{font-family:'Cinzel',serif;font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;color:var(--clay);margin-bottom:8px}
+.token-detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:16px;border-top:1px solid rgba(196,132,90,.12)}
+.token-detail-close{position:absolute;top:12px;right:12px}
+.token-detail-panel{position:relative}
+
+/* thumb media (compact card) */
+.token-meta{font-family:'IBM Plex Mono',monospace;font-size:.75rem;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
+.token-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.token-action-note{flex-basis:100%;font-family:'IBM Plex Mono',monospace;font-size:.68rem;line-height:1.45;color:var(--muted);max-width:360px}
+
+/* -- Pin indicators -- */
+/* Version thumbnail pin overlay */
+.token-version.pinned{border-color:var(--gold);box-shadow:0 0 0 1px rgba(201,153,58,.32),0 0 14px rgba(201,153,58,.12)}
+.token-version-pin{position:absolute;bottom:3px;right:3px;display:inline-flex;align-items:center;justify-content:center;background:rgba(14,10,8,.9);border:1px solid rgba(201,153,58,.5);border-radius:3px;padding:3px 4px;color:var(--gold);line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.token-version-pin .pin-icon{font-size:.7rem;line-height:1}
+
+/* Detail panel pin notice bar */
+.token-pinned-notice{font-family:'Crimson Pro',serif;font-size:.9rem;line-height:1.5;color:var(--gold);background:rgba(201,153,58,.07);border:1px solid rgba(201,153,58,.22);border-radius:5px;padding:9px 13px;margin-bottom:14px}
+.btn-inline-link{background:none;border:none;color:var(--clay);font-family:'Crimson Pro',serif;font-size:inherit;font-weight:600;text-decoration:underline;cursor:pointer;padding:0;display:inline}
+.btn-inline-link:hover{color:var(--gold)}
+
+/* "pinned" chip inside token-detail-meta */
+.token-pinned-chip{display:inline-block;font-family:'Cinzel',serif;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);background:rgba(201,153,58,.1);border:1px solid rgba(201,153,58,.3);border-radius:3px;padding:1px 5px;vertical-align:middle;margin-left:2px}
+
+/* Pinned version value in details table */
+.detail-pin-val{color:var(--gold);font-weight:500}
+.token-version-grid{display:flex;gap:8px;margin-top:10px;overflow-x:auto;padding:0 0 8px;justify-content:center}
+.token-version{background:rgba(232,213,176,.03);border:1px solid rgba(196,132,90,.22);border-radius:5px;overflow:hidden;min-width:68px;max-width:80px;flex:0 0 74px;cursor:pointer;position:relative;transition:transform .18s,border-color .18s,box-shadow .18s}
+.token-version:hover{transform:translateY(-2px);border-color:var(--clay)}
+.token-version.active{border-color:var(--gold);box-shadow:0 0 0 1px rgba(201,153,58,.22)}
+.token-version .token-media{aspect-ratio:1/1;border-bottom:1px solid rgba(196,132,90,.14);padding:0;font-size:.58rem}
+.token-version-body{padding:3px}
+.token-version-title{position:absolute;top:3px;left:3px;background:rgba(14,10,8,.8);border:1px solid rgba(232,213,176,.14);border-radius:3px;padding:1px 5px;font-family:'IBM Plex Mono',monospace;font-size:.58rem;color:var(--sand)}
+.token-version-uri{display:none}
+.token-hero{background:#0e0a08;border:1px solid rgba(196,132,90,.26);border-radius:var(--r);overflow:hidden;margin-top:12px}
+.token-hero-media{min-height:420px;display:flex;align-items:center;justify-content:center;background:#060403;position:relative;overflow:hidden;touch-action:none;cursor:zoom-in}
+.token-hero-media.is-zoomed{cursor:grab}.token-hero-media.is-dragging{cursor:grabbing}
+.token-hero-media img,.token-hero-media video{max-width:100%;max-height:65vh;object-fit:contain;display:block}
+.token-hero-media img.js-zoom-img{transition:transform .12s ease;transform-origin:center center;will-change:transform}
+.token-zoom-tools{position:absolute;right:12px;bottom:12px;z-index:3;display:flex;align-items:center;gap:5px;background:rgba(14,10,8,.8);border:1px solid rgba(196,132,90,.24);border-radius:4px;padding:5px;backdrop-filter:blur(8px)}
+.token-zoom-btn{width:30px!important;min-width:30px;min-height:30px;height:30px;padding:0!important;font-size:.68rem}
+.token-zoom-reset{width:auto!important;min-height:30px;padding:0 8px!important}
+.token-zoom-label{font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--sand);min-width:38px;text-align:center}
+.token-hero-info{display:flex;flex-direction:column;gap:12px;padding:16px 18px;border-top:1px solid rgba(196,132,90,.16)}
+.token-hero-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.3rem,2.5vw,1.9rem);line-height:1.15;font-weight:500;color:var(--sand);margin-bottom:0;overflow-wrap:anywhere;word-break:break-word}
+.token-hero-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-start}
+.nft-details{border-top:1px solid rgba(196,132,90,.2);padding:14px 16px;background:rgba(232,213,176,.04)}
+.nft-details-title{font-family:'Cinzel',serif;font-weight:600;font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--clay);margin-bottom:9px}
+.nft-details-row{display:flex;justify-content:space-between;gap:16px;padding:8px 0;font-family:'IBM Plex Mono',monospace;font-size:.78rem;border-top:1px solid rgba(232,213,176,.05)}
+.nft-details-row span:first-child{color:var(--muted)}.nft-details-row span:last-child{color:var(--sand);text-align:right;overflow-wrap:anywhere}
+.fullscreen-viewer{position:fixed;inset:0;background:rgba(8,5,4,.97);z-index:300;display:none;align-items:center;justify-content:center;padding:24px}.fullscreen-viewer.open{display:flex}.fullscreen-viewer img,.fullscreen-viewer video{max-width:96vw;max-height:92vh;object-fit:contain}.fullscreen-close{position:fixed;top:16px;right:16px}.fullscreen-nav{position:fixed;top:50%;transform:translateY(-50%);width:42px!important;height:42px;border-radius:50%;padding:0!important;justify-content:center}.fullscreen-prev{left:16px}.fullscreen-next{right:16px}.fullscreen-caption{position:fixed;left:22px;right:22px;bottom:16px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--muted);overflow-wrap:anywhere}#fullscreen-media{max-width:96vw;max-height:92vh;display:flex;align-items:center;justify-content:center}
+.token-empty{font-family:'Crimson Pro',serif;color:var(--muted);font-size:.95rem;border:1px dashed rgba(196,132,90,.22);border-radius:var(--r);padding:14px;margin-top:10px}
+.token-loading{display:flex;align-items:center;gap:10px;border-style:solid;background:rgba(201,153,58,.05);position:relative;overflow:hidden}
+.token-loading .sb-spin{width:16px;height:16px}.token-loading-text{display:flex;flex-direction:column;gap:2px}
+.token-loading strong{font-family:'Cinzel',serif;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--sand)}.token-loading span{color:var(--muted);font-size:.88rem}
+.token-loading:after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:loadbar 1.15s linear infinite}@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+#wallet-modal{position:fixed;inset:0;background:rgba(8,5,4,.82);z-index:100;display:none;align-items:center;justify-content:center;padding:18px}#wallet-modal.open{display:flex}
+.wm-box{background:#1e1610;border:1px solid rgba(196,132,90,.35);border-radius:10px;padding:28px;width:370px;max-width:94vw;box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 0 1px rgba(196,132,90,.08)}
+.wm-title{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:1.65rem;color:var(--sand);margin-bottom:5px}
+.wm-sub{font-size:.92rem;color:var(--muted);margin-bottom:20px}
+.wm-btn{display:flex;align-items:center;gap:13px;width:100%;padding:13px 14px;background:rgba(232,213,176,.03);border:1px solid var(--bdr);border-radius:5px;color:var(--sand);font-family:'Cinzel',serif;font-weight:600;font-size:.7rem;letter-spacing:.13em;text-transform:uppercase;cursor:pointer;transition:all .2s;margin-bottom:9px;text-align:left}.wm-btn:hover{border-color:var(--clay);color:var(--clay);transform:translateY(-1px)}.wm-btn:last-child{margin-bottom:0}
+.wm-btn .wm-icon{width:32px;height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.68rem;flex-shrink:0;color:var(--linen);font-family:'Cinzel',serif}
+.wm-btn .wm-desc{font-family:'Crimson Pro',serif;font-size:.9rem;letter-spacing:0;text-transform:none;color:var(--muted);font-weight:400;margin-top:2px;line-height:1.35}
+.wm-cancel{width:100%;margin-top:10px;background:transparent;border:none;color:var(--muted);font-family:'Crimson Pro',serif;font-size:.95rem;cursor:pointer;padding:8px}.wm-cancel:hover{color:var(--sand)}
+.wm-badge{font-size:.55rem;padding:2px 6px;border-radius:999px;background:rgba(201,153,58,.1);color:var(--gold);border:1px solid rgba(201,153,58,.3);margin-left:auto;font-family:'Cinzel',serif;white-space:nowrap;letter-spacing:.1em}
+@media(max-width:900px){.wrap{width:min(100% - 28px,1100px)}header{align-items:flex-start;flex-direction:column;margin-bottom:26px}.hdr-right{justify-content:flex-start;width:100%}.token-hero-media{min-height:300px}.token-hero-actions{width:100%}.token-hero-actions .btn{flex:1 1 160px}.title{font-size:clamp(1.65rem,9vw,2.5rem)}}
+@media(max-width:620px){body{font-size:15px;line-height:1.55}.wrap{width:min(100% - 36px,1100px);padding-bottom:44px}#status-bar{font-size:.56rem;line-height:1.35;padding:10px 12px;margin-bottom:12px}.row2{grid-template-columns:1fr}.card{padding:14px;margin-bottom:12px}.card-title{font-size:1.1rem;align-items:flex-start;flex-wrap:wrap}.tag{font-size:.6rem;letter-spacing:.2em}.title{margin-bottom:18px}.preconnect-panel{min-height:calc(100vh - 80px);padding:40px 20px}.preconnect-title{font-size:clamp(2rem,11vw,3.2rem)}.preconnect-copy{font-size:.92rem;margin-bottom:28px}.preconnect-actions{align-items:stretch}.btn-connect-hero{width:100%}.token-tools{display:grid;grid-template-columns:1fr;gap:10px}.token-tools .field{min-width:0}.token-version-grid{justify-content:flex-start;gap:6px;padding:2px 0 8px}.token-version{flex-basis:62px;min-width:62px;max-width:68px}.token-detail-layout{grid-template-columns:1fr}.token-detail-media-col{border-right:none;border-bottom:1px solid rgba(196,132,90,.16)}.token-detail-info-col{max-height:none;padding:16px}.token-hero-media{min-height:0;aspect-ratio:1/1;max-height:60vh}.token-hero-media img,.token-hero-media video{max-height:60vh}.token-zoom-tools{right:6px;bottom:6px;padding:4px;gap:3px}.token-zoom-btn{width:28px!important;min-width:28px;height:28px;min-height:28px}.token-zoom-reset{min-height:28px;padding:0 7px!important}.token-zoom-label{display:none}.token-detail-actions .btn,.preconnect-actions .btn,.hdr-right .btn{width:100%;justify-content:center}.token-grid{gap:12px}.hdr-right select,.hdr-right .addr-pill{width:100%;justify-content:center}.nft-details{padding:12px}.nft-details-row{display:grid;grid-template-columns:1fr;gap:2px}.nft-details-row span:last-child{text-align:left}.btn{min-height:42px}.logo-text{font-size:.65rem;letter-spacing:.12em}.fullscreen-nav{width:36px!important;height:36px}.fullscreen-prev{left:8px}.fullscreen-next{right:8px}.fullscreen-close{top:8px;right:8px}}
+</style>
+</head>
+<body class="preconnect">
+
+<div id="wallet-modal">
+ <div class="wm-box">
+ <div class="wm-title">Connect Your Wallet</div>
+ <div class="wm-sub">Choose how you want to connect.</div>
+ <button class="wm-btn" id="wm-temple">
+ <div class="wm-icon" style="background:#9e4f2e">TZ</div>
+ <div>
+ <div style="display:flex;align-items:center;gap:8px">Temple <span class="wm-badge">Direct</span></div>
+ <div class="wm-desc">Connect directly with your Temple browser extension.</div>
+ </div>
+ </button>
+ <button class="wm-btn" id="wm-beacon">
+ <div class="wm-icon" style="background:#261a13;border:1px solid var(--bdr)">BC</div>
+ <div>
+ <div>Beacon Wallet</div>
+ <div class="wm-desc">Use Beacon if you prefer Temple, Kukai, Naan, AirGap, or mobile wallets.</div>
+ </div>
+ </button>
+ <button class="wm-cancel" id="wm-cancel">Not now</button>
+ </div>
+</div>
+
+<!-- ── SITE NAV (matches kaysworks.com) ── -->
+<nav id="siteNav" class="site-nav">
+ <a href="/" class="site-nav-logo"><span style="font-weight:600">KAY'S</span>&nbsp;<span style="font-weight:500">WORKS</span></a>
+ <ul class="site-nav-links">
+ <li><a href="/">Home</a></li>
+ <li><a href="/apoti-olowe" class="site-nav-series">Àpótí Ọlọ́wẹ̀</a></li>
+ <li><a href="/auction">Auction</a></li>
+ </ul>
+ <div class="site-nav-mobile-controls" id="pinMobileControls">
+ <button class="site-nav-hamburger" id="pinHamburger" aria-label="Menu"><span></span><span></span><span></span></button>
+ </div>
+</nav>
+
+<!-- Mobile nav drawer -->
+<div class="site-mobile-nav" id="pinMobileNav">
+ <button class="site-mobile-nav-close" id="pinMobileNavClose" aria-label="Close menu">&#x2715;</button>
+ <a href="/">Home</a>
+ <a href="/apoti-olowe" style="font-family:'Cinzel',serif;font-size:1.1rem;letter-spacing:0.15em;color:var(--gold);font-style:normal;">Àpótí Ọlọ́wẹ̀</a>
+ <a href="/auction">Auction</a>
+</div>
+
+<button class="theme-toggle-pin" id="pinThemeToggle" title="Toggle light/dark mode"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3a7 7 0 107 7c-3.87 0-7-3.13-7-7z" fill="currentColor"/></svg></button>
+<div class="wrap">
+
+ <header>
+ <div class="logo">
+<div class="logo-text">Kay's Works <em>Collector</em> &middot; Tezos</div>
+ </div>
+ <div class="hdr-right">
+ <select class="net" id="net-sel">
+ <option value="mainnet">Mainnet</option>
+ <option value="ghostnet">Ghostnet (testnet)</option>
+ </select>
+ <span class="addr-pill" id="addr-pill"></span>
+ <button class="btn btn-ghost btn-sm" id="btn-disconnect" style="display:none">Disconnect</button>
+ </div>
+ </header>
+
+ <div class="preconnect-panel">
+ <div class="preconnect-eyebrow">FA2 Metadata Pinning &middot; Tezos</div>
+ <h1 class="preconnect-title">Choose the Artwork<br><em>You Want to Pin</em></h1>
+ <p class="preconnect-copy">Connect your Tezos wallet and this page will find your FA2 collections, load your tokens, and let you pin the metadata version you want displayed.</p>
+ <div class="preconnect-actions">
+ <button class="btn btn-acc btn-connect-hero" id="btn-connect-intro" type="button" disabled>Connect Wallet</button>
+ </div>
+ <div class="preconnect-wallets">
+ <span id="wallet-hint" class="preconnect-wallet-hint">Detecting wallet&hellip;</span>
+ </div>
+ <div style="margin-top:24px"><button class="btn btn-ghost" id="btn-browse-mode" style="font-size:.82rem;padding:10px 22px">Browse a Collection Without a Wallet</button></div>
+ </div>
+
+ <div class="page-title-area">
+ <div class="tag">Your collector access</div>
+ <div class="title">Choose the Artwork <em>You Want to Pin</em></div>
+ <div class="browse-mode-hint" style="display:none;font-family:Crimson Pro,serif;font-size:.9rem;color:var(--muted);margin-top:6px">Viewing mode &mdash; connect a wallet to pin metadata</div>
+ </div>
+
+ <div id="status-bar" class="loading collector-flow">
+ <div class="sb-spin"></div>
+ <span id="status-txt">Ready.</span>
+ </div>
+
+ <div class="card collector-flow">
+ <div class="card-title">Choose Your Collection</div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+ <div class="field" style="flex:1;min-width:240px;margin:0"><label>Your collection contract</label><input id="contract-addr" placeholder="Paste the KT1 contract address" /></div>
+ <button class="btn btn-sec" id="btn-load-contract">Open Collection</button>
+ </div>
+ <div class="hint">Paste your KT1 collection address, or connect your wallet and let this page find the FA2 collections you hold.</div>
+ </div>
+
+ <div class="card collector-flow" id="fa2-card">
+ <div class="card-title">Your FA2 Collections <span class="badge badge-g">Wallet</span></div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+ <button class="btn btn-sec" id="btn-discover-fa2">Find My Collections</button>
+ </div>
+ <div id="discovered-contracts" class="token-empty">Connect your wallet and I will look for your pinnable FA2 collections.</div>
+ </div>
+
+ <div id="deployed-banner" class="collector-flow">
+ <div class="banner-lbl">Your Collection Is Open</div>
+ <div class="banner-addr" id="ct-addr-display"></div>
+ <div class="banner-acts"><a id="tzkt-link" href="#" target="_blank" class="btn btn-sec btn-sm">View Your Collection on TzKT</a></div>
+ </div>
+
+ <div class="card collector-flow">
+ <div class="card-title">Your Token Gallery <span class="badge badge-g">Ready to pin</span></div>
+ <div class="token-tools">
+ <div class="field"><label>Start at token ID</label><input id="gallery-start" type="number" min="0" value="0" /></div>
+ <div class="field"><label>How many tokens do you want to see?</label><input id="gallery-count" type="number" min="1" max="100" value="24" /></div>
+ <button class="btn btn-sec" id="btn-load-gallery">Show These Tokens</button>
+ <button class="btn btn-ghost" id="btn-refresh-pins" style="display:none">&#x1F4CC; Refresh Pin Status</button>
+
+
+ </div>
+ <div class="hint">You can compare each metadata option before you pin. If you unpin later, your token returns to its latest metadata.</div>
+ <div id="collector-grid" class="token-grid"><div class="token-empty">Open your collection to preview your token images.</div></div>
+ </div>
+
+ <div class="collector-flow" style="margin-top:28px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+ <div class="tag" style="margin:0">Your Activity</div>
+ <button class="btn btn-ghost btn-sm" id="btn-clr-log">Clear Activity</button>
+ </div>
+ <div class="log collector-flow" id="log"><span class="linfo">Getting ready for you...</span></div>
+</div>
+
+<script>
+(function() {
+ window.global = window.global || window;
+ window.beaconSdkDebugEnabled = true;
+ if (window.Buffer) return;
+ function bytesToBinary(bytes) {
+ var s = '';
+ for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+ return s;
+ }
+ class BrowserBuffer extends Uint8Array {
+ static from(value, enc) {
+ if (typeof value === 'string') {
+ if (enc === 'hex') {
+ var out = new BrowserBuffer(value.length / 2);
+ for (var i = 0; i < out.length; i++) out[i] = parseInt(value.substr(i * 2, 2), 16);
+ return out;
+ }
+ if (enc === 'base64') {
+ var bin = atob(value);
+ var b64 = new BrowserBuffer(bin.length);
+ for (var j = 0; j < bin.length; j++) b64[j] = bin.charCodeAt(j);
+ return b64;
+ }
+ return new BrowserBuffer(new TextEncoder().encode(value));
+ }
+ return new BrowserBuffer(value || []);
+ }
+ static alloc(size) { return new BrowserBuffer(size); }
+ static isBuffer(value) { return value instanceof Uint8Array; }
+ toString(enc) {
+ if (enc === 'hex') {
+ return Array.from(this).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+ }
+ if (enc === 'base64') return btoa(bytesToBinary(this));
+ return new TextDecoder().decode(this);
+ }
+ }
+ window.Buffer = BrowserBuffer;
+})();
+globalThis.Buffer = window.Buffer;
+var Buffer = window.Buffer;
+</script>
+<script src="./taquito-bundle.js"></script>
+<script>
+window.addEventListener('load', function() {
+ var statusBar = document.getElementById('status-bar');
+ var statusTxt = document.getElementById('status-txt');
+ var logEl = document.getElementById('log');
+ var bundle = window.TaquitoBundle;
+ if (bundle && bundle.default) bundle = bundle.default;
+ var TezosToolkit = bundle && bundle.TezosToolkit;
+ var BeaconWallet = bundle && bundle.BeaconWallet;
+ var RPCS = {
+ ghostnet:['https://ghostnet.tezos.ecadinfra.com','https://rpc.ghostnet.teztnets.com','https://ghostnet.smartpy.io'],
+ mainnet:['https://mainnet.tezos.ecadinfra.com','https://rpc.tzkt.io/mainnet','https://mainnet.smartpy.io','https://mainnet.api.tez.ie']
+ };
+ var TZKT = { ghostnet:'https://ghostnet.tzkt.io', mainnet:'https://tzkt.io' };
+ var network = 'mainnet';
+ var Tezos, wallet, userAddr, ct, ctAddr;
+
+ function log(msg, type) {
+ type = type || 'info';
+ var cls = type === 'ok' ? 'lok' : type === 'err' ? 'lerr' : type === 'warn' ? 'lwarn' : 'linfo';
+ logEl.innerHTML += '<br><span class="'+cls+'">'+esc(msg)+'</span>';
+ logEl.scrollTop = logEl.scrollHeight;
+ }
+ function esc(v) { return String(v).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+ function errorText(e) { return !e ? 'Unknown error' : (typeof e === 'string' ? e : (e.message || e.description || e.title || String(e))); }
+function networkName() { return network === 'ghostnet' ? 'Ghostnet' : 'Mainnet'; }
+ function beaconNetworkConfig() {
+ var cfg = { type: network };
+ if (network !== 'mainnet') cfg.rpcUrl = RPCS[network] && RPCS[network][0] || '';
+ return cfg;
+ }
+ function createBeaconWallet() {
+ wallet = new BeaconWallet({ name:'NFT Collector Pinning', network: beaconNetworkConfig(), preferredNetwork: network });
+ Tezos.setWalletProvider(wallet);
+ return wallet;
+ }
+ async function resetBeaconWallet() {
+ if (wallet) {
+ try { await wallet.clearActiveAccount(); } catch(_) {}
+ if (wallet.client && typeof wallet.client.destroy === 'function') {
+ try { await wallet.client.destroy(); } catch(_) {}
+ }
+ }
+ return createBeaconWallet();
+ }
+ async function setNetwork(net) {
+ network = net;
+ if (wallet) {
+ try { await wallet.clearActiveAccount(); } catch(_) {}
+ if (wallet.client && typeof wallet.client.destroy === 'function') {
+ try { await wallet.client.destroy(); } catch(_) {}
+ }
+ }
+ Tezos = new TezosToolkit(RPCS[network][0]);
+ createBeaconWallet();
+ ct = null; ctAddr = null; userAddr = null;
+ document.getElementById('addr-pill').classList.remove('show');
+ document.getElementById('btn-disconnect').style.display = 'none';
+ document.getElementById('deployed-banner').classList.remove('show');
+ document.body.classList.add('preconnect');
+ document.body.classList.remove('wallet-ready');
+ var fa2Card = document.getElementById('fa2-card'); if (fa2Card) fa2Card.classList.remove('fa2-found');
+ statusBar.style.display = 'none';
+ }
+ function shortAddr(a) { return a ? a.slice(0, 6) + '...' + a.slice(-4) : ''; }
+ function oneLineJson(value, maxLen) {
+ var s;
+ try { s = JSON.stringify(value); }
+ catch(_) { s = String(value); }
+ if (maxLen && s.length > maxLen) return s.slice(0, maxLen) + '...';
+ return s;
+ }
+ function compactKeys(obj) {
+ if (!obj) return 'none';
+ try {
+ var keys = [];
+ var cur = obj;
+ while (cur && cur !== Object.prototype && keys.length < 40) {
+ Object.getOwnPropertyNames(cur).forEach(function(k) {
+ if (keys.indexOf(k) < 0 && k !== 'constructor') keys.push(k);
+ });
+ cur = Object.getPrototypeOf(cur);
+ }
+ return keys.slice(0, 24).join(', ') || typeof obj;
+ } catch(e) { return typeof obj; }
+ }
+ function makeCloneable(value) {
+ var seen = [];
+ return JSON.parse(JSON.stringify(value, function(key, val) {
+ if (typeof val === 'function' || typeof val === 'undefined') return undefined;
+ if (typeof val === 'bigint') return val.toString();
+ if (val && typeof val === 'object') {
+ if (seen.indexOf(val) >= 0) return undefined;
+ seen.push(val);
+ }
+ return val;
+ }));
+ }
+ function extractOpHash(value) {
+ if (!value) return null;
+ if (typeof value === 'string') return /^o[a-zA-Z0-9]{50,}$/.test(value) ? value : null;
+ if (typeof value !== 'object') return value && value.toString ? extractOpHash(value.toString()) : null;
+ var keys = ['opHash','hash','operationHash','operation_hash','transactionHash','transaction_hash'];
+ for (var i = 0; i < keys.length; i++) {
+ var v = value[keys[i]];
+ if (typeof v === 'string' && v.length > 10) return v;
+ }
+ // Deep-search common wrappers
+ var wrappers = ['receipt','operation','result','data','payload'];
+ for (var w = 0; w < wrappers.length; w++) {
+ if (value[wrappers[w]]) {
+ var found = extractOpHash(value[wrappers[w]]);
+ if (found) return found;
+ }
+ }
+ // Search all own string properties for something that looks like an op hash
+ try {
+ var ownKeys = Object.keys(value);
+ for (var k = 0; k < ownKeys.length; k++) {
+ var prop = value[ownKeys[k]];
+ if (typeof prop === 'string' && /^o[a-zA-Z0-9]{50,}$/.test(prop)) return prop;
+ }
+ } catch(_) {}
+ if (Array.isArray(value)) {
+ for (var j = 0; j < value.length; j++) {
+ var found = extractOpHash(value[j]);
+ if (found) return found;
+ }
+ }
+ return null;
+ }
+ function randomId() {
+ return 'temple-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+ }
+ function templeDappNetwork() {
+ return network === 'mainnet' ? 'mainnet' : { name:network, rpc:RPCS[network][0] };
+ }
+ function templePageRequest(payload, timeoutMs) {
+ timeoutMs = timeoutMs || 60000;
+ return new Promise(function(resolve, reject) {
+ var reqId = randomId();
+ var timer;
+ function done(fn, value) {
+ clearTimeout(timer);
+ window.removeEventListener('message', onMessage);
+ fn(value);
+ }
+ function onMessage(evt) {
+ var data = evt.data;
+ if (evt.source !== window || !data || data.reqId !== reqId) return;
+ if (data.type === 'TEMPLE_PAGE_RESPONSE') done(resolve, data.payload);
+ else if (data.type === 'TEMPLE_PAGE_ERROR_RESPONSE') done(reject, new Error(Array.isArray(data.payload) ? data.payload.join(': ') : String(data.payload || 'Temple rejected the request')));
+ }
+ window.addEventListener('message', onMessage);
+ window.postMessage({ type:'TEMPLE_PAGE_REQUEST', payload:makeCloneable(payload), reqId:reqId }, '*');
+ timer = setTimeout(function() { done(reject, new Error('Temple did not answer. Unlock Temple and allow this page.')); }, timeoutMs);
+ });
+ }
+ function templeDirectAvailable(timeoutMs) {
+ timeoutMs = timeoutMs || 800;
+ return new Promise(function(resolve) {
+ var timer;
+ function finish(ok) {
+ clearTimeout(timer);
+ window.removeEventListener('message', onMessage);
+ resolve(ok);
+ }
+ function onMessage(evt) {
+ var data = evt.data;
+ if (evt.source === window && data && data.type === 'TEMPLE_PAGE_RESPONSE' && data.payload === 'PONG') finish(true);
+ }
+ window.addEventListener('message', onMessage);
+ window.postMessage({ type:'TEMPLE_PAGE_REQUEST', payload:'PING' }, '*');
+ timer = setTimeout(function() { finish(false); }, timeoutMs);
+ });
+ }
+ function templeDiagnostics() {
+ return [
+ 'templeWallet.tezos=' + compactKeys(window.templeWallet && window.templeWallet.tezos),
+ 'templeWallet=' + compactKeys(window.templeWallet),
+ 'temple.tezos=' + compactKeys(window.temple && window.temple.tezos),
+ 'temple=' + compactKeys(window.temple),
+ 'thanos=' + compactKeys(window.thanos)
+ ].join(' | ');
+ }
+ async function requestTempleDirectPermission() {
+ return templePageRequest({
+ type:'PERMISSION_REQUEST',
+ network:templeDappNetwork(),
+ appMeta:{ name:'NFT Collector Pinning' },
+ force:true
+ }, 90000);
+ }
+ function templeDirectProvider(permission) {
+ async function resolveWalletParams(params) { return typeof params === 'function' ? params() : params; }
+ async function resolveOperationInput(value) {
+ while (typeof value === 'function') value = value();
+ if (value && typeof value.then === 'function') value = await value;
+ return value;
+ }
+ function unwrapOperationContainer(value) {
+ if (!value || Array.isArray(value)) return value;
+ if (Array.isArray(value.opParams)) return value.opParams;
+ if (Array.isArray(value.contents)) return value.contents;
+ if (value.operation && Array.isArray(value.operation.contents)) return value.operation.contents;
+ if (value.params) return value.params;
+ return value;
+ }
+ async function cleanOperations(ops) {
+ var resolved = unwrapOperationContainer(await resolveOperationInput(ops));
+ var arr = Array.isArray(resolved) ? resolved : [resolved];
+ return makeCloneable(arr).map(function(op) {
+ if (!op) return op;
+ if (!op.kind && (op.destination || op.to || op.contract || op.address)) {
+ op.kind = 'transaction';
+ if (!op.destination) op.destination = op.to || op.contract || op.address;
+ if (op.amount === undefined) op.amount = '0';
+ }
+ return op;
+ }).filter(function(op) { return op && op.kind; });
+ }
+ return {
+ getPKH:function() { return Promise.resolve(permission.pkh); },
+ mapTransferParamsToWalletParams:resolveWalletParams,
+ mapOriginateParamsToWalletParams:resolveWalletParams,
+ mapDelegateParamsToWalletParams:resolveWalletParams,
+ sendOperations:async function(ops) {
+ var opParams = await cleanOperations(ops);
+ if (!opParams.length) throw new Error('Temple direct adapter received no operation payload.');
+ log('Temple operation prepared: ' + oneLineJson(opParams[0], 420), 'info');
+ var response = await templePageRequest({ type:'OPERATION_REQUEST', sourcePkh:permission.pkh, opParams:opParams }, 120000);
+ var opHash = extractOpHash(response);
+ if (!opHash && response) {
+ log('Temple response shape: ' + oneLineJson(response, 800), 'warn');
+ // Temple confirmed the operation (no error thrown) but returned the hash in an unexpected shape.
+ // Use the stringified response as a fallback identifier.
+ var fallback = typeof response === 'string' ? response : null;
+ if (!fallback) {
+ // Last resort: stringify and look for the hash pattern inside it
+ try {
+ var s = JSON.stringify(response);
+ var m = s.match(/o[a-zA-Z0-9]{50,}/);
+ if (m) fallback = m[0];
+ } catch(_){}
+ }
+ if (fallback) {
+ opHash = fallback;
+ } else {
+ log('Temple confirmed the operation but the hash could not be read. The transaction likely succeeded.', 'warn');
+ opHash = 'unknown';
+ }
+ }
+ if (!opHash) throw new Error('Temple returned no response for this operation.');
+ log('Temple submitted: ' + opHash, 'ok');
+ return { opHash:opHash, confirmation:function() { return Promise.resolve({ opHash:opHash }); } };
+ },
+ sign:async function(bytes) {
+ var signature = await templePageRequest({ type:'SIGN_REQUEST', sourcePkh:permission.pkh, payload:bytes }, 90000);
+ return { bytes:bytes, sig:signature, prefixSig:signature, sbytes:bytes + signature };
+ }
+ };
+ }
+ function finishConnect(addr) {
+ userAddr = addr;
+ document.getElementById('wallet-modal').classList.remove('open');
+ document.getElementById('addr-pill').textContent = shortAddr(userAddr);
+ document.getElementById('addr-pill').classList.add('show');
+ document.getElementById('btn-disconnect').style.display = 'inline-flex';
+ // Show status bar now that we're in the collector flow
+ statusBar.style.display = 'flex';
+ statusBar.className = 'ok';
+ statusTxt.textContent = 'Connected � ' + shortAddr(addr);
+ document.body.classList.remove('preconnect');
+ document.body.classList.add('wallet-ready');
+ }
+ function req() {
+ if (!ct) throw new Error('Open your collection first.');
+ }
+ function reqWallet() {
+ req();
+ if (!userAddr) throw new Error('Connect your wallet first.');
+ }
+ function natFromInput(id, label) {
+ var n = Number(document.getElementById(id).value);
+ if (!Number.isInteger(n) || n < 0) throw new Error('Enter a valid ' + label + '.');
+ return n;
+ }
+ function galleryCount() {
+ var n = natFromInput('gallery-count', 'gallery count');
+ if (n < 1 || n > 100) throw new Error('Choose between 1 and 100 tokens to view.');
+ return n;
+ }
+function gatewayUrl(uri) {
+ uri = String(uri || '').trim();
+ if (!uri) return '';
+ if (/^ipfs:\/\//i.test(uri)) return 'https://ipfs.io/ipfs/' + uri.replace(/^ipfs:\/\//i, '');
+ if (/^ipfs\//i.test(uri)) return 'https://ipfs.io/' + uri;
+ return uri;
+ }
+function ipfsPath(uri) {
+ uri = String(uri || '').trim();
+ if (/^ipfs:\/\//i.test(uri)) return uri.replace(/^ipfs:\/\//i, '').replace(/^ipfs\//i, '');
+ if (/^ipfs\//i.test(uri)) return uri.replace(/^ipfs\//i, '');
+ return '';
+}
+function gatewayUrls(uri) {
+ var primary = gatewayUrl(uri);
+ var path = ipfsPath(uri);
+ var urls = primary ? [primary] : [];
+ if (path) {
+ // Reliable, well-CORSed gateways first. ipfs.io is primary; others are fallbacks.
+ ['https://cloudflare-ipfs.com/ipfs/','https://dweb.link/ipfs/','https://gateway.pinata.cloud/ipfs/','https://w3s.link/ipfs/','https://nftstorage.link/ipfs/','https://cf-ipfs.com/ipfs/'].forEach(function(base) {
+ var alt = base + path;
+ if (urls.indexOf(alt) === -1) urls.push(alt);
+ });
+ }
+ return urls;
+}
+ 
+ function skeletonCardHtml() {
+ return '<div class="skeleton-card"><div class="skeleton-hero skeleton"></div>' +
+ '<div class="skeleton-body">' +
+ '<div class="skeleton skeleton-line w60"></div>' +
+ '<div class="skeleton skeleton-line w40"></div>' +
+ '<div class="skeleton skeleton-line w80"></div>' +
+ '<div class="skeleton-thumbs"><div class="skeleton skeleton-thumb"></div><div class="skeleton skeleton-thumb"></div><div class="skeleton skeleton-thumb"></div></div>' +
+ '</div>' +
+ '<div class="skeleton-details">' +
+ '<div class="skeleton-detail-row"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>' +
+ '<div class="skeleton-detail-row"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>' +
+ '<div class="skeleton-detail-row"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>' +
+ '<div class="skeleton-detail-row"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>' +
+ '</div></div>';
+ }
+ function showSkeletonGrid(count) {
+ var grid = document.getElementById('collector-grid');
+ if (!grid) return;
+ var html = '';
+ for (var s = 0; s < (count || 4); s++) html += skeletonCardHtml();
+ grid.innerHTML = html;
+ }
+
+ var _isRefreshing = false;
+ function setGalleryLoading(title, detail) {
+ if (_isRefreshing) { showSkeletonGrid(window._galleryItems ? window._galleryItems.length : 4); return; }
+var grid = document.getElementById('collector-grid');
+if (!grid) return;
+grid.innerHTML = '<div class="token-empty token-loading"><div class="sb-spin"></div><div class="token-loading-text"><strong>'+esc(title || 'Loading your tokens')+'</strong><span>'+esc(detail || 'Fetching your collection and token metadata...')+'</span></div></div>';
+}
+function mediaKindFromMime(mime) {
+ mime = String(mime || '').toLowerCase();
+ if (mime.indexOf('video/') === 0) return 'video';
+ if (mime.indexOf('image/') === 0) return 'image';
+ if (mime.indexOf('model/') === 0 || mime.indexOf('gltf') !== -1 || mime.indexOf('glb') !== -1) return 'model';
+ return '';
+}
+function mediaKindFromUri(uri) {
+ uri = String(uri || '').split('?')[0].split('#')[0].toLowerCase();
+ if (/\.(mp4|m4v|mov|webm|ogv|ogg|avi|mkv)$/.test(uri)) return 'video';
+ if (/\.(png|jpg|jpeg|gif|webp|svg|avif|bmp)$/.test(uri)) return 'image';
+ if (/\.(glb|gltf)$/.test(uri)) return 'model';
+ return '';
+}
+function metadataFormats(meta) {
+ var formats = meta && (meta.formats || meta.display || meta.assets);
+ return Array.isArray(formats) ? formats : [];
+}
+function formatUri(format) {
+ return format && (format.uri || format.fileName || format.file_name || format.artifactUri || format.artifact_uri || format.displayUri || format.display_uri || '');
+}
+function metadataMediaKind(meta, uri) {
+ if (!meta || typeof meta !== 'object') return mediaKindFromUri(uri);
+ // 1) Top-level MIME is authoritative when present.
+ var topMime = meta.mimeType || meta.mime_type || meta.contentType || meta.content_type;
+ var direct = mediaKindFromMime(topMime);
+ if (direct) return direct;
+ // 2) If a uri is given, prefer the matching format entry.
+ var formats = metadataFormats(meta);
+ for (var f = 0; f < formats.length; f++) {
+ var fmt = formats[f] || {};
+ var fUri = formatUri(fmt);
+ if (!uri || !fUri || gatewayUrl(fUri) === gatewayUrl(uri) || fUri === uri) {
+ var k = mediaKindFromMime(fmt.mimeType || fmt.mime_type || fmt.contentType || fmt.content_type);
+ if (k) return k;
+ }
+ }
+ // 3) Fall back: any video format anywhere wins (multi-metadata often lists video first in formats).
+ for (var g = 0; g < formats.length; g++) {
+ var f2 = formats[g] || {};
+ var k2 = mediaKindFromMime(f2.mimeType || f2.mime_type || f2.contentType || f2.content_type);
+ if (k2 === 'video') return 'video';
+ }
+ // 4) Last resort: file extension on the URI.
+ return mediaKindFromUri(uri);
+}
+function metadataMediaMime(meta, uri) {
+ if (!meta || typeof meta !== 'object') return '';
+ var direct = meta.mimeType || meta.mime_type || meta.contentType || meta.content_type || '';
+ if (!direct) {
+ var formats = metadataFormats(meta);
+ // Prefer the format whose URI matches.
+ for (var f = 0; f < formats.length; f++) {
+ var fmt = formats[f] || {};
+ var fUri = formatUri(fmt);
+ if (!uri || !fUri || gatewayUrl(fUri) === gatewayUrl(uri) || fUri === uri) {
+ direct = fmt.mimeType || fmt.mime_type || fmt.contentType || fmt.content_type || direct;
+ if (direct) break;
+ }
+ }
+ // Otherwise take the first format MIME we can find.
+ if (!direct) {
+ for (var g = 0; g < formats.length; g++) {
+ var f2 = formats[g] || {};
+ direct = f2.mimeType || f2.mime_type || f2.contentType || f2.content_type || direct;
+ if (direct) break;
+ }
+ }
+ }
+ direct = String(direct || '').toLowerCase();
+ if (direct === 'video/quicktime') return 'video/mp4';
+ if (direct === 'video/x-m4v') return 'video/mp4';
+ if (direct === 'video/ogg') return 'video/ogg';
+ return direct;
+}
+function mediaUriFromMetadata(meta, fallbackUri) {
+ if (!meta || typeof meta !== 'object') return fallbackUri || '';
+ var artifactUri = meta.artifactUri || meta.artifact_uri || '';
+ var displayUri  = meta.displayUri || meta.display_uri || '';
+ var imageUri    = meta.image || meta.imageUri || meta.image_uri || '';
+ var thumbUri    = meta.thumbnailUri || meta.thumbnail_uri || '';
+ // If metadata declares video at the top level, artifactUri is the video file.
+ // displayUri / thumbnailUri are typically still-image previews of that video.
+ var topKind = mediaKindFromMime(meta.mimeType || meta.mime_type || meta.contentType || meta.content_type);
+ if (topKind === 'video' && artifactUri) return artifactUri;
+ // Scan formats for any video and return its URI.
+ var formats = metadataFormats(meta);
+ for (var f = 0; f < formats.length; f++) {
+ var fmt = formats[f] || {};
+ var k = mediaKindFromMime(fmt.mimeType || fmt.mime_type || fmt.contentType || fmt.content_type);
+ var u = formatUri(fmt);
+ if (k === 'video' && u) return u;
+ }
+ // No declared video — pick the first available candidate.
+ var candidates = [artifactUri, displayUri, imageUri, thumbUri, fallbackUri || ''].filter(Boolean);
+ // If any candidate URI has a video extension, prefer it.
+ for (var i = 0; i < candidates.length; i++) {
+ if (mediaKindFromUri(candidates[i]) === 'video') return candidates[i];
+ }
+ return candidates[0] || '';
+}
+ async function fetchJsonMaybe(uri) {
+ var urls = gatewayUrls(uri);
+ if (!urls.length) throw new Error('Empty URI (input was: ' + JSON.stringify(uri) + ')');
+ var report = [];
+ report.push('URI: ' + uri);
+ report.push('Gateways tried: ' + urls.length);
+ for (var i = 0; i < urls.length; i++) {
+ var url = urls[i];
+ var label = 'GW' + (i+1) + ' (' + url.replace(/^https?:\/\//,'').split('/')[0] + ')';
+ try {
+ var controller = new AbortController();
+ var timer = setTimeout(function(){ controller.abort(); }, 8000);
+ var res;
+ try {
+ res = await fetch(url, { cache:'no-store', signal: controller.signal, mode:'cors' });
+ } finally {
+ clearTimeout(timer);
+ }
+ if (!res.ok) {
+ report.push(label + ': HTTP ' + res.status);
+ continue;
+ }
+ var ct = (res.headers.get('content-type') || '').toLowerCase();
+ var text = await res.text();
+ // Try to parse JSON even if content-type is wrong (some gateways send text/plain).
+ try {
+ var json = JSON.parse(text);
+ // Success — return early.
+ return json;
+ } catch (parseErr) {
+ var preview = text.slice(0, 60).replace(/\s+/g,' ');
+ report.push(label + ': not JSON (ct=' + (ct||'?') + ', body="' + preview + '...")');
+ continue;
+ }
+ } catch (netErr) {
+ var msg = (netErr && netErr.name === 'AbortError') ? 'timeout' : ((netErr && netErr.message) || String(netErr));
+ report.push(label + ': ' + msg);
+ continue;
+ }
+ }
+ throw new Error(report.join(' | '));
+ }
+ async function tokenInfo(tokenId) {
+ var info = await ct.contractViews.get_token_info(tokenId).executeView({viewCaller:userAddr || 'tz1burnburnburnburnburnburnburjAYjjX'});
+ var activeIndex = Number(info.active_index);
+ var count = Number(info.uri_count);
+ var activeUri = await ct.contractViews.get_active_uri(tokenId).executeView({viewCaller:userAddr || 'tz1burnburnburnburnburnburnburjAYjjX'});
+ var versions = [];
+ for (var i = 0; i < count; i++) {
+ var uri = await ct.contractViews.get_uri_at({token_id:tokenId,index:i}).executeView({viewCaller:userAddr || 'tz1burnburnburnburnburnburnburjAYjjX'});
+ var metadata;
+ try { metadata = await fetchJsonMaybe(uri); }
+ catch(e) {
+ var diag = errorText(e);
+ try { console.error('[tezos-pin] metadata fetch failed', { tokenId:tokenId, index:i, uri:uri, error:e }); } catch(_) {}
+ metadata = { name:'Token #' + tokenId + ' Metadata #' + i, description:'On-chain URI: ' + uri + '\n\nFetch diagnostics:\n' + diag };
+ }
+ var mediaUri = mediaUriFromMetadata(metadata, uri);
+ versions.push({ index:i, uri:uri, metadata:metadata, mediaUri:mediaUri, mediaKind:metadataMediaKind(metadata, mediaUri), mediaMime:metadataMediaMime(metadata, mediaUri), isActive:i === activeIndex });
+ }
+ // Dump all info keys for debugging
+ var infoKeys = info ? Object.keys(info) : [];
+ log('Token #' + tokenId + ' info keys: ' + infoKeys.join(', '), 'info');
+ // Try every possible field name for the pinned index
+ var pinnedIndex = null;
+ var pinnedRaw = undefined;
+ var pinnedKeyNames = ['pinned_index','pinnedIndex','pinned','pin_index','pinIndex','pinnedUri','pinned_uri_index'];
+ for (var pk = 0; pk < pinnedKeyNames.length; pk++) {
+ if (info && info[pinnedKeyNames[pk]] !== undefined && info[pinnedKeyNames[pk]] !== null) {
+ pinnedRaw = info[pinnedKeyNames[pk]];
+ break;
+ }
+ }
+ // If not found by name, check if any key contains 'pin' (case-insensitive)
+ if (pinnedRaw === undefined && info) {
+ for (var ik = 0; ik < infoKeys.length; ik++) {
+ if (infoKeys[ik].toLowerCase().indexOf('pin') !== -1) {
+ pinnedRaw = info[infoKeys[ik]];
+ log('Token #' + tokenId + ': found pin-related key "' + infoKeys[ik] + '" = ' + pinnedRaw, 'info');
+ break;
+ }
+ }
+ }
+ // Unwrap Michelson Option: { Some: value } or { some: value }
+ if (pinnedRaw !== null && pinnedRaw !== undefined && typeof pinnedRaw === 'object') {
+ if (pinnedRaw.Some !== undefined) pinnedRaw = pinnedRaw.Some;
+ else if (pinnedRaw.some !== undefined) pinnedRaw = pinnedRaw.some;
+ else if (pinnedRaw.c !== undefined && Array.isArray(pinnedRaw.c)) pinnedRaw = pinnedRaw.c[0]; // BigNumber internal
+ }
+ // Parse to number
+ if (pinnedRaw !== undefined && pinnedRaw !== null) {
+ var asStr = (typeof pinnedRaw === 'object' && pinnedRaw.toString) ? pinnedRaw.toString() : String(pinnedRaw);
+ var asNum = Number(asStr);
+ if (!isNaN(asNum) && asNum >= 0) pinnedIndex = asNum;
+ }
+ // Also use is_pinned as confirmation if available
+ var isPinnedFlag = !!(info && (info.is_pinned || info.isPinned));
+ var trulyPinned = pinnedIndex !== null;
+ // If is_pinned is true and we couldn't find pinnedIndex, use is_pinned + active_index as last resort
+ if (!trulyPinned && isPinnedFlag) {
+ var fallback = info.active_index !== undefined ? Number(info.active_index) : (info.activeIndex !== undefined ? Number(info.activeIndex) : NaN);
+ if (!isNaN(fallback) && fallback >= 0) {
+ pinnedIndex = fallback;
+ trulyPinned = true;
+ log('Token #' + tokenId + ': using is_pinned + active_index fallback, pinnedIndex=' + pinnedIndex, 'warn');
+ }
+ }
+ log('Token #' + tokenId + ' pin result: raw=' + JSON.stringify(pinnedRaw) + ', parsed=' + pinnedIndex + ', is_pinned=' + isPinnedFlag + ', trulyPinned=' + trulyPinned, 'info');
+ versions.forEach(function(v) { v.isPinned = trulyPinned && v.index === pinnedIndex; });
+ var activeVersion = versions[activeIndex] || versions[versions.length - 1] || null;
+ return { tokenId:tokenId, info:info, activeIndex:activeIndex, pinnedIndex:pinnedIndex, uriCount:count, activeUri:activeUri, uris:versions.map(function(v){ return v.uri; }), versions:versions, metadata:activeVersion ? activeVersion.metadata : {}, mediaUri:activeVersion ? activeVersion.mediaUri : activeUri, mediaKind:activeVersion ? activeVersion.mediaKind : '', mediaMime:activeVersion ? activeVersion.mediaMime : '' };
+ }
+ async function discoverTokenLimit(defaultCount) {
+ try { var storage = await ct.storage(); if (storage && storage.next_token_id !== undefined) return Number(storage.next_token_id && storage.next_token_id.toString ? storage.next_token_id.toString() : storage.next_token_id); } catch(_) {}
+ return defaultCount;
+ }
+
+ function shortContract(addr) {
+ return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
+ }
+ function metadataStorage(uri) {
+ return /^ipfs:///i.test(String(uri || '')) ? 'IPFS' : /^https?:///i.test(String(uri || '')) ? 'HTTP' : 'URI';
+ }
+function mediaTypeFromUri(uri, kind) {
+ if (kind === 'video') return 'Video';
+ if (kind === 'image') return 'Image';
+ if (kind === 'model') return '3D';
+ uri = String(uri || '').split('?')[0].toLowerCase();
+ if (/\.(png|jpg|jpeg|gif|webp|svg)$/.test(uri)) return uri.split('.').pop().toUpperCase();
+ if (/\.(mp4|webm|ogg)$/.test(uri)) return uri.split('.').pop().toUpperCase();
+ if (/\.(glb|gltf)$/.test(uri)) return uri.split('.').pop().toUpperCase();
+ return 'Media';
+ }
+ function detailsHtml(item, version) {
+return '<div class="nft-details"><div class="nft-details-title">Details</div>' +
+'<div class="nft-details-row"><span>Token ID</span><span>'+item.tokenId+'</span></div>' +
+'<div class="nft-details-row"><span>Viewing</span><span>'+version.index+(version.isActive ? ' (active)' : '')+'</span></div>' +
+'<div class="nft-details-row"><span>Chain</span><span>Tezos '+esc(network === 'ghostnet' ? 'Ghostnet' : 'Mainnet')+'</span></div>' +
+'<div class="nft-details-row"><span>Contract</span><span>'+esc(shortAddr(ctAddr || document.getElementById('contract-addr').value.trim()))+'</span></div>' +
+'<div class="nft-details-row"><span>Type</span><span>FA2</span></div>' +
+'<div class="nft-details-row"><span>Metadata</span><span>'+metadataStorage(version.uri)+'</span></div>' +
+'<div class="nft-details-row"><span>Media</span><span>'+mediaTypeFromUri(version.mediaUri, version.mediaKind)+'</span></div>' +
+'</div>';
+}
+
+function mediaMarkup(version, cls) {
+ var url = gatewayUrl(version.mediaUri);
+ var name = version.metadata && version.metadata.name ? version.metadata.name : 'Token preview';
+ var kind = version.mediaKind || metadataMediaKind(version.metadata, version.mediaUri);
+ var mime = version.mediaMime || metadataMediaMime(version.metadata, version.mediaUri);
+ cls = cls || 'token-media';
+ if (!url) return '<div class="'+cls+'">No media is available for this metadata option</div>';
+ if (kind === 'video' || /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(url)) {
+ var sources = gatewayUrls(version.mediaUri).join('|');
+ var attrs = cls === 'token-media' ? 'muted loop playsinline preload="metadata"' : 'controls playsinline preload="metadata"';
+ var poster = gatewayUrl(version.metadata && (version.metadata.thumbnailUri || version.metadata.thumbnail_uri || version.metadata.displayUri || version.metadata.display_uri || version.metadata.image || ''));
+ return '<div class="'+cls+'"><video class="js-inline-video" '+attrs+' data-sources="'+esc(sources)+'" data-no-blob="'+(cls === 'token-media' ? '1' : '0')+'"'+(mime ? ' data-mime="'+esc(mime)+'"' : '')+(poster ? ' poster="'+esc(poster)+'"' : '')+' src="'+esc(url)+'"></video><div class="token-video-error">Video preview is trying another gateway...</div></div>';
+ }
+ if (cls === 'token-hero-media') return '<div class="'+cls+' js-zoom-stage" data-zoom="1" data-pan-x="0" data-pan-y="0"><img class="js-zoom-img" src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy" onerror="this.parentNode.textContent=\'This image is unavailable\'"><div class="token-zoom-tools" aria-label="Artwork zoom controls"><button class="btn btn-sec btn-sm token-zoom-btn js-zoom-out" type="button">-</button><span class="token-zoom-label">100%</span><button class="btn btn-sec btn-sm token-zoom-btn js-zoom-in" type="button">+</button><button class="btn btn-ghost btn-sm token-zoom-reset js-zoom-reset" type="button">Reset</button></div></div>';
+ return '<div class="'+cls+'"><img src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy" onerror="this.parentNode.textContent=\'This image is unavailable\'"></div>';
+ }
+ function sortedVersions(item) {
+ var versions = (item.versions || []).slice();
+ versions.sort(function(a, b) {
+ if (a.isPinned && !b.isPinned) return -1;
+ if (!a.isPinned && b.isPinned) return 1;
+ if (a.isActive && !b.isActive) return -1;
+ if (!a.isActive && b.isActive) return 1;
+ return a.index - b.index;
+ });
+ return versions;
+ }
+ function versionHtml(item, version) {
+ var meta = version.metadata || {};
+ var title = meta.name || ('Token #' + item.tokenId + ' Metadata #' + version.index);
+ var isPinned = !!version.isPinned;
+ var isSelected = version.isSelected !== undefined ? version.isSelected : version.isActive;
+ return '<button class="token-version'+(isSelected ? ' active' : '')+(isPinned ? ' pinned' : '')+' js-select-version" type="button" data-token-id="'+item.tokenId+'" data-index="'+version.index+'" data-title="'+esc(title)+'" data-uri="'+esc(version.uri)+'" data-media="'+esc(gatewayUrl(version.mediaUri))+'" data-raw-media="'+esc(version.mediaUri || '')+'" data-kind="'+esc(version.mediaKind || metadataMediaKind(meta, version.mediaUri))+'" data-mime="'+esc(version.mediaMime || metadataMediaMime(meta, version.mediaUri))+'" data-desc="'+esc(meta.description || '')+'">' +
+ mediaMarkup(version, 'token-media') + '<div class="token-version-title">'+version.index+'</div>'+(isPinned ? '<div class="token-version-pin"><span class="pin-icon">&#x1F4CC;</span></div>' : '')+'<div class="token-version-body"><div class="token-version-uri">'+esc(version.uri)+'</div></div></button>';
+ }
+ function metadataActionHtml(item, version) {
+ var isViewingPinned = !!version.isPinned;
+ if (isViewingPinned) {
+ return '<button class="btn btn-ghost btn-sm js-unpin" type="button" data-token-id="'+item.tokenId+'">Unpin This Metadata</button><div class="token-action-note">Unpinning will let this token show its latest metadata instead.</div>';
+ }
+ return '<button class="btn btn-acc btn-sm js-pin-selected" type="button" data-token-id="'+item.tokenId+'" data-index="'+version.index+'">Pin This Metadata</button>';
+ }
+ function heroHtml(item, version) {
+ var meta = version.metadata || {};
+ var title = meta.name || ('Token #' + item.tokenId + ' Metadata #' + version.index);
+ var desc = meta.description ? '<div class="token-meta" style="margin-top:6px;white-space:pre-wrap">'+esc(meta.description)+'</div>' : '';
+ var versionLine = '<div class="token-meta" style="margin-top:6px">Metadata #'+version.index+(version.isActive ? ' \u00b7 active' : '')+(version.isPinned ? ' \u00b7 \uD83D\uDCCC pinned' : '')+'</div>';
+ return '<div class="token-hero" data-token-id="'+item.tokenId+'"><div class="js-hero-media">'+mediaMarkup(version, 'token-hero-media')+'</div><div class="token-hero-info"><div><div class="token-hero-title">'+esc(title)+'</div>'+versionLine+desc+'</div><div class="token-hero-actions"><a class="btn btn-ghost btn-sm js-hero-metadata" target="_blank" href="'+esc(gatewayUrl(version.uri))+'">View Metadata</a><button class="btn btn-sec btn-sm js-fullscreen" type="button" data-media="'+esc(gatewayUrl(version.mediaUri))+'" data-media-uri="'+esc(version.mediaUri || '')+'" data-kind="'+esc(version.mediaKind || metadataMediaKind(meta, version.mediaUri))+'" data-mime="'+esc(version.mediaMime || metadataMediaMime(meta, version.mediaUri))+'">View Full Screen</button>' +
+ metadataActionHtml(item, version) +
+ '</div></div></div>';
+ }
+ function cardHtml(item) {
+ var versions = sortedVersions(item);
+ var pinnedVersion = versions.find(function(v){ return v.isPinned; });
+ var first = pinnedVersion || versions[0] || { index:0, uri:item.activeUri, mediaUri:item.mediaUri, metadata:item.metadata || {}, isActive:true, isPinned:false };
+ versions.forEach(function(version){ version.isSelected = version.index === first.index; });
+ var isPinned = !!pinnedVersion;
+ return '<div class="token-card'+(isPinned ? ' active pinned' : '')+'"><div class="token-body">' +
+ '<div class="js-token-hero-wrap">' + heroHtml(item, first) + '</div>' +
+ '<div class="token-version-grid">' + versions.map(function(version){ return versionHtml(item, version); }).join('') + '</div>' +
+ '<div class="js-token-details">' + detailsHtml(item, first) + '</div>' +
+ '</div></div>';
+ }
+ var fullscreenItems = []; var fullscreenIndex = 0;
+var fullscreenZoom = 1;
+ function renderFullscreen() {
+var viewer = document.getElementById('fullscreen-viewer');
+var box = document.getElementById('fullscreen-media');
+var caption = document.getElementById('fullscreen-caption');
+var item = fullscreenItems[fullscreenIndex];
+if (!viewer || !box || !item) return;
+if (item.kind === 'video' || /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(item.media)) {
+var fsSources = gatewayUrls(item.rawMedia || item.media).join('|');
+box.innerHTML = '<video class="js-inline-video" controls autoplay playsinline data-sources="'+esc(fsSources)+'"'+(item.mime ? ' data-mime="'+esc(item.mime)+'"' : '')+' src="'+esc(item.media)+'"></video><div class="token-video-error">Video preview is trying another gateway...</div>';
+} else {
+box.innerHTML = '<img src="'+esc(item.media)+'" alt="'+esc(item.title || 'Full screen token preview')+'">';
+}
+caption.textContent = (fullscreenIndex + 1) + ' / ' + fullscreenItems.length + ' - ' + (item.title || item.uri || 'Token preview');
+viewer.querySelector('.fullscreen-prev').disabled = fullscreenItems.length < 2;
+viewer.querySelector('.fullscreen-next').disabled = fullscreenItems.length < 2;
+bindInlineVideos(box);
+}
+ function stepFullscreen(delta) {
+ if (!fullscreenItems.length) return;
+ fullscreenIndex = (fullscreenIndex + delta + fullscreenItems.length) % fullscreenItems.length;
+ renderFullscreen();
+ }
+ function openFullscreen(mediaUrl, items, startIndex) {
+ if (!mediaUrl && (!items || !items.length)) return;
+ fullscreenItems = items && items.length ? items : [{ media:mediaUrl, title:'Token preview', uri:'' }];
+ fullscreenIndex = Math.max(0, Math.min(Number(startIndex) || 0, fullscreenItems.length - 1));
+fullscreenZoom = 1;
+ var viewer = document.getElementById('fullscreen-viewer');
+ if (!viewer) {
+ viewer = document.createElement('div');
+ viewer.id = 'fullscreen-viewer';
+ viewer.className = 'fullscreen-viewer';
+ viewer.innerHTML = '<button class="btn btn-sec btn-sm fullscreen-close" type="button">Close</button><button class="btn btn-sec btn-sm fullscreen-nav fullscreen-prev" type="button">&lt;</button><div id="fullscreen-media"></div><button class="btn btn-sec btn-sm fullscreen-nav fullscreen-next" type="button">&gt;</button><div id="fullscreen-caption" class="fullscreen-caption"></div>';
+ document.body.appendChild(viewer);
+ viewer.querySelector('.fullscreen-close').onclick = function(){ viewer.classList.remove('open'); };
+ viewer.querySelector('.fullscreen-prev').onclick = function(e){ e.stopPropagation(); stepFullscreen(-1); };
+ viewer.querySelector('.fullscreen-next').onclick = function(e){ e.stopPropagation(); stepFullscreen(1); };
+ viewer.onclick = function(e){ if (e.target === viewer) viewer.classList.remove('open'); };
+ document.addEventListener('keydown', function(e) {
+ if (!viewer.classList.contains('open')) return;
+ if (e.key === 'Escape') viewer.classList.remove('open');
+ if (e.key === 'ArrowLeft') stepFullscreen(-1);
+ if (e.key === 'ArrowRight') stepFullscreen(1);
+ });
+ }
+ renderFullscreen();
+ viewer.classList.add('open');
+ }
+ function fullscreenItemsFromCard(card) {
+ return Array.from(card.querySelectorAll('.js-select-version')).map(function(btn) {
+ return { media:btn.dataset.media, rawMedia:btn.dataset.rawMedia || btn.dataset.media, kind:btn.dataset.kind || '', mime:btn.dataset.mime || '', title:btn.dataset.title || ('Metadata #' + btn.dataset.index), uri:btn.dataset.uri, index:Number(btn.dataset.index) };
+ });
+ }
+ function bindVersionViewers(grid) {
+ grid.querySelectorAll('.js-select-version').forEach(function(btn) {
+ btn.onclick = function() {
+ var card = btn.closest('.token-card');
+ var tokenId = Number(btn.dataset.tokenId);
+ var versionIndex = Number(btn.dataset.index);
+ var item = (window._galleryItems || []).find(function(it){ return it.tokenId === tokenId; });
+ if (!card || !item) return;
+ var versions = sortedVersions(item);
+ var version = versions.find(function(v){ return v.index === versionIndex; });
+ if (!version) return;
+ card.querySelectorAll('.js-select-version').forEach(function(x){ x.classList.toggle('active', Number(x.dataset.index) === versionIndex); });
+ var heroWrap = card.querySelector('.js-token-hero-wrap');
+ if (heroWrap) heroWrap.innerHTML = heroHtml(item, version);
+ var details = card.querySelector('.js-token-details');
+ if (details) details.innerHTML = detailsHtml(item, version);
+ bindHeroButtons(card);
+ };
+ });
+ grid.querySelectorAll('.token-card').forEach(bindHeroButtons);
+ }
+ function clampPan(stage, zoom, x, y) {
+ var rect = stage.getBoundingClientRect();
+ var limitX = Math.max(0, rect.width * (zoom - 1) / 2);
+ var limitY = Math.max(0, rect.height * (zoom - 1) / 2);
+ return { x:Math.max(-limitX, Math.min(limitX, x)), y:Math.max(-limitY, Math.min(limitY, y)) };
+ }
+ function setStageZoom(stage, nextZoom, nextX, nextY) {
+ var img = stage.querySelector('.js-zoom-img');
+ if (!img) return;
+ var zoom = Math.max(1, Math.min(4, Number(nextZoom) || 1));
+ var pan = clampPan(stage, zoom, Number(nextX) || 0, Number(nextY) || 0);
+ if (zoom === 1) { pan.x = 0; pan.y = 0; }
+ stage.dataset.zoom = zoom.toFixed(2);
+ stage.dataset.panX = pan.x.toFixed(1);
+ stage.dataset.panY = pan.y.toFixed(1);
+ img.style.transform = 'translate(' + pan.x.toFixed(1) + 'px,' + pan.y.toFixed(1) + 'px) scale(' + zoom.toFixed(2) + ')';
+ stage.classList.toggle('is-zoomed', zoom > 1);
+ var label = stage.querySelector('.token-zoom-label');
+ if (label) label.textContent = Math.round(zoom * 100) + '%';
+ }
+ function adjustStageZoom(stage, delta) {
+ var zoom = Number(stage.dataset.zoom || 1);
+ setStageZoom(stage, zoom + delta, Number(stage.dataset.panX || 0), Number(stage.dataset.panY || 0));
+ }
+ function bindNormalZoom(scope) {
+ scope.querySelectorAll('.js-zoom-stage').forEach(function(stage) {
+ if (stage.dataset.zoomBound) return;
+ stage.dataset.zoomBound = '1';
+ setStageZoom(stage, 1, 0, 0);
+ var dragged = false;
+ var start = null;
+ var img = stage.querySelector('.js-zoom-img');
+ var zoomIn = stage.querySelector('.js-zoom-in');
+ var zoomOut = stage.querySelector('.js-zoom-out');
+ var reset = stage.querySelector('.js-zoom-reset');
+ if (zoomIn) zoomIn.onclick = function(e) { e.stopPropagation(); adjustStageZoom(stage, .5); };
+ if (zoomOut) zoomOut.onclick = function(e) { e.stopPropagation(); adjustStageZoom(stage, -.5); };
+ if (reset) reset.onclick = function(e) { e.stopPropagation(); setStageZoom(stage, 1, 0, 0); };
+ stage.onwheel = function(e) {
+ if (!img) return;
+ e.preventDefault();
+ adjustStageZoom(stage, e.deltaY < 0 ? .25 : -.25);
+ };
+ stage.onpointerdown = function(e) {
+ if (e.target.closest('.token-zoom-tools')) return;
+ var zoom = Number(stage.dataset.zoom || 1);
+ if (zoom <= 1) return;
+ dragged = false;
+ start = { id:e.pointerId, x:e.clientX, y:e.clientY, panX:Number(stage.dataset.panX || 0), panY:Number(stage.dataset.panY || 0) };
+ stage.classList.add('is-dragging');
+ stage.setPointerCapture(e.pointerId);
+ };
+ stage.onpointermove = function(e) {
+ if (!start || e.pointerId !== start.id) return;
+ var dx = e.clientX - start.x;
+ var dy = e.clientY - start.y;
+ if (Math.abs(dx) + Math.abs(dy) > 3) dragged = true;
+ setStageZoom(stage, Number(stage.dataset.zoom || 1), start.panX + dx, start.panY + dy);
+ };
+ stage.onpointerup = function(e) {
+ if (start && e.pointerId === start.id) {
+ stage.classList.remove('is-dragging');
+ start = null;
+ }
+ };
+ stage.onclick = function(e) {
+ if (e.target.closest('.token-zoom-tools') || dragged) return;
+ var zoom = Number(stage.dataset.zoom || 1);
+ setStageZoom(stage, zoom > 1 ? 1 : 2, 0, 0);
+ };
+ });
+ }
+
+function bindInlineVideos(scope) {
+ scope.querySelectorAll('.js-inline-video').forEach(function(video) {
+ if (video.dataset.videoBound) return;
+ video.dataset.videoBound = '1';
+ var sources = (video.dataset.sources || '').split('|').filter(Boolean);
+ var idx = Math.max(0, sources.indexOf(video.getAttribute('src') || video.src));
+ if (idx < 0) idx = 0;
+ var blobTried = false;
+ var failed = false;
+ var box = video.closest('.token-media,.token-hero-media');
+ var stuckTimer = null;
+ function setMessage(text, show) {
+ if (!box) return;
+ var msg = box.querySelector('.token-video-error');
+ if (msg) msg.textContent = text;
+ box.classList.toggle('video-failed', !!show);
+ }
+ function clearStuck() { if (stuckTimer) { clearTimeout(stuckTimer); stuckTimer = null; } }
+ function armStuck() {
+ clearStuck();
+ // If we don't get loadedmetadata within 6s, treat as failed and try next gateway.
+ stuckTimer = setTimeout(function() {
+ if (failed || video.readyState >= 1) return; // HAVE_METADATA
+ advance();
+ }, 6000);
+ }
+ function advance() {
+ var next = idx + 1;
+ if (next < sources.length) {
+ idx = next;
+ setMessage('Trying another video gateway...', true);
+ video.src = sources[idx];
+ video.load();
+ armStuck();
+ return;
+ }
+ loadBlobFallback().then(function(ok) {
+ if (!ok) {
+ failed = true;
+ clearStuck();
+ setMessage('Video preview could not load from the available gateways.', true);
+ }
+ });
+ }
+ async function loadBlobFallback() {
+ if (video.dataset.noBlob === '1') return false;
+ if (blobTried || !sources.length) return false;
+ blobTried = true;
+ setMessage('Loading video into the preview...', true);
+ for (var i = 0; i < sources.length; i++) {
+ try {
+ var res = await fetch(sources[i], { cache:'force-cache' });
+ if (!res.ok) continue;
+ var ct = (res.headers.get('content-type') || '').toLowerCase();
+ // Reject HTML responses (gateway error pages disguised as 200).
+ if (ct.indexOf('text/html') === 0 || ct.indexOf('application/json') === 0) continue;
+ var blob = await res.blob();
+ if (!blob || !blob.size) continue;
+ var objectUrl = URL.createObjectURL(blob);
+ video.src = objectUrl;
+ video.load();
+ setMessage('', false);
+ clearStuck();
+ return true;
+ } catch(_) {}
+ }
+ return false;
+ }
+ video.onerror = function() {
+ if (failed) return;
+ clearStuck();
+ advance();
+ };
+ video.onloadedmetadata = function() {
+ clearStuck();
+ setMessage('', false);
+ };
+ video.oncanplay = function() { clearStuck(); setMessage('', false); };
+ video.onstalled = function() { if (!blobTried) loadBlobFallback(); };
+ armStuck();
+ });
+ }
+
+ function bindHeroButtons(scope) {
+ bindInlineVideos(scope);
+ bindNormalZoom(scope);
+ scope.querySelectorAll('.js-fullscreen').forEach(function(btn){ btn.onclick = function(){ var card = btn.closest('.token-card'); var items = fullscreenItemsFromCard(card); var selected = card.querySelector('.js-select-version.active'); var selectedIndex = selected ? items.findIndex(function(item){ return item.index === Number(selected.dataset.index); }) : 0; if (!items.length && btn.dataset.media) items = [{ media:btn.dataset.media, rawMedia:btn.dataset.mediaUri || btn.dataset.media, kind:btn.dataset.kind || '', mime:btn.dataset.mime || '', title:'Token preview', uri:'' }]; openFullscreen(btn.dataset.media, items, selectedIndex < 0 ? 0 : selectedIndex); }; });
+ scope.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin may have succeeded despite the error.', 'warn'); } _isRefreshing = true; showSkeletonGrid(window._galleryItems ? window._galleryItems.length : 4); log('Updating on-chain data...', 'info'); await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
+ scope.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin may have succeeded.', 'warn'); } _isRefreshing = true; log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
+ }
+
+ function entrypointCall(name, positionalArgs, objectArg) {
+ if (ct && ct.methodsObject && typeof ct.methodsObject[name] === 'function' && objectArg !== undefined) return ct.methodsObject[name](objectArg);
+ if (ct && ct.methods && typeof ct.methods[name] === 'function') return ct.methods[name].apply(ct.methods, positionalArgs || []);
+ if (ct && ct.methodsObject && typeof ct.methodsObject[name] === 'function') return ct.methodsObject[name].apply(ct.methodsObject, positionalArgs || []);
+ throw new Error('Entrypoint ' + name + ' is not available on this contract.');
+ }
+ function pinCall(tokenId, index) { return entrypointCall('pin_token_uri', [index, tokenId], { index:index, token_id:tokenId }); }
+ function unpinCall(tokenId) { return entrypointCall('unpin_token_uri', [tokenId], tokenId); }
+ async function send(label, promise, btn) {
+ var orig = btn && btn.innerHTML;
+ if (btn) { btn.innerHTML = '<span class="spin"></span> Waiting...'; btn.disabled = true; }
+ log(label + ': sign in wallet...', 'warn');
+ try {
+ var op = await promise;
+ if (op && op.confirmation) {
+ try { await op.confirmation(1); }
+ catch(confErr) {
+ var h = op.opHash || op.hash || (extractOpHash ? extractOpHash(op) : null);
+ log(label + ': the operation was submitted' + (h && h !== 'unknown' ? ' (' + h + ')' : '') + ' but confirmation timed out. Check your wallet or TzKT.', 'warn');
+ return op;
+ }
+ }
+ log(label + ': confirmed', 'ok');
+ return op;
+ } catch(e) { log(label + ' failed: ' + errorText(e), 'err'); throw e; }
+ finally { if (btn) { btn.innerHTML = orig; btn.disabled = false; } }
+ }
+
+ function tzktApiBase() {
+ return network === 'mainnet' ? 'https://api.tzkt.io' : 'https://api.ghostnet.tzkt.io';
+ }
+ async function contractDisplayName(addr) {
+ try {
+ var res = await fetch(tzktApiBase() + '/v1/contracts/' + encodeURIComponent(addr), { cache:'no-store' });
+ if (!res.ok) return '';
+ var data = await res.json();
+ var name = readableCollectionName(data.metadata && (data.metadata.name || data.metadata.symbol)) || readableCollectionName(data.alias);
+ if (name) return name;
+ } catch(_) {}
+ try {
+ var metaRes = await fetch(tzktApiBase() + '/v1/contracts/' + encodeURIComponent(addr) + '/metadata', { cache:'no-store' });
+ if (metaRes.ok) {
+ var meta = await metaRes.json();
+ return readableCollectionName(meta && (meta.name || meta.symbol || meta.title)) || '';
+ }
+ } catch(_) { return ''; }
+ return '';
+ }
+ function readableCollectionName(value) {
+ value = String(value || '').trim();
+ if (!value) return '';
+ if (/^KT1[1-9A-HJ-NP-Za-km-z]{33}$/.test(value)) return '';
+ if (/^tz[1-3][1-9A-HJ-NP-Za-km-z]{33}$/.test(value)) return '';
+ if (/^[a-f0-9]{24,}$/i.test(value)) return '';
+ if (/^[A-Z0-9]{18,}$/i.test(value) && !/\s/.test(value)) return '';
+ return value;
+ }
+ function tokenCollectionName(meta) {
+ if (!meta || typeof meta !== 'object') return '';
+ var collection = meta.collection || meta.collections || meta.collectionName || meta.collection_name;
+ if (typeof collection === 'string') return readableCollectionName(collection);
+ if (collection && typeof collection === 'object') return readableCollectionName(collection.name || collection.title || collection.slug);
+ return readableCollectionName(meta.contractName || meta.contract_name || meta.series || meta.project || '');
+ }
+function setCollectionBanner(addr, name) {
+ var display = document.getElementById('ct-addr-display');
+ var title = document.querySelector('#deployed-banner .banner-lbl');
+ if (title) title.textContent = name ? 'Collection Open' : 'Your Collection Is Open';
+ if (!display) return;
+ if (name) {
+ display.innerHTML = '<span style="font-family:Cormorant Garamond,serif;font-size:1.35rem;color:var(--sand);display:block;margin-bottom:2px">'+esc(name)+'</span><span style="font-family:IBM Plex Mono,monospace;font-size:.72rem;color:var(--muted)">'+esc(addr)+'</span>';
+ } else {
+ display.textContent = addr;
+ }
+ }
+ function collapseCollectionPicker(addr, name) {
+ var box = document.getElementById('discovered-contracts');
+ if (!box) return;
+ box.className = 'view-result';
+ box.style.display = 'block';
+ box.innerHTML = '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;padding:6px 0"><div class="token-meta" style="color:var(--tx)"><span style="color:var(--gold);font-family:Cinzel,serif;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase">Opened Collection</span><br><span style="color:var(--sand)">'+esc(name || shortContract(addr))+'</span><br><span style="color:var(--muted);font-size:.72rem">'+esc(addr)+'</span></div><button class="btn btn-ghost btn-sm" type="button" id="btn-show-collections">Show Collections</button></div>';
+ var btn = document.getElementById('btn-show-collections');
+ if (btn) btn.onclick = function() { discoverAndMaybeLoadFa2(false).catch(function(e){ log('I could not refresh your collections: ' + errorText(e), 'err'); }); };
+ }
+ function updateCollectionNameFromItems(items) {
+ if (!ctAddr || !items || !items.length) return;
+ var current = document.getElementById('ct-addr-display');
+ var hasName = current && current.querySelector && current.querySelector('span');
+ if (hasName) return;
+ for (var i = 0; i < items.length; i++) {
+ var name = tokenCollectionName(items[i].metadata) || readableCollectionName(items[i].metadata && items[i].metadata.name);
+ if (name) {
+ setCollectionBanner(ctAddr, name);
+ return;
+ }
+ }
+ }
+
+ async function discoverFa2Contracts() {
+ if (!userAddr) throw new Error('Connect your wallet first.');
+ var url = tzktApiBase() + '/v1/tokens/balances?account=' + encodeURIComponent(userAddr) + '&balance.gt=0&limit=1000';
+ var res = await fetch(url, { cache:'no-store' });
+ if (!res.ok) throw new Error('FA2 contract lookup failed (' + res.status + ').');
+ var rows = await res.json();
+ var byContract = {};
+ rows.forEach(function(row) {
+ var token = row && row.token;
+ var contract = token && token.contract;
+ var address = contract && contract.address;
+ if (!address || !address.startsWith('KT1')) return;
+ if (!byContract[address]) byContract[address] = { address:address, alias:readableCollectionName(contract.alias), tokenName:'', tokenCount:0, sampleTokenIds:[], pinSupported:false, viewsSupported:false };
+ byContract[address].tokenCount += 1;
+ var meta = token && token.metadata;
+ if (!byContract[address].alias) byContract[address].alias = tokenCollectionName(meta);
+ if (!byContract[address].tokenName && meta && meta.name) byContract[address].tokenName = readableCollectionName(meta.name);
+ if (token.tokenId !== undefined && byContract[address].sampleTokenIds.length < 5) byContract[address].sampleTokenIds.push(String(token.tokenId));
+ });
+ var candidates = Object.keys(byContract).sort().map(function(address) { return byContract[address]; });
+ if (!candidates.length) return [];
+ log('Checking ' + candidates.length + ' FA2 contract' + (candidates.length === 1 ? '' : 's') + ' for pinning support...', 'info');
+ // Check all contracts in parallel, but keep contracts even when TzKT cannot prove pin support.
+ function hasPinEntrypoint(entrypoints) {
+ var names = [];
+ if (Array.isArray(entrypoints)) {
+ entrypoints.forEach(function(ep) {
+ if (typeof ep === 'string') names.push(ep);
+ else if (ep && typeof ep === 'object') names.push(ep.name || ep.entrypoint || ep.prim || ep.parameter || '');
+ });
+ } else if (entrypoints && typeof entrypoints === 'object') {
+ names = Object.keys(entrypoints);
+ Object.keys(entrypoints).forEach(function(key) {
+ var ep = entrypoints[key];
+ if (ep && typeof ep === 'object') names.push(ep.name || ep.entrypoint || ep.prim || ep.parameter || '');
+ });
+ }
+ return names.filter(Boolean).indexOf('pin_token_uri') !== -1;
+ }
+ async function enrichCandidate(c) {
+ var displayName = await contractDisplayName(c.address);
+ if (displayName) c.alias = displayName;
+ try {
+ var candidateContract = await Tezos.wallet.at(c.address);
+ c.pinSupported = c.pinSupported || !!(candidateContract && candidateContract.methodsObject && typeof candidateContract.methodsObject.pin_token_uri === 'function');
+ c.viewsSupported = !!(candidateContract && candidateContract.contractViews && candidateContract.contractViews.get_token_info && candidateContract.contractViews.get_uri_at);
+ } catch(_) {}
+ return c;
+ }
+ var results = await Promise.all(candidates.map(function(c) {
+ return fetch(tzktApiBase() + '/v1/contracts/' + encodeURIComponent(c.address) + '/entrypoints', { cache:'no-store' })
+ .then(function(epRes) { return epRes.ok ? epRes.json() : []; })
+ .then(async function(entrypoints) {
+ c.pinSupported = hasPinEntrypoint(entrypoints);
+ return await enrichCandidate(c);
+ })
+ .catch(function() { return enrichCandidate(c); });
+ }));
+ var discovered = results.filter(function(c) { return c !== null; });
+ discovered.sort(function(a, b) {
+ if ((a.pinSupported || a.viewsSupported) && !(b.pinSupported || b.viewsSupported)) return -1;
+ if (!(a.pinSupported || a.viewsSupported) && (b.pinSupported || b.viewsSupported)) return 1;
+ return (a.alias || a.tokenName || a.address).localeCompare(b.alias || b.tokenName || b.address);
+ });
+ var pinCount = discovered.filter(function(c) { return c.pinSupported; }).length;
+ if (discovered.length && pinCount === 0) {
+ log('Found ' + discovered.length + ' collection' + (discovered.length === 1 ? '' : 's') + '. Pin support could not be confirmed from TzKT, so I am showing them anyway.', 'warn');
+ }
+ return discovered;
+ }
+ function renderDiscoveredContracts(contracts) {
+ var box = document.getElementById('discovered-contracts');
+ var fa2Card = document.getElementById('fa2-card');
+ if (fa2Card) fa2Card.classList.toggle('fa2-found', !!contracts.length);
+ if (!contracts.length) {
+ box.className = 'token-empty';
+ if (fa2Card) fa2Card.classList.remove('fa2-found');
+ box.innerHTML = 'No FA2 token balances were found in your wallet on ' + esc(network) + '. If the token was just transferred, wait a minute for the indexer and try again.';
+ return;
+ }
+ box.className = 'view-result';
+ box.style.display = 'block';
+ var heading = '';
+ if (contracts.length === 1) {
+ heading = '<div style="padding:12px 0 8px;color:var(--sand);font-family:Crimson Pro,serif;font-size:1rem;line-height:1.5">Found your collection! Tap <strong style="color:var(--gold)">Use</strong> to explore your tokens.</div>';
+ } else {
+ heading = '<div style="padding:12px 0 8px;color:var(--sand);font-family:Crimson Pro,serif;font-size:1rem;line-height:1.5">Nice \u2014 you have <strong style="color:var(--gold)">' + contracts.length + ' collections</strong> in this wallet! Which one do you want to explore first?</div>';
+ }
+ box.innerHTML = heading + contracts.map(function(c) {
+ var displayName = c.alias || c.tokenName || '';
+ var label = displayName ? '<span style="color:var(--sand);font-family:Cormorant Garamond,serif;font-size:1.08rem;font-weight:500">' + esc(displayName) + '</span><br>' : '';
+ var tokenLabel = c.tokenCount === 1 ? '1 token' : c.tokenCount + ' tokens';
+ var support = c.pinSupported ? ' \u00b7 pinning supported' : (c.viewsSupported ? ' \u00b7 pinnable-style views found' : ' \u00b7 preview first, pin support checked when opened');
+ var ids = c.sampleTokenIds.length ? ' \u00b7 IDs ' + esc(c.sampleTokenIds.join(', ')) : '';
+ return '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bdr);padding:12px 0">' +
+ '<div class="token-meta" style="color:var(--tx)">' + label + '<span style="color:var(--muted);font-size:.78rem">' + esc(c.address) + '</span><br><span style="color:var(--clay)">' + tokenLabel + ' you hold' + ids + esc(support) + '</span></div>' +
+ '<button class="btn btn-acc btn-sm js-use-fa2" type="button" data-contract="'+esc(c.address)+'" data-name="'+esc(displayName)+'">Use</button>' +
+ '</div>';
+ }).join('');
+ box.querySelectorAll('.js-use-fa2').forEach(function(btn) {
+ btn.onclick = function() { loadContractAddress(btn.dataset.contract, true, btn.dataset.name || ''); };
+ });
+ }
+ async function discoverAndMaybeLoadFa2(autoLoadSingle) {
+ var box = document.getElementById('discovered-contracts');
+ box.className = 'token-empty';
+ box.innerHTML = '<div class="token-empty token-loading" style="margin-top:0"><div class="sb-spin"></div><div class="token-loading-text"><strong>Looking for your pinnable collections</strong><span>Scanning your wallet on ' + esc(network) + '...</span></div></div>'; 
+ var contracts = await discoverFa2Contracts();
+ renderDiscoveredContracts(contracts);
+ log(contracts.length === 1 ? 'Found your collection!' : 'Found ' + contracts.length + ' collections in your wallet!', contracts.length ? 'ok' : 'warn');
+ var strong = contracts.filter(function(c) { return c.pinSupported || c.viewsSupported; });
+ if (autoLoadSingle && !ctAddr && (strong.length === 1 || contracts.length === 1)) {
+ var chosen = strong.length === 1 ? strong[0] : contracts[0];
+ document.getElementById('contract-addr').value = chosen.address;
+ log('Your most likely pinnable collection is ready: ' + (chosen.alias || chosen.tokenName || chosen.address), 'ok');
+ await loadContractAddress(chosen.address, true, chosen.alias || chosen.tokenName || '');
+ }
+ }
+
+ async function ownedTokenIds() {
+ reqWallet();
+ if (!ctAddr) throw new Error('Open your collection first.');
+ var url = tzktApiBase() + '/v1/tokens/balances?account=' + encodeURIComponent(userAddr) + '&token.contract=' + encodeURIComponent(ctAddr) + '&balance.ne=0&limit=1000';
+ var res = await fetch(url, { cache:'no-store' });
+ if (!res.ok) throw new Error('I could not look up the tokens in your wallet (' + res.status + ').');
+ var rows = await res.json();
+ return rows.map(function(row) {
+ return row && row.token ? Number(row.token.tokenId) : NaN;
+ }).filter(function(id) { return Number.isInteger(id) && id >= 0; }).sort(function(a, b) { return a - b; });
+ }
+ async function loadTokenIds(tokenIds, emptyMessage) {
+ req();
+ var grid = document.getElementById('collector-grid');
+ setGalleryLoading('Loading your token metadata', 'Fetching the token images and metadata options you can choose from...');
+ var items = [];
+ var BATCH = 6;
+ for (var b = 0; b < tokenIds.length; b += BATCH) {
+ var batch = tokenIds.slice(b, b + BATCH);
+ var results = await Promise.all(batch.map(function(id) {
+ return tokenInfo(id).catch(function(e) { log('I could not load token #' + id + ': ' + errorText(e), 'warn'); return null; });
+ }));
+ results.forEach(function(item) { if (item) items.push(item); });
+ updateCollectionNameFromItems(items);
+ // Progressive render: show what we have so far
+ window._galleryItems = items;
+ grid.innerHTML = items.length ? items.map(cardHtml).join('') : '';
+ bindVersionViewers(grid);
+ grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin may have succeeded despite the error.', 'warn'); } _isRefreshing = true; showSkeletonGrid(window._galleryItems ? window._galleryItems.length : 4); log('Updating on-chain data...', 'info'); await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
+ grid.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin may have succeeded.', 'warn'); } _isRefreshing = true; log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
+ }
+ if (!items.length) {
+ grid.innerHTML = '<div class="token-empty">'+esc(emptyMessage || 'I could not find tokens for you here.')+'</div>';
+ }
+ var detailPanel = document.getElementById('token-detail-panel');
+ if (detailPanel) detailPanel.style.display = 'none';
+ log('Your wallet token previews are ready: ' + items.length + '.', 'ok');
+ document.getElementById('btn-refresh-pins').style.display = 'inline-flex';
+ }
+ async function loadOwnedTokens() {
+ var ids = await ownedTokenIds();
+ await loadTokenIds(ids, 'No tokens from this contract were found in the connected wallet.');
+ }
+ function preloadOwnedTokensIfReady() {
+ if (!userAddr || !ctAddr) return;
+ loadOwnedTokens().catch(function(e) { log('I could not preload your wallet tokens: ' + errorText(e), 'warn'); });
+ }
+
+ async function loadGallery() {
+ req();
+ var grid = document.getElementById('collector-grid');
+ setGalleryLoading('Loading your token metadata', 'Fetching the token images and metadata options you can choose from...');
+ var start = natFromInput('gallery-start', 'start token ID');
+ var count = galleryCount();
+ var limit = await discoverTokenLimit(start + count);
+ var end = Math.min(start + count, limit || (start + count));
+ var tokenIds = [];
+ for (var id = start; id < end; id++) tokenIds.push(id);
+ var items = [];
+ var BATCH = 6;
+ for (var b = 0; b < tokenIds.length; b += BATCH) {
+ var batch = tokenIds.slice(b, b + BATCH);
+ var results = await Promise.all(batch.map(function(id) {
+ return tokenInfo(id).catch(function(e) { log('I could not load token #' + id + ': ' + errorText(e), 'warn'); return null; });
+ }));
+ results.forEach(function(item) { if (item) items.push(item); });
+ updateCollectionNameFromItems(items);
+ // Progressive render
+ window._galleryItems = items;
+ grid.innerHTML = items.length ? items.map(cardHtml).join('') : '';
+ bindVersionViewers(grid);
+ grid.querySelectorAll('.js-pin-selected').forEach(function(btn){ btn.onclick = async function(){ try { await send('Pinning token #' + btn.dataset.tokenId + ' metadata #' + btn.dataset.index, pinCall(Number(btn.dataset.tokenId), Number(btn.dataset.index)).send(), btn); } catch(_) { log('The pin may have succeeded despite the error.', 'warn'); } _isRefreshing = true; showSkeletonGrid(window._galleryItems ? window._galleryItems.length : 4); log('Updating on-chain data...', 'info'); await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
+ grid.querySelectorAll('.js-unpin').forEach(function(btn){ btn.onclick = async function(){ try { await send('Unpinning token #' + btn.dataset.tokenId, unpinCall(Number(btn.dataset.tokenId)).send(), btn); } catch(_) { log('The unpin may have succeeded.', 'warn'); } _isRefreshing = true; log('Waiting for the chain to update before refreshing...', 'info'); _isRefreshing = true; await new Promise(function(r){ setTimeout(r, 8000); }); loadGallery().finally(function(){_isRefreshing=false}); }; });
+ }
+ if (!items.length) {
+ grid.innerHTML = '<div class="token-empty">No tokens found in this range.</div>';
+ }
+ var detailPanel = document.getElementById('token-detail-panel');
+ if (detailPanel) detailPanel.style.display = 'none';
+ log('Your gallery is ready: ' + items.length + ' token' + (items.length === 1 ? '' : 's') + '.', 'ok');
+ document.getElementById('btn-refresh-pins').style.display = 'inline-flex';
+ }
+
+ if (!TezosToolkit || !BeaconWallet) {
+ statusBar.className = 'err'; statusBar.style.display = 'flex'; statusTxt.textContent = 'Wallet tools failed to load.'; logEl.innerHTML = '<span class="lerr">Wallet tools failed to load.</span>'; return;
+ }
+ setNetwork(network);
+ logEl.innerHTML = '<span class="lok">Ready for you.</span>';
+
+ // Auto-reconnect from persisted Beacon session
+ (async function() {
+ try {
+ var activeAccount = await wallet.client.getActiveAccount();
+ if (activeAccount && activeAccount.address) {
+ userAddr = activeAccount.address;
+ Tezos.setWalletProvider(wallet);
+ finishConnect(userAddr);
+ log('Reconnected from your previous session: ' + userAddr, 'ok');
+ if (!ctAddr) discoverAndMaybeLoadFa2(true).catch(function(e){ log('I could not automatically find your FA2 collections: ' + errorText(e), 'warn'); });
+ }
+ } catch(_) {}
+ })();
+
+ // Enable hero connect button and detect Temple
+ var heroBtn = document.getElementById('btn-connect-intro');
+ var walletHint = document.getElementById('wallet-hint');
+ if (heroBtn) {
+ heroBtn.disabled = false;
+ heroBtn.onclick = function() { document.getElementById('wallet-modal').classList.add('open'); };
+ }
+ // Detect Temple availability and update hint
+ templeDirectAvailable(1200).then(function(available) {
+ if (walletHint) {
+ walletHint.textContent = available ? 'Temple detected � or use Beacon for mobile wallets' : 'Temple, Kukai, Naan, AirGap & mobile wallets via Beacon';
+ walletHint.className = 'preconnect-wallet-hint' + (available ? ' ready' : '');
+ }
+ });
+
+ document.getElementById('net-sel').onchange = async function() { await setNetwork(this.value); log('You switched to ' + this.value + '.', 'info'); };
+ document.getElementById('wm-cancel').onclick = function() { document.getElementById('wallet-modal').classList.remove('open'); };
+ async function connectWithBeacon(reopenOnError) {
+ // Close modal immediately so Beacon's pairing UI is not hidden behind it.
+ document.getElementById('wallet-modal').classList.remove('open');
+ try {
+ log('Opening Beacon wallet pairing...', 'warn');
+ await resetBeaconWallet();
+ await wallet.requestPermissions({ network: beaconNetworkConfig() });
+ userAddr = await wallet.getPKH();
+ finishConnect(userAddr);
+ log('Your wallet is connected with Beacon: ' + userAddr, 'ok');
+ if (!ctAddr) discoverAndMaybeLoadFa2(true).catch(function(e){ log('I could not automatically find your FA2 collections: ' + errorText(e), 'warn'); });
+ else loadGallery().catch(function(e){ log('I could not preload your token gallery: ' + errorText(e), 'warn'); });
+ return true;
+ } catch(e) {
+ log('I could not connect your wallet: ' + errorText(e), 'err');
+ if (reopenOnError) document.getElementById('wallet-modal').classList.add('open');
+ return false;
+ }
+ }
+
+ document.getElementById('wm-temple').onclick = async function() {
+ try {
+ log('Opening Temple for you...', 'warn');
+ if (!(await templeDirectAvailable())) {
+ log('Temple direct connection did not answer, so I am opening Beacon pairing instead. Detected: ' + templeDiagnostics(), 'warn');
+ await connectWithBeacon(true);
+ return;
+ }
+ var permission = await requestTempleDirectPermission();
+ if (!permission || !permission.pkh) throw new Error('Temple connected, but I could not read your wallet address.');
+ Tezos.setWalletProvider(templeDirectProvider(permission));
+ if (ctAddr) ct = await Tezos.wallet.at(ctAddr);
+ finishConnect(permission.pkh);
+ log('Your Temple wallet is connected: ' + permission.pkh, 'ok');
+ if (!ctAddr) discoverAndMaybeLoadFa2(true).catch(function(e){ log('I could not automatically find your FA2 collections: ' + errorText(e), 'warn'); });
+ else loadGallery().catch(function(e){ log('I could not preload your token gallery: ' + errorText(e), 'warn'); });
+ } catch(e) { log('I could not connect your Temple wallet directly: ' + errorText(e), 'warn'); log('Opening Beacon pairing as a fallback...', 'warn'); await connectWithBeacon(true); }
+ };
+ document.getElementById('wm-beacon').onclick = function() { connectWithBeacon(true); };
+ document.getElementById('btn-disconnect').onclick = async function() {
+ try { await wallet.clearActiveAccount(); } catch(_) {}
+ // Reset Tezos provider back to beacon wallet (clears any Temple provider)
+ Tezos.setWalletProvider(wallet);
+ userAddr = null; ct = null; ctAddr = null;
+ document.getElementById('addr-pill').classList.remove('show');
+ document.getElementById('btn-disconnect').style.display = 'none';
+ document.getElementById('deployed-banner').classList.remove('show');
+ statusBar.style.display = 'none';
+ document.body.classList.add('preconnect');
+ document.body.classList.remove('wallet-ready');
+ var fa2Card = document.getElementById('fa2-card'); if (fa2Card) fa2Card.classList.remove('fa2-found');
+ var grid = document.getElementById('collector-grid'); if (grid) grid.innerHTML = '<div class="token-empty">Open your collection to preview your token images.</div>';
+ window._galleryItems = [];
+ log('Your wallet is disconnected.', 'info');
+ };
+
+ async function loadContractAddress(addr, preferOwned, knownName) {
+if (!addr || !addr.startsWith('KT1')) { log('Paste a valid KT1 collection address first.', 'err'); return; }
+var btn = document.getElementById('btn-load-contract');
+var orig = btn && btn.innerHTML;
+try {
+if (btn) { btn.innerHTML = '<span class="spin"></span> Opening...'; btn.disabled = true; }
+setGalleryLoading('Opening your collection', 'Preparing token previews from ' + (knownName || addr) + '...');
+log('Opening your collection: ' + (knownName || addr) + '...', 'warn');
+ct = await Tezos.wallet.at(addr); ctAddr = addr;
+var displayName = knownName || await contractDisplayName(addr);
+document.getElementById('contract-addr').value = addr;
+document.getElementById('deployed-banner').classList.add('show');
+setCollectionBanner(addr, displayName);
+collapseCollectionPicker(addr, displayName);
+log('Your collection is open: ' + (displayName || addr), 'ok');
+if (preferOwned && userAddr) {
+ await loadOwnedTokens();
+} else {
+ await loadGallery();
+}
+var galleryCard = document.getElementById('collector-grid');
+if (galleryCard && galleryCard.scrollIntoView) setTimeout(function(){ galleryCard.scrollIntoView({ behavior:'smooth', block:'start' }); }, 150);
+} catch(e) {
+setGalleryLoading('I could not open your collection', errorText(e));
+log('I could not open your collection: ' + errorText(e), 'err');
+} finally {
+if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+}
+}
+
+ document.getElementById('btn-load-contract').onclick = async function() {
+ var addr = document.getElementById('contract-addr').value.trim();
+ await loadContractAddress(addr, true);
+ };
+ document.getElementById('btn-load-gallery').onclick = function() { loadGallery().catch(function(e){ log('I could not show those tokens: ' + errorText(e), 'err'); }); };
+ document.getElementById('btn-refresh-pins').onclick = function() {
+ var rbtn = document.getElementById('btn-refresh-pins');
+ var rorig = rbtn.innerHTML;
+ _isRefreshing = true;
+ showSkeletonGrid(window._galleryItems ? window._galleryItems.length : 4);
+ rbtn.innerHTML = '<span class="spin"></span> Refreshing...';
+ rbtn.disabled = true;
+ log('Waiting a few seconds for the chain to update...', 'info');
+ setTimeout(function() {
+ loadGallery().catch(function(e){ log('Refresh failed: ' + errorText(e), 'err'); }).finally(function(){ _isRefreshing = false; rbtn.innerHTML = rorig; rbtn.disabled = false; });
+ }, 6000);
+ };
+
+
+ document.getElementById('btn-discover-fa2').onclick = function() { discoverAndMaybeLoadFa2(false).catch(function(e){ log('I could not find your collections: ' + errorText(e), 'err'); }); };
+ document.getElementById('btn-clr-log').onclick = function() { logEl.innerHTML = '<span class="linfo">Your activity is clear.</span>'; };
+
+ var qs = new URLSearchParams(location.search);
+ if (qs.get('contract')) { document.getElementById('contract-addr').value = qs.get('contract'); loadContractAddress(qs.get('contract'), true); }
+});
+
+ // ── Site nav mobile menu ──
+ (function(){
+ var hamburger = document.getElementById('pinHamburger');
+ var mobileNav = document.getElementById('pinMobileNav');
+ var closeBtn = document.getElementById('pinMobileNavClose');
+ if (!hamburger || !mobileNav) return;
+ hamburger.addEventListener('click', function(){ mobileNav.classList.add('open'); });
+ closeBtn.addEventListener('click', function(){ mobileNav.classList.remove('open'); });
+ mobileNav.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', function(){ mobileNav.classList.remove('open'); }); });
+ })();
+
+ // ── Theme toggle ──
+ (function(){
+ var btn = document.getElementById('pinThemeToggle');
+ if (!btn) return;
+ var moonSvg = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3a7 7 0 107 7c-3.87 0-7-3.13-7-7z" fill="currentColor"/></svg>';
+ var sunSvg = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="4" fill="currentColor"/><g stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="10" y1="1.5" x2="10" y2="4"/><line x1="10" y1="16" x2="10" y2="18.5"/><line x1="1.5" y1="10" x2="4" y2="10"/><line x1="16" y1="10" x2="18.5" y2="10"/><line x1="4" y1="4" x2="5.8" y2="5.8"/><line x1="14.2" y1="14.2" x2="16" y2="16"/><line x1="4" y1="16" x2="5.8" y2="14.2"/><line x1="14.2" y1="5.8" x2="16" y2="4"/></g></svg>';
+ var saved = null;
+ try { saved = localStorage.getItem('tezos-pin-theme'); } catch(_){}
+ if (saved === 'light') { document.body.classList.add('light'); btn.innerHTML = sunSvg; }
+ btn.addEventListener('click', function(){
+ var isLight = document.body.classList.toggle('light');
+ btn.innerHTML = isLight ? sunSvg : moonSvg;
+ try { localStorage.setItem('tezos-pin-theme', isLight ? 'light' : 'dark'); } catch(_){}
+ });
+ })();
+
+ // ── Browse mode (no wallet) ──
+ (function(){
+ var browseBtn = document.getElementById('btn-browse-mode');
+ if (!browseBtn) return;
+ browseBtn.addEventListener('click', function(){
+ document.body.classList.remove('preconnect');
+ document.body.classList.add('browse-mode');
+ log('Browse mode: paste a KT1 contract address and click Open Collection to view tokens. Connect a wallet to pin.', 'info');
+ });
+ })();
+</script>
+</body>
+</html>
