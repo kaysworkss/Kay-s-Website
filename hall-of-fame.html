@@ -298,7 +298,6 @@ main { position:relative; z-index:1; max-width:1060px; margin:0 auto; padding:80
 
 /* Stat sub label — default small; JS overrides to large when showing dual-chain volume */
 .stat-sub { font-family:'Crimson Pro',serif; font-size:0.72rem; color:var(--text-muted); font-style:italic; margin-top:3px; }
-.stat-sub.large { font-family:'Cormorant Garamond',serif; font-size:2.2rem; font-weight:600; color:var(--clay); line-height:1; margin-top:6px; font-style:normal; }
 
 /* Chain tag inline */
 .chain-tag { font-family:'Cinzel',serif; font-size:0.42rem; letter-spacing:0.14em; text-transform:uppercase; border-radius:2px; padding:2px 6px; border:1px solid; vertical-align:middle; }
@@ -316,6 +315,8 @@ footer a { color:var(--clay); text-decoration:none; }
   .hero { padding:120px 24px 56px; }
   .stats-bar { flex-wrap:wrap; }
   .stat-item { min-width:50%; border-right:none; border-bottom:1px solid var(--divider); }
+  /* On mobile with 5 cells, last one spans full width for balance */
+  .stat-item:last-child:nth-child(odd) { min-width:100%; }
   main { padding:40px 16px 80px; }
 
   /* Stack: image above details */
@@ -385,10 +386,13 @@ footer a { color:var(--clay); text-decoration:none; }
 
 <div class="stats-bar" id="stats-bar">
   <div class="stat-item"><div class="stat-num" id="stat-auctions">—</div><div class="stat-label">Auctions Settled</div></div>
-  <div class="stat-item">
+  <div class="stat-item" id="stat-vol-eth-item">
     <div class="stat-num" id="stat-volume">—</div>
-    <div class="stat-label">Total Volume</div>
-    <div class="stat-sub" id="stat-volume-sub"></div>
+    <div class="stat-label"><span class="chain-icon eth" style="font-size:0.8rem">⟠</span> ETH Volume</div>
+  </div>
+  <div class="stat-item" id="stat-vol-xtz-item" style="display:none">
+    <div class="stat-num" id="stat-volume-xtz">—</div>
+    <div class="stat-label"><span class="chain-icon tezos" style="font-size:0.8rem">ꜩ</span> XTZ Volume</div>
   </div>
   <div class="stat-item">
     <div style="display:flex;align-items:baseline;gap:7px;justify-content:center">
@@ -798,18 +802,30 @@ async function loadResults() {
     document.getElementById("stat-auctions").textContent   = rows.length;
     document.getElementById("stat-collectors").textContent = uniqueWallets.size;
 
-    const volEl    = document.getElementById("stat-volume");
-    const volSubEl = document.getElementById("stat-volume-sub");
+    // ETH volume cell — always visible if any ETH sales exist, else hidden
+    const ethVolItem = document.getElementById("stat-vol-eth-item");
+    const xtzVolItem = document.getElementById("stat-vol-xtz-item");
+    const volEl      = document.getElementById("stat-volume");
+    const volXtzEl   = document.getElementById("stat-volume-xtz");
+
     if (ethRows.length > 0 && xtzRows.length > 0) {
+      // Both chains — show two separate equal cells
       volEl.textContent    = totalEth.toFixed(3) + " ETH";
-      volSubEl.textContent = totalXtz.toFixed(2) + " XTZ";
-      volSubEl.className   = "stat-sub large";
+      volXtzEl.textContent = totalXtz.toFixed(2) + " XTZ";
+      if (ethVolItem) ethVolItem.style.display = "";
+      if (xtzVolItem) xtzVolItem.style.display = "";
     } else if (xtzRows.length > 0) {
-      volEl.textContent    = totalXtz.toFixed(2) + " XTZ";
-      volSubEl.textContent = "";
+      // XTZ only — repurpose the ETH cell with XTZ label
+      volEl.textContent = totalXtz.toFixed(2) + " XTZ";
+      const ethLabel = ethVolItem?.querySelector(".stat-label");
+      if (ethLabel) ethLabel.innerHTML = '<span class="chain-icon tezos" style="font-size:0.8rem">ꜩ</span> XTZ Volume';
+      if (ethVolItem) ethVolItem.style.display = "";
+      if (xtzVolItem) xtzVolItem.style.display = "none";
     } else {
-      volEl.textContent    = fmtEth(totalEth) + " ETH";
-      volSubEl.textContent = "";
+      // ETH only
+      volEl.textContent = fmtEth(totalEth) + " ETH";
+      if (ethVolItem) ethVolItem.style.display = "";
+      if (xtzVolItem) xtzVolItem.style.display = "none";
     }
 
     // Highest sale — ranked by live USD value, not raw token amount
