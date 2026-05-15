@@ -299,6 +299,20 @@ main { position:relative; z-index:1; max-width:1060px; margin:0 auto; padding:80
 /* Stat sub label — default small; JS overrides to large when showing dual-chain volume */
 .stat-sub { font-family:'Crimson Pro',serif; font-size:0.72rem; color:var(--text-muted); font-style:italic; margin-top:3px; }
 
+/* ── Combined ETH + XTZ volume panel ── */
+.stat-item--combined { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px 24px; }
+.stat-combined-label { font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); margin-bottom:10px; }
+.stat-combined-rows { display:flex; flex-direction:column; gap:5px; width:100%; }
+.stat-combined-row { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:3px 0; border-bottom:1px solid var(--divider); }
+.stat-combined-row:last-child { border-bottom:none; }
+.stat-combined-usd { border-top:1px solid rgba(201,153,58,0.2); margin-top:2px; padding-top:6px !important; }
+.stat-combined-chain { font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.14em; text-transform:uppercase; white-space:nowrap; flex-shrink:0; }
+.stat-combined-chain.eth   { color:#627eea; }
+.stat-combined-chain.tezos { color:#2c7df7; }
+.stat-combined-chain.usd   { color:var(--gold); opacity:0.75; }
+.stat-combined-val { font-family:'Cormorant Garamond',serif; font-size:1.35rem; font-weight:600; color:var(--clay); line-height:1; text-align:right; }
+.stat-item--combined .stat-label { margin-top:10px; }
+
 /* Chain tag inline */
 .chain-tag { font-family:'Cinzel',serif; font-size:0.42rem; letter-spacing:0.14em; text-transform:uppercase; border-radius:2px; padding:2px 6px; border:1px solid; vertical-align:middle; }
 .chain-tag.eth { color:#627eea; border-color:rgba(98,126,234,0.4); background:rgba(98,126,234,0.08); }
@@ -386,13 +400,23 @@ footer a { color:var(--clay); text-decoration:none; }
 
 <div class="stats-bar" id="stats-bar">
   <div class="stat-item"><div class="stat-num" id="stat-auctions">—</div><div class="stat-label">Auctions Settled</div></div>
-  <div class="stat-item" id="stat-vol-eth-item">
-    <div class="stat-num" id="stat-volume">—</div>
-    <div class="stat-label"><span class="chain-icon eth" style="font-size:0.8rem">⟠</span> ETH Volume</div>
-  </div>
-  <div class="stat-item" id="stat-vol-xtz-item" style="display:none">
-    <div class="stat-num" id="stat-volume-xtz">—</div>
-    <div class="stat-label"><span class="chain-icon tezos" style="font-size:0.8rem">ꜩ</span> XTZ Volume</div>
+  <div class="stat-item stat-item--combined" id="stat-vol-combined-item">
+    <div class="stat-combined-label" id="stat-combined-heading">⟠ Eth &nbsp;+&nbsp; ꜩ Tez</div>
+    <div class="stat-combined-rows">
+      <div class="stat-combined-row" id="stat-vol-eth-row">
+        <span class="stat-combined-chain eth">⟠ ETH</span>
+        <span class="stat-combined-val" id="stat-volume">—</span>
+      </div>
+      <div class="stat-combined-row" id="stat-vol-xtz-row">
+        <span class="stat-combined-chain tezos">ꜩ XTZ</span>
+        <span class="stat-combined-val" id="stat-volume-xtz">—</span>
+      </div>
+      <div class="stat-combined-row stat-combined-usd" id="stat-vol-usd-row">
+        <span class="stat-combined-chain usd">≈ USD</span>
+        <span class="stat-combined-val" id="stat-volume-usd">—</span>
+      </div>
+    </div>
+    <div class="stat-label" id="stat-vol-combined-label">Cumulative Volume</div>
   </div>
   <div class="stat-item">
     <div style="display:flex;align-items:baseline;gap:7px;justify-content:center">
@@ -556,12 +580,55 @@ function toggleChat(btn, chatBody, auctionId, state) {
 // ── Chain filter ──
 let _currentChainFilter = "all";
 let _allRows = [];
+let _totalEth = 0, _totalXtz = 0, _ethRows = [], _xtzRows = [];
+
+function _updateCombinedPanel(chain) {
+  const volEl    = document.getElementById("stat-volume");
+  const volXtzEl = document.getElementById("stat-volume-xtz");
+  const volUsdEl = document.getElementById("stat-volume-usd");
+  const heading  = document.getElementById("stat-combined-heading");
+  const ethRow   = document.getElementById("stat-vol-eth-row");
+  const xtzRow   = document.getElementById("stat-vol-xtz-row");
+  const usdRow   = document.getElementById("stat-vol-usd-row");
+  const label    = document.getElementById("stat-vol-combined-label");
+
+  if (chain === "eth") {
+    // ETH only
+    heading.textContent = "⟠ Ethereum";
+    if (ethRow) ethRow.style.display = "";
+    if (xtzRow) xtzRow.style.display = "none";
+    const ethUsd = _ethRows.reduce((s,r) => s + _toUsd(r), 0);
+    if (volEl)    volEl.textContent    = _totalEth.toFixed(3) + " ETH";
+    if (volUsdEl) volUsdEl.textContent = "$" + Math.round(ethUsd).toLocaleString("en-US");
+    if (label)    label.textContent    = "ETH Cumulative Volume";
+  } else if (chain === "tezos") {
+    // XTZ only
+    heading.textContent = "ꜩ Tezos";
+    if (ethRow) ethRow.style.display = "none";
+    if (xtzRow) xtzRow.style.display = "";
+    const xtzUsd = _xtzRows.reduce((s,r) => s + _toUsd(r), 0);
+    if (volXtzEl) volXtzEl.textContent = _totalXtz.toFixed(2) + " XTZ";
+    if (volUsdEl) volUsdEl.textContent = "$" + Math.round(xtzUsd).toLocaleString("en-US");
+    if (label)    label.textContent    = "XTZ Cumulative Volume";
+  } else {
+    // All chains — show both rows
+    heading.textContent = "⟠ Eth \u00a0+\u00a0 ꜩ Tez";
+    if (ethRow) ethRow.style.display = "";
+    if (xtzRow) xtzRow.style.display = _xtzRows.length > 0 ? "" : "none";
+    const totalUsd = [..._ethRows, ..._xtzRows].reduce((s,r) => s + _toUsd(r), 0);
+    if (volEl)    volEl.textContent    = _totalEth.toFixed(3) + " ETH";
+    if (volXtzEl) volXtzEl.textContent = _totalXtz.toFixed(2) + " XTZ";
+    if (volUsdEl) volUsdEl.textContent = "$" + Math.round(totalUsd).toLocaleString("en-US");
+    if (label)    label.textContent    = "Cumulative Volume";
+  }
+}
 
 function setChainFilter(chain) {
   _currentChainFilter = chain;
   document.querySelectorAll(".chain-filter-btn").forEach(b => {
     b.classList.toggle("active", b.dataset.chain === chain);
   });
+  _updateCombinedPanel(chain);
   _renderFiltered();
 }
 
@@ -802,31 +869,12 @@ async function loadResults() {
     document.getElementById("stat-auctions").textContent   = rows.length;
     document.getElementById("stat-collectors").textContent = uniqueWallets.size;
 
-    // ETH volume cell — always visible if any ETH sales exist, else hidden
-    const ethVolItem = document.getElementById("stat-vol-eth-item");
-    const xtzVolItem = document.getElementById("stat-vol-xtz-item");
-    const volEl      = document.getElementById("stat-volume");
-    const volXtzEl   = document.getElementById("stat-volume-xtz");
-
-    if (ethRows.length > 0 && xtzRows.length > 0) {
-      // Both chains — show two separate equal cells
-      volEl.textContent    = totalEth.toFixed(3) + " ETH";
-      volXtzEl.textContent = totalXtz.toFixed(2) + " XTZ";
-      if (ethVolItem) ethVolItem.style.display = "";
-      if (xtzVolItem) xtzVolItem.style.display = "";
-    } else if (xtzRows.length > 0) {
-      // XTZ only — repurpose the ETH cell with XTZ label
-      volEl.textContent = totalXtz.toFixed(2) + " XTZ";
-      const ethLabel = ethVolItem?.querySelector(".stat-label");
-      if (ethLabel) ethLabel.innerHTML = '<span class="chain-icon tezos" style="font-size:0.8rem">ꜩ</span> XTZ Volume';
-      if (ethVolItem) ethVolItem.style.display = "";
-      if (xtzVolItem) xtzVolItem.style.display = "none";
-    } else {
-      // ETH only
-      volEl.textContent = fmtEth(totalEth) + " ETH";
-      if (ethVolItem) ethVolItem.style.display = "";
-      if (xtzVolItem) xtzVolItem.style.display = "none";
-    }
+    // Store totals for use by _updateCombinedPanel
+    _totalEth = totalEth;
+    _totalXtz = totalXtz;
+    _ethRows  = ethRows;
+    _xtzRows  = xtzRows;
+    _updateCombinedPanel("all");
 
     // Highest sale — ranked by live USD value, not raw token amount
     const trueTopRow = rows.reduce((best, r) => _toUsd(r) > _toUsd(best) ? r : best, rows[0]);
@@ -843,7 +891,7 @@ async function loadResults() {
 
     document.getElementById("stats-bar").classList.add("show");
 
-    if (ethRows.length > 0 && xtzRows.length > 0) {
+    if (ethRows.length > 0 || xtzRows.length > 0) {
       document.getElementById("chain-filter-bar").style.display = "";
     }
 
