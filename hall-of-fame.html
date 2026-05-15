@@ -300,18 +300,26 @@ main { position:relative; z-index:1; max-width:1060px; margin:0 auto; padding:80
 .stat-sub { font-family:'Crimson Pro',serif; font-size:0.72rem; color:var(--text-muted); font-style:italic; margin-top:3px; }
 
 /* ── Combined ETH + XTZ volume panel ── */
-.stat-item--combined { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px 24px; }
-.stat-combined-label { font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); margin-bottom:10px; }
-.stat-combined-rows { display:flex; flex-direction:column; gap:5px; width:100%; }
-.stat-combined-row { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:3px 0; border-bottom:1px solid var(--divider); }
-.stat-combined-row:last-child { border-bottom:none; }
-.stat-combined-usd { border-top:1px solid rgba(201,153,58,0.2); margin-top:2px; padding-top:6px !important; }
-.stat-combined-chain { font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.14em; text-transform:uppercase; white-space:nowrap; flex-shrink:0; }
-.stat-combined-chain.eth   { color:#627eea; }
-.stat-combined-chain.tezos { color:#2c7df7; }
-.stat-combined-chain.usd   { color:var(--gold); opacity:0.75; }
-.stat-combined-val { font-family:'Cormorant Garamond',serif; font-size:1.35rem; font-weight:600; color:var(--clay); line-height:1; text-align:right; }
-.stat-item--combined .stat-label { margin-top:10px; }
+.stat-item--combined { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px 28px; gap:4px; }
+
+/* Row 1 — chain name labels */
+.svc-labels { display:grid; grid-template-columns:1fr auto 1fr; align-items:baseline; width:100%; }
+.svc-chain-label { font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.22em; text-transform:uppercase; }
+.svc-chain-label.eth { color:#627eea; text-align:left; }
+.svc-chain-label.tez { color:#2c7df7; text-align:right; }
+.svc-plus { font-family:'Cormorant Garamond',serif; font-size:1rem; color:var(--text-muted); text-align:center; padding:0 10px; opacity:0.6; }
+
+/* Row 2 — native amounts */
+.svc-amounts { display:grid; grid-template-columns:1fr auto 1fr; align-items:baseline; width:100%; margin-top:2px; }
+.svc-amount { font-family:'Cormorant Garamond',serif; font-size:2rem; font-weight:600; line-height:1; }
+.svc-amount.eth  { color:var(--clay); text-align:left; }
+.svc-amount.tez  { color:var(--clay); text-align:right; }
+.svc-spacer { min-width:30px; }
+
+/* Row 3 — USD total */
+.svc-usd { font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:400; color:var(--text-muted); margin-top:6px; letter-spacing:0.04em; }
+
+.stat-item--combined .stat-label { margin-top:8px; }
 
 /* Chain tag inline */
 .chain-tag { font-family:'Cinzel',serif; font-size:0.42rem; letter-spacing:0.14em; text-transform:uppercase; border-radius:2px; padding:2px 6px; border:1px solid; vertical-align:middle; }
@@ -401,20 +409,21 @@ footer a { color:var(--clay); text-decoration:none; }
 <div class="stats-bar" id="stats-bar">
   <div class="stat-item"><div class="stat-num" id="stat-auctions">—</div><div class="stat-label">Auctions Settled</div></div>
   <div class="stat-item stat-item--combined" id="stat-vol-combined-item">
-    <div class="stat-combined-label" id="stat-combined-heading">⟠ Eth &nbsp;+&nbsp; ꜩ Tez</div>
-    <div class="stat-combined-rows">
-      <div class="stat-combined-row" id="stat-vol-eth-row">
-        <span class="stat-combined-chain eth">⟠ ETH</span>
-        <span class="stat-combined-val" id="stat-volume">—</span>
-      </div>
-      <div class="stat-combined-row" id="stat-vol-xtz-row">
-        <span class="stat-combined-chain tezos">ꜩ XTZ</span>
-        <span class="stat-combined-val" id="stat-volume-xtz">—</span>
-      </div>
-      <div class="stat-combined-row stat-combined-usd" id="stat-vol-usd-row">
-        <span class="stat-combined-chain usd">≈ USD</span>
-        <span class="stat-combined-val" id="stat-volume-usd">—</span>
-      </div>
+    <!-- Row 1: labels -->
+    <div class="svc-labels" id="stat-combined-heading">
+      <span class="svc-chain-label eth" id="svc-eth-label">Eth</span>
+      <span class="svc-plus" id="svc-plus">+</span>
+      <span class="svc-chain-label tez" id="svc-tez-label">Tez</span>
+    </div>
+    <!-- Row 2: amounts -->
+    <div class="svc-amounts">
+      <span class="svc-amount eth" id="stat-volume">—</span>
+      <span class="svc-spacer"></span>
+      <span class="svc-amount tez" id="stat-volume-xtz">—</span>
+    </div>
+    <!-- Row 3: USD total -->
+    <div class="svc-usd" id="stat-vol-usd-row">
+      <span id="stat-volume-usd">—</span>
     </div>
     <div class="stat-label" id="stat-vol-combined-label">Cumulative Volume</div>
   </div>
@@ -583,43 +592,48 @@ let _allRows = [];
 let _totalEth = 0, _totalXtz = 0, _ethRows = [], _xtzRows = [];
 
 function _updateCombinedPanel(chain) {
-  const volEl    = document.getElementById("stat-volume");
-  const volXtzEl = document.getElementById("stat-volume-xtz");
-  const volUsdEl = document.getElementById("stat-volume-usd");
-  const heading  = document.getElementById("stat-combined-heading");
-  const ethRow   = document.getElementById("stat-vol-eth-row");
-  const xtzRow   = document.getElementById("stat-vol-xtz-row");
-  const usdRow   = document.getElementById("stat-vol-usd-row");
-  const label    = document.getElementById("stat-vol-combined-label");
+  const volEl     = document.getElementById("stat-volume");
+  const volXtzEl  = document.getElementById("stat-volume-xtz");
+  const volUsdEl  = document.getElementById("stat-volume-usd");
+  const ethLabel  = document.getElementById("svc-eth-label");
+  const tezLabel  = document.getElementById("svc-tez-label");
+  const plusEl    = document.getElementById("svc-plus");
+  const usdRow    = document.getElementById("stat-vol-usd-row");
+  const label     = document.getElementById("stat-vol-combined-label");
 
   if (chain === "eth") {
-    // ETH only
-    heading.textContent = "⟠ Ethereum";
-    if (ethRow) ethRow.style.display = "";
-    if (xtzRow) xtzRow.style.display = "none";
+    // ETH only — hide Tez side, centre the ETH value
+    if (ethLabel)  { ethLabel.style.display = ""; ethLabel.style.textAlign = "center"; }
+    if (tezLabel)  tezLabel.style.display = "none";
+    if (plusEl)    plusEl.style.display = "none";
+    if (volEl)     { volEl.style.display = ""; volEl.style.textAlign = "center"; volEl.style.gridColumn = "1 / -1"; volEl.textContent = _totalEth.toFixed(3) + " ETH"; }
+    if (volXtzEl)  volXtzEl.style.display = "none";
     const ethUsd = _ethRows.reduce((s,r) => s + _toUsd(r), 0);
-    if (volEl)    volEl.textContent    = _totalEth.toFixed(3) + " ETH";
-    if (volUsdEl) volUsdEl.textContent = "$" + Math.round(ethUsd).toLocaleString("en-US");
-    if (label)    label.textContent    = "ETH Cumulative Volume";
+    if (volUsdEl)  volUsdEl.textContent = "$" + Math.round(ethUsd).toLocaleString("en-US");
+    if (usdRow)    usdRow.style.display = "";
+    if (label)     label.textContent = "ETH Cumulative Volume";
   } else if (chain === "tezos") {
-    // XTZ only
-    heading.textContent = "ꜩ Tezos";
-    if (ethRow) ethRow.style.display = "none";
-    if (xtzRow) xtzRow.style.display = "";
+    // XTZ only — hide ETH side, centre the XTZ value
+    if (ethLabel)  ethLabel.style.display = "none";
+    if (tezLabel)  { tezLabel.style.display = ""; tezLabel.style.textAlign = "center"; }
+    if (plusEl)    plusEl.style.display = "none";
+    if (volEl)     volEl.style.display = "none";
+    if (volXtzEl)  { volXtzEl.style.display = ""; volXtzEl.style.textAlign = "center"; volXtzEl.style.gridColumn = "1 / -1"; volXtzEl.textContent = _totalXtz.toFixed(2) + " XTZ"; }
     const xtzUsd = _xtzRows.reduce((s,r) => s + _toUsd(r), 0);
-    if (volXtzEl) volXtzEl.textContent = _totalXtz.toFixed(2) + " XTZ";
-    if (volUsdEl) volUsdEl.textContent = "$" + Math.round(xtzUsd).toLocaleString("en-US");
-    if (label)    label.textContent    = "XTZ Cumulative Volume";
+    if (volUsdEl)  volUsdEl.textContent = "$" + Math.round(xtzUsd).toLocaleString("en-US");
+    if (usdRow)    usdRow.style.display = "";
+    if (label)     label.textContent = "XTZ Cumulative Volume";
   } else {
-    // All chains — show both rows
-    heading.textContent = "⟠ Eth \u00a0+\u00a0 ꜩ Tez";
-    if (ethRow) ethRow.style.display = "";
-    if (xtzRow) xtzRow.style.display = _xtzRows.length > 0 ? "" : "none";
+    // All — restore both sides
+    if (ethLabel)  { ethLabel.style.display = ""; ethLabel.style.textAlign = "left"; }
+    if (tezLabel)  { tezLabel.style.display = _xtzRows.length > 0 ? "" : "none"; tezLabel.style.textAlign = "right"; }
+    if (plusEl)    plusEl.style.display = _xtzRows.length > 0 ? "" : "none";
+    if (volEl)     { volEl.style.display = ""; volEl.style.textAlign = "left"; volEl.style.gridColumn = ""; volEl.textContent = _totalEth.toFixed(3) + " ETH"; }
+    if (volXtzEl)  { volXtzEl.style.display = _xtzRows.length > 0 ? "" : "none"; volXtzEl.style.textAlign = "right"; volXtzEl.style.gridColumn = ""; volXtzEl.textContent = _totalXtz.toFixed(2) + " XTZ"; }
     const totalUsd = [..._ethRows, ..._xtzRows].reduce((s,r) => s + _toUsd(r), 0);
-    if (volEl)    volEl.textContent    = _totalEth.toFixed(3) + " ETH";
-    if (volXtzEl) volXtzEl.textContent = _totalXtz.toFixed(2) + " XTZ";
-    if (volUsdEl) volUsdEl.textContent = "$" + Math.round(totalUsd).toLocaleString("en-US");
-    if (label)    label.textContent    = "Cumulative Volume";
+    if (volUsdEl)  volUsdEl.textContent = "$" + Math.round(totalUsd).toLocaleString("en-US");
+    if (usdRow)    usdRow.style.display = "";
+    if (label)     label.textContent = "Cumulative Volume";
   }
 }
 
