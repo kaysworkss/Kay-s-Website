@@ -336,16 +336,48 @@ footer a { color:var(--clay); text-decoration:none; }
   .nav-hamburger { display:flex; }
   .hero { padding:120px 24px 56px; }
 
-  /* ── Stats bar — 2-col grid on mobile ── */
-  .stats-bar.show { display:grid; grid-template-columns:1fr 1fr; }
-  .stat-item { border-right:none; border-bottom:1px solid var(--divider); padding:20px 16px; }
-  /* Combined panel spans full width, sits in its natural position */
-  .stat-item--combined { grid-column:1 / -1; border-bottom:1px solid var(--divider); padding:20px 24px; }
-  /* Scale down the volume numbers on narrow screens */
-  .svc-amount { font-size:1.5rem; }
-  .svc-usd { font-size:0.95rem; }
-  /* Last regular cell in odd count — full width */
-  .stat-item:not(.stat-item--combined):last-child { grid-column:1 / -1; border-bottom:none; }
+  /* ── Stats bar: explicit grid placement ──
+     Row 1: [combined panel — full width]
+     Row 2: [Auctions] [Collectors]
+     Row 3: [Highest Sale — full width]
+  */
+  .stats-bar.show {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    grid-template-rows:auto auto auto;
+  }
+  .stat-item { border-right:none; border-bottom:1px solid var(--divider); padding:18px 14px; }
+
+  #stat-vol-combined-item {
+    grid-column:1 / -1; grid-row:1;
+    border-right:none; border-bottom:1px solid var(--divider);
+    padding:16px 20px;
+  }
+  #stat-item-auctions {
+    grid-column:1; grid-row:2;
+    border-right:1px solid var(--divider);
+    border-bottom:1px solid var(--divider);
+  }
+  #stat-item-collectors {
+    grid-column:2; grid-row:2;
+    border-right:none;
+    border-bottom:1px solid var(--divider);
+  }
+  #stat-item-top {
+    grid-column:1 / -1; grid-row:3;
+    border-right:none; border-bottom:none;
+  }
+
+  /* Scale down combined panel internals */
+  .svc-amount       { font-size:1.3rem; }
+  .svc-usd          { font-size:0.85rem; margin-top:4px; }
+  .svc-plus         { padding:0 8px; font-size:0.85rem; }
+  .svc-chain-label  { font-size:0.44rem; }
+  .stat-item--combined .stat-label { font-size:0.42rem; margin-top:5px; }
+
+  /* Highest sale — clamp big number, keep tag inline */
+  #stat-top { font-size:1.6rem; word-break:break-all; }
+  .chain-tag { font-size:0.38rem; padding:2px 5px; vertical-align:middle; }
 
   main { padding:40px 16px 80px; }
 
@@ -353,18 +385,11 @@ footer a { color:var(--clay); text-decoration:none; }
   .record-top,
   .record-top.img-portrait,
   .record-top.img-landscape { grid-template-columns:1fr; }
-
-  /* Image wrap fills full card width on mobile — no max-height cap, let aspect-ratio control height */
   .record-img-wrap { min-height:0; width:100%; }
   .record-top.img-portrait  .record-img-wrap { aspect-ratio:3/4; max-height:none; }
   .record-top.img-landscape .record-img-wrap { aspect-ratio:16/9; max-height:none; }
-  /* Fallback before orientation detected */
   .record-top:not(.img-portrait):not(.img-landscape) .record-img-wrap { aspect-ratio:16/9; }
-
-  /* On mobile the wrap is a block container with known dimensions,
-     so the absolutely-positioned image can fill and centre correctly */
   .record-img-wrap { position:relative; }
-
   .record-details { border-left:none; border-top:1px solid var(--divider); padding:20px; }
   .record-stats { grid-template-columns:1fr 1fr; }
   .chat-toggle,.chat-body { padding-left:16px; padding-right:16px; }
@@ -415,7 +440,7 @@ footer a { color:var(--clay); text-decoration:none; }
 </div>
 
 <div class="stats-bar" id="stats-bar">
-  <div class="stat-item"><div class="stat-num" id="stat-auctions">—</div><div class="stat-label">Auctions Settled</div></div>
+  <div class="stat-item" id="stat-item-auctions"><div class="stat-num" id="stat-auctions">—</div><div class="stat-label">Auctions Settled</div></div>
   <div class="stat-item stat-item--combined" id="stat-vol-combined-item">
     <!-- Row 1: labels -->
     <div class="svc-labels" id="stat-combined-heading">
@@ -435,14 +460,14 @@ footer a { color:var(--clay); text-decoration:none; }
     </div>
     <div class="stat-label" id="stat-vol-combined-label">Cumulative Volume</div>
   </div>
-  <div class="stat-item">
-    <div style="display:flex;align-items:baseline;gap:7px;justify-content:center">
+  <div class="stat-item" id="stat-item-top">
+    <div style="display:flex;align-items:baseline;gap:7px;justify-content:center;flex-wrap:wrap;">
       <div class="stat-num" id="stat-top">—</div>
       <span class="chain-tag" id="stat-top-chain" style="display:none"></span>
     </div>
     <div class="stat-label">Highest Sale</div>
   </div>
-  <div class="stat-item"><div class="stat-num" id="stat-collectors">—</div><div class="stat-label">Unique Collectors</div></div>
+  <div class="stat-item" id="stat-item-collectors"><div class="stat-num" id="stat-collectors">—</div><div class="stat-label">Unique Collectors</div></div>
 </div>
 
 <!-- Chain filter -->
