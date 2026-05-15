@@ -302,12 +302,10 @@ main { position:relative; z-index:1; max-width:1060px; margin:0 auto; padding:80
 /* ── Combined ETH + XTZ volume panel ── */
 .stat-item--combined { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px 28px; gap:4px; }
 
-/* Amounts row: figure + figure with + between */
-.svc-amounts { display:grid; grid-template-columns:1fr auto 1fr; align-items:baseline; width:100%; }
-.svc-amount { font-family:'Cormorant Garamond',serif; font-size:2rem; font-weight:600; line-height:1; }
-.svc-amount.eth  { color:var(--clay); text-align:left; }
-.svc-amount.tez  { color:var(--clay); text-align:right; }
-.svc-plus { font-family:'Cormorant Garamond',serif; font-size:1.1rem; color:var(--text-muted); text-align:center; padding:0 14px; opacity:0.5; }
+/* Amounts row: figures + plus naturally centered as inline-flex */
+.svc-amounts { display:flex; align-items:baseline; justify-content:center; gap:0; width:100%; }
+.svc-amount { font-family:'Cormorant Garamond',serif; font-size:2rem; font-weight:600; line-height:1; color:var(--clay); }
+.svc-plus { font-family:'Cormorant Garamond',serif; font-size:1.1rem; color:var(--text-muted); padding:0 14px; opacity:0.5; }
 
 /* USD total */
 .svc-usd { font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:400; color:var(--text-muted); margin-top:6px; letter-spacing:0.04em; }
@@ -621,7 +619,7 @@ function _updateCombinedPanel(chain) {
 
   if (chain === "eth") {
     if (plusEl)   plusEl.style.display = "none";
-    if (volEl)    { volEl.style.display = ""; volEl.style.gridColumn = "1 / -1"; volEl.style.textAlign = "center"; volEl.textContent = _totalEth.toFixed(3) + " ETH"; }
+    if (volEl)    { volEl.style.display = ""; volEl.textContent = _totalEth.toFixed(3) + " ETH"; }
     if (volXtzEl) volXtzEl.style.display = "none";
     const ethUsd = _ethRows.reduce((s,r) => s + _toUsd(r), 0);
     if (volUsdEl) volUsdEl.textContent = "$" + Math.round(ethUsd).toLocaleString("en-US");
@@ -630,15 +628,15 @@ function _updateCombinedPanel(chain) {
   } else if (chain === "tezos") {
     if (plusEl)   plusEl.style.display = "none";
     if (volEl)    volEl.style.display = "none";
-    if (volXtzEl) { volXtzEl.style.display = ""; volXtzEl.style.gridColumn = "1 / -1"; volXtzEl.style.textAlign = "center"; volXtzEl.textContent = _totalXtz.toFixed(2) + " XTZ"; }
+    if (volXtzEl) { volXtzEl.style.display = ""; volXtzEl.textContent = _totalXtz.toFixed(2) + " XTZ"; }
     const xtzUsd = _xtzRows.reduce((s,r) => s + _toUsd(r), 0);
     if (volUsdEl) volUsdEl.textContent = "$" + Math.round(xtzUsd).toLocaleString("en-US");
     if (usdRow)   usdRow.style.display = "";
     if (label)    label.textContent = "XTZ Cumulative Volume";
   } else {
-    if (plusEl)   { plusEl.style.display = _xtzRows.length > 0 ? "" : "none"; }
-    if (volEl)    { volEl.style.display = ""; volEl.style.gridColumn = ""; volEl.style.textAlign = "left"; volEl.textContent = _totalEth.toFixed(3) + " ETH"; }
-    if (volXtzEl) { volXtzEl.style.display = _xtzRows.length > 0 ? "" : "none"; volXtzEl.style.gridColumn = ""; volXtzEl.style.textAlign = "right"; volXtzEl.textContent = _totalXtz.toFixed(2) + " XTZ"; }
+    if (plusEl)   plusEl.style.display = _xtzRows.length > 0 ? "" : "none";
+    if (volEl)    { volEl.style.display = ""; volEl.textContent = _totalEth.toFixed(3) + " ETH"; }
+    if (volXtzEl) { volXtzEl.style.display = _xtzRows.length > 0 ? "" : "none"; volXtzEl.textContent = _totalXtz.toFixed(2) + " XTZ"; }
     const totalUsd = [..._ethRows, ..._xtzRows].reduce((s,r) => s + _toUsd(r), 0);
     if (volUsdEl) volUsdEl.textContent = "$" + Math.round(totalUsd).toLocaleString("en-US");
     if (usdRow)   usdRow.style.display = "";
