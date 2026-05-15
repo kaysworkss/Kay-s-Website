@@ -226,6 +226,13 @@ body.light .theme-toggle-pin{background:rgba(255,253,248,.98);border-color:rgba(
 body.light .theme-toggle-pin:hover{border-color:var(--terra);transform:scale(1.08);box-shadow:0 6px 24px rgba(74,50,40,.22)}
 
 
+/* ── Example collection chip ── */
+.example-chip{display:inline-flex;align-items:center;gap:7px;font-family:'Cinzel',serif;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--clay);background:rgba(196,132,90,.07);border:1px solid rgba(196,132,90,.3);border-radius:4px;padding:6px 12px;cursor:pointer;transition:background .2s,border-color .2s,color .2s,transform .18s;white-space:nowrap;margin-top:10px}
+.example-chip:hover{background:rgba(196,132,90,.14);border-color:var(--clay);transform:translateY(-1px)}
+.example-chip .chip-dot{width:6px;height:6px;border-radius:50%;background:var(--clay);opacity:.75;flex-shrink:0}
+body.light .example-chip{color:var(--terra);background:var(--terra-bg);border-color:var(--terra-bdr)}
+body.light .example-chip:hover{background:rgba(140,61,28,.14);border-color:var(--terra)}
+body.light .example-chip .chip-dot{background:var(--terra)}
 /* Browse mode — view without wallet */
 body.browse-mode .preconnect-panel{display:none}
 body.browse-mode .page-title-area{display:block}
@@ -586,7 +593,12 @@ body.preconnect .page-title-area{display:none}
  <div class="preconnect-wallets">
  <span id="wallet-hint" class="preconnect-wallet-hint">Detecting wallet&hellip;</span>
  </div>
- <div style="margin-top:24px"><button class="btn btn-ghost" id="btn-browse-mode" style="font-size:.82rem;padding:10px 22px">Browse a Collection Without a Wallet</button></div>
+ <div style="margin-top:24px;display:flex;flex-direction:column;align-items:center;gap:10px">
+  <button class="btn btn-ghost" id="btn-browse-mode" style="font-size:.82rem;padding:10px 22px">Browse a Collection Without a Wallet</button>
+  <button class="example-chip" id="btn-example-intro" title="Load Àpótí Ọlọ́wẹ̀ — an example FA2 collection on Tezos mainnet">
+   <span class="chip-dot"></span>Try an Example Collection &mdash; Àpótí Ọlọ́wẹ̀
+  </button>
+ </div>
  </div>
 
  <div class="page-title-area">
@@ -607,6 +619,11 @@ body.preconnect .page-title-area{display:none}
  <button class="btn btn-sec" id="btn-load-contract">Open Collection</button>
  </div>
  <div class="hint">Paste your KT1 collection address, or connect your wallet and let this page find the FA2 collections you hold.</div>
+ <div style="margin-top:4px">
+  <button class="example-chip" id="btn-example-load" title="Load Àpótí Ọlọ́wẹ̀ — an example FA2 collection">
+   <span class="chip-dot"></span>Load Example: Àpótí Ọlọ́wẹ̀ &mdash; <span style="font-family:'IBM Plex Mono',monospace;letter-spacing:.04em;text-transform:none;font-size:.75em">KT1ENJN&hellip;gUni</span>
+  </button>
+ </div>
  </div>
 
  <div class="card collector-flow" id="fa2-card">
@@ -2148,6 +2165,8 @@ if (btn) { btn.innerHTML = orig; btn.disabled = false; }
 
  var qs = new URLSearchParams(location.search);
  if (qs.get('contract')) { document.getElementById('contract-addr').value = qs.get('contract'); loadContractAddress(qs.get('contract'), true); }
+ // Expose for example-collection shortcut
+ window.loadContractAddress = loadContractAddress;
 });
 
  // ── Site nav mobile menu ──
@@ -2186,6 +2205,37 @@ if (btn) { btn.innerHTML = orig; btn.disabled = false; }
  document.body.classList.add('browse-mode');
  log('Browse mode: paste a KT1 contract address and click Open Collection to view tokens. Connect a wallet to pin.', 'info');
  });
+ })();
+
+ // ── Example collection shortcut ──
+ (function(){
+ var EXAMPLE_ADDR = 'KT1ENJN3a27bqnY1ZoHnzgwAY9GnaDr7gUni';
+ var EXAMPLE_NAME = 'Àpótí Ọlọ́wẹ̀';
+
+ function launchExample() {
+  // Switch to browse mode first (no wallet needed)
+  document.body.classList.remove('preconnect');
+  document.body.classList.add('browse-mode');
+  // Pre-fill the contract field
+  var input = document.getElementById('contract-addr');
+  if (input) input.value = EXAMPLE_ADDR;
+  // Load it — loadContractAddress is defined inside the window load handler,
+  // so we dispatch after the current call stack clears to ensure it exists.
+  setTimeout(function(){
+   if (typeof loadContractAddress === 'function') {
+    loadContractAddress(EXAMPLE_ADDR, false, EXAMPLE_NAME);
+   } else {
+    // Fallback: trigger the load button programmatically
+    var btn = document.getElementById('btn-load-contract');
+    if (btn) btn.click();
+   }
+  }, 80);
+ }
+
+ var btnIntro = document.getElementById('btn-example-intro');
+ var btnLoad  = document.getElementById('btn-example-load');
+ if (btnIntro) btnIntro.addEventListener('click', launchExample);
+ if (btnLoad)  btnLoad.addEventListener('click', launchExample);
  })();
 </script>
 </body>
