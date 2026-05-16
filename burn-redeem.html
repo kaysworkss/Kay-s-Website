@@ -115,8 +115,13 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 40px
 .ex-icon{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--kw-sans);font-weight:600;font-size:13px;margin-right:14px}
 .ex-icon.b{background:rgba(192,68,42,.08);color:var(--kw-accent);border:1px solid rgba(192,68,42,.15)}
 .ex-icon.r{background:rgba(139,105,20,.08);color:var(--kw-gold);border:1px solid rgba(139,105,20,.15)}
+.ex-icon img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
+.ex-icon.has-img{background:#fff;color:transparent;padding:0;overflow:hidden}
+.ex-icon.has-img.b{border-color:rgba(192,68,42,.28)}
+.ex-icon.has-img.r{border-color:rgba(139,105,20,.28)}
 .ex-label{font-family:var(--kw-sans);font-size:10px;color:var(--kw-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
 .ex-name{font-family:var(--kw-sans);font-size:13px;font-weight:500;color:var(--kw-ink)}
+.ex-subname{font-family:var(--kw-sans);font-size:10px;color:var(--kw-muted);margin-top:3px;letter-spacing:.02em;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ex-amt{font-family:var(--kw-serif);font-size:34px;font-weight:600;line-height:1}
 .ex-amt.b{color:var(--kw-accent)}
 .ex-amt.r{color:var(--kw-gold)}
@@ -382,10 +387,11 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 40px
   <div class="ex-card">
     <div class="ex-row">
       <div style="display:flex;align-items:center">
-        <div class="ex-icon b">&#128293;</div>
+        <div class="ex-icon b" id="burnPreview">&#128293;</div>
         <div>
           <div class="ex-label">Requirement</div>
           <div class="ex-name" id="burnName">Edition Token</div>
+          <div class="ex-subname" id="burnTokenRef">Token preview loading</div>
         </div>
       </div>
       <div style="text-align:right">
@@ -399,10 +405,11 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 40px
     </div>
     <div class="ex-row">
       <div style="display:flex;align-items:center">
-        <div class="ex-icon r">&#127942;</div>
+        <div class="ex-icon r" id="rewardPreview">&#127942;</div>
         <div>
           <div class="ex-label">Reward</div>
           <div class="ex-name" id="rewardName">Reward Token</div>
+          <div class="ex-subname" id="rewardTokenRef">Token preview loading</div>
         </div>
       </div>
       <div style="text-align:right">
@@ -1144,6 +1151,7 @@ const state = {
   tezos: null,
   wallet: null,
   walletConnecting: false,
+  tokenMeta: {},
   cfg: {
     burnTokenAddress:'KT1...', burnTokenId:0, burnAmount:10,
     rewardTokenAddress:'KT1...', rewardTokenId:0, rewardAmount:1,
@@ -1992,10 +2000,8 @@ function refreshCollector() {
   // amounts shown in card rows instead
   document.getElementById('burnAmt').textContent     = c.burnAmount;
   document.getElementById('rewardAmt').textContent   = c.rewardAmount;
-  const bn = c.burnTokenAddress.length>8 ? c.burnTokenAddress.slice(0,6)+'...#'+c.burnTokenId : 'BURN TOKEN';
-  const rn = c.rewardTokenAddress.length>8 ? c.rewardTokenAddress.slice(0,6)+'...#'+c.rewardTokenId : 'REWARD TOKEN';
-  document.getElementById('burnName').textContent    = bn;
-  document.getElementById('rewardName').textContent  = rn;
+  renderTokenPreview('burn', c.burnTokenAddress, c.burnTokenId, 'BURN TOKEN', '&#128293;');
+  renderTokenPreview('reward', c.rewardTokenAddress, c.rewardTokenId, 'REWARD TOKEN', '&#127942;');
   document.getElementById('totalRedeemed').textContent = c.totalRedeemed.toLocaleString();
   document.getElementById('contractDisplay').textContent = state.contractAddress
     ? state.contractAddress.slice(0,8)+'...'+state.contractAddress.slice(-4) : 'Not loaded';
@@ -2026,6 +2032,88 @@ function refreshCollector() {
     btn.onclick=doRedeem;
   }
 }
+
+function tokenKey(address, tokenId) {
+  return String(address || '') + ':' + String(tokenId ?? 0);
+}
+
+function shortTokenRef(address, tokenId) {
+  return address && address.length > 8 ? address.slice(0,6) + '...' + address.slice(-4) + ' #' + tokenId : '';
+}
+
+function normaliseMediaUri(uri) {
+  uri = String(uri || '').trim();
+  if (!uri) return '';
+  if (uri.startsWith('ipfs://')) return 'https://ipfs.io/ipfs/' + uri.slice(7).replace(/^ipfs\//, '');
+  if (uri.startsWith('https://') || uri.startsWith('http://') || uri.startsWith('data:')) return uri;
+  return uri;
+}
+
+function pickTokenImage(meta) {
+  if (!meta) return '';
+  return normaliseMediaUri(meta.displayUri || meta.thumbnailUri || meta.artifactUri || meta.image || meta.imageUri || meta.formats?.[0]?.uri);
+}
+
+function renderTokenPreview(kind, address, tokenId, fallbackName, fallbackIcon) {
+  const meta = state.tokenMeta[tokenKey(address, tokenId)] || null;
+  const nameEl = document.getElementById(kind + 'Name');
+  const refEl = document.getElementById(kind + 'TokenRef');
+  const iconEl = document.getElementById(kind + 'Preview');
+  const name = meta?.name || meta?.tokenName || (address && address.length > 8 ? address.slice(0,6) + '...#' + tokenId : fallbackName);
+  if (nameEl) nameEl.textContent = name;
+  if (refEl) refEl.textContent = shortTokenRef(address, tokenId) || 'No token configured';
+  if (!iconEl) return;
+  const img = pickTokenImage(meta);
+  if (img) {
+    iconEl.classList.add('has-img');
+    iconEl.innerHTML = '<img alt="" src="' + img.replace(/"/g, '&quot;') + '" loading="lazy" referrerpolicy="no-referrer">';
+  } else {
+    iconEl.classList.remove('has-img');
+    iconEl.innerHTML = fallbackIcon;
+  }
+}
+
+async function fetchTokenMeta(address, tokenId) {
+  if (!address || !address.startsWith('KT1')) return null;
+  const key = tokenKey(address, tokenId);
+  if (state.tokenMeta[key]) return state.tokenMeta[key];
+  const base = NETWORK === 'mainnet' ? 'https://api.tzkt.io' : 'https://api.ghostnet.tzkt.io';
+  const url = base + '/v1/tokens?contract=' + encodeURIComponent(address) + '&tokenId=' + encodeURIComponent(tokenId) + '&limit=1';
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('token metadata ' + res.status);
+    const rows = await res.json();
+    const token = Array.isArray(rows) ? rows[0] : rows;
+    const meta = token?.metadata || {};
+    state.tokenMeta[key] = {
+      name: meta.name || token?.name || '',
+      displayUri: meta.displayUri || '',
+      thumbnailUri: meta.thumbnailUri || '',
+      artifactUri: meta.artifactUri || '',
+      image: meta.image || '',
+      imageUri: meta.imageUri || '',
+      formats: meta.formats || []
+    };
+    return state.tokenMeta[key];
+  } catch (e) {
+    console.warn('[token-meta] failed', address, tokenId, e);
+    state.tokenMeta[key] = { name: '', failed: true };
+    return state.tokenMeta[key];
+  }
+}
+
+async function refreshTokenMetadata() {
+  const c = state.cfg;
+  const burnKey = tokenKey(c.burnTokenAddress, c.burnTokenId);
+  const rewardKey = tokenKey(c.rewardTokenAddress, c.rewardTokenId);
+  await Promise.all([
+    state.tokenMeta[burnKey]?.failed ? null : fetchTokenMeta(c.burnTokenAddress, c.burnTokenId),
+    state.tokenMeta[rewardKey]?.failed ? null : fetchTokenMeta(c.rewardTokenAddress, c.rewardTokenId)
+  ]);
+  renderTokenPreview('burn', c.burnTokenAddress, c.burnTokenId, 'BURN TOKEN', '&#128293;');
+  renderTokenPreview('reward', c.rewardTokenAddress, c.rewardTokenId, 'REWARD TOKEN', '&#127942;');
+}
+
 
 let timerInt=null;
 function startTimer() {
@@ -2076,13 +2164,33 @@ async function loadContractByAddress(addr, silent) {
     state.cfg.endTimestamp         = st.end_timestamp ? new Date(st.end_timestamp) : null;
 
     refreshStats(); refreshCollector(); syncAdminFields(); fetchWalletBurnBalance();
-    if (!silent) toast('success','?','Contract loaded', addr.slice(0,10)+'...');
-    if (typeof saveBurnConfig === 'function') saveBurnConfig(addr);
+    refreshTokenMetadata();
+    if (!silent && typeof saveBurnConfig === 'function') {
+      const saved = await saveBurnConfig(addr);
+      toast(
+        saved.remote ? 'success' : 'info',
+        saved.remote ? '✓' : 'i',
+        saved.remote ? 'Contract loaded and saved' : 'Contract loaded locally',
+        saved.remote ? 'This KT1 will persist until you load another one.' : 'Vercel config was not updated; check env/API setup.'
+      );
+    } else if (!silent) {
+      toast('success','✓','Contract loaded', addr.slice(0,10)+'...');
+    }
     return true;
   } catch(e) {
     refreshStats(); refreshCollector(); syncAdminFields();
-    if (typeof saveBurnConfig === 'function') saveBurnConfig(addr);
-    if (!silent) toast('info','?','Address saved but could not fetch config', e.message.slice(0,60));
+    refreshTokenMetadata();
+    if (!silent && typeof saveBurnConfig === 'function') {
+      const saved = await saveBurnConfig(addr);
+      toast(
+        saved.remote ? 'info' : 'error',
+        saved.remote ? 'i' : '!',
+        saved.remote ? 'Address saved; config fetch failed' : 'Address only saved in this browser',
+        saved.remote ? e.message.slice(0,60) : 'Vercel config was not updated; check env/API setup.'
+      );
+    } else if (!silent) {
+      toast('info','!','Address loaded but could not fetch config', e.message.slice(0,60));
+    }
     return true;
   }
 }
@@ -3079,9 +3187,13 @@ function handleStoragePaste(evt) { /* legacy */ }
 
   window.saveBurnConfig = async function(addr) {
     const token = state && state.adminToken ? state.adminToken : '';
-    if (!addr || !addr.startsWith('KT1')) return;
-    try { localStorage.setItem('burnredeem_contract_address', addr); } catch (_) {}
-    if (!token) return;
+    const result = { local: false, remote: false };
+    if (!addr || !addr.startsWith('KT1')) return result;
+    try {
+      localStorage.setItem('burnredeem_contract_address', addr);
+      result.local = true;
+    } catch (_) {}
+    if (!token) return result;
     try {
       const res = await fetch(API, {
         method: 'POST',
@@ -3089,9 +3201,11 @@ function handleStoragePaste(evt) { /* legacy */ }
         body: JSON.stringify({ contractAddress: addr, network: NETWORK })
       });
       if (!res.ok) throw new Error('config save ' + res.status);
+      result.remote = true;
     } catch (e) {
       console.warn('[burn-config] save failed', e);
     }
+    return result;
   };
 })();
 </script>
