@@ -2847,7 +2847,6 @@ function handleStoragePaste(evt) { /* legacy */ }
 <script>
 (function(){
   if (!document.body.classList.contains('admin-page')) return;
-  const SESSION_KEY = 'burnredeem_admin_unlocked';
   const TOKEN_KEY = 'burnredeem_admin_token';
   const lock = document.getElementById('adminLock');
   const form = document.getElementById('adminLockForm');
@@ -2858,19 +2857,17 @@ function handleStoragePaste(evt) { /* legacy */ }
   function unlock() {
     document.body.classList.remove('admin-locked');
     if (lock) lock.classList.add('hidden');
-    try { sessionStorage.setItem(SESSION_KEY, '1'); } catch (_) {}
     if (typeof loadSavedDeployInputs === 'function') loadSavedDeployInputs();
-    if (typeof loadBurnConfig === 'function') setTimeout(loadBurnConfig, 0);
+    setTimeout(function() {
+      if (typeof loadBurnConfig === 'function') loadBurnConfig();
+    }, 0);
     var ae = document.getElementById('d-admin');
     if (ae) ae.value = state.walletAddress || '';
   }
 
   try {
-    if (sessionStorage.getItem(SESSION_KEY) === '1' && sessionStorage.getItem(TOKEN_KEY)) {
-      state.adminToken = sessionStorage.getItem(TOKEN_KEY);
-      unlock();
-      return;
-    }
+    sessionStorage.removeItem('burnredeem_admin_unlocked');
+    sessionStorage.removeItem(TOKEN_KEY);
   } catch (_) {}
 
   if (!form) return;
@@ -2889,7 +2886,6 @@ function handleStoragePaste(evt) { /* legacy */ }
       if (!res.ok) throw new Error(res.status === 401 ? 'Wrong password.' : 'Password check failed.');
       const data = await res.json();
       state.adminToken = data.token || '';
-      try { sessionStorage.setItem(TOKEN_KEY, state.adminToken); } catch (_) {}
       unlock();
     } catch (e) {
       if (err) { err.textContent = e.message || 'Could not unlock admin.'; err.style.display = 'block'; }
@@ -2906,23 +2902,32 @@ function handleStoragePaste(evt) { /* legacy */ }
   const API = '/api/burn-config';
 
   window.loadBurnConfig = async function() {
+    let loaded = false;
     try {
       const res = await fetch(API, { cache: 'no-store' });
       if (!res.ok) throw new Error('config ' + res.status);
       const data = await res.json();
-      const addr = data && data.config && data.config.contractAddress;
-      if (addr && addr.startsWith('KT1')) await loadContractByAddress(addr, true);
+      const cfg = data && data.config ? data.config : {};
+      const addr = cfg.contractAddress || cfg.contractAddr || '';
+      if (addr && addr.startsWith('KT1')) {
+        loaded = await loadContractByAddress(addr, true);
+      }
     } catch (e) {
+      console.warn('[burn-config] load failed', e);
+    }
+
+    if (!loaded) {
       try {
         const localAddr = localStorage.getItem('burnredeem_contract_address') || '';
-        if (localAddr.startsWith('KT1')) await loadContractByAddress(localAddr, true);
+        if (localAddr.startsWith('KT1')) {
+          await loadContractByAddress(localAddr, true);
+        }
       } catch (_) {}
-      console.warn('[burn-config] load failed', e);
     }
   };
 
   window.saveBurnConfig = async function(addr) {
-    const token = (state && state.adminToken) || sessionStorage.getItem('burnredeem_admin_token') || '';
+    const token = state && state.adminToken ? state.adminToken : '';
     if (!addr || !addr.startsWith('KT1')) return;
     try { localStorage.setItem('burnredeem_contract_address', addr); } catch (_) {}
     if (!token) return;
