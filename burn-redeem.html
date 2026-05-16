@@ -850,6 +850,7 @@ const state = {
   contractAddress: null,
   tezos: null,
   wallet: null,
+  walletConnecting: false,
   cfg: {
     burnTokenAddress:'KT1...', burnTokenId:0, burnAmount:10,
     rewardTokenAddress:'KT1...', rewardTokenId:0, rewardAmount:1,
@@ -883,8 +884,9 @@ function showPage(name, btn) {
 
 /* ─── WALLET ──────────────────────────────────────────────────── */
 function toggleWallet() {
+  if (state.walletConnecting) return;
   if (state.walletAddress) {
-    disconnectWallet();
+    toast('info', '✓', 'Wallet already connected', state.walletAddress.slice(0,14)+'...');
   } else {
     document.getElementById('wallet-modal').classList.add('show');
   }
@@ -907,6 +909,7 @@ async function disconnectWallet() {
 
 function setConnectedWallet(address, label) {
   state.walletAddress = address;
+  state.walletConnecting = false;
   const short = address.slice(0,8)+'...'+address.slice(-4);
   document.getElementById('walletBtn').classList.add('connected');
   document.getElementById('wdot').classList.add('live');
@@ -1368,15 +1371,17 @@ function templeDappNetwork() {
 }
 
 async function connectTempleDirect() {
+  if (state.walletAddress || state.walletConnecting) return;
+  state.walletConnecting = true;
   document.getElementById('wallet-modal').classList.remove('show');
   try {
     initTaquito();
-    toast('info', '🏛', 'Opening Temple...', 'Approve in the Temple extension');
+    toast('info', '??', 'Opening Temple...', 'Approve in the Temple extension');
 
     if (!(await templeDirectAvailable())) {
       console.info('Temple direct not available, diagnostics:', templeDiagnostics());
-      toast('info', '🔄', 'Temple not detected', 'Falling back to Beacon...');
-      await connectBeaconWallet();
+      toast('info', '??', 'Temple not detected', 'Falling back to Beacon...');
+      await connectBeaconWallet(true);
       return;
     }
 
@@ -1390,15 +1395,22 @@ async function connectTempleDirect() {
   } catch(e) {
     const msg = e?.message || String(e);
     if (/reject|cancel|denied|aborted/i.test(msg)) {
-      toast('info', '↩', 'Cancelled');
+      toast('info', '?', 'Cancelled');
     } else {
-      toast('info', '🔄', 'Temple failed, trying Beacon...', msg.slice(0,60));
-      await connectBeaconWallet();
+      toast('info', '??', 'Temple failed, trying Beacon...', msg.slice(0,60));
+      await connectBeaconWallet(true);
     }
+  } finally {
+    state.walletConnecting = false;
   }
 }
 
-async function connectBeaconWallet() {
+async function connectBeaconWallet(fromFallback) {
+  if (state.walletAddress) return;
+  if (!fromFallback) {
+    if (state.walletConnecting) return;
+    state.walletConnecting = true;
+  }
   document.getElementById('wallet-modal').classList.remove('show');
   try {
     initTaquito();
@@ -1410,29 +1422,31 @@ async function connectBeaconWallet() {
       window.TaquitoBundle?.BeaconWallet
     );
     if (typeof BeaconWalletClass !== 'function') {
-      toast('error', '⚠', 'Beacon not available', 'Install Temple and use Temple Direct instead');
+      toast('error', '?', 'Beacon not available', 'Install Temple and use Temple Direct instead');
       document.getElementById('wallet-modal').classList.add('show');
       return;
     }
     const wallet = new BeaconWalletClass({
-      name: 'Burn→Redeem',
+      name: 'Burn?Redeem',
       preferredNetwork: NETWORK,
       network: walletNetworkConfig()
     });
     state.wallet = wallet;
     state.tezos.setWalletProvider(wallet);
-    toast('info', '🔗', 'Opening Beacon...', 'Approve in your wallet');
+    toast('info', '??', 'Opening Beacon...', 'Approve in your wallet');
     await wallet.requestPermissions({ network: walletNetworkConfig() });
     const address = await wallet.getPKH();
     setConnectedWallet(address, 'Beacon');
   } catch(e) {
     const msg = e?.message || String(e);
     if (/reject|cancel|denied|aborted/i.test(msg)) {
-      toast('info', '↩', 'Cancelled');
+      toast('info', '?', 'Cancelled');
     } else {
-      toast('error', '⚠', 'Beacon failed', msg.slice(0,80));
+      toast('error', '?', 'Beacon failed', msg.slice(0,80));
       document.getElementById('wallet-modal').classList.add('show');
     }
+  } finally {
+    if (!fromFallback) state.walletConnecting = false;
   }
 }
 
@@ -2703,14 +2717,21 @@ function handleStoragePaste(evt) { /* legacy */ }
 
 <script>
 window.addEventListener('load', async function() {
+  let loaded = false;
   try {
     const res = await fetch('/api/burn-config', { cache: 'no-store' });
     if (!res.ok) throw new Error('config ' + res.status);
     const data = await res.json();
     const addr = data && data.config && data.config.contractAddress;
-    if (addr && addr.startsWith('KT1')) await loadContractByAddress(addr, true);
+    if (addr && addr.startsWith('KT1')) loaded = await loadContractByAddress(addr, true);
   } catch (e) {
     console.warn('[burn-config] collector load failed', e);
+  }
+  if (!loaded) {
+    try {
+      const localAddr = localStorage.getItem('burnredeem_contract_address') || '';
+      if (localAddr.startsWith('KT1')) await loadContractByAddress(localAddr, true);
+    } catch (_) {}
   }
 });
 </script>
