@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Burn Redeem | Collector</title>
+<title>Burn Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Barlow+Condensed:wght@400;600;700;800&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
@@ -275,49 +275,22 @@ body.admin-page.admin-locked #walletBtn{display:none}
 .admin-lock-form button:disabled{opacity:.55;cursor:not-allowed}
 .admin-lock-error{display:none;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--glow);line-height:1.5}
 @media(max-width:620px){.admin-lock-form{flex-direction:column}.admin-lock-form button{padding:12px 16px}nav{gap:10px}.admin-link{padding:8px 10px}}
-@media(min-width:900px){
-  body.collector-page{background:#FAF8F4;color:#1a1a1a}
-  body.collector-page nav{height:76px;padding:0 clamp(32px,5vw,64px);background:rgba(255,255,255,.86);border-bottom:1px solid #EEEAE3;box-shadow:none}
-  body.collector-page .wallet-btn{color:#77736b;border-color:#D9D3CA;border-radius:999px;padding:12px 23px;background:#fff}
-  body.collector-page .wallet-btn:hover{color:var(--kw-accent,#C0442A);border-color:rgba(192,68,42,.35)}
-  #page-collector{min-height:calc(100vh - 76px)}
-  #page-collector > .col-wrap{width:min(1180px,calc(100vw - 48px));max-width:none;min-height:calc(100vh - 76px);margin:0 auto;padding:88px 0 76px;display:grid;grid-template-columns:minmax(360px,1fr) minmax(420px,504px);grid-template-areas:"badge card" "hero card" "copy card" "history history";column-gap:clamp(56px,8vw,118px);align-items:center}
-  #page-collector .ticker{display:none}
-  #page-collector .campaign-badge{grid-area:badge;align-self:end;margin:0 0 30px;width:max-content;border-radius:3px;padding:5px 12px}
-  #page-collector .hero{grid-area:hero;align-self:center;font-size:clamp(78px,8vw,112px);line-height:.92;letter-spacing:-.025em;margin:0;max-width:560px}
-  #page-collector .hero .fire,#page-collector .hero .claim{display:inline}
-  #page-collector .hero .claim::before{content:" for "}
-  #page-collector .hero .claim em{color:#b9b9b5;font-style:italic}
-  #page-collector .hero-tag{display:none}
-  #page-collector .hero-sub{grid-area:copy;align-self:start;max-width:500px;margin:34px 0 0;font-size:17px;line-height:1.55;color:#66645f}
-  #page-collector .timer-bar,#page-collector .ex-card,#page-collector .tx-confirm,#page-collector .stats-row{grid-column:2;width:100%}
-  #page-collector .timer-bar{margin:0 0 16px;border-radius:20px;background:#fff;box-shadow:0 16px 50px rgba(33,28,18,.06)}
-  #page-collector .ex-card{grid-area:card;align-self:center;border-radius:36px;border-color:#ECE7DF;padding:46px 48px 126px;background:#fff;box-shadow:0 30px 70px rgba(31,27,20,.08);overflow:hidden}
-  #page-collector .ex-card::before{height:5px}
-  #page-collector .ex-row{padding:0;background:transparent}
-  #page-collector .ex-row+.ex-row{border-top:none}
-  #page-collector .ex-row-mid{margin:54px 0;padding:0;height:1px;justify-content:center;border:0;background:#ECE7DF;position:relative}
-  #page-collector .ex-row-mid span:first-child{position:absolute;width:46px;height:22px;display:flex;align-items:center;justify-content:center;background:#fff;color:#CFCAC1!important;font-size:18px!important}
-  #page-collector .ex-row-mid span:last-child{display:none}
-  #page-collector .ex-icon{width:38px;height:38px;margin-right:14px;font-size:14px}
-  #page-collector .ex-label{margin-bottom:12px;font-size:10px;letter-spacing:.16em}
-  #page-collector .ex-name{font-size:15px;font-weight:700}
-  #page-collector .ex-amt{font-size:31px;font-style:italic}
-  #page-collector .redeem-btn{margin-top:46px;border-radius:999px;padding:21px 24px;font-size:15px;box-shadow:0 16px 28px rgba(0,0,0,.12)}
-  #page-collector .stats-row{grid-area:card;align-self:end;margin:0;padding:0 48px 44px;grid-template-columns:1fr 1fr;gap:0;pointer-events:none}
-  #page-collector .stat-box{border:0;background:transparent;padding:0}
-  #page-collector #walletBalBox{display:none}
-  #page-collector .stat-box:nth-child(2){text-align:right}
-  #page-collector .stat-lbl{font-size:10px;letter-spacing:.16em;margin:0 0 8px;color:#b7b1a8}
-  #page-collector .stat-val{font-size:16px}
-  #page-collector .stat-val.blue{font-size:10px;color:#b7b1a8}
-  #page-collector .steps-hdr,#page-collector .step{display:none}
-  #page-collector #txHistorySection{grid-area:history;max-width:720px;margin:70px auto 0;width:100%}
-}
 
 </style>
 </head>
-<body class="collector-page">
+<body class="admin-page admin-locked">
+
+<div class="admin-lock" id="adminLock">
+  <div class="admin-lock-box">
+    <div class="admin-lock-title">Admin Access</div>
+    <div class="admin-lock-sub">Enter the admin password to unlock campaign controls.</div>
+    <form class="admin-lock-form" id="adminLockForm">
+      <input type="password" id="adminPassword" autocomplete="current-password" placeholder="Password" autofocus />
+      <button type="submit" id="adminUnlockBtn">Unlock</button>
+    </form>
+    <div class="admin-lock-error" id="adminLockError"></div>
+  </div>
+</div>
 
 
 <!-- Wallet prompt modal -->
@@ -334,124 +307,293 @@ body.admin-page.admin-locked #walletBtn{display:none}
 
 <nav>
   <div class="logo" style="font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:400;font-size:18px;letter-spacing:.02em;text-shadow:none;color:#1a1a1a;text-transform:none">Kay's Works <em style="font-style:normal;color:#C0442A;font-family:'Inter',sans-serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:500;vertical-align:middle;margin-left:6px">Burn &rarr; Redeem</em></div>
+    <a class="admin-link" href="/burn-redeem">Collector</a>
   <button class="wallet-btn" id="walletBtn" onclick="toggleWallet()">
     <span class="wdot" id="wdot"></span>
     <span id="walletLabel">Connect Wallet</span>
   </button>
 </nav>
 
-<!-- COLLECTOR -->
-<div class="page active" id="page-collector">
-<div class="col-wrap">
-
-  <!-- Ticker -->
-  <div class="ticker"><div class="ticker-inner">&nbsp;&nbsp;&nbsp;Tezos &middot; FA2 &middot; Burn-to-Redeem &middot; On-Chain Verified &middot; Kay&rsquo;s Works&nbsp;&nbsp;&nbsp;Tezos &middot; FA2 &middot; Burn-to-Redeem &middot; On-Chain Verified &middot; Kay&rsquo;s Works</div></div>
-
-  <!-- Badge -->
-  <div class="campaign-badge live" id="campBadge">
-    <span style="width:5px;height:5px;border-radius:50%;background:currentColor;animation:blink 1.4s infinite;flex-shrink:0;display:inline-block"></span>
-    <span id="campBadgeText">Active Collection</span>
+<!-- ADMIN -->
+<div class="page active" id="page-admin">
+<div class="adm-wrap">
+  <div class="adm-title">Admin Panel</div>
+  <div class="adm-sub">Configure campaign &middot; Manage tokens &middot; Monitor activity</div>
+  <div class="loader-bar">
+    <div class="field"><label>Contract KT1 Address</label><input type="text" id="adminContractAddr" placeholder="KT1..."/></div>
+    <button class="load-btn" onclick="loadContract()">Load</button>
   </div>
-
-  <!-- Hero -->
-  <h1 class="hero">
-    <span class="fire" id="burnLabel">Redeem</span>
-    <span class="claim" id="rewardLabel"><em>Bronze Token</em></span>
-    <span class="hero-tag">Tezos</span>
-  </h1>
-  <p class="hero-sub">Hold five <strong>Wooden Tokens</strong> and exchange them for a <strong>Bronze Token</strong> — unlocking Bronze Tier collector privileges including access to bid on paintings, sculptures, exclusive merch, and your name inscribed on the project monolith.</p>
-
-  <!-- Timer -->
-  <div id="timerBar" style="display:none" class="timer-bar">
-    <div class="timer-seg"><span class="timer-num" id="tDays">00</span><span class="timer-lbl">Days</span></div>
-    <div class="timer-seg"><span class="timer-num" id="tHrs">00</span><span class="timer-lbl">Hours</span></div>
-    <div class="timer-seg"><span class="timer-num" id="tMin">00</span><span class="timer-lbl">Mins</span></div>
-    <div class="timer-seg"><span class="timer-num" id="tSec">00</span><span class="timer-lbl">Secs</span></div>
+  <div class="adm-stats">
+    <div class="adm-stat"><div class="adm-sv" id="sTotal">&#8212;</div><div class="adm-sl">Redeemed</div></div>
+    <div class="adm-stat"><div class="adm-sv" id="sBurn" style="color:var(--glow)">&#8212;</div><div class="adm-sl">Burn / Tx</div></div>
+    <div class="adm-stat"><div class="adm-sv" id="sReward" style="color:var(--gold)">&#8212;</div><div class="adm-sl">Reward / Tx</div></div>
+    <div class="adm-stat"><div class="adm-sv" id="sState" style="color:var(--green)">&#8212;</div><div class="adm-sl">State</div></div>
   </div>
+  <div class="adm-grid">
+    <div class="adm-card">
+      <div class="adm-card-hdr">&#128293; Burn Token <span class="chip">FA2</span></div>
+      <div class="field"><label>FA2 Contract Address</label><input type="text" id="bAddr" placeholder="KT1..."/></div>
+      <div class="field-row">
+        <div class="field"><label>Token ID</label><input type="number" id="bId" value="0" min="0"/></div>
+        <div class="field"><label>Burn Amount</label><input type="number" id="bAmt" value="10" min="1"/></div>
+      </div>
+      <button class="abtn primary" onclick="setBurnToken()">Update Burn Token</button>
+    </div>
+    <div class="adm-card">
+      <div class="adm-card-hdr">&#127942; Reward Token <span class="chip">FA2</span></div>
+      <div class="field"><label>FA2 Contract Address</label><input type="text" id="rAddr" placeholder="KT1..."/></div>
+      <div class="field-row">
+        <div class="field"><label>Token ID</label><input type="number" id="rId" value="0" min="0"/></div>
+        <div class="field"><label>Reward Amount</label><input type="number" id="rAmt" value="1" min="1"/></div>
+      </div>
+      <button class="abtn primary" onclick="setRewardToken()">Update Reward Token</button>
+    </div>
+    <div class="adm-card">
+      <div class="adm-card-hdr">&#9201; Campaign Duration</div>
+      <div class="field"><label>Mode</label><select id="durMode" onchange="toggleDur()"><option value="unlimited">&#9854;&#65039; Unlimited</option><option value="timed">&#128197; Timed</option></select></div>
+      <div id="durFields" style="display:none"><div class="field"><label>End Date &amp; Time (UTC)</label><input type="datetime-local" id="endDt"/></div></div>
+      <button class="abtn sec" onclick="setDuration()">Apply Duration</button>
+    </div>
+    <div class="adm-card">
+      <div class="adm-card-hdr">&#9889; Campaign Control</div>
+      <div class="tog-wrap"><div><div class="tog-lbl">Active</div><div class="tog-sub">Toggle to pause or resume</div></div><label class="toggle"><input type="checkbox" id="activeTog" checked onchange="setActive()"/><span class="tslider"></span></label></div>
+      <div class="divider"></div>
+      <div class="field"><label>Withdraw Reward Tokens</label><input type="number" id="wdAmt" placeholder="Amount" min="1"/></div>
+      <button class="abtn danger" onclick="withdrawRewards()">Withdraw to Admin</button>
+    </div>
+    <div class="adm-card">
+      <div class="adm-card-hdr">&#128273; Transfer Ownership</div>
+      <div class="field"><label>New Admin Address</label><input type="text" id="newAdmin" placeholder="tz1..."/></div>
+      <button class="abtn danger" onclick="transferAdmin()">Transfer Admin Rights</button>
+    </div>
+    <div class="adm-card full" id="swapCard">
+      <div class="adm-card-hdr">&#9854;&#65039; Campaign Swap <span class="chip">GUIDED</span></div>
+      <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:18px">
+        Use this to safely swap to a new campaign on the same contract — pause, withdraw old rewards, set new tokens, then resume. Each step must be completed in order.
+      </p>
 
-  <!-- Exchange card -->
-  <div class="ex-card">
-    <div class="ex-row">
-      <div style="display:flex;align-items:center">
-        <div class="ex-icon b">&#128293;</div>
-        <div>
-          <div class="ex-label">Requirement</div>
-          <div class="ex-name" id="burnName">Edition Token</div>
+      <!-- Step tracker -->
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:20px">
+        <div id="sw1" style="flex:1;padding:9px 4px;text-align:center;font-size:9px;letter-spacing:.08em;text-transform:uppercase;border-right:1px solid var(--border);color:var(--glow);transition:.2s">&#9312; Pause</div>
+        <div id="sw2" style="flex:1;padding:9px 4px;text-align:center;font-size:9px;letter-spacing:.08em;text-transform:uppercase;border-right:1px solid var(--border);opacity:.35;transition:.2s">&#9313; Withdraw</div>
+        <div id="sw3" style="flex:1;padding:9px 4px;text-align:center;font-size:9px;letter-spacing:.08em;text-transform:uppercase;border-right:1px solid var(--border);opacity:.35;transition:.2s">&#9314; Set Tokens</div>
+        <div id="sw4" style="flex:1;padding:9px 4px;text-align:center;font-size:9px;letter-spacing:.08em;text-transform:uppercase;border-right:1px solid var(--border);opacity:.35;transition:.2s">&#9315; Fund</div>
+        <div id="sw5" style="flex:1;padding:9px 4px;text-align:center;font-size:9px;letter-spacing:.08em;text-transform:uppercase;opacity:.35;transition:.2s">&#9316; Resume</div>
+      </div>
+
+      <!-- Step 1: Pause -->
+      <div id="swPanel1">
+        <div style="font-size:11px;color:var(--mid);line-height:1.7;margin-bottom:14px">
+          <strong style="color:var(--text)">Step 1 — Pause the campaign.</strong><br>
+          This stops any redemptions while you make changes. Your contract must be loaded above first.
+        </div>
+        <div id="swErr1" style="display:none;background:rgba(255,77,28,.12);border:1px solid rgba(255,77,28,.4);border-radius:4px;padding:9px 12px;font-size:11px;color:var(--glow);margin-bottom:10px"></div>
+        <button class="abtn primary" style="margin:0" onclick="swapStep1()">&#9646;&#9646; Pause Campaign</button>
+      </div>
+
+      <!-- Step 2: Withdraw -->
+      <div id="swPanel2" style="display:none">
+        <div style="font-size:11px;color:var(--mid);line-height:1.7;margin-bottom:14px">
+          <strong style="color:var(--text)">Step 2 — Withdraw remaining reward tokens.</strong><br>
+          Pull any unsent reward tokens back to your wallet before swapping. Enter 0 to skip if the contract is already empty.
+        </div>
+        <div id="swErr2" style="display:none;background:rgba(255,77,28,.12);border:1px solid rgba(255,77,28,.4);border-radius:4px;padding:9px 12px;font-size:11px;color:var(--glow);margin-bottom:10px"></div>
+        <div class="field"><label>Amount to Withdraw (enter 0 to skip)</label><input type="number" id="sw-wd-amt" value="0" min="0"/></div>
+        <div style="display:flex;gap:8px">
+          <button class="abtn danger" style="margin:0;flex:1" onclick="swapStep2()">Withdraw &amp; Continue</button>
+          <button class="abtn sec" style="margin:0;white-space:nowrap" onclick="swapSkip2()">Skip (empty)</button>
         </div>
       </div>
-      <div style="text-align:right">
-        <div class="ex-amt b" id="burnAmt">10</div>
-        <div style="font-family:var(--kw-sans);font-size:10px;color:var(--kw-muted);letter-spacing:.06em;margin-top:2px">pcs</div>
+
+      <!-- Step 3: Set new tokens -->
+      <div id="swPanel3" style="display:none">
+        <div style="font-size:11px;color:var(--mid);line-height:1.7;margin-bottom:14px">
+          <strong style="color:var(--text)">Step 3 — Set your new burn and reward tokens.</strong><br>
+          These will be saved to the contract. Leave a field unchanged if you only want to update one token.
+        </div>
+        <div id="swErr3" style="display:none;background:rgba(255,77,28,.12);border:1px solid rgba(255,77,28,.4);border-radius:4px;padding:9px 12px;font-size:11px;color:var(--glow);margin-bottom:10px"></div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">&#128293; New Burn Token</div>
+        <div class="field"><label>FA2 Contract Address</label><input type="text" id="sw-burn-addr" placeholder="KT1... (leave blank to keep current)"/></div>
+        <div class="field-row">
+          <div class="field"><label>Token ID</label><input type="number" id="sw-burn-id" value="0" min="0"/></div>
+          <div class="field"><label>Burn Amount</label><input type="number" id="sw-burn-amt" value="10" min="1"/></div>
+        </div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:14px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border)">&#127942; New Reward Token</div>
+        <div class="field"><label>FA2 Contract Address</label><input type="text" id="sw-reward-addr" placeholder="KT1... (leave blank to keep current)"/></div>
+        <div class="field-row">
+          <div class="field"><label>Token ID</label><input type="number" id="sw-reward-id" value="0" min="0"/></div>
+          <div class="field"><label>Reward Amount</label><input type="number" id="sw-reward-amt" value="1" min="1"/></div>
+        </div>
+        <button class="abtn primary" style="margin:0" onclick="swapStep3()">Update Tokens on Chain</button>
+      </div>
+
+      <!-- Step 4: Fund -->
+      <div id="swPanel4" style="display:none">
+        <div style="font-size:11px;color:var(--mid);line-height:1.7;margin-bottom:14px">
+          <strong style="color:var(--text)">Step 4 — Fund the contract with new reward tokens.</strong><br>
+          Send your new reward tokens to the contract address below using your wallet or the FA2 token's interface. The contract cannot send rewards it doesn't hold.
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:12px 14px;margin-bottom:14px">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Send reward tokens to this contract address</div>
+          <div id="sw-kt1-display" style="font-family:var(--mono);font-size:13px;color:var(--green);font-weight:700;word-break:break-all"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:14px">&#9888;&#65039; Once you have sent the tokens, click Continue below.</div>
+        <button class="abtn primary" style="margin:0" onclick="swapStep4Done()">I've Sent the Tokens — Continue</button>
+      </div>
+
+      <!-- Step 5: Resume -->
+      <div id="swPanel5" style="display:none">
+        <div style="font-size:11px;color:var(--mid);line-height:1.7;margin-bottom:14px">
+          <strong style="color:var(--text)">Step 5 — Resume the campaign.</strong><br>
+          Everything is set. Click below to make the campaign live again.
+        </div>
+        <div id="swErr5" style="display:none;background:rgba(255,77,28,.12);border:1px solid rgba(255,77,28,.4);border-radius:4px;padding:9px 12px;font-size:11px;color:var(--glow);margin-bottom:10px"></div>
+        <button class="abtn primary" style="margin:0;background:linear-gradient(90deg,var(--green),#00c853);border:none" onclick="swapStep5()">&#9654; Resume Campaign</button>
+      </div>
+
+      <!-- Done -->
+      <div id="swPanelDone" style="display:none;text-align:center;padding:20px 0">
+        <div style="font-size:32px;margin-bottom:10px">&#127881;</div>
+        <div style="font-family:var(--display);font-size:22px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Campaign Swapped!</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:18px">Your new campaign is live on-chain.</div>
+        <button class="abtn sec" style="margin:0 auto;display:inline-block" onclick="swapReset()">&#8635; Run Another Swap</button>
       </div>
     </div>
-    <div class="ex-row-mid">
-      <span style="color:var(--kw-border);font-size:18px;line-height:1">&#8594;</span>
-      <span style="font-family:var(--kw-sans);font-size:10px;color:var(--kw-muted);letter-spacing:.1em;text-transform:uppercase">Exchange</span>
-    </div>
-    <div class="ex-row">
-      <div style="display:flex;align-items:center">
-        <div class="ex-icon r">&#127942;</div>
-        <div>
-          <div class="ex-label">Reward</div>
-          <div class="ex-name" id="rewardName">Reward Token</div>
+        <div class="adm-card full" id="deployCard">
+      <div class="adm-card-hdr">&#128640; Deploy New Contract <span class="chip">ONE-CLICK</span></div>
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:18px">
+        <div id="dstep1" style="flex:1;padding:10px;text-align:center;font-size:10px;letter-spacing:.1em;text-transform:uppercase;border-right:1px solid var(--border);color:var(--glow)">&#9312; Configure</div>
+        <div id="dstep2" style="flex:1;padding:10px;text-align:center;font-size:10px;letter-spacing:.1em;text-transform:uppercase;border-right:1px solid var(--border);opacity:.4">&#9313; Review</div>
+        <div id="dstep3" style="flex:1;padding:10px;text-align:center;font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.4">&#9314; Deploy</div>
+      </div>
+      <div id="deployPanel1">
+        <div id="deployInlineErr" style="display:none;background:rgba(255,77,28,.12);border:1px solid rgba(255,77,28,.4);border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:12px;color:var(--glow);margin-bottom:12px"></div>
+
+        <!-- Saved config banner -->
+        <div id="savedBanner" style="display:none;background:rgba(61,214,140,.08);border:1px solid rgba(61,214,140,.2);border-radius:4px;padding:8px 14px;margin-bottom:12px;font-family:var(--mono);font-size:11px;color:var(--green);align-items:center;gap:10px">
+          <span>&#128190;</span><span id="savedBannerMsg">Saved config loaded</span>
+          <button onclick="clearSavedConfig()" style="margin-left:auto;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:11px;font-family:var(--mono)">&#10005; Clear</button>
+        </div>
+
+        <!-- Step 0: Paste SmartPy outputs -->
+        <div style="background:rgba(41,121,255,.07);border:1px solid rgba(41,121,255,.18);border-radius:4px;padding:12px 14px;margin-bottom:16px;font-size:11px;color:var(--mid);line-height:1.7">
+          &#128161; SmartPy gives two files. Paste each below — the app combines them and fills in your wallet + token details automatically.
+        </div>
+
+        <div style="margin-bottom:6px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">&#128196; code.json <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px"> — from SmartPy: Compile &rarr; Download &rarr; code.json</span></div>
+        <textarea id="d-contract-json" rows="4"
+          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:9px 12px;font-family:var(--mono);font-size:10px;color:var(--muted);resize:vertical;outline:none;margin-bottom:4px;transition:.15s"
+          placeholder='[{"prim":"parameter",...},{"prim":"code",...}]'
+          oninput="validateDeployCode();saveDeployInputs()"></textarea>
+        <div id="codeJsonStatus" style="font-family:var(--mono);font-size:10px;margin-bottom:14px;color:var(--muted)"></div>
+
+        <!-- Admin (read-only, from wallet) -->
+        <div class="field">
+          <label>Admin — your connected wallet (auto-injected)</label>
+          <input type="text" id="d-admin" readonly style="opacity:.65;cursor:default" placeholder="Connect your wallet first — admin will appear here"/>
+        </div>
+
+        <!-- Burn token -->
+        <div style="margin:14px 0 6px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding-bottom:8px;border-bottom:1px solid var(--border)">&#128293; Burn Token</div>
+        <div class="field">
+          <label>FA2 Contract Address</label>
+          <input type="text" id="d-burn-addr" placeholder="KT1..." oninput="saveDeployInputs()"/>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Token ID</label>
+            <input type="number" id="d-burn-id" value="0" min="0" oninput="saveDeployInputs()"/>
+          </div>
+          <div class="field">
+            <label>Burn Amount (per redeem)</label>
+            <input type="number" id="d-burn-amt" value="10" min="1" oninput="saveDeployInputs()"/>
+          </div>
+        </div>
+
+        <!-- Reward token -->
+        <div style="margin:14px 0 6px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding-bottom:8px;border-bottom:1px solid var(--border)">&#127942; Reward Token</div>
+        <div class="field">
+          <label>FA2 Contract Address</label>
+          <input type="text" id="d-reward-addr" placeholder="KT1..." oninput="saveDeployInputs()"/>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Token ID</label>
+            <input type="number" id="d-reward-id" value="0" min="0" oninput="saveDeployInputs()"/>
+          </div>
+          <div class="field">
+            <label>Reward Amount (per redeem)</label>
+            <input type="number" id="d-reward-amt" value="1" min="1" oninput="saveDeployInputs()"/>
+          </div>
+        </div>
+
+        <!-- Campaign duration -->
+        <div style="margin:14px 0 6px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding-bottom:8px;border-bottom:1px solid var(--border)">&#9201; Campaign Duration</div>
+        <div class="field">
+          <label>Mode</label>
+          <select id="d-dur-mode" onchange="toggleDeployDur()" oninput="saveDeployInputs()">
+            <option value="unlimited">&#9854;&#65039; Unlimited</option>
+            <option value="timed">&#128197; Timed (set end date)</option>
+          </select>
+        </div>
+        <div id="d-dur-fields" style="display:none">
+          <div class="field">
+            <label>End Date &amp; Time (UTC)</label>
+            <input type="datetime-local" id="d-end-dt" oninput="saveDeployInputs()"/>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;margin-top:18px;margin-bottom:10px">
+          <button class="abtn primary" style="margin:0;flex:1" onclick="deployReview()">Review &#8594;</button>
+          <button class="abtn sec" style="margin:0;white-space:nowrap" onclick="saveDeployInputs(true)">&#128190; Save</button>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">
+          Inputs auto-save to your browser. Fill in your token details, connect wallet, then click Review.
         </div>
       </div>
-      <div style="text-align:right">
-        <div class="ex-amt r" id="rewardAmt">1</div>
-        <div style="font-family:var(--kw-sans);font-size:10px;color:var(--kw-muted);letter-spacing:.06em;margin-top:2px">pcs</div>
+      <div id="deployPanel2" style="display:none">
+        <p style="font-size:11px;color:var(--muted);margin-bottom:8px">Verify storage below then click Deploy.</p>
+        <div id="deployAdminConfirm" style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:4px;padding:9px 12px;margin-bottom:12px;font-family:var(--mono);font-size:11px;color:var(--green)"></div>
+        <div id="deployReviewBox" style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:12px;font-family:var(--mono);font-size:10px;color:var(--muted);max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin-bottom:12px"></div>
+        <div style="display:flex;gap:10px">
+          <button class="abtn sec" style="margin-top:0" onclick="deployBack()">&#8592; Back</button>
+          <button class="abtn primary" style="margin-top:0;flex:1" onclick="deployContract()">&#128640; Deploy to Mainnet</button>
+        </div>
+      </div>
+      <div id="deployPanel3" style="display:none">
+        <div style="text-align:center;padding:20px 0">
+          <div id="deploySpinner" style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--glow);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px"></div>
+          <div id="deployStatusMsg" style="font-size:12px;color:var(--mid);font-family:var(--mono)">Waiting for wallet...</div>
+        </div>
+        <div id="deployResultBox" style="display:none;background:var(--surface);border:1px solid rgba(0,230,118,.25);border-radius:4px;padding:14px;font-family:var(--mono);font-size:11px;line-height:1.8">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Deployed Contract</div>
+          <div id="deployedKT1" style="font-size:14px;color:var(--green);font-weight:700;word-break:break-all;margin-bottom:10px"></div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Op Hash</div>
+          <div id="deployedOpHash" style="color:var(--mid);word-break:break-all;margin-bottom:12px;font-size:10px"></div>
+          <button class="abtn primary" style="margin-top:0" onclick="useDeployedContract()">&#10003; Use This Contract</button>
+          <button class="abtn sec" style="margin-top:8px" onclick="deployReset()">Deploy Another</button>
+        </div>
       </div>
     </div>
-    <button class="redeem-btn" id="redeemBtn" onclick="doRedeem()"><span id="redeemBtnTxt">Exchange Now</span></button>
   </div>
+</div>
 
-  <!-- TX Confirmation Banner (shown after successful redeem) -->
-  <div class="tx-confirm" id="txConfirmBanner">
-    <div class="tx-confirm-bar"></div>
-    <div class="tx-confirm-body">
-      <div class="tx-confirm-check">&#10003;</div>
-      <div class="tx-confirm-text">
-        <div class="tx-confirm-label">Transaction Confirmed</div>
-        <div class="tx-confirm-hash" id="txConfirmHash"></div>
-        <a class="tx-confirm-link" id="txConfirmLink" href="#" target="_blank" rel="noopener">View on tzkt.io</a>
-      </div>
-      <button class="tx-confirm-dismiss" onclick="document.getElementById('txConfirmBanner').style.display='none'" title="Dismiss">&#215;</button>
-    </div>
+<!-- ── Debug Log Panel ─────────────────────────────────── -->
+<div class="dbg-panel" id="dbgPanel">
+  <div class="dbg-hdr" onclick="dbgToggle()">
+    <span style="font-size:13px">🐛</span>
+    <span class="dbg-hdr-title">Debug Log <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:9px;color:var(--muted)">— Temple · wallet · tx events</span></span>
+    <span class="dbg-hdr-count" id="dbgCount">0</span>
+    <button class="dbg-hdr-btn" onclick="event.stopPropagation();dbgCopy()" title="Copy all to clipboard">Copy</button>
+    <button class="dbg-hdr-btn danger" onclick="event.stopPropagation();dbgClear()" title="Clear log">Clear</button>
+    <span class="dbg-hdr-chevron" id="dbgChevron">▼</span>
   </div>
-
-  <!-- Stats -->
-  <div class="stats-row">
-    <div class="stat-box">
-      <div class="stat-lbl">Total Redeemed</div>
-      <div class="stat-val green" id="totalRedeemed">0</div>
-      <div style="font-family:var(--kw-sans);font-size:10px;color:var(--kw-muted);margin-top:4px">Verified on-chain</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-lbl">Contract</div>
-      <div class="stat-val blue" id="contractDisplay">Not loaded</div>
-    </div>
-    <div class="stat-box" id="walletBalBox" style="position:relative">
-      <div class="stat-lbl">Your Burn Tokens</div>
-      <div class="stat-val" id="walletBalVal" style="color:var(--kw-ink)">—</div>
-      <div style="font-family:var(--kw-sans);font-size:10px;color:var(--kw-muted);margin-top:4px" id="walletBalSub">Connect wallet</div>
-      <div id="walletBalSpinner" style="display:none;position:absolute;top:10px;right:12px;width:10px;height:10px;border:2px solid var(--kw-border);border-top-color:var(--kw-ink);border-radius:50%;animation:spin .7s linear infinite"></div>
+  <div class="dbg-body" id="dbgBody">
+    <div class="dbg-log" id="dbgLog">
+      <div class="dbg-empty" id="dbgEmpty">No events yet — connect wallet or submit a transaction.</div>
     </div>
   </div>
-
-  <!-- How it works -->
-  <div class="steps-hdr">How it works</div>
-  <div class="step"><div class="step-n">1</div><div class="step-t"><strong>Hold 5 Wooden Tokens</strong> &mdash; make sure they are in your connected wallet before proceeding.</div></div>
-  <div class="step"><div class="step-n">2</div><div class="step-t"><strong>Connect your wallet</strong> &mdash; Temple or Beacon using the button at top right.</div></div>
-  <div class="step"><div class="step-n">3</div><div class="step-t"><strong>Click Exchange Now</strong> &mdash; one approval covers everything. The contract approves, burns your Wooden Tokens, and delivers your Bronze Token in a single transaction.</div></div>
-  <div class="step"><div class="step-n">4</div><div class="step-t"><strong>Done</strong> &mdash; your Bronze Token and collector privileges are yours. Welcome to the Bronze Tier.</div></div>
-
-  <!-- Transaction History -->
-  <div id="txHistorySection" style="display:none">
-    <div class="txh-hdr">
-      <span>Recent Exchanges</span>
-      <button class="txh-clear" onclick="txHistoryClear()">Clear history</button>
-    </div>
-    <div class="txh-list" id="txHistoryList"></div>
-  </div>
+</div>
 
 </div>
 </div>
@@ -878,6 +1020,7 @@ function showPage(name, btn) {
     if (ae) ae.value = state.walletAddress || '';
     // Load saved deploy inputs when Admin tab is opened
     if (typeof loadSavedDeployInputs === 'function') loadSavedDeployInputs();
+    if (typeof loadBurnConfig === 'function') loadBurnConfig();
   }
 }
 
@@ -2702,17 +2845,92 @@ function handleStoragePaste(evt) { /* legacy */ }
 </script>
 
 <script>
-window.addEventListener('load', async function() {
-  try {
-    const res = await fetch('/api/burn-config', { cache: 'no-store' });
-    if (!res.ok) throw new Error('config ' + res.status);
-    const data = await res.json();
-    const addr = data && data.config && data.config.contractAddress;
-    if (addr && addr.startsWith('KT1')) await loadContractByAddress(addr, true);
-  } catch (e) {
-    console.warn('[burn-config] collector load failed', e);
+(function(){
+  if (!document.body.classList.contains('admin-page')) return;
+  const SESSION_KEY = 'burnredeem_admin_unlocked';
+  const TOKEN_KEY = 'burnredeem_admin_token';
+  const lock = document.getElementById('adminLock');
+  const form = document.getElementById('adminLockForm');
+  const input = document.getElementById('adminPassword');
+  const btn = document.getElementById('adminUnlockBtn');
+  const err = document.getElementById('adminLockError');
+
+  function unlock() {
+    document.body.classList.remove('admin-locked');
+    if (lock) lock.classList.add('hidden');
+    try { sessionStorage.setItem(SESSION_KEY, '1'); } catch (_) {}
+    if (typeof loadSavedDeployInputs === 'function') loadSavedDeployInputs();
+    var ae = document.getElementById('d-admin');
+    if (ae) ae.value = state.walletAddress || '';
   }
-});
+
+  try {
+    if (sessionStorage.getItem(SESSION_KEY) === '1' && sessionStorage.getItem(TOKEN_KEY)) {
+      state.adminToken = sessionStorage.getItem(TOKEN_KEY);
+      unlock();
+      return;
+    }
+  } catch (_) {}
+
+  if (!form) return;
+  form.addEventListener('submit', async function(evt) {
+    evt.preventDefault();
+    const password = input ? input.value : '';
+    if (!password) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Checking'; }
+    if (err) { err.style.display = 'none'; err.textContent = ''; }
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+      if (!res.ok) throw new Error(res.status === 401 ? 'Wrong password.' : 'Password check failed.');
+      const data = await res.json();
+      state.adminToken = data.token || '';
+      try { sessionStorage.setItem(TOKEN_KEY, state.adminToken); } catch (_) {}
+      unlock();
+    } catch (e) {
+      if (err) { err.textContent = e.message || 'Could not unlock admin.'; err.style.display = 'block'; }
+      if (input) { input.value = ''; input.focus(); }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Unlock'; }
+    }
+  });
+})();
+</script>
+
+<script>
+(function(){
+  const API = '/api/burn-config';
+
+  window.loadBurnConfig = async function() {
+    try {
+      const res = await fetch(API, { cache: 'no-store' });
+      if (!res.ok) throw new Error('config ' + res.status);
+      const data = await res.json();
+      const addr = data && data.config && data.config.contractAddress;
+      if (addr && addr.startsWith('KT1')) await loadContractByAddress(addr, true);
+    } catch (e) {
+      console.warn('[burn-config] load failed', e);
+    }
+  };
+
+  window.saveBurnConfig = async function(addr) {
+    const token = (state && state.adminToken) || sessionStorage.getItem('burnredeem_admin_token') || '';
+    if (!token || !addr || !addr.startsWith('KT1')) return;
+    try {
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ contractAddress: addr, network: NETWORK })
+      });
+      if (!res.ok) throw new Error('config save ' + res.status);
+    } catch (e) {
+      console.warn('[burn-config] save failed', e);
+    }
+  };
+})();
 </script>
 </body>
 </html>
