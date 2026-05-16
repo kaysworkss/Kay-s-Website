@@ -1851,22 +1851,12 @@ async function connectBeaconWallet(fromFallback) {
     state.beaconClient = client;
 
     const permissionRequest = {
+      network: beaconNetworkConfig(sdk),
       scopes: beaconPermissionScopes(sdk)
     };
     console.info('Beacon permission request:', permissionRequest);
     toast('info', '??', 'Opening mobile wallet...', 'Approve the Tezos claim in your wallet');
-    let permission;
-    try {
-      permission = await client.requestPermissions(permissionRequest);
-    } catch (permissionErr) {
-      const permissionMsg = permissionErr?.message || String(permissionErr);
-      if (/not accepted|invalid|unknown|unexpected/i.test(permissionMsg)) {
-        console.info('Beacon scoped permission retry without payload:', permissionMsg);
-        permission = await client.requestPermissions();
-      } else {
-        throw permissionErr;
-      }
-    }
+    const permission = await client.requestPermissions(permissionRequest);
     console.info('Beacon permission response:', permission);
     const account = await client.getActiveAccount?.();
     const address = permission?.address || account?.address;
