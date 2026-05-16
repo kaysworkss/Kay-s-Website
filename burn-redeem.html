@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Burn Redeem | Collector</title>
+<title>Burn → Redeem | Tezos</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Barlow+Condensed:wght@400;600;700;800&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
@@ -215,6 +215,58 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 40px
 .adm-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:640px){.adm-grid{grid-template-columns:1fr}.stats-row{grid-template-columns:1fr 1fr}nav{padding:0 16px}.col-wrap,.adm-wrap{padding-left:16px;padding-right:16px}}
 @media(max-width:400px){.stats-row{grid-template-columns:1fr}}
+
+/* Admin entry and single-file admin lock */
+.nav-actions{display:flex;align-items:center;gap:10px}
+.admin-link{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:8px 14px;transition:.15s;background:transparent;cursor:pointer;white-space:nowrap}
+.admin-link:hover{color:var(--glow);border-color:var(--glow)}
+.admin-lock{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;background:rgba(7,7,10,.88);backdrop-filter:blur(10px);padding:20px}
+.admin-lock.hidden{display:none}
+.admin-lock-box{width:min(420px,100%);border:1px solid var(--border);background:var(--card);border-radius:6px;padding:26px;box-shadow:0 24px 80px rgba(0,0,0,.38)}
+.admin-lock-title{font-family:var(--display);font-size:28px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px;color:var(--text)}
+.admin-lock-sub{font-size:12px;line-height:1.6;color:var(--muted);margin-bottom:18px}
+.admin-lock-form{display:flex;gap:8px;align-items:stretch}
+.admin-lock-form input{flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:12px 14px;font-family:var(--mono);font-size:13px;outline:none}
+.admin-lock-form input:focus{border-color:var(--glow)}
+.admin-lock-form button{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:var(--glow);border:1px solid var(--glow);color:#fff;padding:0 16px;border-radius:4px;cursor:pointer}
+.admin-lock-form button:disabled{opacity:.55;cursor:not-allowed}
+.admin-lock-error{display:none;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--glow);line-height:1.5}
+@media(max-width:620px){.admin-lock-form{flex-direction:column}.admin-lock-form button{padding:12px 16px}nav{gap:10px}.admin-link{padding:8px 10px}.nav-actions{gap:8px}}
+@media(min-width:900px){
+  body{background:#FAF8F4;color:#1a1a1a}
+  nav{height:76px;padding:0 48px;background:rgba(250,248,244,.92);border-bottom:1px solid #eee9df;backdrop-filter:blur(16px)}
+  .tabs{background:transparent;border:0;padding:0;gap:44px}
+  .tab{color:#aaa39a;padding:0;border-radius:0;background:transparent;letter-spacing:.14em;font-family:var(--kw-sans,'Inter',sans-serif);font-size:11px}
+  .tab.active{background:transparent;color:#1a1a1a}
+  .wallet-btn{border-color:#d8d2ca;color:#7c7770;border-radius:999px;padding:12px 20px;background:rgba(255,255,255,.38)}
+  .wallet-btn:hover{border-color:#1a1a1a;color:#1a1a1a}
+  .admin-link{border-color:#d8d2ca;color:#7c7770;border-radius:999px;padding:12px 18px;background:rgba(255,255,255,.38);font-family:var(--kw-sans,'Inter',sans-serif)}
+  #page-collector{min-height:calc(100vh - 76px)}
+  #page-collector > .col-wrap{width:min(1180px,calc(100vw - 48px));max-width:none;min-height:calc(100vh - 76px);margin:0 auto;padding:88px 0 76px;display:grid;grid-template-columns:minmax(360px,1fr) minmax(420px,504px);grid-template-areas:"badge card" "hero card" "copy card" "history history";column-gap:clamp(56px,8vw,118px);align-items:center}
+  #page-collector .ticker,#page-collector .timer-bar,#page-collector .stats-row,#page-collector .steps-hdr,#page-collector .step,#page-collector .dbg-panel{display:none!important}
+  #page-collector .campaign-badge{grid-area:badge;align-self:end;justify-self:start;margin:0 0 28px;border-radius:3px;padding:4px 10px;background:rgba(0,230,118,.06);color:#00a85a;border:1px solid rgba(0,230,118,.26);font-family:var(--kw-sans,'Inter',sans-serif)}
+  #page-collector .hero{grid-area:hero;align-self:center;font-size:clamp(78px,8vw,112px);line-height:.92;letter-spacing:-.025em;margin:0;max-width:560px}
+  #page-collector .hero .fire,#page-collector .hero .claim{display:inline}
+  #page-collector .hero .claim::before{content:" for "}
+  #page-collector .hero .claim em{color:#b9b9b5;font-style:italic}
+  #page-collector .hero-tag{display:none}
+  #page-collector .hero-sub{grid-area:copy;align-self:start;max-width:500px;margin:34px 0 0;font-size:17px;line-height:1.55;color:#66645f}
+  #page-collector .ex-card{grid-area:card;width:100%;margin:0;border-radius:36px;border:1px solid #f0ece5;background:#fff;box-shadow:0 24px 80px rgba(30,24,18,.08);overflow:hidden;padding:46px 48px 38px;align-self:center}
+  #page-collector .ex-card::before{height:6px;background:#ef543f}
+  #page-collector .ex-row{padding:0;background:transparent;display:grid;grid-template-columns:1fr auto;gap:24px;border:0;min-height:96px}
+  #page-collector .ex-row+.ex-row{border-top:0}
+  #page-collector .ex-row-mid{padding:0;height:74px;background:transparent;border:0;display:grid;grid-template-columns:1fr 34px 1fr;gap:12px;color:#d5d0c8}
+  #page-collector .ex-row-mid::before,#page-collector .ex-row-mid::after{content:"";height:1px;background:#eee9df;align-self:center}
+  #page-collector .ex-row-mid span:last-child{display:none}
+  #page-collector .ex-row-mid span:first-child{grid-column:2;text-align:center;color:#cfc9bf}
+  #page-collector .ex-icon{width:40px;height:40px;margin-right:12px}
+  #page-collector .ex-label{font-size:10px;letter-spacing:.13em;color:#beb8b0;margin-bottom:12px}
+  #page-collector .ex-name{font-size:14px;font-weight:700;color:#0c0c0c}
+  #page-collector .ex-amt{font-size:30px;font-style:italic;color:#ef543f}
+  #page-collector .redeem-btn{margin-top:26px;border-radius:999px;background:#1b1b1b;padding:22px;font-size:15px;box-shadow:0 14px 28px rgba(0,0,0,.12)}
+  #page-collector .tx-confirm,#page-collector .txh-hdr,#page-collector .txh-list,#page-collector .txh-empty{grid-column:1/-1;width:100%}
+}
+
 .adm-card{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:22px}
 .adm-card.full{grid-column:1/-1}
 .adm-card-hdr{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:8px;padding-bottom:12px;border-bottom:1px solid var(--border)}
@@ -254,70 +306,9 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 40px
 .toast-icon{font-size:16px;flex-shrink:0}
 .toast-msg{font-size:11px;line-height:1.5}
 .toast-msg small{color:var(--muted);display:block;margin-top:3px}
-
-/* Split collector/admin pages */
-.admin-link{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:8px 14px;transition:.15s}
-.admin-link:hover{color:var(--text);border-color:var(--mid)}
-body.collector-page .tabs,body.admin-page .tabs{display:none}
-body.admin-page{background:var(--bg);color:var(--text)}
-body.admin-page #page-admin{display:block;min-height:100vh;padding-top:86px}
-body.admin-page.admin-locked #page-admin{filter:blur(2px);pointer-events:none;user-select:none;opacity:.28}
-body.admin-page.admin-locked #walletBtn{display:none}
-.admin-lock{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;background:rgba(7,7,10,.88);backdrop-filter:blur(10px);padding:20px}
-.admin-lock.hidden{display:none}
-.admin-lock-box{width:min(420px,100%);border:1px solid var(--border);background:var(--card);border-radius:6px;padding:26px;box-shadow:0 24px 80px rgba(0,0,0,.38)}
-.admin-lock-title{font-family:var(--display);font-size:28px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px;color:var(--text)}
-.admin-lock-sub{font-size:12px;line-height:1.6;color:var(--muted);margin-bottom:18px}
-.admin-lock-form{display:flex;gap:8px;align-items:stretch}
-.admin-lock-form input{flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:12px 14px;font-family:var(--mono);font-size:13px;outline:none}
-.admin-lock-form input:focus{border-color:var(--glow)}
-.admin-lock-form button{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:var(--glow);border:1px solid var(--glow);color:#fff;padding:0 16px;border-radius:4px;cursor:pointer}
-.admin-lock-form button:disabled{opacity:.55;cursor:not-allowed}
-.admin-lock-error{display:none;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--glow);line-height:1.5}
-@media(max-width:620px){.admin-lock-form{flex-direction:column}.admin-lock-form button{padding:12px 16px}nav{gap:10px}.admin-link{padding:8px 10px}}
-@media(min-width:900px){
-  body.collector-page{background:#FAF8F4;color:#1a1a1a}
-  body.collector-page nav{height:76px;padding:0 clamp(32px,5vw,64px);background:rgba(255,255,255,.86);border-bottom:1px solid #EEEAE3;box-shadow:none}
-  body.collector-page .wallet-btn{color:#77736b;border-color:#D9D3CA;border-radius:999px;padding:12px 23px;background:#fff}
-  body.collector-page .wallet-btn:hover{color:var(--kw-accent,#C0442A);border-color:rgba(192,68,42,.35)}
-  #page-collector{min-height:calc(100vh - 76px)}
-  #page-collector > .col-wrap{width:min(1180px,calc(100vw - 48px));max-width:none;min-height:calc(100vh - 76px);margin:0 auto;padding:88px 0 76px;display:grid;grid-template-columns:minmax(360px,1fr) minmax(420px,504px);grid-template-areas:"badge card" "hero card" "copy card" "history history";column-gap:clamp(56px,8vw,118px);align-items:center}
-  #page-collector .ticker{display:none}
-  #page-collector .campaign-badge{grid-area:badge;align-self:end;margin:0 0 30px;width:max-content;border-radius:3px;padding:5px 12px}
-  #page-collector .hero{grid-area:hero;align-self:center;font-size:clamp(78px,8vw,112px);line-height:.92;letter-spacing:-.025em;margin:0;max-width:560px}
-  #page-collector .hero .fire,#page-collector .hero .claim{display:inline}
-  #page-collector .hero .claim::before{content:" for "}
-  #page-collector .hero .claim em{color:#b9b9b5;font-style:italic}
-  #page-collector .hero-tag{display:none}
-  #page-collector .hero-sub{grid-area:copy;align-self:start;max-width:500px;margin:34px 0 0;font-size:17px;line-height:1.55;color:#66645f}
-  #page-collector .timer-bar,#page-collector .ex-card,#page-collector .tx-confirm,#page-collector .stats-row{grid-column:2;width:100%}
-  #page-collector .timer-bar{margin:0 0 16px;border-radius:20px;background:#fff;box-shadow:0 16px 50px rgba(33,28,18,.06)}
-  #page-collector .ex-card{grid-area:card;align-self:center;border-radius:36px;border-color:#ECE7DF;padding:46px 48px 126px;background:#fff;box-shadow:0 30px 70px rgba(31,27,20,.08);overflow:hidden}
-  #page-collector .ex-card::before{height:5px}
-  #page-collector .ex-row{padding:0;background:transparent}
-  #page-collector .ex-row+.ex-row{border-top:none}
-  #page-collector .ex-row-mid{margin:54px 0;padding:0;height:1px;justify-content:center;border:0;background:#ECE7DF;position:relative}
-  #page-collector .ex-row-mid span:first-child{position:absolute;width:46px;height:22px;display:flex;align-items:center;justify-content:center;background:#fff;color:#CFCAC1!important;font-size:18px!important}
-  #page-collector .ex-row-mid span:last-child{display:none}
-  #page-collector .ex-icon{width:38px;height:38px;margin-right:14px;font-size:14px}
-  #page-collector .ex-label{margin-bottom:12px;font-size:10px;letter-spacing:.16em}
-  #page-collector .ex-name{font-size:15px;font-weight:700}
-  #page-collector .ex-amt{font-size:31px;font-style:italic}
-  #page-collector .redeem-btn{margin-top:46px;border-radius:999px;padding:21px 24px;font-size:15px;box-shadow:0 16px 28px rgba(0,0,0,.12)}
-  #page-collector .stats-row{grid-area:card;align-self:end;margin:0;padding:0 48px 44px;grid-template-columns:1fr 1fr;gap:0;pointer-events:none}
-  #page-collector .stat-box{border:0;background:transparent;padding:0}
-  #page-collector #walletBalBox{display:none}
-  #page-collector .stat-box:nth-child(2){text-align:right}
-  #page-collector .stat-lbl{font-size:10px;letter-spacing:.16em;margin:0 0 8px;color:#b7b1a8}
-  #page-collector .stat-val{font-size:16px}
-  #page-collector .stat-val.blue{font-size:10px;color:#b7b1a8}
-  #page-collector .steps-hdr,#page-collector .step{display:none}
-  #page-collector #txHistorySection{grid-area:history;max-width:720px;margin:70px auto 0;width:100%}
-}
-
 </style>
 </head>
-<body class="collector-page">
+<body>
 
 
 <!-- Wallet prompt modal -->
@@ -332,12 +323,30 @@ body.admin-page.admin-locked #walletBtn{display:none}
   </div>
 </div>
 
+<div class="admin-lock hidden" id="adminLock">
+  <div class="admin-lock-box">
+    <div class="admin-lock-title">Admin Access</div>
+    <div class="admin-lock-sub">Enter the admin password to unlock campaign controls.</div>
+    <form class="admin-lock-form" id="adminLockForm">
+      <input type="password" id="adminPassword" autocomplete="current-password" placeholder="Password" />
+      <button type="submit" id="adminUnlockBtn">Unlock</button>
+    </form>
+    <div class="admin-lock-error" id="adminLockError"></div>
+  </div>
+</div>
+
 <nav>
   <div class="logo" style="font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:400;font-size:18px;letter-spacing:.02em;text-shadow:none;color:#1a1a1a;text-transform:none">Kay's Works <em style="font-style:normal;color:#C0442A;font-family:'Inter',sans-serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:500;vertical-align:middle;margin-left:6px">Burn &rarr; Redeem</em></div>
-  <button class="wallet-btn" id="walletBtn" onclick="toggleWallet()">
-    <span class="wdot" id="wdot"></span>
-    <span id="walletLabel">Connect Wallet</span>
-  </button>
+  <div class="tabs">
+    <button class="tab active" onclick="showPage('collector',this)">Exchange</button>
+  </div>
+  <div class="nav-actions">
+    <button class="admin-link" onclick="openAdminGate()">Admin</button>
+    <button class="wallet-btn" id="walletBtn" onclick="toggleWallet()">
+      <span class="wdot" id="wdot"></span>
+      <span id="walletLabel">Connect Wallet</span>
+    </button>
+  </div>
 </nav>
 
 <!-- COLLECTOR -->
@@ -452,6 +461,290 @@ body.admin-page.admin-locked #walletBtn{display:none}
     </div>
     <div class="txh-list" id="txHistoryList"></div>
   </div>
+
+</div>
+</div>
+
+<!-- ADMIN -->
+<div class="page" id="page-admin">
+<div class="adm-wrap">
+  <div class="adm-title">Admin Panel</div>
+  <div class="adm-sub">Configure campaign &middot; Manage tokens &middot; Monitor activity</div>
+  <div class="loader-bar">
+    <div class="field"><label>Contract KT1 Address</label><input type="text" id="adminContractAddr" placeholder="KT1..."/></div>
+    <button class="load-btn" onclick="loadContract()">Load</button>
+  </div>
+  <div class="adm-stats">
+    <div class="adm-stat"><div class="adm-sv" id="sTotal">&#8212;</div><div class="adm-sl">Redeemed</div></div>
+    <div class="adm-stat"><div class="adm-sv" id="sBurn" style="color:var(--glow)">&#8212;</div><div class="adm-sl">Burn / Tx</div></div>
+    <div class="adm-stat"><div class="adm-sv" id="sReward" style="color:var(--gold)">&#8212;</div><div class="adm-sl">Reward / Tx</div></div>
+    <div class="adm-stat"><div class="adm-sv" id="sState" style="color:var(--green)">&#8212;</div><div class="adm-sl">State</div></div>
+  </div>
+  <div class="adm-grid">
+    <div class="adm-card">
+      <div class="adm-card-hdr">&#128293; Burn Token <span class="chip">FA2</span></div>
+      <div class="field"><label>FA2 Contract Address</label><input type="text" id="bAddr" placeholder="KT1..."/></div>
+      <div class="field-row">
+        <div class="field"><label>Token ID</label><input type="number" id="bId" value="0" min="0"/></div>
+        <div class="field"><label>Burn Amount</label><input type="number" id="bAmt" value="10" min="1"/></div>
+      </div>
+      <button class="abtn primary" onclick="setBurnToken()">Update Burn Token</button>
+    </div>
+    <div class="adm-card">
+      <div class="adm-card-hdr">&#127942; Reward Token <span class="chip">FA2</span></div>
+      <div class="field"><label>FA2 Contract Address</label><input type="text" id="rAddr" placeholder="KT1..."/></div>
+      <div class="field-row">
+        <div class="field"><label>Token ID</label><input type="number" id="rId" value="0" min="0"/></div>
+        <div class="field"><label>Reward Amount</label><input type="number" id="rAmt" value="1" min="1"/></div>
+      </div>
+      <button class="abtn primary" onclick="setRewardToken()">Update Reward Token</button>
+    </div>
+    <div class="adm-card">
+      <div class="adm-card-hdr">&#9201; Campaign Duration</div>
+      <div class="field"><label>Mode</label><select id="durMode" onchange="toggleDur()"><option value="unlimited">&#9854;&#65039; Unlimited</option><option value="timed">&#128197; Timed</option></select></div>
+      <div id="durFields" style="display:none"><div class="field"><label>End Date &amp; Time (UTC)</label><input type="datetime-local" id="endDt"/></div></div>
+      <button class="abtn sec" onclick="setDuration()">Apply Duration</button>
+    </div>
+    <div class="adm-card">
+      <div class="adm-card-hdr">&#9889; Campaign Control</div>
+      <div class="tog-wrap"><div><div class="tog-lbl">Active</div><div class="tog-sub">Toggle to pause or resume</div></div><label class="toggle"><input type="checkbox" id="activeTog" checked onchange="setActive()"/><span class="tslider"></span></label></div>
+      <div class="divider"></div>
+      <div class="field"><label>Withdraw Reward Tokens</label><input type="number" id="wdAmt" placeholder="Amount" min="1"/></div>
+      <button class="abtn danger" onclick="withdrawRewards()">Withdraw to Admin</button>
+    </div>
+    <div class="adm-card">
+      <div class="adm-card-hdr">&#128273; Transfer Ownership</div>
+      <div class="field"><label>New Admin Address</label><input type="text" id="newAdmin" placeholder="tz1..."/></div>
+      <button class="abtn danger" onclick="transferAdmin()">Transfer Admin Rights</button>
+    </div>
+    <div class="adm-card full" id="swapCard">
+      <div class="adm-card-hdr">&#9854;&#65039; Campaign Swap <span class="chip">GUIDED</span></div>
+      <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:18px">
+        Use this to safely swap to a new campaign on the same contract — pause, withdraw old rewards, set new tokens, then resume. Each step must be completed in order.
+      </p>
+
+      <!-- Step tracker -->
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:20px">
+        <div id="sw1" style="flex:1;padding:9px 4px;text-align:center;font-size:9px;letter-spacing:.08em;text-transform:uppercase;border-right:1px solid var(--border);color:var(--glow);transition:.2s">&#9312; Pause</div>
+        <div id="sw2" style="flex:1;padding:9px 4px;text-align:center;font-size:9px;letter-spacing:.08em;text-transform:uppercase;border-right:1px solid var(--border);opacity:.35;transition:.2s">&#9313; Withdraw</div>
+        <div id="sw3" style="flex:1;padding:9px 4px;text-align:center;font-size:9px;letter-spacing:.08em;text-transform:uppercase;border-right:1px solid var(--border);opacity:.35;transition:.2s">&#9314; Set Tokens</div>
+        <div id="sw4" style="flex:1;padding:9px 4px;text-align:center;font-size:9px;letter-spacing:.08em;text-transform:uppercase;border-right:1px solid var(--border);opacity:.35;transition:.2s">&#9315; Fund</div>
+        <div id="sw5" style="flex:1;padding:9px 4px;text-align:center;font-size:9px;letter-spacing:.08em;text-transform:uppercase;opacity:.35;transition:.2s">&#9316; Resume</div>
+      </div>
+
+      <!-- Step 1: Pause -->
+      <div id="swPanel1">
+        <div style="font-size:11px;color:var(--mid);line-height:1.7;margin-bottom:14px">
+          <strong style="color:var(--text)">Step 1 — Pause the campaign.</strong><br>
+          This stops any redemptions while you make changes. Your contract must be loaded above first.
+        </div>
+        <div id="swErr1" style="display:none;background:rgba(255,77,28,.12);border:1px solid rgba(255,77,28,.4);border-radius:4px;padding:9px 12px;font-size:11px;color:var(--glow);margin-bottom:10px"></div>
+        <button class="abtn primary" style="margin:0" onclick="swapStep1()">&#9646;&#9646; Pause Campaign</button>
+      </div>
+
+      <!-- Step 2: Withdraw -->
+      <div id="swPanel2" style="display:none">
+        <div style="font-size:11px;color:var(--mid);line-height:1.7;margin-bottom:14px">
+          <strong style="color:var(--text)">Step 2 — Withdraw remaining reward tokens.</strong><br>
+          Pull any unsent reward tokens back to your wallet before swapping. Enter 0 to skip if the contract is already empty.
+        </div>
+        <div id="swErr2" style="display:none;background:rgba(255,77,28,.12);border:1px solid rgba(255,77,28,.4);border-radius:4px;padding:9px 12px;font-size:11px;color:var(--glow);margin-bottom:10px"></div>
+        <div class="field"><label>Amount to Withdraw (enter 0 to skip)</label><input type="number" id="sw-wd-amt" value="0" min="0"/></div>
+        <div style="display:flex;gap:8px">
+          <button class="abtn danger" style="margin:0;flex:1" onclick="swapStep2()">Withdraw &amp; Continue</button>
+          <button class="abtn sec" style="margin:0;white-space:nowrap" onclick="swapSkip2()">Skip (empty)</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Set new tokens -->
+      <div id="swPanel3" style="display:none">
+        <div style="font-size:11px;color:var(--mid);line-height:1.7;margin-bottom:14px">
+          <strong style="color:var(--text)">Step 3 — Set your new burn and reward tokens.</strong><br>
+          These will be saved to the contract. Leave a field unchanged if you only want to update one token.
+        </div>
+        <div id="swErr3" style="display:none;background:rgba(255,77,28,.12);border:1px solid rgba(255,77,28,.4);border-radius:4px;padding:9px 12px;font-size:11px;color:var(--glow);margin-bottom:10px"></div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">&#128293; New Burn Token</div>
+        <div class="field"><label>FA2 Contract Address</label><input type="text" id="sw-burn-addr" placeholder="KT1... (leave blank to keep current)"/></div>
+        <div class="field-row">
+          <div class="field"><label>Token ID</label><input type="number" id="sw-burn-id" value="0" min="0"/></div>
+          <div class="field"><label>Burn Amount</label><input type="number" id="sw-burn-amt" value="10" min="1"/></div>
+        </div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:14px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border)">&#127942; New Reward Token</div>
+        <div class="field"><label>FA2 Contract Address</label><input type="text" id="sw-reward-addr" placeholder="KT1... (leave blank to keep current)"/></div>
+        <div class="field-row">
+          <div class="field"><label>Token ID</label><input type="number" id="sw-reward-id" value="0" min="0"/></div>
+          <div class="field"><label>Reward Amount</label><input type="number" id="sw-reward-amt" value="1" min="1"/></div>
+        </div>
+        <button class="abtn primary" style="margin:0" onclick="swapStep3()">Update Tokens on Chain</button>
+      </div>
+
+      <!-- Step 4: Fund -->
+      <div id="swPanel4" style="display:none">
+        <div style="font-size:11px;color:var(--mid);line-height:1.7;margin-bottom:14px">
+          <strong style="color:var(--text)">Step 4 — Fund the contract with new reward tokens.</strong><br>
+          Send your new reward tokens to the contract address below using your wallet or the FA2 token's interface. The contract cannot send rewards it doesn't hold.
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:12px 14px;margin-bottom:14px">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Send reward tokens to this contract address</div>
+          <div id="sw-kt1-display" style="font-family:var(--mono);font-size:13px;color:var(--green);font-weight:700;word-break:break-all"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:14px">&#9888;&#65039; Once you have sent the tokens, click Continue below.</div>
+        <button class="abtn primary" style="margin:0" onclick="swapStep4Done()">I've Sent the Tokens — Continue</button>
+      </div>
+
+      <!-- Step 5: Resume -->
+      <div id="swPanel5" style="display:none">
+        <div style="font-size:11px;color:var(--mid);line-height:1.7;margin-bottom:14px">
+          <strong style="color:var(--text)">Step 5 — Resume the campaign.</strong><br>
+          Everything is set. Click below to make the campaign live again.
+        </div>
+        <div id="swErr5" style="display:none;background:rgba(255,77,28,.12);border:1px solid rgba(255,77,28,.4);border-radius:4px;padding:9px 12px;font-size:11px;color:var(--glow);margin-bottom:10px"></div>
+        <button class="abtn primary" style="margin:0;background:linear-gradient(90deg,var(--green),#00c853);border:none" onclick="swapStep5()">&#9654; Resume Campaign</button>
+      </div>
+
+      <!-- Done -->
+      <div id="swPanelDone" style="display:none;text-align:center;padding:20px 0">
+        <div style="font-size:32px;margin-bottom:10px">&#127881;</div>
+        <div style="font-family:var(--display);font-size:22px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Campaign Swapped!</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:18px">Your new campaign is live on-chain.</div>
+        <button class="abtn sec" style="margin:0 auto;display:inline-block" onclick="swapReset()">&#8635; Run Another Swap</button>
+      </div>
+    </div>
+        <div class="adm-card full" id="deployCard">
+      <div class="adm-card-hdr">&#128640; Deploy New Contract <span class="chip">ONE-CLICK</span></div>
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:18px">
+        <div id="dstep1" style="flex:1;padding:10px;text-align:center;font-size:10px;letter-spacing:.1em;text-transform:uppercase;border-right:1px solid var(--border);color:var(--glow)">&#9312; Configure</div>
+        <div id="dstep2" style="flex:1;padding:10px;text-align:center;font-size:10px;letter-spacing:.1em;text-transform:uppercase;border-right:1px solid var(--border);opacity:.4">&#9313; Review</div>
+        <div id="dstep3" style="flex:1;padding:10px;text-align:center;font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.4">&#9314; Deploy</div>
+      </div>
+      <div id="deployPanel1">
+        <div id="deployInlineErr" style="display:none;background:rgba(255,77,28,.12);border:1px solid rgba(255,77,28,.4);border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:12px;color:var(--glow);margin-bottom:12px"></div>
+
+        <!-- Saved config banner -->
+        <div id="savedBanner" style="display:none;background:rgba(61,214,140,.08);border:1px solid rgba(61,214,140,.2);border-radius:4px;padding:8px 14px;margin-bottom:12px;font-family:var(--mono);font-size:11px;color:var(--green);align-items:center;gap:10px">
+          <span>&#128190;</span><span id="savedBannerMsg">Saved config loaded</span>
+          <button onclick="clearSavedConfig()" style="margin-left:auto;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:11px;font-family:var(--mono)">&#10005; Clear</button>
+        </div>
+
+        <!-- Step 0: Paste SmartPy outputs -->
+        <div style="background:rgba(41,121,255,.07);border:1px solid rgba(41,121,255,.18);border-radius:4px;padding:12px 14px;margin-bottom:16px;font-size:11px;color:var(--mid);line-height:1.7">
+          &#128161; SmartPy gives two files. Paste each below — the app combines them and fills in your wallet + token details automatically.
+        </div>
+
+        <div style="margin-bottom:6px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">&#128196; code.json <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px"> — from SmartPy: Compile &rarr; Download &rarr; code.json</span></div>
+        <textarea id="d-contract-json" rows="4"
+          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:9px 12px;font-family:var(--mono);font-size:10px;color:var(--muted);resize:vertical;outline:none;margin-bottom:4px;transition:.15s"
+          placeholder='[{"prim":"parameter",...},{"prim":"code",...}]'
+          oninput="validateDeployCode();saveDeployInputs()"></textarea>
+        <div id="codeJsonStatus" style="font-family:var(--mono);font-size:10px;margin-bottom:14px;color:var(--muted)"></div>
+
+        <!-- Admin (read-only, from wallet) -->
+        <div class="field">
+          <label>Admin — your connected wallet (auto-injected)</label>
+          <input type="text" id="d-admin" readonly style="opacity:.65;cursor:default" placeholder="Connect your wallet first — admin will appear here"/>
+        </div>
+
+        <!-- Burn token -->
+        <div style="margin:14px 0 6px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding-bottom:8px;border-bottom:1px solid var(--border)">&#128293; Burn Token</div>
+        <div class="field">
+          <label>FA2 Contract Address</label>
+          <input type="text" id="d-burn-addr" placeholder="KT1..." oninput="saveDeployInputs()"/>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Token ID</label>
+            <input type="number" id="d-burn-id" value="0" min="0" oninput="saveDeployInputs()"/>
+          </div>
+          <div class="field">
+            <label>Burn Amount (per redeem)</label>
+            <input type="number" id="d-burn-amt" value="10" min="1" oninput="saveDeployInputs()"/>
+          </div>
+        </div>
+
+        <!-- Reward token -->
+        <div style="margin:14px 0 6px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding-bottom:8px;border-bottom:1px solid var(--border)">&#127942; Reward Token</div>
+        <div class="field">
+          <label>FA2 Contract Address</label>
+          <input type="text" id="d-reward-addr" placeholder="KT1..." oninput="saveDeployInputs()"/>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Token ID</label>
+            <input type="number" id="d-reward-id" value="0" min="0" oninput="saveDeployInputs()"/>
+          </div>
+          <div class="field">
+            <label>Reward Amount (per redeem)</label>
+            <input type="number" id="d-reward-amt" value="1" min="1" oninput="saveDeployInputs()"/>
+          </div>
+        </div>
+
+        <!-- Campaign duration -->
+        <div style="margin:14px 0 6px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding-bottom:8px;border-bottom:1px solid var(--border)">&#9201; Campaign Duration</div>
+        <div class="field">
+          <label>Mode</label>
+          <select id="d-dur-mode" onchange="toggleDeployDur()" oninput="saveDeployInputs()">
+            <option value="unlimited">&#9854;&#65039; Unlimited</option>
+            <option value="timed">&#128197; Timed (set end date)</option>
+          </select>
+        </div>
+        <div id="d-dur-fields" style="display:none">
+          <div class="field">
+            <label>End Date &amp; Time (UTC)</label>
+            <input type="datetime-local" id="d-end-dt" oninput="saveDeployInputs()"/>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;margin-top:18px;margin-bottom:10px">
+          <button class="abtn primary" style="margin:0;flex:1" onclick="deployReview()">Review &#8594;</button>
+          <button class="abtn sec" style="margin:0;white-space:nowrap" onclick="saveDeployInputs(true)">&#128190; Save</button>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">
+          Inputs auto-save to your browser. Fill in your token details, connect wallet, then click Review.
+        </div>
+      </div>
+      <div id="deployPanel2" style="display:none">
+        <p style="font-size:11px;color:var(--muted);margin-bottom:8px">Verify storage below then click Deploy.</p>
+        <div id="deployAdminConfirm" style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:4px;padding:9px 12px;margin-bottom:12px;font-family:var(--mono);font-size:11px;color:var(--green)"></div>
+        <div id="deployReviewBox" style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:12px;font-family:var(--mono);font-size:10px;color:var(--muted);max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin-bottom:12px"></div>
+        <div style="display:flex;gap:10px">
+          <button class="abtn sec" style="margin-top:0" onclick="deployBack()">&#8592; Back</button>
+          <button class="abtn primary" style="margin-top:0;flex:1" onclick="deployContract()">&#128640; Deploy to Mainnet</button>
+        </div>
+      </div>
+      <div id="deployPanel3" style="display:none">
+        <div style="text-align:center;padding:20px 0">
+          <div id="deploySpinner" style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--glow);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px"></div>
+          <div id="deployStatusMsg" style="font-size:12px;color:var(--mid);font-family:var(--mono)">Waiting for wallet...</div>
+        </div>
+        <div id="deployResultBox" style="display:none;background:var(--surface);border:1px solid rgba(0,230,118,.25);border-radius:4px;padding:14px;font-family:var(--mono);font-size:11px;line-height:1.8">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Deployed Contract</div>
+          <div id="deployedKT1" style="font-size:14px;color:var(--green);font-weight:700;word-break:break-all;margin-bottom:10px"></div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Op Hash</div>
+          <div id="deployedOpHash" style="color:var(--mid);word-break:break-all;margin-bottom:12px;font-size:10px"></div>
+          <button class="abtn primary" style="margin-top:0" onclick="useDeployedContract()">&#10003; Use This Contract</button>
+          <button class="abtn sec" style="margin-top:8px" onclick="deployReset()">Deploy Another</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Debug Log Panel ─────────────────────────────────── -->
+<div class="dbg-panel" id="dbgPanel">
+  <div class="dbg-hdr" onclick="dbgToggle()">
+    <span style="font-size:13px">🐛</span>
+    <span class="dbg-hdr-title">Debug Log <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:9px;color:var(--muted)">— Temple · wallet · tx events</span></span>
+    <span class="dbg-hdr-count" id="dbgCount">0</span>
+    <button class="dbg-hdr-btn" onclick="event.stopPropagation();dbgCopy()" title="Copy all to clipboard">Copy</button>
+    <button class="dbg-hdr-btn danger" onclick="event.stopPropagation();dbgClear()" title="Clear log">Clear</button>
+    <span class="dbg-hdr-chevron" id="dbgChevron">▼</span>
+  </div>
+  <div class="dbg-body" id="dbgBody">
+    <div class="dbg-log" id="dbgLog">
+      <div class="dbg-empty" id="dbgEmpty">No events yet — connect wallet or submit a transaction.</div>
+    </div>
+  </div>
+</div>
 
 </div>
 </div>
@@ -866,6 +1159,9 @@ function initTaquito() {
 window.addEventListener('load', () => {
   initTaquito();
   refreshCollector();
+  if (typeof loadBurnConfig === 'function') loadBurnConfig();
+  const wantsAdmin = location.hash === '#admin' || new URLSearchParams(location.search).has('admin');
+  if (wantsAdmin) setTimeout(openAdminGate, 0);
 });
 
 /* ─── NAV ────────────────────────────────────────────────────── */
@@ -873,12 +1169,13 @@ function showPage(name, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
   if (name === 'admin') {
     var ae = document.getElementById('d-admin');
     if (ae) ae.value = state.walletAddress || '';
     // Load saved deploy inputs when Admin tab is opened
     if (typeof loadSavedDeployInputs === 'function') loadSavedDeployInputs();
+    if (typeof loadBurnConfig === 'function') loadBurnConfig();
   }
 }
 
@@ -886,7 +1183,7 @@ function showPage(name, btn) {
 function toggleWallet() {
   if (state.walletConnecting) return;
   if (state.walletAddress) {
-    toast('info', '✓', 'Wallet already connected', state.walletAddress.slice(0,14)+'...');
+    toast('info', '?', 'Wallet already connected', state.walletAddress.slice(0,14)+'...');
   } else {
     document.getElementById('wallet-modal').classList.add('show');
   }
@@ -1414,7 +1711,6 @@ async function connectBeaconWallet(fromFallback) {
   document.getElementById('wallet-modal').classList.remove('show');
   try {
     initTaquito();
-    // Try every known global name the Beacon UMD bundle might use
     const BeaconWalletClass = (
       window.taquitoBeaconWallet?.BeaconWallet ||
       window.taquito_beacon_wallet?.BeaconWallet ||
@@ -1756,49 +2052,37 @@ async function loadContract() {
 async function loadContractByAddress(addr, silent) {
   addr = String(addr || '').trim();
   if (!addr.startsWith('KT1') || addr.length < 10) {
-    if (!silent) toast('error','⚠','Invalid address','Must be a valid KT1 address');
+    if (!silent) toast('error','?','Invalid address','Must be a valid KT1 address');
     return false;
   }
   state.contractAddress = addr;
   const input = document.getElementById('adminContractAddr');
   if (input) input.value = addr;
-  if (!silent) toast('info','🔄','Loading contract...', addr.slice(0,10)+'...');
+  if (!silent) toast('info','??','Loading contract...', addr.slice(0,10)+'...');
 
-  // Fetch real on-chain config via tzkt storage endpoint
-  // This populates state.cfg with actual values from the deployed contract
   try {
     const res = await fetch(TZKT + '/v1/contracts/' + addr + '/storage');
     if (!res.ok) throw new Error('tzkt returned ' + res.status);
-    const s = await res.json();
+    const st = await res.json();
 
-    // tzkt returns storage fields by annotation name
-    state.cfg.active               = s.active === true || s.active === 'true';
-    state.cfg.burnTokenAddress     = s.burn_token_address  || state.cfg.burnTokenAddress;
-    state.cfg.burnTokenId          = parseInt(s.burn_token_id)  || 0;
-    state.cfg.burnAmount           = parseInt(s.burn_amount)    || state.cfg.burnAmount;
-    state.cfg.rewardTokenAddress   = s.reward_token_address || state.cfg.rewardTokenAddress;
-    state.cfg.rewardTokenId        = parseInt(s.reward_token_id) || 0;
-    state.cfg.rewardAmount         = parseInt(s.reward_amount)   || state.cfg.rewardAmount;
-    state.cfg.totalRedeemed        = parseInt(s.total_redeemed)  || 0;
-    state.cfg.endTimestamp         = s.end_timestamp
-      ? new Date(s.end_timestamp)
-      : null;
+    state.cfg.active               = st.active === true || st.active === 'true';
+    state.cfg.burnTokenAddress     = st.burn_token_address  || state.cfg.burnTokenAddress;
+    state.cfg.burnTokenId          = parseInt(st.burn_token_id)  || 0;
+    state.cfg.burnAmount           = parseInt(st.burn_amount)    || state.cfg.burnAmount;
+    state.cfg.rewardTokenAddress   = st.reward_token_address || state.cfg.rewardTokenAddress;
+    state.cfg.rewardTokenId        = parseInt(st.reward_token_id) || 0;
+    state.cfg.rewardAmount         = parseInt(st.reward_amount)   || state.cfg.rewardAmount;
+    state.cfg.totalRedeemed        = parseInt(st.total_redeemed)  || 0;
+    state.cfg.endTimestamp         = st.end_timestamp ? new Date(st.end_timestamp) : null;
 
-    refreshCollector();
-    if (document.getElementById('sTotal')) refreshStats();
-    if (document.getElementById('bAddr')) syncAdminFields();
-    // Refresh wallet balance with the now-known burn token address
-    fetchWalletBurnBalance();
-    if (!silent) toast('success','✓','Contract loaded', addr.slice(0,10)+'...');
+    refreshStats(); refreshCollector(); syncAdminFields(); fetchWalletBurnBalance();
+    if (!silent) toast('success','?','Contract loaded', addr.slice(0,10)+'...');
     if (typeof saveBurnConfig === 'function') saveBurnConfig(addr);
     return true;
   } catch(e) {
-    // tzkt failed — still set the address so admin ops work, but warn user
-    refreshCollector();
-    if (document.getElementById('sTotal')) refreshStats();
-    if (document.getElementById('bAddr')) syncAdminFields();
-    if (!silent) toast('info','⚠','Address saved but could not fetch config', e.message.slice(0,60));
+    refreshStats(); refreshCollector(); syncAdminFields();
     if (typeof saveBurnConfig === 'function') saveBurnConfig(addr);
+    if (!silent) toast('info','?','Address saved but could not fetch config', e.message.slice(0,60));
     return true;
   }
 }
@@ -2716,24 +3000,100 @@ function handleStoragePaste(evt) { /* legacy */ }
 </script>
 
 <script>
-window.addEventListener('load', async function() {
-  let loaded = false;
-  try {
-    const res = await fetch('/api/burn-config', { cache: 'no-store' });
-    if (!res.ok) throw new Error('config ' + res.status);
-    const data = await res.json();
-    const addr = data && data.config && data.config.contractAddress;
-    if (addr && addr.startsWith('KT1')) loaded = await loadContractByAddress(addr, true);
-  } catch (e) {
-    console.warn('[burn-config] collector load failed', e);
+(function(){
+  const lock = document.getElementById('adminLock');
+  const form = document.getElementById('adminLockForm');
+  const input = document.getElementById('adminPassword');
+  const btn = document.getElementById('adminUnlockBtn');
+  const err = document.getElementById('adminLockError');
+  let unlocked = false;
+
+  window.openAdminGate = function() {
+    if (unlocked) {
+      showPage('admin');
+      location.hash = 'admin';
+      return;
+    }
+    if (lock) lock.classList.remove('hidden');
+    if (input) setTimeout(() => input.focus(), 30);
+  };
+
+  function unlock() {
+    unlocked = true;
+    if (lock) lock.classList.add('hidden');
+    showPage('admin');
+    location.hash = 'admin';
+    if (typeof loadBurnConfig === 'function') loadBurnConfig();
+    if (input) input.value = '';
   }
-  if (!loaded) {
+
+  form?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    if (err) { err.style.display = 'none'; err.textContent = ''; }
+    const password = input ? input.value : '';
+    if (!password) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Checking...'; }
     try {
-      const localAddr = localStorage.getItem('burnredeem_contract_address') || '';
-      if (localAddr.startsWith('KT1')) await loadContractByAddress(localAddr, true);
-    } catch (_) {}
-  }
-});
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+      if (!res.ok) throw new Error(res.status === 401 ? 'Wrong password.' : 'Password check failed.');
+      const data = await res.json();
+      state.adminToken = data.token || '';
+      unlock();
+    } catch (e) {
+      if (err) { err.textContent = e.message || 'Could not unlock admin.'; err.style.display = 'block'; }
+      if (input) { input.value = ''; input.focus(); }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Unlock'; }
+    }
+  });
+})();
+</script>
+
+<script>
+(function(){
+  const API = '/api/burn-config';
+
+  window.loadBurnConfig = async function() {
+    let loaded = false;
+    try {
+      const res = await fetch(API, { cache: 'no-store' });
+      if (!res.ok) throw new Error('config ' + res.status);
+      const data = await res.json();
+      const cfg = data && data.config ? data.config : {};
+      const addr = cfg.contractAddress || cfg.contractAddr || '';
+      if (addr && addr.startsWith('KT1')) loaded = await loadContractByAddress(addr, true);
+    } catch (e) {
+      console.warn('[burn-config] load failed', e);
+    }
+    if (!loaded) {
+      try {
+        const localAddr = localStorage.getItem('burnredeem_contract_address') || '';
+        if (localAddr.startsWith('KT1')) await loadContractByAddress(localAddr, true);
+      } catch (_) {}
+    }
+  };
+
+  window.saveBurnConfig = async function(addr) {
+    const token = state && state.adminToken ? state.adminToken : '';
+    if (!addr || !addr.startsWith('KT1')) return;
+    try { localStorage.setItem('burnredeem_contract_address', addr); } catch (_) {}
+    if (!token) return;
+    try {
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ contractAddress: addr, network: NETWORK })
+      });
+      if (!res.ok) throw new Error('config save ' + res.status);
+    } catch (e) {
+      console.warn('[burn-config] save failed', e);
+    }
+  };
+})();
 </script>
 </body>
 </html>
