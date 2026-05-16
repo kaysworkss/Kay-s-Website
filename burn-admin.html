@@ -256,7 +256,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 40px
 .toast-msg small{color:var(--muted);display:block;margin-top:3px}
 
 /* Split collector/admin pages */
-.admin-link{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:8px 14px;transition:.15s}
+.admin-link{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:8px 14px;transition:.15s;white-space:nowrap}
 .admin-link:hover{color:var(--text);border-color:var(--mid)}
 body.collector-page .tabs,body.admin-page .tabs{display:none}
 body.admin-page{background:var(--bg);color:var(--text)}
@@ -307,7 +307,7 @@ body.admin-page.admin-locked #walletBtn{display:none}
 
 <nav>
   <div class="logo" style="font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:400;font-size:18px;letter-spacing:.02em;text-shadow:none;color:#1a1a1a;text-transform:none">Kay's Works <em style="font-style:normal;color:#C0442A;font-family:'Inter',sans-serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:500;vertical-align:middle;margin-left:6px">Burn &rarr; Redeem</em></div>
-    <a class="admin-link" href="/burn-redeem">Collector</a>
+    <a class="admin-link" href="burn-redeem.html" target="_blank" rel="noopener">Preview Claim Page</a>
   <button class="wallet-btn" id="walletBtn" onclick="toggleWallet()">
     <span class="wdot" id="wdot"></span>
     <span id="walletLabel">Connect Wallet</span>
@@ -2860,6 +2860,7 @@ function handleStoragePaste(evt) { /* legacy */ }
     if (lock) lock.classList.add('hidden');
     try { sessionStorage.setItem(SESSION_KEY, '1'); } catch (_) {}
     if (typeof loadSavedDeployInputs === 'function') loadSavedDeployInputs();
+    if (typeof loadBurnConfig === 'function') setTimeout(loadBurnConfig, 0);
     var ae = document.getElementById('d-admin');
     if (ae) ae.value = state.walletAddress || '';
   }
@@ -2912,13 +2913,19 @@ function handleStoragePaste(evt) { /* legacy */ }
       const addr = data && data.config && data.config.contractAddress;
       if (addr && addr.startsWith('KT1')) await loadContractByAddress(addr, true);
     } catch (e) {
+      try {
+        const localAddr = localStorage.getItem('burnredeem_contract_address') || '';
+        if (localAddr.startsWith('KT1')) await loadContractByAddress(localAddr, true);
+      } catch (_) {}
       console.warn('[burn-config] load failed', e);
     }
   };
 
   window.saveBurnConfig = async function(addr) {
     const token = (state && state.adminToken) || sessionStorage.getItem('burnredeem_admin_token') || '';
-    if (!token || !addr || !addr.startsWith('KT1')) return;
+    if (!addr || !addr.startsWith('KT1')) return;
+    try { localStorage.setItem('burnredeem_contract_address', addr); } catch (_) {}
+    if (!token) return;
     try {
       const res = await fetch(API, {
         method: 'POST',
