@@ -1770,6 +1770,14 @@ function beaconPermissionScopes(sdk) {
   ].filter(Boolean);
 }
 
+function beaconMatrixNodes(sdk) {
+  const regions = sdk?.Regions || {};
+  const region = regions.EUROPE_WEST || 'EUROPE_WEST';
+  return {
+    [region]: ['beacon-node-0.papers.tech:8448']
+  };
+}
+
 async function getBeaconSdk() {
   const globalSdk = window.beacon || window.walletbeacon || window.beaconSdk || window.airgapBeaconSdk;
   if (globalSdk?.DAppClient) return globalSdk;
@@ -1846,7 +1854,8 @@ async function connectBeaconWallet(fromFallback) {
     const client = state.beaconClient || new DAppClient({
       name: "Kay's Works Tezos Claim",
       preferredNetwork: NETWORK,
-      iconUrl: location.origin + '/images/kayslogo1.png'
+      iconUrl: location.origin + '/images/kayslogo1.png',
+      matrixNodes: beaconMatrixNodes(sdk)
     });
     state.beaconClient = client;
 
