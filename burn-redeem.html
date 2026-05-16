@@ -1770,14 +1770,6 @@ function beaconPermissionScopes(sdk) {
   ].filter(Boolean);
 }
 
-function beaconMatrixNodes(sdk) {
-  const regions = sdk?.Regions || {};
-  const region = regions.EUROPE_WEST || 'EUROPE_WEST';
-  return {
-    [region]: ['beacon-node-0.papers.tech:8448']
-  };
-}
-
 async function getBeaconSdk() {
   const globalSdk = window.beacon || window.walletbeacon || window.beaconSdk || window.airgapBeaconSdk;
   if (globalSdk?.DAppClient) return globalSdk;
@@ -1854,8 +1846,7 @@ async function connectBeaconWallet(fromFallback) {
     const client = state.beaconClient || new DAppClient({
       name: "Kay's Works Tezos Claim",
       preferredNetwork: NETWORK,
-      iconUrl: location.origin + '/images/kayslogo1.png',
-      matrixNodes: beaconMatrixNodes(sdk)
+      iconUrl: location.origin + '/images/kayslogo1.png'
     });
     state.beaconClient = client;
 
@@ -1864,7 +1855,18 @@ async function connectBeaconWallet(fromFallback) {
     };
     console.info('Beacon permission request:', permissionRequest);
     toast('info', '??', 'Opening mobile wallet...', 'Approve the Tezos claim in your wallet');
-    const permission = await client.requestPermissions(permissionRequest);
+    let permission;
+    try {
+      permission = await client.requestPermissions(permissionRequest);
+    } catch (permissionErr) {
+      const permissionMsg = permissionErr?.message || String(permissionErr);
+      if (/not accepted|invalid|unknown|unexpected/i.test(permissionMsg)) {
+        console.info('Beacon scoped permission retry without payload:', permissionMsg);
+        permission = await client.requestPermissions();
+      } else {
+        throw permissionErr;
+      }
+    }
     console.info('Beacon permission response:', permission);
     const account = await client.getActiveAccount?.();
     const address = permission?.address || account?.address;
