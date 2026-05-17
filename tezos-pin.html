@@ -712,6 +712,7 @@ body.preconnect .page-title-area{display:none}
 globalThis.Buffer = window.Buffer;
 var Buffer = window.Buffer;
 </script>
+<script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
 <script src="./taquito-bundle.js"></script>
 <script>
 window.addEventListener('load', function() {
@@ -728,7 +729,7 @@ window.addEventListener('load', function() {
  };
  var TZKT = { ghostnet:'https://ghostnet.tzkt.io', mainnet:'https://tzkt.io' };
  var network = 'mainnet';
- var Tezos, wallet, userAddr, ct, ctAddr;
+ var Tezos, wallet, beaconClient, userAddr, ct, ctAddr;
  function isMobileWalletDevice() {
  return /Android|iPhone|iPad|iPod|Mobile|IEMobile|Opera Mini/i.test(navigator.userAgent || '') || (navigator.maxTouchPoints > 1 && Math.min(screen.width || 9999, screen.height || 9999) < 900);
  }
@@ -763,6 +764,13 @@ function networkName() { return network === 'ghostnet' ? 'Ghostnet' : 'Mainnet';
  }
  function beaconPermissionRequest() {
  return { scopes: ['operation_request', 'sign'] };
+ }
+ function beaconPermissionScopes(sdk) {
+ var scopes = sdk && sdk.PermissionScope || {};
+ return [
+ scopes.OPERATION_REQUEST || 'operation_request',
+ scopes.SIGN || 'sign'
+ ].filter(Boolean);
  }
  function createBeaconWallet() {
  wallet = new BeaconWallet({
@@ -802,6 +810,125 @@ function networkName() { return network === 'ghostnet' ? 'Ghostnet' : 'Mainnet';
  } else {
  throw e;
  }
+ async function getBeaconSdk() {
+ var globalSdk = window.beacon || window.walletbeacon || window.beaconSdk || window.airgapBeaconSdk;
+ if (globalSdk && globalSdk.DAppClient) return globalSdk;
+ var sources = [
+ 'https://esm.sh/@airgap/beacon-sdk@4.6.2?bundle',
+ 'https://cdn.jsdelivr.net/npm/@airgap/beacon-sdk@4.6.2/+esm'
+ ];
+ for (var i = 0; i < sources.length; i++) {
+ try {
+ var sdk = await import(sources[i]);
+ if (sdk && sdk.DAppClient) return sdk;
+ } catch(_) {}
+ }
+ return null;
+ }
+ function makeBeaconClient(DAppClient, sdk) {
+ return new DAppClient({
+ name:'NFT Collector Pinning',
+ iconUrl: location.origin + '/images/kayslogo1.png',
+ appUrl: location.origin,
+ network: beaconNetworkConfig(),
+ featuredWallets: ['temple','kukai','trust'],
+ matrixNodes: beaconMatrixNodes()
+ });
+ }
+ function withTimeout(promise, ms, label) {
+ return Promise.race([
+ promise,
+ new Promise(function(_, reject) { setTimeout(function() { reject(new Error(label || 'Request timed out')); }, ms); })
+ ]);
+ }
+ async function resetBeaconClient(client) {
+ if (!client) return;
+ var tasks = [
+ function() { return client.removeAllAccounts && client.removeAllAccounts(); },
+ function() { return client.clearActiveAccount && client.clearActiveAccount(); },
+ function() { return client.setActiveAccount && client.setActiveAccount(); },
+ function() { return client.destroy && client.destroy(); }
+ ];
+ for (var i = 0; i < tasks.length; i++) {
+ try { await tasks[i](); } catch(_) {}
+ }
+ }
+ async function requestBeaconDirectPermission(client, sdk) {
+ var permissionRequest = { scopes: beaconPermissionScopes(sdk) };
+ try {
+ return await withTimeout(client.requestPermissions(permissionRequest), 90000, 'Beacon permission timed out.');
+ } catch(e) {
+ var msg = errorText(e);
+ if (/not accepted|invalid|unknown|unexpected/i.test(msg)) {
+ log('Beacon rejected scoped permission payload; retrying without payload.', 'warn');
+ return await withTimeout(client.requestPermissions(), 90000, 'Beacon permission timed out.');
+ }
+ throw e;
+ }
+ }
+ async function connectBeaconDirectAttempt(DAppClient, sdk, resetFirst) {
+ if (resetFirst) {
+ await resetBeaconClient(beaconClient);
+ beaconClient = null;
+ }
+ var client = beaconClient || makeBeaconClient(DAppClient, sdk);
+ beaconClient = client;
+ var permission = await requestBeaconDirectPermission(client, sdk);
+ var account = client.getActiveAccount ? await client.getActiveAccount() : null;
+ var address = permission && permission.address || account && account.address;
+ if (!address) throw new Error('Beacon connected but returned no address.');
+ return { client:client, address:address };
+ }
+ async function resolveBeaconWalletParams(params) {
+ while (typeof params === 'function') params = params();
+ if (params && typeof params.then === 'function') params = await params;
+ if (!params || typeof params !== 'object') return params;
+ var out = Object.assign({}, params);
+ if (!out.kind && (out.destination || out.to || out.contract || out.address)) out.kind = 'transaction';
+ if (out.to && !out.destination) out.destination = out.to;
+ if (out.contract && !out.destination) out.destination = out.contract;
+ if (out.address && !out.destination) out.destination = out.address;
+ if (out.parameter && !out.parameters) out.parameters = out.parameter;
+ if (out.amount === undefined && out.kind === 'transaction') out.amount = '0';
+ delete out.to;
+ delete out.contract;
+ delete out.address;
+ delete out.parameter;
+ return out;
+ }
+ function beaconDirectProvider(client, address) {
+ return {
+ getPKH:function() { return Promise.resolve(address); },
+ mapTransferParamsToWalletParams:resolveBeaconWalletParams,
+ mapOriginateParamsToWalletParams:async function(p) { return Object.assign({ kind:'origination' }, await resolveBeaconWalletParams(p)); },
+ mapDelegateParamsToWalletParams:resolveBeaconWalletParams,
+ sendOperations:async function(ops) {
+ if (!Array.isArray(ops)) {
+ if (ops && Array.isArray(ops.opParams)) ops = ops.opParams;
+ else if (ops && Array.isArray(ops.contents)) ops = ops.contents;
+ else if (ops && ops.operation && Array.isArray(ops.operation.contents)) ops = ops.operation.contents;
+ else if (ops && ops.params) ops = ops.params;
+ else ops = [ops];
+ }
+ var operationDetails = [];
+ for (var i = 0; i < ops.length; i++) {
+ var op = await resolveBeaconWalletParams(ops[i]);
+ if (op) operationDetails.push(op);
+ }
+ if (!operationDetails.length) throw new Error('Beacon received no operation payload.');
+ var response = await client.requestOperation({ operationDetails:operationDetails });
+ var opHash = extractOpHash(response) || response && (response.transactionHash || response.opHash || response.hash) || (typeof response === 'string' ? response : '');
+ if (!opHash) throw new Error('Beacon approved the operation, but no operation hash was returned.');
+ log('Beacon submitted: ' + opHash, 'ok');
+ return { opHash:opHash, confirmation:function() { return Promise.resolve({ opHash:opHash }); } };
+ },
+ sign:async function(bytes) {
+ var response = await client.requestSignPayload({ signingType:'micheline', payload:bytes, sourceAddress:address });
+ var signature = response && (response.signature || response.sig) || '';
+ return { bytes:bytes, sig:signature, prefixSig:signature, sbytes:bytes + signature };
+ }
+ };
+ }
  }
  }
  async function setNetwork(net) {
@@ -818,6 +945,8 @@ function networkName() { return network === 'ghostnet' ? 'Ghostnet' : 'Mainnet';
  }
  }
  }
+ await resetBeaconClient(beaconClient);
+ beaconClient = null;
  Tezos = new TezosToolkit(RPCS[network][0]);
  createBeaconWallet();
  ct = null; ctAddr = null; userAddr = null;
@@ -2119,12 +2248,21 @@ function setCollectionBanner(addr, name) {
  // Close modal immediately so Beacon's pairing UI is not hidden behind it.
  document.getElementById('wallet-modal').classList.remove('open');
  try {
- log('Opening Beacon wallet pairing...', 'warn');
- await resetBeaconWallet();
- await requestBeaconPermissionsClean();
- userAddr = await wallet.getPKH();
- finishConnect(userAddr);
- log('Your wallet is connected with Beacon: ' + userAddr, 'ok');
+ log('Opening Beacon wallet picker...', 'warn');
+ var sdk = await getBeaconSdk();
+ var DAppClient = sdk && sdk.DAppClient;
+ if (typeof DAppClient !== 'function') throw new Error('Beacon SDK did not load.');
+ var result;
+ try {
+ result = await connectBeaconDirectAttempt(DAppClient, sdk, false);
+ } catch(firstErr) {
+ log('Retrying Beacon with a clean wallet session...', 'warn');
+ result = await connectBeaconDirectAttempt(DAppClient, sdk, true);
+ }
+ Tezos.setWalletProvider(beaconDirectProvider(result.client, result.address));
+ if (ctAddr) ct = await Tezos.wallet.at(ctAddr);
+ finishConnect(result.address);
+ log('Your wallet is connected with Beacon: ' + result.address, 'ok');
  if (!ctAddr) discoverAndMaybeLoadFa2(true).catch(function(e){ log('I could not automatically find your FA2 collections: ' + errorText(e), 'warn'); });
  else loadGallery().catch(function(e){ log('I could not preload your token gallery: ' + errorText(e), 'warn'); });
  return true;
@@ -2162,6 +2300,7 @@ function setCollectionBanner(addr, name) {
  document.getElementById('wm-beacon').onclick = function() { connectWithBeacon(true); };
  document.getElementById('btn-disconnect').onclick = async function() {
  try { await resetBeaconWallet(); } catch(_) {}
+ try { await resetBeaconClient(beaconClient); beaconClient = null; } catch(_) {}
  // Reset Tezos provider back to beacon wallet (clears any Temple provider)
  Tezos.setWalletProvider(wallet);
  userAddr = null; ct = null; ctAddr = null;
