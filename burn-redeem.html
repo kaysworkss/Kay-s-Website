@@ -1782,10 +1782,11 @@ async function connectTempleDirect() {
 
 function beaconNetworkConfig(sdk) {
   const networkTypes = sdk?.NetworkType || {};
-  const type = NETWORK === 'mainnet'
-    ? (networkTypes.MAINNET || 'mainnet')
-    : (networkTypes.GHOSTNET || NETWORK);
-  const cfg = { type };
+  if (NETWORK === 'mainnet') {
+    // Don't override rpcUrl — let wallets use their own trusted RPC for mainnet
+    return { type: networkTypes.MAINNET || 'mainnet' };
+  }
+  const cfg = { type: networkTypes.GHOSTNET || NETWORK };
   if (RPC[NETWORK]) cfg.rpcUrl = RPC[NETWORK];
   return cfg;
 }
@@ -1816,9 +1817,26 @@ function beaconMatrixNodes(sdk) {
 }
 
 async function getBeaconSdk() {
-  const globalSdk = window.beacon || window.walletbeacon || window.beaconSdk || window.airgapBeaconSdk;
+  // Beacon was loaded via <script src="...walletbeacon.min.js"> in the head.
+  // It registers a global (window.beacon, window.walletbeacon, etc.) but the
+  // script may still be parsing/executing when we get here. Wait up to 5 s
+  // for the global to appear before falling back to ESM. Loading via ESM as
+  // well would register a SECOND beacon-modal web component and cause the
+  // mobile wallet grid to flash-and-disappear due to component conflicts.
+  function findGlobal() {
+    return window.beacon || window.walletbeacon || window.beaconSdk || window.airgapBeaconSdk || null;
+  }
+  let globalSdk = findGlobal();
+  if (!globalSdk?.DAppClient) {
+    for (let i = 0; i < 50; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      globalSdk = findGlobal();
+      if (globalSdk?.DAppClient) break;
+    }
+  }
   if (globalSdk?.DAppClient) return globalSdk;
 
+  // Last-resort ESM fallback — only if the script tag entirely failed to load
   const sources = [
     'https://esm.sh/@airgap/beacon-sdk@4.6.2?bundle',
     'https://cdn.jsdelivr.net/npm/@airgap/beacon-sdk@4.6.2/+esm'
@@ -1889,14 +1907,20 @@ async function resetBeaconClient(client) {
 }
 
 function makeBeaconClient(DAppClient, sdk) {
-  return new DAppClient({
+  // NOTE: Do NOT pass custom matrixNodes — the beacon-node-N.octez.io hostnames
+  // are stale/unreliable and cause "server error" during pairing on mobile.
+  // Beacon's built-in defaults are kept up to date by AirGap.
+  const cfg = {
     name: "Kay's Works Tezos Claim",
-    iconUrl: location.origin + '/images/kayslogo1.png',
     appUrl: location.origin,
     network: beaconNetworkConfig(sdk),
-    featuredWallets: ['temple', 'kukai', 'trust'],
-    matrixNodes: beaconMatrixNodes(sdk)
-  });
+    featuredWallets: ['temple', 'kukai', 'trust']
+  };
+  // Only set iconUrl if we're on a real http/https origin (file:// will 404)
+  if (location.protocol === 'http:' || location.protocol === 'https:') {
+    cfg.iconUrl = location.origin + '/images/kayslogo1.png';
+  }
+  return new DAppClient(cfg);
 }
 
 function withTimeout(promise, ms, label) {
@@ -1928,6 +1952,22 @@ async function connectBeaconAttempt(DAppClient, sdk, resetFirst) {
   }
   const client = state.beaconClient || makeBeaconClient(DAppClient, sdk);
   state.beaconClient = client;
+
+  // MOBILE FIX: Pre-initialize the Beacon transport BEFORE asking for
+  // permissions. Without this, requestPermissions() does init+transport-setup
+  // +modal-render in one go, and on mobile any transport hiccup causes the
+  // pairing modal to flash and immediately close with a "server error".
+  // Pre-init separates concerns: transport is ready before the modal opens,
+  // so the user has time to actually pick a wallet.
+  if (typeof client.init === 'function') {
+    try {
+      await withTimeout(client.init(), 15000, 'Beacon init timed out — check your connection.');
+    } catch (initErr) {
+      console.warn('[beacon] init warning (continuing):', initErr?.message || initErr);
+      // Don't throw — requestPermissions will retry init internally
+    }
+  }
+
   const permission = await requestBeaconPermission(client, sdk);
   console.info('Beacon permission response:', permission);
   const account = await client.getActiveAccount?.();
@@ -1983,45 +2023,41 @@ async function connectBeaconWallet(fromFallback) {
   }
   state._beaconCancelFlag = false;
 
-  // MOBILE FIX: Keep the modal open (switch to connecting view) while Beacon
-  // loads its SDK and opens its own pairing UI. Hiding the modal immediately
-  // caused the page to re-render / scroll, which dismissed the Beacon overlay
-  // before the user could pick a wallet.
-  walletModalShowConnecting('Loading Beacon SDK…', 'One moment — preparing wallet connector…');
+  // Show loading state while SDK is loading. We KEEP our modal open during
+  // SDK load so the user sees feedback (not a blank screen), but we HIDE our
+  // modal just before Beacon shows its own pairing UI — otherwise the two
+  // modals overlap and Beacon's pairing alert can be visually clipped or
+  // dismissed by viewport reflows on mobile.
+  walletModalShowConnecting('Loading wallet connector…', 'One moment…');
 
   try {
     initTaquito();
     const sdk = await getBeaconSdk();
     const DAppClient = sdk?.DAppClient;
-    if (typeof DAppClient !== 'function') throw new Error('Beacon SDK did not load.');
+    if (typeof DAppClient !== 'function') throw new Error('Beacon SDK did not load. Check your internet connection and refresh.');
 
     if (state._beaconCancelFlag) return;
 
-    // Now Beacon is ready — update the connecting message and keep the modal
-    // visible. Beacon will render its own overlay on top of our modal.
-    walletModalShowConnecting(
-      'Opening wallet…',
-      'Approve the connection in your wallet app. A wallet picker should appear above this message.'
-    );
-
-    // Show the "open again" button after 4 s in case the Beacon overlay was missed
-    const openBtnTimer = setTimeout(walletModalShowOpenBtn, 4000);
+    // CRITICAL: Hide our modal NOW, before Beacon renders its pairing alert.
+    // Beacon's <beacon-modal> web component positions itself fixed at the top
+    // of the DOM. If our modal stays open, on mobile the body scroll
+    // restrictions from our modal can prevent Beacon's modal from being
+    // interactable, AND focus changes between the two modals can cause
+    // Beacon to auto-close before the user clicks a wallet.
+    walletModalHide();
+    toast('info', '📱', 'Opening wallet picker…', 'Select your wallet to continue');
 
     let result;
     try {
       result = await connectBeaconAttempt(DAppClient, sdk, false);
     } catch (firstErr) {
-      if (state._beaconCancelFlag) { clearTimeout(openBtnTimer); return; }
+      if (state._beaconCancelFlag) return;
       const firstMsg = firstErr?.message || String(firstErr);
-      if (/reject|cancel|denied|aborted/i.test(firstMsg)) throw firstErr; // propagate cancel
-      console.info('Beacon clean reconnect retry:', firstMsg);
-      walletModalShowConnecting(
-        'Retrying…',
-        'Starting a clean wallet session — approve the connection in your wallet app.'
-      );
+      // Don't retry if user cancelled or timed out — only retry on transient errors
+      if (/reject|cancel|denied|aborted|timed out/i.test(firstMsg)) throw firstErr;
+      console.info('Beacon retry after error:', firstMsg);
+      toast('info', '🔄', 'Retrying…', 'Resetting connection');
       result = await connectBeaconAttempt(DAppClient, sdk, true);
-    } finally {
-      clearTimeout(openBtnTimer);
     }
 
     if (state._beaconCancelFlag) return;
@@ -2029,17 +2065,18 @@ async function connectBeaconWallet(fromFallback) {
     const provider = beaconDirectProvider(result.client, result.address);
     state.wallet = provider;
     state.tezos.setWalletProvider(provider);
-    // setConnectedWallet hides the modal via walletModalHide path inside it
     setConnectedWallet(result.address, 'Beacon');
   } catch(e) {
     const msg = e?.message || String(e);
     if (/reject|cancel|denied|aborted/i.test(msg) || state._beaconCancelFlag) {
       walletModalHide();
       toast('info', '✕', 'Cancelled');
+    } else if (/timed out/i.test(msg)) {
+      walletModalHide();
+      toast('error', '⏱', 'Wallet timed out', 'Please try again');
     } else {
-      toast('error', '⚠', 'Beacon failed', msg.slice(0,100));
-      // Return to picker so user can retry
-      walletModalShowPick();
+      walletModalHide();
+      toast('error', '⚠', 'Connection failed', msg.slice(0,120));
     }
   } finally {
     if (!fromFallback) state.walletConnecting = false;
