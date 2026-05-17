@@ -264,7 +264,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 40px
 .admin-lock-form button{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:var(--glow);border:1px solid var(--glow);color:#fff;padding:0 16px;border-radius:4px;cursor:pointer}
 .admin-lock-form button:disabled{opacity:.55;cursor:not-allowed}
 .admin-lock-error{display:none;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--glow);line-height:1.5}
-@media(max-width:620px){.admin-lock-form{flex-direction:column}.admin-lock-form button{padding:12px 16px}nav{gap:10px;background:rgba(6,6,8,.98)}.nav-actions{gap:8px}.nav-logo{font-size:13px;gap:6px;color:#fff;font-weight:800;text-shadow:0 1px 12px rgba(232,87,60,.28)}.nav-logo span:nth-child(2){color:#ffd9cf}.nav-logo small{display:none}.admin-float{right:14px;bottom:14px;padding:8px 10px;font-size:9px}}
+@media(max-width:620px){.admin-lock-form{flex-direction:column}.admin-lock-form button{padding:12px 16px}nav{gap:8px;background:rgba(6,6,8,.98);justify-content:space-between}.tabs{display:none}.nav-actions{gap:8px;flex-shrink:0}.nav-logo{font-size:12px;gap:5px;color:#fff;font-weight:800;text-shadow:0 1px 12px rgba(232,87,60,.28);min-width:0}.nav-logo span:nth-child(2){color:#ffd9cf}.nav-logo small{display:none}.wallet-btn{position:relative;z-index:2;min-height:40px;padding:9px 12px;color:#f7f3ea;border-color:rgba(247,243,234,.44);background:rgba(255,255,255,.06);flex-shrink:0}.wallet-btn:hover{border-color:#ff7a5e;color:#fff}.admin-float{right:14px;bottom:14px;padding:8px 10px;font-size:9px}}
 @media(min-width:900px){
   body{background:#FAF8F4;color:#1a1a1a}
   nav{height:76px;padding:0 48px;background:rgba(250,248,244,.92);border-bottom:1px solid #eee9df;backdrop-filter:blur(16px)}
@@ -1184,8 +1184,16 @@ def test():
 // SmartPy source available via copyContract()
 
 /* ─── State ──────────────────────────────────────────────────── */
-const RPC = { mainnet: 'https://mainnet.api.tez.ie', ghostnet: 'https://rpc.ghostnet.teztnets.com' };
 const NETWORK = 'mainnet';
+const RPCS = {
+  mainnet: [
+    'https://rpc.tzkt.io/mainnet',
+    'https://mainnet.smartpy.io',
+    'https://mainnet.api.tez.ie'
+  ],
+  ghostnet: ['https://rpc.ghostnet.teztnets.com']
+};
+const RPC = { mainnet: RPCS.mainnet[0], ghostnet: RPCS.ghostnet[0] };
 const TZKT = 'https://api.tzkt.io';
 
 const state = {
@@ -1194,6 +1202,7 @@ const state = {
   tezos: null,
   wallet: null,
   walletConnecting: false,
+  network: NETWORK,
   tokenMeta: {},
   cfg: {
     burnTokenAddress:'KT1...', burnTokenId:0, burnAmount:10,
@@ -1764,7 +1773,7 @@ function beaconNetworkConfig(sdk) {
     ? (networkTypes.MAINNET || 'mainnet')
     : (networkTypes.GHOSTNET || NETWORK);
   const cfg = { type };
-  if (NETWORK !== 'mainnet' && RPC[NETWORK]) cfg.rpcUrl = RPC[NETWORK];
+  if (RPC[NETWORK]) cfg.rpcUrl = RPC[NETWORK];
   return cfg;
 }
 
