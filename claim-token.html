@@ -68,6 +68,10 @@
     font-family:'Cinzel',serif; letter-spacing:0.24em; text-transform:uppercase;
     color:var(--clay); font-size:0.64rem; margin-bottom:0.65rem;
   }
+  .action-copy {
+    color:rgba(232,213,176,0.74); line-height:1.55; margin:-0.15rem 0 0.75rem;
+    font-size:0.96rem;
+  }
   .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.7rem; }
   .action-link {
     min-height:54px; border-radius:5px; border:1px solid rgba(201,153,58,0.42);
@@ -184,28 +188,29 @@
 
   <section class="hero">
     <div>
-      <p class="eyebrow">Matching Entry Token</p>
-      <h1>Collect once. <em>Enter both ways.</em></h1>
+      <p class="eyebrow">Entry Token Hub</p>
+      <h1>Mint first. <em>Then bridge your access.</em></h1>
       <p class="lead">
-        Hold the Entry Token on Ethereum or Tezos, connect that wallet here, and request the matching token on the other chain. This keeps auction access flexible without asking collectors to claim twice.
+        Start by minting the Entry Token on the chain you prefer. After it is in your wallet, return here to verify ownership and request the equivalent Entry Token on the other chain.
       </p>
       <p class="note">
-        Once your ownership is verified, submit the wallet that should receive the matching token. Approved requests are fulfilled manually within 24 hours.
+        You only need to mint once. The matching-token request is for collectors who already hold the Entry Token on Ethereum or Tezos and want auction access on both chains.
       </p>
       <div class="steps">
-        <div class="step"><strong>1. Connect</strong><span>Choose the chain where you already hold the Entry Token.</span></div>
-        <div class="step"><strong>2. Verify</strong><span>The page checks your wallet for the qualifying token.</span></div>
-        <div class="step"><strong>3. Receive</strong><span>Enter the other-chain wallet and receive the match within 24 hours.</span></div>
+        <div class="step"><strong>1. Mint</strong><span>Choose ETH or Tezos and mint the Entry Token on that chain first.</span></div>
+        <div class="step"><strong>2. Verify</strong><span>Connect the wallet that now holds the Entry Token so the page can confirm ownership.</span></div>
+        <div class="step"><strong>3. Request</strong><span>Enter your wallet on the other chain. The matching token is reviewed and sent within 24 hours.</span></div>
       </div>
     </div>
 
     <div class="panel">
       <div class="panel-head">
-        <div class="panel-title">Claim Matching Token</div>
+        <div class="panel-title">Entry Token Actions</div>
       </div>
       <div class="panel-body">
         <div class="action-section" aria-label="Entry token mint actions">
-          <div class="action-label">Mint Entry Token</div>
+          <div class="action-label">Step 1: Mint Entry Token</div>
+          <p class="action-copy">Pick the chain you want to start with. This is the token that qualifies you for the series auctions.</p>
           <div class="action-grid">
             <a href="https://www.transient.xyz/mint/entry-token" target="_blank" rel="noopener noreferrer" class="action-link entry">Entry Token (ETH)</a>
             <a href="https://objkt.com/tokens/KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8/1" target="_blank" rel="noopener noreferrer" class="action-link entry">Entry Token (TEZ)</a>
@@ -213,7 +218,8 @@
         </div>
 
         <div class="action-section" aria-label="Bronze token redemption actions">
-          <div class="action-label">Redeem Bronze Token</div>
+          <div class="action-label">Optional: Redeem Bronze Token</div>
+          <p class="action-copy">Collectors who meet the bronze requirements can redeem on the chain where their qualifying tokens live.</p>
           <div class="action-grid">
             <a href="https://www.transient.xyz/redemption/ethereum/0x6c7e9d96704f8683e988a7414528d3480b26dbb2" target="_blank" rel="noopener noreferrer" class="action-link redeem">Redeem Bronze Token (ETH)</a>
             <a href="https://www.kaysworks.com/burn-redeem" target="_blank" rel="noopener noreferrer" class="action-link redeem">Redeem Bronze Token (TEZ)</a>
@@ -222,13 +228,16 @@
 
         <div class="divider-line"></div>
 
+        <div class="action-label">Step 2: Request Matching Entry Token</div>
+        <p class="action-copy">After minting, connect the wallet that holds your Entry Token. If you minted on ETH, enter your Tezos wallet for the match. If you minted on Tezos, enter your ETH wallet for the match.</p>
+
         <div class="connect-grid">
           <button type="button" class="chain-btn" id="connectEth">Connect ETH Wallet</button>
           <button type="button" class="chain-btn" id="connectTez">Connect Tezos Wallet</button>
         </div>
 
         <div class="status" id="claimStatus">
-          Connect the wallet that already holds your Entry Token. No transaction is sent.
+          Mint first, then connect the wallet that holds your Entry Token. No transaction is sent when verifying.
         </div>
 
         <form class="claim-form" id="claimForm">
@@ -244,7 +253,7 @@
           </div>
 
           <div class="field">
-            <label for="collectorEmail">Email for confirmation</label>
+            <label for="collectorEmail">Email for follow-up</label>
             <input id="collectorEmail" name="email" type="email" autocomplete="email" required />
           </div>
 
@@ -258,9 +267,9 @@
             <textarea id="claimNote" name="note" placeholder="Optional: collector handle, preferred contact, or anything useful."></textarea>
           </div>
 
-          <button class="submit" type="submit" id="submitClaim">Submit Claim</button>
+          <button class="submit" type="submit" id="submitClaim">Submit Request</button>
           <p class="fine-print">
-            Submitting records your verified source wallet and destination wallet. The matching token will be sent within 24 hours after review.
+            Submitting records your verified source wallet and destination wallet in the request queue. The matching token will be sent within 24 hours after review.
           </p>
         </form>
       </div>
@@ -396,7 +405,7 @@ async function connectEth() {
       showAlreadyFulfilled(fulfilled);
       return;
     }
-    setStatus('ok', 'Verified: this ETH wallet holds ' + balance + ' Entry Token' + (balance === 1 ? '' : 's') + '. Enter the Tezos wallet that should receive the matching token within 24 hours.');
+    setStatus('ok', 'Verified: this ETH wallet holds ' + balance + ' Entry Token' + (balance === 1 ? '' : 's') + '. Enter the Tezos wallet that should receive the matching Entry Token.');
     showClaimForm('Ethereum', address, balance);
   } catch (error) {
     setStatus('err', error.message || 'Could not connect or verify the ETH wallet.');
@@ -622,7 +631,7 @@ async function verifyTezosAddress(address) {
     showAlreadyFulfilled(fulfilled);
     return;
   }
-  setStatus('ok', 'Verified: this Tezos wallet holds ' + balance + ' Entry Token' + (balance === 1 ? '' : 's') + '. Enter the ETH wallet that should receive the matching token within 24 hours.');
+  setStatus('ok', 'Verified: this Tezos wallet holds ' + balance + ' Entry Token' + (balance === 1 ? '' : 's') + '. Enter the ETH wallet that should receive the matching Entry Token.');
   showClaimForm('Tezos', address, balance);
 }
 
@@ -674,12 +683,12 @@ els.form.addEventListener('submit', async (event) => {
     if (!res.ok) throw new Error('The claim could not be submitted. Please try again.');
     els.form.reset();
     els.form.classList.remove('show');
-    setStatus('ok', 'Claim submitted. Your matching token request has been recorded and will be fulfilled within 24 hours.');
+    setStatus('ok', 'Request recorded. Your matching Entry Token will be reviewed and fulfilled within 24 hours.');
   } catch (error) {
     setStatus('err', error.message || 'The claim could not be submitted. Please try again.');
   } finally {
     els.submit.disabled = false;
-    els.submit.textContent = 'Submit Claim';
+    els.submit.textContent = 'Submit Request';
   }
 });
 </script>
