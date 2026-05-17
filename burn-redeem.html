@@ -3047,8 +3047,15 @@ async function deployContract() {
       ktAddress || opHash.slice(0,14));
 
   } catch(e) {
+    console.error('[deployContract] Error:', e);
     document.getElementById('deploySpinner').style.display = 'none';
-    var msg = (e && e.message) ? e.message : String(e);
+    var msg = (e && e.message)
+      ? e.message
+      : (typeof e === 'string')
+        ? e
+        : (e && (e.description || e.data || e.error || e.title))
+          ? String(e.description || e.data || e.error || e.title)
+          : (() => { try { return JSON.stringify(e); } catch(_) { return 'Unknown error (see console)'; } })();
     var cancelled = /reject|cancel|denied|aborted/i.test(msg);
     document.getElementById('deployStatusMsg').textContent = cancelled ? 'Cancelled.' : 'Error: ' + msg.slice(0,80);
     toast(cancelled?'info':'error', cancelled?'\u21a9':'\u2717',
