@@ -736,26 +736,75 @@ function networkName() { return network === 'ghostnet' ? 'Ghostnet' : 'Mainnet';
  if (network !== 'mainnet') cfg.rpcUrl = RPCS[network] && RPCS[network][0] || '';
  return cfg;
  }
+ function beaconMatrixNodes() {
+ return {
+ EUROPE_WEST: [
+ 'beacon-node-1.octez.io',
+ 'beacon-node-2.octez.io',
+ 'beacon-node-3.octez.io',
+ 'beacon-node-4.octez.io',
+ 'beacon-node-5.octez.io',
+ 'beacon-node-6.octez.io',
+ 'beacon-node-7.octez.io',
+ 'beacon-node-8.octez.io'
+ ]
+ };
+ }
+ function beaconPermissionRequest() {
+ return { scopes: ['operation_request', 'sign'] };
+ }
  function createBeaconWallet() {
- wallet = new BeaconWallet({ name:'NFT Collector Pinning', network: beaconNetworkConfig(), preferredNetwork: network });
+ wallet = new BeaconWallet({
+ name:'NFT Collector Pinning',
+ iconUrl: location.origin + '/images/kayslogo1.png',
+ appUrl: location.origin,
+ network: beaconNetworkConfig(),
+ featuredWallets: ['temple','kukai','trust'],
+ matrixNodes: beaconMatrixNodes()
+ });
  Tezos.setWalletProvider(wallet);
  return wallet;
  }
  async function resetBeaconWallet() {
  if (wallet) {
  try { await wallet.clearActiveAccount(); } catch(_) {}
- if (wallet.client && typeof wallet.client.destroy === 'function') {
+ try { await wallet.removeAllAccounts(); } catch(_) {}
+ if (wallet.client) {
+ try { await wallet.client.removeAllAccounts?.(); } catch(_) {}
+ try { await wallet.client.clearActiveAccount?.(); } catch(_) {}
+ try { await wallet.client.setActiveAccount?.(); } catch(_) {}
+ if (typeof wallet.client.destroy === 'function') {
  try { await wallet.client.destroy(); } catch(_) {}
  }
  }
+ }
  return createBeaconWallet();
+ }
+ async function requestBeaconPermissionsClean() {
+ try {
+ await wallet.requestPermissions(beaconPermissionRequest());
+ } catch(e) {
+ var msg = errorText(e);
+ if (/not accepted|invalid|unknown|unexpected/i.test(msg)) {
+ log('Beacon rejected scoped permission payload; retrying without payload.', 'warn');
+ await wallet.requestPermissions();
+ } else {
+ throw e;
+ }
+ }
  }
  async function setNetwork(net) {
  network = net;
  if (wallet) {
  try { await wallet.clearActiveAccount(); } catch(_) {}
- if (wallet.client && typeof wallet.client.destroy === 'function') {
+ try { await wallet.removeAllAccounts(); } catch(_) {}
+ if (wallet.client) {
+ try { await wallet.client.removeAllAccounts?.(); } catch(_) {}
+ try { await wallet.client.clearActiveAccount?.(); } catch(_) {}
+ try { await wallet.client.setActiveAccount?.(); } catch(_) {}
+ if (typeof wallet.client.destroy === 'function') {
  try { await wallet.client.destroy(); } catch(_) {}
+ }
  }
  }
  Tezos = new TezosToolkit(RPCS[network][0]);
@@ -2061,7 +2110,7 @@ function setCollectionBanner(addr, name) {
  try {
  log('Opening Beacon wallet pairing...', 'warn');
  await resetBeaconWallet();
- await wallet.requestPermissions({ network: beaconNetworkConfig() });
+ await requestBeaconPermissionsClean();
  userAddr = await wallet.getPKH();
  finishConnect(userAddr);
  log('Your wallet is connected with Beacon: ' + userAddr, 'ok');
@@ -2095,7 +2144,7 @@ function setCollectionBanner(addr, name) {
  };
  document.getElementById('wm-beacon').onclick = function() { connectWithBeacon(true); };
  document.getElementById('btn-disconnect').onclick = async function() {
- try { await wallet.clearActiveAccount(); } catch(_) {}
+ try { await resetBeaconWallet(); } catch(_) {}
  // Reset Tezos provider back to beacon wallet (clears any Temple provider)
  Tezos.setWalletProvider(wallet);
  userAddr = null; ct = null; ctAddr = null;
