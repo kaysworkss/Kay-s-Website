@@ -9,7 +9,7 @@
 <meta charset="UTF-8" />
 <meta name="google-site-verification" content="e9TWfxuPMB5PAQcZ0Hpa72H111jODvMsedDkePP2UVM" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn-cgi.cloudflare.com https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://formspree.io https://vitals.vercel-insights.com https://eth-mainnet.g.alchemy.com;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn-cgi.cloudflare.com https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://vitals.vercel-insights.com https://eth-mainnet.g.alchemy.com;">
 <title>Kay's Works | Original Art, Prints & Commissions</title>
 
 <!-- Vercel Speed Insights -->
@@ -1922,7 +1922,7 @@
       </div>
       <!-- ── MINT ENTRY TOKEN CARD ── -->
       <div class="precursor-card" style="margin-top:1.2rem;">
-        <p class="precursor-title">Mint Entry Token</p>
+        <p class="precursor-title">Entry Token Access</p>
         <div class="precursor-phases">
 
           <!-- Public phase — single button -->
@@ -1931,21 +1931,9 @@
               <span class="status-live" id="public-live" style="display:none;">✦ Mint is Live ✦</span>
               <span class="status-countdown" id="public-countdown"></span>
             </div>
-            <div class="token-action-row">
-              <a href="https://www.transient.xyz/mint/entry-token" target="_blank" rel="noopener noreferrer" class="btn-public-phase phase-btn">Entry Token (ETH)</a>
-              <a href="https://objkt.com/tokens/KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8/1" target="_blank" rel="noopener noreferrer" class="btn-public-phase phase-btn">Entry Token (TEZ)</a>
-            </div>
+            <a href="/claim-token" class="btn-claim-match">Entry Token Claim Page</a>
           </div>
 
-        </div>
-        <div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid rgba(201,153,58,0.2);">
-          <div class="token-action-row">
-            <a href="https://www.transient.xyz/redemption/ethereum/0x6c7e9d96704f8683e988a7414528d3480b26dbb2" target="_blank" rel="noopener noreferrer" class="btn-token-burn">Redeem Bronze Token (ETH)</a>
-            <a href="https://www.kaysworks.com/burn-redeem" target="_blank" rel="noopener noreferrer" class="btn-token-burn">Redeem Bronze Token (TEZ)</a>
-          </div>
-        </div>
-        <div style="margin-top:0.5rem;">
-          <a href="/claim-token" class="btn-claim-match">Claim Matching Entry Token</a>
         </div>
       </div>
 
@@ -2931,12 +2919,13 @@
       hideStatus();
       if (!form.checkValidity()) { form.reportValidity(); return; }
       setLoading(true);
-      var data = new FormData(form);
+      var data = Object.fromEntries(new FormData(form).entries());
+      data.form_type = 'commission';
 
-      fetch('https://formspree.io/f/xzdkeklb', {
+      fetch('/api/site-form', {
         method: 'POST',
-        body: data,
-        headers: { 'Accept': 'application/json' }
+        body: JSON.stringify(data),
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
       })
       .then(function (response) {
         if (response.ok) {

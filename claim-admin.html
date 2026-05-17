@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Claim Requests Admin | Kay's Works</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; font-family: Georgia, serif; color:#e8d5b0; background:#1e1510; }
+  main { width:min(1180px, calc(100% - 28px)); margin:0 auto; padding:32px 0 52px; }
+  .top { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:24px; }
+  h1 { margin:0; font-size:clamp(2rem, 5vw, 4rem); font-weight:400; line-height:1; }
+  .label { color:#c4845a; letter-spacing:0.2em; text-transform:uppercase; font-size:0.72rem; margin-bottom:0.5rem; }
+  .card { border:1px solid rgba(201,153,58,0.28); border-radius:8px; background:rgba(42,28,20,0.82); padding:1rem; }
+  .login { max-width:420px; margin-top:22px; }
+  input, select, button, textarea { font:inherit; }
+  input, select { width:100%; border:1px solid rgba(232,213,176,0.22); background:rgba(245,237,224,0.08); color:#e8d5b0; border-radius:5px; padding:0.78rem 0.86rem; }
+  button { border:1px solid rgba(201,153,58,0.5); background:#9e4f2e; color:#f5ede0; border-radius:5px; padding:0.76rem 1rem; cursor:pointer; }
+  button.secondary { background:transparent; color:#e8d5b0; }
+  button:disabled { opacity:0.55; cursor:not-allowed; }
+  .controls { display:grid; grid-template-columns:1fr 1fr auto auto; gap:0.7rem; align-items:end; margin:20px 0; }
+  .grid { display:grid; gap:0.85rem; }
+  .item { border:1px solid rgba(232,213,176,0.14); border-radius:8px; background:rgba(0,0,0,0.16); padding:1rem; }
+  .item-head { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:0.8rem; }
+  .item-title { font-size:1.2rem; color:#f5ede0; }
+  .badge { display:inline-flex; border:1px solid rgba(201,153,58,0.42); color:#c9993a; border-radius:999px; padding:0.25rem 0.55rem; font-size:0.72rem; }
+  .fields { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0.55rem 1rem; }
+  .field span { display:block; color:#9a8070; text-transform:uppercase; letter-spacing:0.12em; font-size:0.68rem; margin-bottom:0.18rem; }
+  .field strong { color:#e8d5b0; font-weight:400; overflow-wrap:anywhere; }
+  .message { grid-column:1 / -1; white-space:pre-wrap; }
+  .actions { display:flex; flex-wrap:wrap; gap:0.55rem; margin-top:0.9rem; }
+  .status { margin-top:0.8rem; color:#c4845a; }
+  .hidden { display:none; }
+  @media (max-width:760px) {
+    .top { align-items:flex-start; flex-direction:column; }
+    .controls { grid-template-columns:1fr; }
+    .fields { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div>
+      <div class="label">Kay's Works</div>
+      <h1>Form Requests</h1>
+    </div>
+    <a href="/" style="color:#c9993a">Back to site</a>
+  </div>
+
+  <section class="card login" id="loginBox">
+    <div class="label">Admin Login</div>
+    <input type="password" id="password" placeholder="Admin password" autocomplete="current-password" />
+    <div class="actions"><button type="button" id="loginBtn">Load Requests</button></div>
+    <div class="status" id="loginStatus"></div>
+  </section>
+
+  <section id="adminBox" class="hidden">
+    <div class="controls">
+      <label><span class="label">Status</span><select id="statusFilter"><option value="pending">Pending</option><option value="settled">Settled</option><option value="archived">Archived</option><option value="all">All</option></select></label>
+      <label><span class="label">Type</span><select id="typeFilter"><option value="">All forms</option><option value="matching-token">Matching token</option><option value="commission">Commission</option></select></label>
+      <button type="button" id="refreshBtn">Refresh</button>
+      <button type="button" class="secondary" id="logoutBtn">Logout</button>
+    </div>
+    <div class="status" id="adminStatus"></div>
+    <div class="grid" id="requestList"></div>
+  </section>
+</main>
+
+<script>
+const API = '/api/site-form';
+let adminPassword = '';
+
+const els = {
+  loginBox: document.getElementById('loginBox'),
+  adminBox: document.getElementById('adminBox'),
+  password: document.getElementById('password'),
+  loginBtn: document.getElementById('loginBtn'),
+  loginStatus: document.getElementById('loginStatus'),
+  adminStatus: document.getElementById('adminStatus'),
+  statusFilter: document.getElementById('statusFilter'),
+  typeFilter: document.getElementById('typeFilter'),
+  refreshBtn: document.getElementById('refreshBtn'),
+  logoutBtn: document.getElementById('logoutBtn'),
+  requestList: document.getElementById('requestList')
+};
+
+function esc(value) {
+  return String(value || '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
+}
+
+function field(label, value, wide) {
+  if (!value) return '';
+  return `<div class="field ${wide ? 'message' : ''}"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`;
+}
+
+function rowTitle(row) {
+  return row.form_type === 'matching-token'
+    ? `${row.collector_name || 'Collector'} -> ${row.requested_token || 'Matching token'}`
+    : `${row.name || 'Client'} -> ${row.commission_type || 'Commission'}`;
+}
+
+function render(rows) {
+  if (!rows.length) {
+    els.requestList.innerHTML = '<div class="card">No requests found.</div>';
+    return;
+  }
+  els.requestList.innerHTML = rows.map((row) => {
+    const isClaim = row.form_type === 'matching-token';
+    const body = isClaim ? [
+      field('Email', row.email),
+      field('Source chain', row.source_chain),
+      field('Source wallet', row.source_wallet),
+      field('Balance', row.source_balance),
+      field('Requested token', row.requested_token),
+      field('Destination wallet', row.destination_wallet),
+      field('Note', row.note, true)
+    ].join('') : [
+      field('Email', row.email),
+      field('Commission type', row.commission_type),
+      field('Message', row.message, true)
+    ].join('');
+    return `<article class="item">
+      <div class="item-head">
+        <div><div class="item-title">${esc(rowTitle(row))}</div><div style="color:#9a8070">${esc(new Date(row.created_at).toLocaleString())}</div></div>
+        <span class="badge">${esc(row.status)}</span>
+      </div>
+      <div class="fields">${body}</div>
+      <div class="actions">
+        ${row.status !== 'settled' ? `<button type="button" data-action="settled" data-id="${esc(row.id)}">Mark Settled</button>` : ''}
+        ${row.status !== 'pending' ? `<button type="button" class="secondary" data-action="pending" data-id="${esc(row.id)}">Move to Pending</button>` : ''}
+        ${row.status !== 'archived' ? `<button type="button" class="secondary" data-action="archived" data-id="${esc(row.id)}">Archive</button>` : ''}
+      </div>
+    </article>`;
+  }).join('');
+}
+
+async function request(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...(adminPassword ? { 'X-Admin-Password': adminPassword } : {}),
+      ...(options.headers || {})
+    }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Request failed.');
+  return data;
+}
+
+async function login() {
+  els.loginStatus.textContent = '';
+  els.loginBtn.disabled = true;
+  try {
+    adminPassword = els.password.value;
+    if (!adminPassword) throw new Error('Password required.');
+    await loadRequests();
+    els.loginBox.classList.add('hidden');
+    els.adminBox.classList.remove('hidden');
+  } catch (error) {
+    adminPassword = '';
+    els.loginStatus.textContent = error.message;
+  } finally {
+    els.loginBtn.disabled = false;
+  }
+}
+
+async function loadRequests() {
+  els.adminStatus.textContent = 'Loading...';
+  const params = new URLSearchParams({ status: els.statusFilter.value });
+  if (els.typeFilter.value) params.set('type', els.typeFilter.value);
+  try {
+    const rows = await request(API + '?' + params.toString());
+    render(rows);
+    els.adminStatus.textContent = `${rows.length} request${rows.length === 1 ? '' : 's'} loaded.`;
+  } catch (error) {
+    els.adminStatus.textContent = error.message;
+  }
+}
+
+async function updateStatus(id, status) {
+  await request(API + '?id=' + encodeURIComponent(id), { method:'PATCH', body: JSON.stringify({ status }) });
+  await loadRequests();
+}
+
+els.loginBtn.addEventListener('click', login);
+els.password.addEventListener('keydown', (event) => { if (event.key === 'Enter') login(); });
+els.refreshBtn.addEventListener('click', loadRequests);
+els.statusFilter.addEventListener('change', loadRequests);
+els.typeFilter.addEventListener('change', loadRequests);
+els.logoutBtn.addEventListener('click', () => {
+  adminPassword = '';
+  els.password.value = '';
+  els.adminBox.classList.add('hidden');
+  els.loginBox.classList.remove('hidden');
+});
+els.requestList.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-id]');
+  if (button) updateStatus(button.dataset.id, button.dataset.action);
+});
+
+</script>
+</body>
+</html>
