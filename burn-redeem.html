@@ -36,6 +36,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 40px
 .wdot{width:6px;height:6px;border-radius:50%;background:currentColor}
 .wdot.live{animation:blink 1.4s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+@keyframes spin{to{transform:rotate(360deg)}}
 .page{display:none}
 .page.active{display:block;animation:fadein .25s ease}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -353,12 +354,23 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 40px
 <!-- Wallet prompt modal -->
 <div id="wallet-modal">
   <div class="modal-box">
-    <div class="modal-title">Connect Wallet</div>
-    <div class="modal-sub">On desktop, Temple Direct works with the browser extension. On phones, use Mobile Wallet / Beacon to open Temple, Kukai, Umami, or another Tezos wallet.</div>
-    <button class="modal-btn primary" onclick="connectBeaconWallet()">Mobile Wallet / Beacon</button>
-    <button class="modal-btn secondary" onclick="connectTempleDirect()">Temple Direct (Desktop)</button>
-    <a class="modal-btn ghost" href="https://templewallet.com/download" target="_blank" rel="noopener" style="text-decoration:none">Install Temple Wallet</a>
-    <button class="modal-btn ghost" onclick="document.getElementById('wallet-modal').classList.remove('show')">Dismiss</button>
+    <!-- Default: wallet picker -->
+    <div id="wallet-modal-pick">
+      <div class="modal-title">Connect Wallet</div>
+      <div class="modal-sub">On desktop, Temple Direct works with the browser extension. On phones, use Mobile Wallet / Beacon to open Temple, Kukai, Umami, or another Tezos wallet.</div>
+      <button class="modal-btn primary" onclick="connectBeaconWallet()">Mobile Wallet / Beacon</button>
+      <button class="modal-btn secondary" onclick="connectTempleDirect()">Temple Direct (Desktop)</button>
+      <a class="modal-btn ghost" href="https://templewallet.com/download" target="_blank" rel="noopener" style="text-decoration:none">Install Temple Wallet</a>
+      <button class="modal-btn ghost" onclick="walletModalDismiss()">Dismiss</button>
+    </div>
+    <!-- Shown while Beacon is loading / pairing on mobile -->
+    <div id="wallet-modal-connecting" style="display:none;flex-direction:column;align-items:center;gap:16px;padding:8px 0 4px">
+      <div style="width:36px;height:36px;border:3px solid var(--border-hi);border-top-color:var(--glow);border-radius:50%;animation:spin .7s linear infinite"></div>
+      <div style="font-family:var(--display);font-size:20px;font-weight:800;text-transform:uppercase;letter-spacing:.08em" id="wallet-modal-connecting-title">Opening wallet…</div>
+      <div style="font-size:11px;color:var(--muted);text-align:center;line-height:1.6" id="wallet-modal-connecting-sub">Approve the connection in your wallet app. Tap the button below if your wallet didn't open.</div>
+      <button class="modal-btn ghost" id="wallet-modal-open-btn" style="display:none;width:100%" onclick="beaconOpenPairingUi()">Open wallet picker again</button>
+      <button class="modal-btn ghost" style="width:100%;margin-top:4px;font-size:10px" onclick="walletModalCancel()">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -1245,7 +1257,7 @@ function toggleWallet() {
   if (state.walletAddress) {
     toast('info', '?', 'Wallet already connected', state.walletAddress.slice(0,14)+'...');
   } else {
-    document.getElementById('wallet-modal').classList.add('show');
+    walletModalShowPick();
   }
 }
 
@@ -1275,7 +1287,7 @@ function setConnectedWallet(address, label) {
   document.getElementById('walletBtn').classList.add('connected');
   document.getElementById('wdot').classList.add('live');
   document.getElementById('walletLabel').textContent = short;
-  document.getElementById('wallet-modal').classList.remove('show');
+  walletModalHide();
   var _ae=document.getElementById('d-admin');if(_ae)_ae.value=address;
   refreshCollector();
   toast('success', '✓', 'Connected ('+label+')', address.slice(0,14)+'...');
@@ -1734,14 +1746,13 @@ function templeDappNetwork() {
 async function connectTempleDirect() {
   if (state.walletAddress || state.walletConnecting) return;
   state.walletConnecting = true;
-  document.getElementById('wallet-modal').classList.remove('show');
+  walletModalShowConnecting('Opening Temple…', 'Approve in the Temple browser extension.');
   try {
     initTaquito();
-    toast('info', '??', 'Opening Temple...', 'Approve in the Temple extension');
 
     if (!(await templeDirectAvailable())) {
       console.info('Temple direct not available, diagnostics:', templeDiagnostics());
-      toast('info', '??', 'Temple not detected', 'Falling back to Beacon...');
+      walletModalShowConnecting('Temple not found…', 'Falling back to Beacon — approve in your wallet app.');
       await connectBeaconWallet(true);
       return;
     }
@@ -1756,9 +1767,11 @@ async function connectTempleDirect() {
   } catch(e) {
     const msg = e?.message || String(e);
     if (/reject|cancel|denied|aborted/i.test(msg)) {
-      toast('info', '?', 'Cancelled');
+      walletModalHide();
+      toast('info', '✕', 'Cancelled');
     } else {
-      toast('info', '??', 'Temple failed, trying Beacon...', msg.slice(0,60));
+      toast('info', '⚠', 'Temple failed, trying Beacon…', msg.slice(0,60));
+      walletModalShowConnecting('Trying Beacon…', 'Approve the connection in your wallet app.');
       await connectBeaconWallet(true);
     }
   } finally {
@@ -1923,41 +1936,110 @@ async function connectBeaconAttempt(DAppClient, sdk, resetFirst) {
   return { client, address };
 }
 
+/* ── Wallet modal helpers ─────────────────────────────────────── */
+function walletModalShowPick() {
+  document.getElementById('wallet-modal-pick').style.display = '';
+  document.getElementById('wallet-modal-connecting').style.display = 'none';
+  document.getElementById('wallet-modal').classList.add('show');
+}
+function walletModalShowConnecting(title, sub) {
+  document.getElementById('wallet-modal-pick').style.display = 'none';
+  var el = document.getElementById('wallet-modal-connecting');
+  el.style.display = 'flex';
+  document.getElementById('wallet-modal-connecting-title').textContent = title || 'Opening wallet…';
+  document.getElementById('wallet-modal-connecting-sub').textContent = sub || 'Approve the connection in your wallet app.';
+  document.getElementById('wallet-modal-open-btn').style.display = 'none';
+  document.getElementById('wallet-modal').classList.add('show');
+}
+function walletModalShowOpenBtn() {
+  document.getElementById('wallet-modal-open-btn').style.display = '';
+}
+function walletModalHide() {
+  document.getElementById('wallet-modal').classList.remove('show');
+  document.getElementById('wallet-modal-pick').style.display = '';
+  document.getElementById('wallet-modal-connecting').style.display = 'none';
+}
+function walletModalDismiss() {
+  if (!state.walletConnecting) walletModalHide();
+}
+function walletModalCancel() {
+  state._beaconCancelFlag = true;
+  state.walletConnecting = false;
+  walletModalHide();
+  toast('info', '✕', 'Cancelled');
+}
+// Called by the "Open wallet picker again" button
+function beaconOpenPairingUi() {
+  if (state.beaconClient && typeof state.beaconClient.openPairingPopup === 'function') {
+    try { state.beaconClient.openPairingPopup(); } catch(_) {}
+  }
+}
+
 async function connectBeaconWallet(fromFallback) {
   if (state.walletAddress) return;
   if (!fromFallback) {
     if (state.walletConnecting) return;
     state.walletConnecting = true;
   }
-  document.getElementById('wallet-modal').classList.remove('show');
+  state._beaconCancelFlag = false;
+
+  // MOBILE FIX: Keep the modal open (switch to connecting view) while Beacon
+  // loads its SDK and opens its own pairing UI. Hiding the modal immediately
+  // caused the page to re-render / scroll, which dismissed the Beacon overlay
+  // before the user could pick a wallet.
+  walletModalShowConnecting('Loading Beacon SDK…', 'One moment — preparing wallet connector…');
+
   try {
     initTaquito();
     const sdk = await getBeaconSdk();
     const DAppClient = sdk?.DAppClient;
     if (typeof DAppClient !== 'function') throw new Error('Beacon SDK did not load.');
 
-    toast('info', '??', 'Opening mobile wallet...', 'Approve the Tezos claim in your wallet');
+    if (state._beaconCancelFlag) return;
+
+    // Now Beacon is ready — update the connecting message and keep the modal
+    // visible. Beacon will render its own overlay on top of our modal.
+    walletModalShowConnecting(
+      'Opening wallet…',
+      'Approve the connection in your wallet app. A wallet picker should appear above this message.'
+    );
+
+    // Show the "open again" button after 4 s in case the Beacon overlay was missed
+    const openBtnTimer = setTimeout(walletModalShowOpenBtn, 4000);
+
     let result;
     try {
       result = await connectBeaconAttempt(DAppClient, sdk, false);
     } catch (firstErr) {
+      if (state._beaconCancelFlag) { clearTimeout(openBtnTimer); return; }
       const firstMsg = firstErr?.message || String(firstErr);
+      if (/reject|cancel|denied|aborted/i.test(firstMsg)) throw firstErr; // propagate cancel
       console.info('Beacon clean reconnect retry:', firstMsg);
-      toast('info', '??', 'Retrying clean wallet session...', 'Approve the Tezos claim in your wallet');
+      walletModalShowConnecting(
+        'Retrying…',
+        'Starting a clean wallet session — approve the connection in your wallet app.'
+      );
       result = await connectBeaconAttempt(DAppClient, sdk, true);
+    } finally {
+      clearTimeout(openBtnTimer);
     }
+
+    if (state._beaconCancelFlag) return;
 
     const provider = beaconDirectProvider(result.client, result.address);
     state.wallet = provider;
     state.tezos.setWalletProvider(provider);
+    // setConnectedWallet hides the modal via walletModalHide path inside it
     setConnectedWallet(result.address, 'Beacon');
   } catch(e) {
     const msg = e?.message || String(e);
-    if (/reject|cancel|denied|aborted/i.test(msg)) {
-      toast('info', '?', 'Cancelled');
+    if (/reject|cancel|denied|aborted/i.test(msg) || state._beaconCancelFlag) {
+      walletModalHide();
+      toast('info', '✕', 'Cancelled');
     } else {
-      toast('error', '?', 'Beacon failed', msg.slice(0,100));
-      document.getElementById('wallet-modal').classList.add('show');
+      toast('error', '⚠', 'Beacon failed', msg.slice(0,100));
+      // Return to picker so user can retry
+      walletModalShowPick();
     }
   } finally {
     if (!fromFallback) state.walletConnecting = false;
