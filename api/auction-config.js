@@ -87,8 +87,17 @@ function cors(res) {
 
 function sanitisePiece(p) {
   if (!p || typeof p !== "object") return null;
+  const chain = String(p.chain || "eth").toLowerCase() === "tezos" ? "tezos" : "eth";
   return {
+    chain,
     contractAddr: String(p.contractAddr || "").slice(0, 100),
+    tezosContractAddr: String(p.tezosContractAddr || "").slice(0, 100),
+    tezosAuctionId: String(p.tezosAuctionId || "").slice(0, 40),
+    tezosNetwork: ["mainnet","ghostnet"].includes(String(p.tezosNetwork || "").toLowerCase())
+      ? String(p.tezosNetwork || "").toLowerCase()
+      : "mainnet",
+    tezosRpcUrl: String(p.tezosRpcUrl || "").slice(0, 500),
+    crossChainPairKey: String(p.crossChainPairKey || "").slice(0, 100),
     artTitle:     String(p.artTitle     || "").slice(0, 200),
     artArtist:    String(p.artArtist    || "").slice(0, 200),
     // Long-form HTML (rich text from the admin editor). 50k chars allows for
@@ -117,7 +126,13 @@ function sanitiseAuctions(arr) {
 
 const DEFAULT_CONFIG = {
   status:           "off",
+  chain:            "eth",
   contractAddr:     "",
+  tezosContractAddr:"",
+  tezosAuctionId:   "",
+  tezosNetwork:     "mainnet",
+  tezosRpcUrl:      "",
+  crossChainPairKey:"",
   artTitle:         "",
   artArtist:        "",
   artAbout:         "",
@@ -167,7 +182,15 @@ module.exports = async function handler(req, res) {
     const config = {
       status:           ["live", "upcoming", "off"].includes(body.status) ? body.status : "off",
       // Legacy single-piece fields (kept for backward compatibility with old readers)
+      chain:            String(body.chain || "eth").toLowerCase() === "tezos" ? "tezos" : "eth",
       contractAddr:     String(body.contractAddr     || "").slice(0, 100),
+      tezosContractAddr:String(body.tezosContractAddr || "").slice(0, 100),
+      tezosAuctionId:   String(body.tezosAuctionId    || "").slice(0, 40),
+      tezosNetwork:     ["mainnet","ghostnet"].includes(String(body.tezosNetwork || "").toLowerCase())
+        ? String(body.tezosNetwork || "").toLowerCase()
+        : "mainnet",
+      tezosRpcUrl:      String(body.tezosRpcUrl       || "").slice(0, 500),
+      crossChainPairKey:String(body.crossChainPairKey || "").slice(0, 100),
       artTitle:         String(body.artTitle         || "").slice(0, 200),
       artArtist:        String(body.artArtist        || "").slice(0, 200),
       artAbout:         String(body.artAbout         || "").slice(0, 50000),

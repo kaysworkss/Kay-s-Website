@@ -478,6 +478,109 @@ async function handleNotifyBid(req, res) {
   }
 }
 
+// Cross-chain pair claim. Requires a Supabase table:
+// crosschain_auction_claims(pair_key text primary key, active_chain text,
+// active_auction_key text, status text, bid_count int, opened_at timestamptz,
+// reset_at timestamptz, settled_at timestamptz, updated_at timestamptz).
+async function handleCrosschainClaim(req, res, supabase) {
+  const now = new Date();
+
+  if (req.method === 'GET') {
+    const pairKey = String(req.query.pair_key || '').trim().toLowerCase();
+    if (!pairKey) return res.status(400).json({ error: 'pair_key required' });
+    const { data, error } = await supabase
+      .from('crosschain_auction_claims')
+      .select('*')
+      .eq('pair_key', pairKey)
+      .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    if (data && data.bid_count === 0 && data.reset_at && new Date(data.reset_at) <= now) {
+      await supabase.from('crosschain_auction_claims').delete().eq('pair_key', pairKey).eq('bid_count', 0);
+      return res.status(200).json({ ok: true, claim: null, reset: true });
+    }
+    return res.status(200).json({ ok: true, claim: data || null });
+  }
+
+  if (req.method !== 'POST' && req.method !== 'PATCH') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  const action = String(body.action || 'claim');
+  const pairKey = String(body.pair_key || '').trim().toLowerCase();
+  if (!pairKey) return res.status(400).json({ error: 'pair_key required' });
+
+  if (action === 'bid') {
+    const { data, error } = await supabase
+      .from('crosschain_auction_claims')
+      .update({ bid_count: 1, status: 'live', updated_at: now.toISOString() })
+      .eq('pair_key', pairKey)
+      .select('*')
+      .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ ok: true, claim: data || null });
+  }
+
+  if (action === 'settle') {
+    const { data, error } = await supabase
+      .from('crosschain_auction_claims')
+      .update({ status: 'settled', settled_at: now.toISOString(), updated_at: now.toISOString() })
+      .eq('pair_key', pairKey)
+      .select('*')
+      .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ ok: true, claim: data || null });
+  }
+
+  if (action === 'reset') {
+    const { error } = await supabase
+      .from('crosschain_auction_claims')
+      .delete()
+      .eq('pair_key', pairKey)
+      .eq('bid_count', 0);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ ok: true, claim: null, reset: true });
+  }
+
+  const activeChain = String(body.active_chain || '').trim().toLowerCase();
+  const activeAuctionKey = String(body.active_auction_key || '').trim().toLowerCase();
+  const timeoutSec = Math.max(60, Math.min(3600, Number(body.no_bid_timeout_sec || 600)));
+  if (!['eth','tezos'].includes(activeChain) || !activeAuctionKey) {
+    return res.status(400).json({ error: 'active_chain and active_auction_key required' });
+  }
+
+  const resetAt = new Date(now.getTime() + timeoutSec * 1000).toISOString();
+  const row = {
+    pair_key: pairKey,
+    active_chain: activeChain,
+    active_auction_key: activeAuctionKey,
+    status: 'waiting-bid',
+    bid_count: 0,
+    opened_at: now.toISOString(),
+    reset_at: resetAt,
+    updated_at: now.toISOString(),
+  };
+
+  const inserted = await supabase
+    .from('crosschain_auction_claims')
+    .insert(row)
+    .select('*')
+    .single();
+  if (!inserted.error) return res.status(200).json({ ok: true, claim: inserted.data, claimed: true });
+
+  const { data, error } = await supabase
+    .from('crosschain_auction_claims')
+    .select('*')
+    .eq('pair_key', pairKey)
+    .maybeSingle();
+  if (error) return res.status(500).json({ error: error.message });
+  if (data && data.bid_count === 0 && data.reset_at && new Date(data.reset_at) <= now) {
+    await supabase.from('crosschain_auction_claims').delete().eq('pair_key', pairKey).eq('bid_count', 0);
+    return handleCrosschainClaim(req, res, supabase);
+  }
+  return res.status(409).json({ ok: false, claim: data || null, error: 'PAIR_ALREADY_CLAIMED' });
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 module.exports = async (req, res) => {
@@ -502,6 +605,7 @@ module.exports = async (req, res) => {
       }
     }
     else if (urlPath.includes('/hall-of-fame'))   action = 'hall-of-fame';
+    else if (urlPath.includes('/crosschain-claim')) action = 'crosschain-claim';
     else if (urlPath.includes('/notify-outbid'))  action = 'notify-outbid';
     else if (urlPath.includes('/notify-bid'))      action = 'notify-bid';
   }
@@ -515,6 +619,7 @@ module.exports = async (req, res) => {
     case 'score':         return handleScore(req, res, supabase);
     case 'leaderboard':   return handleLeaderboard(req, res, supabase);
     case 'hall-of-fame':  return handleHallOfFame(req, res, supabase);
+    case 'crosschain-claim': return handleCrosschainClaim(req, res, supabase);
     case 'notify-outbid': return handleNotifyOutbid(req, res);
     case 'notify-bid':    return handleNotifyBid(req, res);
     default:
