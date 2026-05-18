@@ -45,10 +45,13 @@ body {
   font-size: 15px;
   line-height: 1.6;
   min-height: 100vh;
-  padding: 48px 20px 80px;
+  padding: 40px clamp(18px, 3vw, 44px) 80px;
 }
 
-.page { max-width: 660px; margin: 0 auto; }
+.page {
+  width: min(100%, 1180px);
+  margin: 0 auto;
+}
 
 /* Header */
 .header { border-bottom: 1px solid var(--divider); padding-bottom: 20px; margin-bottom: 36px; }
@@ -212,17 +215,33 @@ body {
 }
 
 /* Piece tab drag-to-reorder */
-.piece-tab-btn {
-  cursor: grab;
-  user-select: none;
+.piece-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--divider);
+  overflow-x: auto;
+  gap: 2px;
+  scrollbar-width: thin;
 }
-.piece-tab-btn:active { cursor: grabbing; }
-.piece-tab-btn.drag-over {
+.piece-tab-item {
+  display: inline-flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  user-select: none;
+  cursor: grab;
+  touch-action: pan-y;
+}
+.piece-tab-item:active { cursor: grabbing; }
+.piece-tab-item.drag-over {
   border-left: 2px solid var(--clay) !important;
   background: rgba(196,132,90,0.08);
 }
-.piece-tab-btn.dragging {
+.piece-tab-item.dragging {
   opacity: 0.4;
+}
+.piece-tab-item.pointer-dragging {
+  opacity: 0.72;
+  outline: 1px solid rgba(196,132,90,0.45);
+  outline-offset: -1px;
 }
 .piece-tab-drag-hint {
   font-family: 'Crimson Pro', serif; font-size: 0.75rem;
@@ -401,18 +420,26 @@ body {
 .profile-status.err { color:var(--clay); }
 
 /* Piece tabs */
-.piece-tab-btn {
+.piece-tab-main {
   font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.14em; text-transform:uppercase;
-  padding:10px 16px; border:none; background:transparent; color:var(--text-muted);
+  padding:10px 12px 10px 16px; border:none; background:transparent; color:var(--text-muted);
   cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap;
   transition:color .2s, border-color .2s; flex-shrink:0;
 }
-.piece-tab-btn:hover { color:var(--clay); }
-.piece-tab-btn.active { color:var(--sand); border-bottom-color:var(--clay); }
+.piece-tab-main:hover { color:var(--clay); }
+.piece-tab-item.active .piece-tab-main { color:var(--sand); border-bottom-color:var(--clay); }
+.piece-tab-move {
+  font-family:'Cinzel',serif; font-size:0.58rem;
+  background:transparent; border:0; border-bottom:2px solid transparent;
+  color:var(--text-muted); padding:0 7px; cursor:pointer;
+  transition:color .18s, background .18s;
+}
+.piece-tab-move:hover:not(:disabled) { color:var(--clay); background:rgba(196,132,90,0.07); }
+.piece-tab-move:disabled { opacity:0.28; cursor:default; }
 .piece-remove-btn {
   font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.1em; text-transform:uppercase;
   background:transparent; border:1px solid rgba(158,79,46,.35); color:var(--clay);
-  border-radius:var(--r); padding:3px 8px; cursor:pointer; margin-left:4px; transition:all .18s;
+  border-radius:var(--r); padding:3px 8px; cursor:pointer; margin:6px 8px 6px 3px; transition:all .18s;
 }
 .piece-remove-btn:hover { background:var(--rust); color:var(--linen); border-color:var(--rust); }
 
@@ -505,7 +532,7 @@ body {
       </div>
       <div class="card-body" style="padding:0">
         <!-- Piece tabs -->
-        <div id="piece-tabs" style="display:flex;border-bottom:1px solid var(--divider);overflow-x:auto;"></div>
+        <div id="piece-tabs" class="piece-tabs"></div>
         <div class="piece-tab-drag-hint" id="piece-drag-hint">Drag tabs to reorder pieces</div>
         <!-- Piece forms — one per piece -->
         <div id="piece-forms" style="padding:18px"></div>
@@ -1195,21 +1222,13 @@ function _renderPieceTabs() {
   const hint  = document.getElementById("piece-drag-hint");
   if (!tabs || !forms) return;
 
-  tabs.innerHTML = _pieces.map((p, i) => {
-    const eff = _effectivePieceStatus(p);
-    const dotTitle = p.status ? `Status: ${eff}` : `Status: ${eff} (inherited)`;
-    return `
-    <button class="piece-tab-btn ${i===_activePieceIdx?'active':''}" data-idx="${i}" draggable="true" onclick="selectPiece(${i})">
-      <span class="piece-tab-status-dot ${eff}" title="${dotTitle}"></span>${p.artTitle || 'Piece '+(i+1)}
-      ${_pieces.length > 1 ? `<button class="piece-remove-btn" onclick="event.stopPropagation();removePiece(${i})">✕</button>` : ''}
-    </button>`;
-  }).join("");
+  tabs.innerHTML = _renderPieceTabItems();
 
   // Show drag hint only when there are multiple pieces
   if (hint) hint.classList.toggle("show", _pieces.length > 1);
 
   // Wire up drag-to-reorder
-  if (_pieces.length > 1) _initTabDrag(tabs);
+  _wirePieceTabs(tabs);
 
   forms.innerHTML = _buildPieceForm(_activePieceIdx);
 
@@ -1233,12 +1252,86 @@ function _renderPieceTabs() {
 // ─── Drag-to-reorder piece tabs ───────────────────────────────────────────────
 
 let _dragSrcIdx = null;
+let _pointerDrag = null;
+
+function _renderPieceTabItems() {
+  return _pieces.map((p, i) => {
+    const eff = _effectivePieceStatus(p);
+    const dotTitle = p.status ? `Status: ${eff}` : `Status: ${eff} (inherited)`;
+    const label = p.artTitle || 'Piece ' + (i + 1);
+    const canReorder = _pieces.length > 1;
+    return `
+    <div class="piece-tab-item ${i===_activePieceIdx?'active':''}" data-idx="${i}" draggable="${canReorder ? 'true' : 'false'}">
+      <button type="button" class="piece-tab-main" data-action="select" title="Select ${label}">
+        <span class="piece-tab-status-dot ${eff}" title="${dotTitle}"></span>${label}
+      </button>
+      ${canReorder ? `
+        <button type="button" class="piece-tab-move" data-action="move-prev" title="Move earlier" ${i===0 ? 'disabled' : ''}>‹</button>
+        <button type="button" class="piece-tab-move" data-action="move-next" title="Move later" ${i===_pieces.length-1 ? 'disabled' : ''}>›</button>
+        <button type="button" class="piece-remove-btn" data-action="remove" title="Remove ${label}">✕</button>
+      ` : ''}
+    </div>`;
+  }).join("");
+}
+
+function _wirePieceTabs(container) {
+  if (!container) return;
+  container.onclick = _handlePieceTabClick;
+  if (_pieces.length > 1) _initTabDrag(container);
+}
+
+function _handlePieceTabClick(e) {
+  const item = e.target.closest(".piece-tab-item");
+  if (!item) return;
+  const idx = parseInt(item.dataset.idx, 10);
+  const actionEl = e.target.closest("[data-action]");
+  const action = actionEl ? actionEl.dataset.action : "select";
+
+  if (action === "remove") {
+    e.stopPropagation();
+    removePiece(idx);
+    return;
+  }
+  if (action === "move-prev" || action === "move-next") {
+    e.stopPropagation();
+    _reorderPiece(idx, action === "move-prev" ? idx - 1 : idx + 1);
+    return;
+  }
+  selectPiece(idx);
+}
+
+function _reorderPiece(fromIdx, toIdx) {
+  if (!_pieces.length) return false;
+  if (fromIdx < 0 || toIdx < 0 || fromIdx >= _pieces.length || toIdx >= _pieces.length || fromIdx === toIdx) return false;
+
+  _savePieceFormValues(_activePieceIdx);
+
+  const moved = _pieces.splice(fromIdx, 1)[0];
+  _pieces.splice(toIdx, 0, moved);
+
+  if (_activePieceIdx === fromIdx) {
+    _activePieceIdx = toIdx;
+  } else if (fromIdx < _activePieceIdx && toIdx >= _activePieceIdx) {
+    _activePieceIdx--;
+  } else if (fromIdx > _activePieceIdx && toIdx <= _activePieceIdx) {
+    _activePieceIdx++;
+  }
+
+  _dragSrcIdx = null;
+  _renderPieceTabs();
+  toast("ok", "Reordered", "Save to publish the new order");
+  return true;
+}
 
 function _initTabDrag(container) {
-  const btns = container.querySelectorAll(".piece-tab-btn[draggable]");
+  const btns = container.querySelectorAll(".piece-tab-item[draggable='true']");
 
   btns.forEach(btn => {
     btn.addEventListener("dragstart", e => {
+      if (e.target.closest("[data-action='remove'], .piece-tab-move")) {
+        e.preventDefault();
+        return;
+      }
       _dragSrcIdx = parseInt(btn.dataset.idx, 10);
       btn.classList.add("dragging");
       e.dataTransfer.effectAllowed = "move";
@@ -1247,13 +1340,13 @@ function _initTabDrag(container) {
 
     btn.addEventListener("dragend", () => {
       btn.classList.remove("dragging");
-      container.querySelectorAll(".piece-tab-btn").forEach(b => b.classList.remove("drag-over"));
+      container.querySelectorAll(".piece-tab-item").forEach(b => b.classList.remove("drag-over"));
     });
 
     btn.addEventListener("dragover", e => {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
-      container.querySelectorAll(".piece-tab-btn").forEach(b => b.classList.remove("drag-over"));
+      container.querySelectorAll(".piece-tab-item").forEach(b => b.classList.remove("drag-over"));
       const targetIdx = parseInt(btn.dataset.idx, 10);
       if (targetIdx !== _dragSrcIdx) btn.classList.add("drag-over");
     });
@@ -1267,26 +1360,60 @@ function _initTabDrag(container) {
       e.stopPropagation();
       const targetIdx = parseInt(btn.dataset.idx, 10);
       if (_dragSrcIdx === null || _dragSrcIdx === targetIdx) return;
+      _reorderPiece(_dragSrcIdx, targetIdx);
+    });
 
-      // Save current form before reordering
-      _savePieceFormValues(_activePieceIdx);
+    btn.addEventListener("pointerdown", e => {
+      if (!e.isPrimary || e.button !== 0 || e.target.closest("[data-action='remove'], .piece-tab-move")) return;
+      _pointerDrag = {
+        srcIdx: parseInt(btn.dataset.idx, 10),
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        active: false
+      };
+      btn.setPointerCapture(e.pointerId);
+    });
 
-      // Reorder _pieces array
-      const moved = _pieces.splice(_dragSrcIdx, 1)[0];
-      _pieces.splice(targetIdx, 0, moved);
+    btn.addEventListener("pointermove", e => {
+      if (!_pointerDrag || _pointerDrag.pointerId !== e.pointerId) return;
+      const dx = Math.abs(e.clientX - _pointerDrag.startX);
+      const dy = Math.abs(e.clientY - _pointerDrag.startY);
+      if (!_pointerDrag.active && dx < 8 && dy < 8) return;
+      if (dy > dx + 10) return;
 
-      // Keep the active piece selected after reorder
-      if (_activePieceIdx === _dragSrcIdx) {
-        _activePieceIdx = targetIdx;
-      } else if (_dragSrcIdx < _activePieceIdx && targetIdx >= _activePieceIdx) {
-        _activePieceIdx--;
-      } else if (_dragSrcIdx > _activePieceIdx && targetIdx <= _activePieceIdx) {
-        _activePieceIdx++;
+      e.preventDefault();
+      _pointerDrag.active = true;
+      btn.classList.add("pointer-dragging");
+      const target = document.elementFromPoint(e.clientX, e.clientY)?.closest(".piece-tab-item");
+      container.querySelectorAll(".piece-tab-item").forEach(b => b.classList.remove("drag-over"));
+      if (target && target.parentElement === container && parseInt(target.dataset.idx, 10) !== _pointerDrag.srcIdx) {
+        target.classList.add("drag-over");
       }
+    });
 
-      _dragSrcIdx = null;
-      _renderPieceTabs();
-      toast("ok", "Reordered", "Save to publish the new order");
+    btn.addEventListener("pointerup", e => {
+      if (!_pointerDrag || _pointerDrag.pointerId !== e.pointerId) return;
+      const drag = _pointerDrag;
+      _pointerDrag = null;
+      btn.classList.remove("pointer-dragging");
+      container.querySelectorAll(".piece-tab-item").forEach(b => b.classList.remove("drag-over"));
+
+      if (drag.active) {
+        e.preventDefault();
+        e.stopPropagation();
+        const target = document.elementFromPoint(e.clientX, e.clientY)?.closest(".piece-tab-item");
+        if (target && target.parentElement === container) {
+          _reorderPiece(drag.srcIdx, parseInt(target.dataset.idx, 10));
+        }
+      }
+    });
+
+    btn.addEventListener("pointercancel", e => {
+      if (!_pointerDrag || _pointerDrag.pointerId !== e.pointerId) return;
+      _pointerDrag = null;
+      btn.classList.remove("pointer-dragging");
+      container.querySelectorAll(".piece-tab-item").forEach(b => b.classList.remove("drag-over"));
     });
   });
 }
@@ -1609,6 +1736,9 @@ function setStatus(s, updateUI = true) {
 function _renderTabsOnly() {
   const tabs = document.getElementById("piece-tabs");
   if (!tabs) return;
+  tabs.innerHTML = _renderPieceTabItems();
+  _wirePieceTabs(tabs);
+  return;
   tabs.innerHTML = _pieces.map((p, i) => {
     const eff = _effectivePieceStatus(p);
     const dotTitle = p.status ? `Status: ${eff}` : `Status: ${eff} (inherited)`;
