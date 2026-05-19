@@ -89,6 +89,7 @@ function sanitisePiece(p) {
   if (!p || typeof p !== "object") return null;
   const chain = String(p.chain || "eth").toLowerCase() === "tezos" ? "tezos" : "eth";
   return {
+    pieceId: String(p.pieceId || "").slice(0, 80),
     chain,
     contractAddr: String(p.contractAddr || "").slice(0, 100),
     tezosContractAddr: String(p.tezosContractAddr || "").slice(0, 100),
