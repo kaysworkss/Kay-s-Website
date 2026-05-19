@@ -121,6 +121,7 @@ async function sendMinimalAlert(row, id) {
     `Open the admin queue: ${ADMIN_URL}`,
   ].join('\n');
 
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head>
@@ -131,7 +132,7 @@ async function sendMinimalAlert(row, id) {
         <tr><td style="padding:28px 32px">
           <p style="margin:0 0 6px;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works Queue</p>
           <h1 style="margin:0 0 12px;color:#e8d5b0;font-size:26px;font-weight:400;line-height:1.25">${subject}</h1>
-          <p style="margin:0 0 22px;color:#9a8070;font-size:15px;line-height:1.55">A new request was recorded. No wallet addresses or form details are included in this email.</p>
+          <p style="margin:0 0 22px;color:#9a8070;font-size:15px;line-height:1.55">A new request was recorded. Open the admin queue to review the details.</p>
           <a href="${ADMIN_URL}" style="display:inline-block;background:#9e4f2e;color:#f5ede0;text-decoration:none;font-size:12px;letter-spacing:2px;text-transform:uppercase;padding:13px 22px;border-radius:4px">Open admin queue</a>
         </td></tr>
       </table>
