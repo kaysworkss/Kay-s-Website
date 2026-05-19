@@ -2938,12 +2938,22 @@
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
       })
       .then(function (response) {
+        return response.json().catch(function () { return {}; }).then(function (body) {
+          return { response: response, body: body };
+        });
+      })
+      .then(function (result) {
+        var response = result.response;
+        var body = result.body || {};
         if (response.ok) {
-          showStatus('\u2756 Your inquiry has been recorded. I\u2019ll be in touch within a few days \u2014 thank you.', 'success');
+          if (body.alert && body.alert.sent === false) {
+            showStatus('\u2756 Your inquiry has been recorded, but the email alert did not send. I can still review it in the admin queue.', 'warning');
+          } else {
+            showStatus('\u2756 Your inquiry has been recorded. I\u2019ll be in touch within a few days \u2014 thank you.', 'success');
+          }
           form.reset();
           return;
         }
-        return response.json().catch(function () { return {}; }).then(function (body) {
           var status = response.status;
           var err    = body.error || '';
           var errs   = body.errors;
@@ -2964,7 +2974,6 @@
           } else {
             showStatus('\u26a0 Something went wrong (error ' + status + '). Please try again or contact me directly.', 'error');
           }
-        });
       })
       .catch(function () {
         showStatus('⚠ Could not reach the server. Please check your connection and try again.', 'error');

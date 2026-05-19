@@ -680,12 +680,17 @@ els.form.addEventListener('submit', async (event) => {
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if (!res.ok) throw new Error('The claim could not be submitted. Please try again.');
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(result.error || 'The request could not be submitted. Please try again.');
     els.form.reset();
     els.form.classList.remove('show');
-    setStatus('ok', 'Request recorded. Your matching Entry Token will be reviewed and fulfilled within 24 hours.');
+    if (result.alert && result.alert.sent === false) {
+      setStatus('ok', 'Request recorded. The admin alert could not be sent, but your request is saved in the review queue.');
+    } else {
+      setStatus('ok', 'Request recorded. Your matching Entry Token will be reviewed and fulfilled within 24 hours.');
+    }
   } catch (error) {
-    setStatus('err', error.message || 'The claim could not be submitted. Please try again.');
+    setStatus('err', error.message || 'The request could not be submitted. Please try again.');
   } finally {
     els.submit.disabled = false;
     els.submit.textContent = 'Submit Request';
