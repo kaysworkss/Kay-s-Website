@@ -282,14 +282,14 @@ async function handleNotifyOutbid(req, res) {
   // 2. Format display values
   const shortOutbid = outbid_wallet.slice(0, 6) + '…' + outbid_wallet.slice(-4);
   const shortBidder = (new_bidder || '').slice(0, 6) + '…' + (new_bidder || '').slice(-4);
-  const title       = art_title || 'Àpótí Ọlọ́wẹ̀';
+  const title       = art_title || 'an Àpótí Ọlọ́wẹ̀ piece';
   const url         = auction_url || 'https://kaysworks.com/auction';
 
   // 3. Send email via Resend
   const emailBody = {
     from:    'Àpótí Ọlọ́wẹ̀ Auction <auction@mail.kaysworks.com>',
     to:      [email],
-    subject: `You've been outbid — ${new_amount} on ${title}`,
+    subject: `Ohhh — ${shortBidder} just swept in and took your crown`,
     html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -311,9 +311,9 @@ async function handleNotifyOutbid(req, res) {
           <td style="padding:24px 32px">
             <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(158,79,46,0.12);border:1px solid rgba(196,132,90,0.3);border-radius:4px">
               <tr><td style="padding:18px 20px">
-                <p style="margin:0 0 6px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#c4845a;font-family:'Georgia',serif">Outbid alert</p>
-                <p style="margin:0;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">You've been outbid at <strong style="color:#c4845a">${new_amount}</strong></p>
-                <p style="margin:8px 0 0;font-size:13px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">${shortBidder} placed a higher bid on the piece you were leading.</p>
+                <p style="margin:0 0 10px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#c4845a;font-family:'Georgia',serif">You've been outbid</p>
+                <p style="margin:0 0 8px;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">${shortBidder} just dropped <strong style="color:#c4845a">${new_amount}</strong> and took your spot.</p>
+                <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">Are you going to let that stand? The Àpótí doesn't wait for anyone — and neither does this room.</p>
               </td></tr>
             </table>
           </td>
@@ -323,18 +323,18 @@ async function handleNotifyOutbid(req, res) {
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
-                  <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Your wallet</span>
-                </td>
-                <td align="right" style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
-                  <span style="font-size:13px;color:#c4845a;font-style:italic;font-family:'Georgia',serif">${shortOutbid}</span>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
                   <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">New leading bid</span>
                 </td>
                 <td align="right" style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
                   <span style="font-size:16px;color:#e8d5b0;font-weight:600;font-family:'Georgia',serif">${new_amount}</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0">
+                  <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Bidder ahead of you</span>
+                </td>
+                <td align="right" style="padding:10px 0">
+                  <span style="font-size:13px;color:#c4845a;font-style:italic;font-family:'Georgia',serif">${shortBidder}</span>
                 </td>
               </tr>
             </table>
@@ -342,8 +342,8 @@ async function handleNotifyOutbid(req, res) {
         </tr>
         <tr>
           <td style="padding:4px 32px 32px;text-align:center">
-            <a href="${url}" style="display:inline-block;background:#9e4f2e;color:#f5ede0;text-decoration:none;font-family:'Georgia',serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 32px;border-radius:4px">Return to auction</a>
-            <p style="margin:18px 0 0;font-size:12px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">The auction is still live. You can still reclaim your lead.</p>
+            <a href="${url}" style="display:inline-block;background:#9e4f2e;color:#f5ede0;text-decoration:none;font-family:'Georgia',serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 32px;border-radius:4px">Bid back — reclaim your lead</a>
+            <p style="margin:18px 0 0;font-size:12px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">This is your moment to respond. The auction is still live.</p>
           </td>
         </tr>
         <tr>
@@ -372,6 +372,197 @@ async function handleNotifyOutbid(req, res) {
   }
 }
 
+// ── Shared helper: look up a bidder's email from collector_notifications ──────
+async function _lookupBidderEmail(wallet, auction_id) {
+  const SUPABASE_URL  = process.env.SUPABASE_URL || 'https://haijshusgcbdexfueunr.supabase.co';
+  const SUPABASE_ANON = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const sbRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/collector_notifications?wallet_address=eq.${encodeURIComponent(wallet.toLowerCase())}&auction_id=eq.${encodeURIComponent(auction_id)}&limit=1&select=email`,
+    { headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + SUPABASE_ANON } }
+  );
+  const rows = await sbRes.json();
+  return Array.isArray(rows) && rows.length > 0 ? rows[0].email : null;
+}
+
+// ── Shared helper: send via Resend ────────────────────────────────────────────
+async function _sendEmail(emailBody) {
+  const RESEND_KEY = process.env.RESEND_API_KEY;
+  if (!RESEND_KEY) throw new Error('Missing RESEND_API_KEY');
+  const res  = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(emailBody),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Resend error');
+  return data;
+}
+
+// ── Shared email shell ────────────────────────────────────────────────────────
+function _emailShell(title, badgeColor, badgeLabel, headingHtml, bodyRowsHtml, ctaHtml) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+</head>
+<body style="margin:0;padding:0;background:#1e1510;font-family:'Georgia',serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#1e1510;padding:40px 0">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#2a1c14;border:1px solid rgba(196,132,90,0.25);border-radius:6px;overflow:hidden;max-width:560px;width:100%">
+        <tr>
+          <td style="padding:28px 32px 20px;border-bottom:1px solid rgba(196,132,90,0.18)">
+            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works · Live Auction</p>
+            <h1 style="margin:0;font-family:'Georgia',serif;font-size:26px;font-weight:400;color:#e8d5b0;line-height:1.2">${title}</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 32px">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:${badgeColor};border:1px solid rgba(196,132,90,0.3);border-radius:4px">
+              <tr><td style="padding:18px 20px">
+                <p style="margin:0 0 6px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#c4845a;font-family:'Georgia',serif">${badgeLabel}</p>
+                ${headingHtml}
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        ${bodyRowsHtml}
+        <tr>
+          <td style="padding:4px 32px 32px;text-align:center">
+            ${ctaHtml}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 32px;border-top:1px solid rgba(196,132,90,0.18);text-align:center">
+            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">© Kay's Works · <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ── POST /api/game?action=notify-bid-confirm ──────────────────────────────────
+// Email sent to the bidder themselves when their bid lands (first bid or retake).
+async function handleNotifyBidConfirm(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { bidder_wallet, amount, auction_id, art_title, auction_url, is_first } = req.body || {};
+  if (!bidder_wallet || !amount) return res.status(400).json({ error: 'Missing required fields' });
+
+  let email;
+  try { email = await _lookupBidderEmail(bidder_wallet, auction_id); } catch (e) {
+    return res.status(500).json({ error: 'Supabase lookup failed: ' + e.message });
+  }
+  if (!email) return res.status(200).json({ sent: false, reason: 'No email registered' });
+
+  const title    = art_title   || 'an Àpótí Ọlọ́wẹ̀ piece';
+  const url      = auction_url || 'https://kaysworks.com/auction';
+  const subject  = is_first
+    ? `The first bid is in — and it's YOU. ${amount} on ${title}`
+    : `Crown changed. You're back on top at ${amount}`;
+  const badgeLabel = is_first ? 'First bid confirmed' : 'Lead reclaimed';
+  const heading    = is_first
+    ? `<p style="margin:0 0 8px;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">YASSS. You just made history — first bid ever, <strong style="color:#c4845a">${amount}</strong>.</p>
+       <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">The energy just shifted in this room. That's YOU at the top. Kay is doing a backflip right now. Stay sharp — this won't last without you watching.</p>`
+    : `<p style="margin:0 0 8px;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">You're back. <strong style="color:#c4845a">${amount}</strong> and the crown is yours again.</p>
+       <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">Kay sees your ${amount} and approves. You're the one to beat now. Protect that position — the room is watching.</p>`;
+  const bodyRows = `
+    <tr>
+      <td style="padding:0 32px 20px">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
+              <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Your bid</span>
+            </td>
+            <td align="right" style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
+              <span style="font-size:16px;color:#e8d5b0;font-weight:600;font-family:'Georgia',serif">${amount}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 0">
+              <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Piece</span>
+            </td>
+            <td align="right" style="padding:10px 0">
+              <span style="font-size:13px;color:#c4845a;font-style:italic;font-family:'Georgia',serif">${title}</span>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>`;
+  const cta = `<a href="${url}" style="display:inline-block;background:#9e4f2e;color:#f5ede0;text-decoration:none;font-family:'Georgia',serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 32px;border-radius:4px">Watch the room</a>
+    <p style="margin:18px 0 0;font-size:12px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">We'll email you the moment anyone tries to take your spot.</p>`;
+
+  const html = _emailShell(title, 'rgba(107,124,92,0.12)', badgeLabel, heading, bodyRows, cta);
+
+  try {
+    const data = await _sendEmail({ from: 'Àpótí Ọlọ́wẹ̀ Auction <auction@mail.kaysworks.com>', to: [email], subject, html });
+    return res.status(200).json({ sent: true, id: data.id });
+  } catch (e) {
+    return res.status(500).json({ error: 'Email send failed: ' + e.message });
+  }
+}
+
+// ── POST /api/game?action=notify-winner ───────────────────────────────────────
+// Email sent to the winning bidder when the auction settles.
+async function handleNotifyWinner(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { winner_wallet, amount, auction_id, art_title, auction_url } = req.body || {};
+  if (!winner_wallet || !amount) return res.status(400).json({ error: 'Missing required fields' });
+
+  let email;
+  try { email = await _lookupBidderEmail(winner_wallet, auction_id); } catch (e) {
+    return res.status(500).json({ error: 'Supabase lookup failed: ' + e.message });
+  }
+  if (!email) return res.status(200).json({ sent: false, reason: 'No email registered' });
+
+  const title   = art_title   || 'an Àpótí Ọlọ́wẹ̀ piece';
+  const url     = auction_url || 'https://kaysworks.com/auction';
+  const subject = `SOLD — ${amount}. ${title} is yours. Kay salutes you.`;
+
+  const heading = `<p style="margin:0 0 8px;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">🏆 The gavel falls. <strong style="color:#c9993a">${amount}</strong> — SOLD.</p>
+    <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">You own a piece of the Àpótí Ọlọ́wẹ̀ story now. Kay made this for someone like you. Welcome to the collection.</p>`;
+
+  const bodyRows = `
+    <tr>
+      <td style="padding:0 32px 20px">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
+              <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Winning bid</span>
+            </td>
+            <td align="right" style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
+              <span style="font-size:16px;color:#c9993a;font-weight:600;font-family:'Georgia',serif">${amount}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 0">
+              <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Piece</span>
+            </td>
+            <td align="right" style="padding:10px 0">
+              <span style="font-size:13px;color:#c4845a;font-style:italic;font-family:'Georgia',serif">${title}</span>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>`;
+
+  const cta = `<a href="${url}" style="display:inline-block;background:#9e4f2e;color:#f5ede0;text-decoration:none;font-family:'Georgia',serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 32px;border-radius:4px">View the settled auction</a>
+    <p style="margin:18px 0 0;font-size:12px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">Congratulations from Kay and everyone who was in that room.</p>`;
+
+  const html = _emailShell(title, 'rgba(201,153,58,0.12)', 'Auction won', heading, bodyRows, cta);
+
+  try {
+    const data = await _sendEmail({ from: 'Àpótí Ọlọ́wẹ̀ Auction <auction@mail.kaysworks.com>', to: [email], subject, html });
+    return res.status(200).json({ sent: true, id: data.id });
+  } catch (e) {
+    return res.status(500).json({ error: 'Email send failed: ' + e.message });
+  }
+}
+
 // ── POST /api/game?action=notify-bid ─────────────────────────────────────────
 // Sends a bid alert email to the site owner whenever a new bid is placed.
 async function handleNotifyBid(req, res) {
@@ -389,7 +580,7 @@ async function handleNotifyBid(req, res) {
   }
 
   const shortBidder = bidder.slice(0, 6) + '…' + bidder.slice(-4);
-  const title       = art_title  || 'Àpótí Ọlọ́wẹ̀';
+  const title       = art_title  || 'an Àpótí Ọlọ́wẹ̀ piece';
   const url         = auction_url || 'https://kaysworks.com/auction';
   const auctionRef  = auction_id  ? ` (${auction_id.slice(0, 8)}…)` : '';
 
@@ -606,8 +797,10 @@ module.exports = async (req, res) => {
     }
     else if (urlPath.includes('/hall-of-fame'))   action = 'hall-of-fame';
     else if (urlPath.includes('/crosschain-claim')) action = 'crosschain-claim';
-    else if (urlPath.includes('/notify-outbid'))  action = 'notify-outbid';
-    else if (urlPath.includes('/notify-bid'))      action = 'notify-bid';
+    else if (urlPath.includes('/notify-outbid'))      action = 'notify-outbid';
+    else if (urlPath.includes('/notify-bid-confirm')) action = 'notify-bid-confirm';
+    else if (urlPath.includes('/notify-winner'))      action = 'notify-winner';
+    else if (urlPath.includes('/notify-bid'))          action = 'notify-bid';
   }
 
   const supabase = getSupabase();
@@ -620,8 +813,10 @@ module.exports = async (req, res) => {
     case 'leaderboard':   return handleLeaderboard(req, res, supabase);
     case 'hall-of-fame':  return handleHallOfFame(req, res, supabase);
     case 'crosschain-claim': return handleCrosschainClaim(req, res, supabase);
-    case 'notify-outbid': return handleNotifyOutbid(req, res);
-    case 'notify-bid':    return handleNotifyBid(req, res);
+    case 'notify-outbid':      return handleNotifyOutbid(req, res);
+    case 'notify-bid-confirm': return handleNotifyBidConfirm(req, res);
+    case 'notify-winner':      return handleNotifyWinner(req, res);
+    case 'notify-bid':         return handleNotifyBid(req, res);
     default:
       return res.status(404).json({ error: `Unknown action: ${action}` });
   }
