@@ -3572,8 +3572,10 @@ function aucOnBid(bid, confirmed = false) {
   _aucPrevLeader = bid.bidder;
   _aucPrevHigh   = bid.amount;
 
-  // Notify owner of every new bid
-  _triggerBidAlert(bid.bidder, amt);
+  // isFirst  → bidder gets a "you're leading" confirmation email
+  // reclaimedLead → bidder previously led, got outbid, now back on top
+  const reclaimedLead = isMine && !isFirst && prevLeader && prevLeader.toLowerCase() !== bid.bidder.toLowerCase();
+  _triggerBidAlert(bid.bidder, amt, isFirst, reclaimedLead);
 
   _startIdleCheck();
 }
@@ -3587,6 +3589,19 @@ function aucOnWon(winner, amount) {
   } else {
     aucSpeak(AUCTIONEER.onSold(winner, amt), "Sold!");
   }
+  // Email the winner regardless of whether they're the connected wallet
+  try {
+    fetch("/api/notify-winner", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        winner_wallet: winner,
+        amount:        amt,
+        auction_id:    _auctionId || "",
+        art_title:     _activeCfg()?.artTitle || cfg.artTitle || "an Àpótí Ọlọ́wẹ̀ piece",
+        auction_url:   window.location.href,
+      }),
+    });
+  } catch(_) {}
 }
 
 function aucLastMinutes(secsLeft) {
@@ -4070,8 +4085,9 @@ async function _triggerOutbidNotification(outbidWallet, newAmt, newBidder) {
   } catch(_) {}
 }
 
-// Fire-and-forget bid alert to site owner on every new bid
-async function _triggerBidAlert(bidder, amount) {
+// Fire-and-forget bid alert to site owner on every new bid,
+// plus a confirmation email to the bidder themselves.
+async function _triggerBidAlert(bidder, amount, isFirst, reclaimedLead) {
   try {
     await fetch("/api/notify-bid", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -4079,11 +4095,28 @@ async function _triggerBidAlert(bidder, amount) {
         bidder,
         amount,
         auction_id:  _auctionId || "",
-        art_title:   _activeCfg()?.artTitle || cfg.artTitle || "Àpótí Ọlọ́wẹ̀",
+        art_title:   _activeCfg()?.artTitle || cfg.artTitle || "an Àpótí Ọlọ́wẹ̀ piece",
         auction_url: window.location.href,
       }),
     });
   } catch(_) {}
+
+  // Email the bidder themselves — only if they registered a notification email
+  if (isFirst || reclaimedLead) {
+    try {
+      await fetch("/api/notify-bid-confirm", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bidder_wallet: bidder,
+          amount,
+          auction_id:  _auctionId || "",
+          art_title:   _activeCfg()?.artTitle || cfg.artTitle || "an Àpótí Ọlọ́wẹ̀ piece",
+          auction_url: window.location.href,
+          is_first:    !!isFirst,
+        }),
+      });
+    } catch(_) {}
+  }
 }
 
 // ─── Presence — live visitor + eligible wallet counts ────────────────────────
