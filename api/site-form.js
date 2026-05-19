@@ -1,6 +1,6 @@
 const TABLE = process.env.FORM_TABLE || 'site_form_submissions';
 const ALERT_TO_EMAIL = process.env.FORM_ALERT_TO_EMAIL || 'oyeniyikayode4@gmail.com';
-const ALERT_FROM_EMAIL = process.env.FORM_ALERT_FROM_EMAIL || "Kay's Works Queue <forms@mail.kaysworks.com>";
+const ALERT_FROM_EMAIL = process.env.FORM_ALERT_FROM_EMAIL || "Kay's Works Queue <auction@mail.kaysworks.com>";
 const ADMIN_URL = process.env.FORM_ADMIN_URL || 'https://www.kaysworks.com/claim-admin';
 
 function setHeaders(res) {
@@ -110,7 +110,7 @@ function alertLabel(formType) {
 
 async function sendMinimalAlert(row, id) {
   const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) return { skipped: true, reason: 'RESEND_API_KEY missing' };
+  if (!resendKey) throw new Error('RESEND_API_KEY missing');
 
   const label = alertLabel(row.form_type);
   const subject = `New ${label}`;
@@ -176,11 +176,11 @@ async function handleCreate(req, res) {
   const id = inserted && inserted[0] && inserted[0].id;
   let alert = { sent: false };
   try {
-    await sendMinimalAlert(row, id);
-    alert = { sent: true };
+    const alertData = await sendMinimalAlert(row, id);
+    alert = { sent: true, id: alertData && alertData.id };
   } catch (error) {
     console.error('Queue alert failed:', error.message);
-    alert = { sent: false };
+    alert = { sent: false, error: error.message };
   }
   return res.status(200).json({ ok: true, id, alert });
 }
