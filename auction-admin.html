@@ -1621,12 +1621,13 @@ function _savePieceFormValues(idx) {
   });
   _pieces[idx].chain = _pieces[idx].chain === "tezos" ? "tezos" : "eth";
   _pieces[idx].status = _normalisePieceStatus(_pieces[idx].status);
+  _ensurePieceId(_pieces[idx]);
 }
 
 function addPiece() {
   const selectedRefs = _capturePieceSelectRefs();
   _savePieceFormValues(_activePieceIdx);
-  _pieces.push({});
+  _pieces.push({ pieceId: _newPieceId() });
   _activePieceIdx = _pieces.length - 1;
   _renderPieceTabs();
   _populateHofSelect(selectedRefs);
@@ -1650,7 +1651,56 @@ function removePiece(idx) {
 function _readAllPieces() {
   _savePieceFormValues(_activePieceIdx);
   _pieces.forEach(p => { p.status = _normalisePieceStatus(p.status); });
+  _ensurePieceIds();
   return _pieces;
+}
+
+function _newPieceId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return "piece-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+}
+
+function _ensurePieceId(piece) {
+  if (!piece) return "";
+  const current = String(piece.pieceId || "").trim();
+  piece.pieceId = current || _newPieceId();
+  return piece.pieceId;
+}
+
+function _ensurePieceIds() {
+  _pieces.forEach(_ensurePieceId);
+}
+
+function _soldSlug(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+function _pieceSoldKeys(piece, idx) {
+  if (!piece) return [];
+  const keys = [];
+  const add = value => {
+    value = String(value || "").trim();
+    if (value && !keys.includes(value)) keys.push(value);
+  };
+  const pieceId = _ensurePieceId(piece);
+  add("piece-" + pieceId);
+  if (piece.crossChainPairKey) add("pair-" + _soldSlug(piece.crossChainPairKey));
+  if (piece.contractAddr) add(piece.contractAddr.toLowerCase());
+  if (piece.tezosContractAddr && piece.tezosAuctionId) {
+    add(("tezos-" + piece.tezosContractAddr + "-" + piece.tezosAuctionId).toLowerCase());
+  }
+  if (piece.tezosContractAddr) add(piece.tezosContractAddr.toLowerCase());
+
+  // Title alias keeps unsaved legacy pieces stable across reordering; the
+  // index alias is the old format, kept so Remove can clean existing rows.
+  const artTitle = piece.artTitle || "Piece " + (idx + 1);
+  if (piece.artTitle) add("manual-" + _soldSlug(artTitle).slice(0, 40));
+  add("manual-" + _soldSlug(artTitle).slice(0, 40) + "-" + idx);
+  return keys;
 }
 
 function populateForm(cfg) {
@@ -1679,8 +1729,9 @@ function populateForm(cfg) {
       gateLink:     cfg.gateLink     || "",
     }];
   } else {
-    _pieces = [{}];
+    _pieces = [{ pieceId: _newPieceId() }];
   }
+  _ensurePieceIds();
   _activePieceIdx = 0;
   _renderPieceTabs();
 
@@ -2775,9 +2826,7 @@ async function setSoldOverride(sold) {
   // Stable piece key — uses contract address if present, else title+index slug.
   // Stored in the SEPARATE `sold_overrides` table, never in auction_results,
   // so it cannot accidentally appear in the Hall of Fame.
-  const pieceKey = piece.contractAddr
-    ? piece.contractAddr.toLowerCase()
-    : "manual-" + artTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40) + "-" + pieceIdx;
+  const pieceKeys = _pieceSoldKeys(piece, pieceIdx);
 
   statusEl.className = "hof-status"; statusEl.textContent = "Saving override…";
 
@@ -2791,24 +2840,27 @@ async function setSoldOverride(sold) {
           "Content-Type": "application/json",
           "Prefer": "resolution=merge-duplicates,return=minimal"
         },
-        body: JSON.stringify({ piece_key: pieceKey, art_title: artTitle, updated_at: new Date().toISOString() }),
+        body: JSON.stringify(pieceKeys.map(pieceKey => ({
+          piece_key: pieceKey,
+          art_title: artTitle,
+          updated_at: new Date().toISOString()
+        }))),
       });
       if (!res.ok) throw new Error("Supabase error: " + await res.text());
     } else {
-      // Delete from sold_overrides
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/sold_overrides?piece_key=eq.${encodeURIComponent(pieceKey)}`,
-        {
+      // Delete current and legacy aliases from sold_overrides
+      for (const pieceKey of pieceKeys) {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/sold_overrides?piece_key=eq.${encodeURIComponent(pieceKey)}`, {
           method: "DELETE",
           headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON }
-        }
-      );
-      if (!res.ok) throw new Error("Supabase error: " + await res.text());
+        });
+        if (!res.ok) throw new Error("Supabase error: " + await res.text());
+      }
     }
 
     statusEl.className   = "hof-status ok";
     statusEl.textContent = sold
-      ? `✓ "${artTitle}" marked as Sold — badge will appear on the auction page`
+      ? `✓ "${artTitle}" marked as Sold — badge will follow this piece if you rearrange it`
       : `✓ Sold badge removed from "${artTitle}"`;
     toast("ok", sold ? "Marked as Sold" : "Sold badge removed", artTitle);
   } catch(e) {
