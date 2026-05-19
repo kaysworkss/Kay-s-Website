@@ -1304,6 +1304,7 @@ function _reorderPiece(fromIdx, toIdx) {
   if (!_pieces.length) return false;
   if (fromIdx < 0 || toIdx < 0 || fromIdx >= _pieces.length || toIdx >= _pieces.length || fromIdx === toIdx) return false;
 
+  const selectedRefs = _capturePieceSelectRefs();
   _savePieceFormValues(_activePieceIdx);
 
   const moved = _pieces.splice(fromIdx, 1)[0];
@@ -1319,6 +1320,7 @@ function _reorderPiece(fromIdx, toIdx) {
 
   _dragSrcIdx = null;
   _renderPieceTabs();
+  _populateHofSelect(selectedRefs);
   toast("ok", "Reordered", "Save to publish the new order");
   return true;
 }
@@ -1420,9 +1422,11 @@ function _initTabDrag(container) {
 
 function selectPiece(idx) {
   // Save current form values before switching
+  const selectedRefs = _capturePieceSelectRefs();
   _savePieceFormValues(_activePieceIdx);
   _activePieceIdx = idx;
   _renderPieceTabs();
+  _populateHofSelect(selectedRefs);
 }
 
 // ─── Rich-text editor helpers ────────────────────────────────────────────────
@@ -1620,19 +1624,27 @@ function _savePieceFormValues(idx) {
 }
 
 function addPiece() {
+  const selectedRefs = _capturePieceSelectRefs();
   _savePieceFormValues(_activePieceIdx);
   _pieces.push({});
   _activePieceIdx = _pieces.length - 1;
   _renderPieceTabs();
+  _populateHofSelect(selectedRefs);
 }
 
 function removePiece(idx) {
   if (_pieces.length <= 1) return;
   if (!confirm("Remove this piece from the auction?")) return;
+  const selectedRefs = _capturePieceSelectRefs();
   _savePieceFormValues(idx);
+  const removed = _pieces[idx];
   _pieces.splice(idx, 1);
   _activePieceIdx = Math.min(_activePieceIdx, _pieces.length - 1);
   _renderPieceTabs();
+  Object.keys(selectedRefs).forEach(k => {
+    if (selectedRefs[k] === removed) selectedRefs[k] = _pieces[_activePieceIdx] || _pieces[0] || null;
+  });
+  _populateHofSelect(selectedRefs);
 }
 
 function _readAllPieces() {
@@ -1680,15 +1692,39 @@ function populateForm(cfg) {
   _showPreviewCard();
 }
 
-function _populateHofSelect() {
+function _capturePieceSelectRefs() {
+  return {
+    hof: _pieces[parseInt(document.getElementById("hof-piece-select")?.value || "0", 10)] || null,
+    tezos: _pieces[parseInt(document.getElementById("tez-hof-piece-select")?.value || "0", 10)] || null,
+    sold: _pieces[parseInt(document.getElementById("sold-override-piece")?.value || "0", 10)] || null,
+  };
+}
+
+function _restorePieceSelectRef(selectId, ref) {
+  const sel = document.getElementById(selectId);
+  if (!sel || !ref) return;
+  const idx = _pieces.indexOf(ref);
+  if (idx >= 0) sel.value = String(idx);
+}
+
+function _escapeOptionText(value) {
+  const div = document.createElement("div");
+  div.textContent = value == null ? "" : String(value);
+  return div.innerHTML;
+}
+
+function _populateHofSelect(selectedRefs = {}) {
   const sel        = document.getElementById("hof-piece-select");
   const tezSel     = document.getElementById("tez-hof-piece-select");
   const field      = document.getElementById("hof-piece-field");
   const soldSel    = document.getElementById("sold-override-piece");
-  const opts       = _pieces.map((p, i) => `<option value="${i}">${p.artTitle || "Piece " + (i+1)}</option>`).join("");
+  const opts       = _pieces.map((p, i) => `<option value="${i}">${_escapeOptionText(p.artTitle || "Piece " + (i+1))}</option>`).join("");
   if (sel)     sel.innerHTML    = opts;
   if (tezSel)  tezSel.innerHTML = opts;
   if (soldSel) soldSel.innerHTML = opts;
+  _restorePieceSelectRef("hof-piece-select", selectedRefs.hof);
+  _restorePieceSelectRef("tez-hof-piece-select", selectedRefs.tezos);
+  _restorePieceSelectRef("sold-override-piece", selectedRefs.sold);
   if (field)   field.style.display = _pieces.length > 1 ? "block" : "none";
 }
 
@@ -2919,4 +2955,3 @@ function toast(type, title, body) {
 </script>
 </body>
 </html>
-
