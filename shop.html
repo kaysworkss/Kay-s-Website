@@ -1117,8 +1117,8 @@ footer a:hover { color:var(--rust); }
           <button class="submit-pay-btn" id="flutterwavePayBtn">Pay with Flutterwave</button>
         </div>
 
-        <!-- Crypto panel -->
-        <div class="pay-panel" id="panel-crypto">
+        <!-- ETH/Crypto panel -->
+        <div class="pay-panel" id="panel-eth">
           <p class="pay-info">Send the exact amount in <strong>USD equivalent</strong> to one of the addresses below, then confirm your transfer using the button.</p>
           <div id="cryptoOptions"></div>
           <button class="submit-pay-btn" id="cryptoConfirmBtn">I've sent the payment</button>
@@ -2032,10 +2032,8 @@ function buildOrderSummary() {
 function buildCryptoOptions() {
   const usd     = grandTotalUsd();
   const ethRate = 0.00033;
-  const xtzRate = 0.33;
   const ethAmt  = (usd * ethRate).toFixed(5);
   const usdcAmt = usd.toFixed(2);
-  const xtzAmt  = (usd * xtzRate).toFixed(4);
 
   let html = '';
 
@@ -2044,11 +2042,8 @@ function buildCryptoOptions() {
     html += cryptoBlock('USDC · ERC-20',           `${usdcAmt} USDC`,     SHOP_CONFIG.ethAddress);
     html += cryptoBlock('USDT · ERC-20',           `${usdcAmt} USDT`,     SHOP_CONFIG.ethAddress);
   }
-  if (SHOP_CONFIG.tezosAddress) {
-    html += cryptoBlock('XTZ · Tezos',             `${xtzAmt} XTZ`,       SHOP_CONFIG.tezosAddress);
-  }
 
-  if (!html) html = `<p class="pay-info" style="color:var(--clay)">Crypto addresses not configured yet. Contact Kay directly.</p>`;
+  if (!html) html = `<p class="pay-info" style="color:var(--clay)">ETH address not configured. Contact Kay directly or use the Tezos tab.</p>`;
   document.getElementById('cryptoOptions').innerHTML = html;
 
   // Copy buttons
@@ -2123,7 +2118,7 @@ function showConfirmation(method, ref) {
   const screen = document.getElementById('confirmScreen');
   screen.classList.add('active');
   document.getElementById('confirmMsg').textContent =
-    (method === 'crypto' || method === 'tezos' || method === 'eth')
+    (method === 'eth' || method === 'tezos' || method === 'crypto')
       ? 'Your payment details have been received. Kay will confirm once the transaction is verified on-chain — usually within 30 minutes.'
       : 'Thank you for your order. Kay will confirm fulfilment within 24 hours — check your inbox for a receipt.';
   document.getElementById('confirmRef').textContent = ref ? 'Reference: ' + ref : '';
@@ -2690,16 +2685,34 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
 });
 
 /* ─── Tezos / Beacon payment ─── */
-// Uses the Beacon SDK loaded from the taquito-bundle or unpkg.
-// We load it lazily only when the Tezos panel is first activated.
+// Robust Beacon connection — matches the working burn-redeem.html pattern.
+// Supports Temple (desktop extension), Beacon QR (mobile), and clean retry.
 
-let _beaconClient = null;
-let _tezosWallet  = null;
 let _tezosConnectedAddr = null;
-const XTZ_PER_USD = 0.33; // rough rate — swap for live fetch if desired
+let _tezosBeaconClient  = null;
+let _tezosWalletProvider = null;
+let _tezosConnecting = false;
+let _xtzPerUsd = null; // set by live fetch only — null until resolved
+
+/* ── Tezos rate: fetch live XTZ/USD from CoinGecko ── */
+(async function fetchXtzRate() {
+  try {
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tezos&vs_currencies=usd');
+    if (!r.ok) return;
+    const data = await r.json();
+    const usdPerXtz = data?.tezos?.usd;
+    if (usdPerXtz && usdPerXtz > 0) {
+      _xtzPerUsd = 1 / usdPerXtz;
+      // If the Tezos panel is already open, refresh the displayed amount
+      const panel = document.getElementById('panel-tezos');
+      if (panel && panel.classList.contains('active')) renderTezosPanel();
+    }
+  } catch(_) {}
+})();
 
 function tezosXtzAmount() {
-  return (grandTotalUsd() * XTZ_PER_USD).toFixed(4);
+  if (!_xtzPerUsd) return null; // rate not yet available
+  return (grandTotalUsd() * _xtzPerUsd).toFixed(4);
 }
 
 function tezosShortAddr(addr) {
@@ -2707,33 +2720,189 @@ function tezosShortAddr(addr) {
   return addr.slice(0,6) + '…' + addr.slice(-4);
 }
 
-async function loadBeacon() {
-  if (window.beacon) return window.beacon;
-  await new Promise((res, rej) => {
-    const s = document.createElement('script');
-    s.src = 'https://unpkg.com/@airgap/beacon-sdk@4.3.0/dist/beacon-sdk.min.js';
-    s.onload = res; s.onerror = rej;
-    document.head.appendChild(s);
-  });
-  return window.beacon || window['@airgap/beacon-sdk'];
+/* ── Scan all known global names for a loaded Beacon SDK ── */
+async function getBeaconSdkForShop() {
+  const candidates = [
+    window.beacon, window.walletbeacon, window.beaconSdk,
+    window.airgapBeaconSdk, window.beacon_sdk, window.Beacon, window.BeaconSDK
+  ];
+  for (const c of candidates) {
+    if (c && typeof c.DAppClient === 'function') return c;
+  }
+  // Sweep window for any object exposing DAppClient
+  for (const key of Object.keys(window)) {
+    const val = window[key];
+    if (val && typeof val === 'object' && typeof val.DAppClient === 'function') return val;
+  }
+  return null;
 }
 
-async function initBeaconClient() {
-  if (_beaconClient) return _beaconClient;
-  const sdk = await loadBeacon();
-  const BeaconWallet = sdk?.BeaconWallet || sdk?.DAppClient;
-  _beaconClient = new BeaconWallet({
+/* ── Lazy-load Beacon SDK (only one copy — avoids the double-register bug) ── */
+let _beaconSdkLoadPromise = null;
+async function loadBeaconSdk() {
+  // First try already-loaded globals (Taquito bundle bundles Beacon)
+  let sdk = await getBeaconSdkForShop();
+  if (sdk) return sdk;
+
+  // Load from CDN exactly once
+  if (!_beaconSdkLoadPromise) {
+    _beaconSdkLoadPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://unpkg.com/@airgap/beacon-sdk@4.3.0/dist/beacon-sdk.min.js';
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  await _beaconSdkLoadPromise;
+  return await getBeaconSdkForShop();
+}
+
+function beaconShopNetworkConfig(sdk) {
+  const networkTypes = sdk?.NetworkType || {};
+  const type = networkTypes.MAINNET || 'mainnet';
+  return { type }; // do NOT set rpcUrl on mainnet — wallets reject pairing
+}
+
+function beaconShopMatrixNodes(sdk) {
+  const regions = sdk?.Regions || {};
+  const region = regions.EUROPE_WEST || 'EUROPE_WEST';
+  return {
+    [region]: [
+      'beacon-node-1.octez.io','beacon-node-2.octez.io','beacon-node-3.octez.io',
+      'beacon-node-4.octez.io','beacon-node-5.octez.io','beacon-node-6.octez.io',
+      'beacon-node-7.octez.io','beacon-node-8.octez.io'
+    ]
+  };
+}
+
+function makeShopBeaconClient(DAppClient, sdk) {
+  return new DAppClient({
     name: "Kay's Works Shop",
-    network: { type: 'mainnet' },
+    iconUrl: location.origin + '/images/kaysworkslogo.svg',
+    appUrl: location.origin,
+    network: beaconShopNetworkConfig(sdk),
+    featuredWallets: ['temple', 'kukai', 'trust'],
+    matrixNodes: beaconShopMatrixNodes(sdk),
   });
-  return _beaconClient;
 }
 
+async function resetShopBeaconClient(client) {
+  if (!client) return;
+  for (const fn of ['removeAllAccounts','clearActiveAccount','setActiveAccount','destroy']) {
+    try { await client[fn]?.(); } catch(_) {}
+  }
+}
+
+/* ── Normalise wallet-param objects (Taquito compat) ── */
+function resolveBeaconShopParams(p) {
+  return Promise.resolve(typeof p === 'function' ? p() : p).then(op => {
+    if (!op || typeof op !== 'object') return op;
+    const out = { ...op };
+    if (!out.kind) out.kind = (out.to || out.destination) ? 'transaction' : out.kind;
+    if (out.to && !out.destination) out.destination = out.to;
+    delete out.to;
+    return out;
+  });
+}
+
+/* ── Build a minimal wallet provider backed by the Beacon DAppClient ── */
+function beaconShopProvider(client, address) {
+  return {
+    _client: client,
+    _address: address,
+    getPKH: () => Promise.resolve(address),
+    mapTransferParamsToWalletParams: resolveBeaconShopParams,
+    mapOriginateParamsToWalletParams: async p => ({ kind: 'origination', ...(await resolveBeaconShopParams(p)) }),
+    mapDelegateParamsToWalletParams: resolveBeaconShopParams,
+    sendOperations: async ops => {
+      const operationDetails = (await Promise.all(ops.map(resolveBeaconShopParams))).filter(Boolean);
+      if (!operationDetails.length) throw new Error('No operation payload.');
+      const response = await client.requestOperation({ operationDetails });
+      const opHash = response?.transactionHash || response?.opHash || response?.hash
+                  || (typeof response === 'string' ? response : '');
+      if (!opHash) throw new Error('Beacon approved but returned no operation hash.');
+      return opHash;
+    },
+  };
+}
+
+/* ── Single Beacon connect attempt ── */
+async function beaconShopConnectAttempt(DAppClient, sdk, resetFirst) {
+  if (resetFirst) {
+    await resetShopBeaconClient(_tezosBeaconClient);
+    _tezosBeaconClient = null;
+  }
+  const client = _tezosBeaconClient || makeShopBeaconClient(DAppClient, sdk);
+  _tezosBeaconClient = client;
+
+  const scopes = sdk?.PermissionScope
+    ? [sdk.PermissionScope.OPERATION_REQUEST, sdk.PermissionScope.SIGN].filter(Boolean)
+    : ['operation_request', 'sign'];
+
+  let permission;
+  try {
+    permission = await client.requestPermissions({ scopes });
+  } catch (e) {
+    const msg = e?.message || String(e);
+    if (/not accepted|invalid|unknown|unexpected/i.test(msg)) {
+      permission = await client.requestPermissions(); // retry without scopes
+    } else throw e;
+  }
+
+  const account = await client.getActiveAccount?.();
+  const address = permission?.address || account?.address;
+  if (!address) throw new Error('Beacon connected but returned no address.');
+  return { client, address };
+}
+
+/* ── Full connect flow (with clean-session retry) ── */
+async function tezosConnectWallet() {
+  if (_tezosConnectedAddr || _tezosConnecting) return;
+  _tezosConnecting = true;
+
+  const btn = document.getElementById('tezosConnectBtn');
+  btn.disabled = true; btn.textContent = 'Opening wallet…';
+
+  try {
+    const sdk = await loadBeaconSdk();
+    const DAppClient = sdk?.DAppClient;
+    if (typeof DAppClient !== 'function') throw new Error('Beacon SDK not available.');
+
+    let result;
+    try {
+      result = await beaconShopConnectAttempt(DAppClient, sdk, false);
+    } catch (firstErr) {
+      const msg = firstErr?.message || String(firstErr);
+      if (/reject|cancel|denied|aborted/i.test(msg)) throw firstErr; // user cancelled
+      // Try again with a clean session
+      btn.textContent = 'Retrying…';
+      result = await beaconShopConnectAttempt(DAppClient, sdk, true);
+    }
+
+    _tezosConnectedAddr  = result.address;
+    _tezosWalletProvider = beaconShopProvider(result.client, result.address);
+    renderTezosPanel();
+    showToast('Wallet connected ✦');
+
+  } catch (e) {
+    const msg = e?.message || String(e);
+    if (/reject|cancel|denied|aborted/i.test(msg)) {
+      showToast('Wallet connection cancelled');
+    } else {
+      showToast('Could not connect wallet — try again');
+      console.error('[Tezos] connect error:', e);
+    }
+  } finally {
+    _tezosConnecting = false;
+    btn.disabled = false; btn.textContent = 'Connect Tezos Wallet';
+  }
+}
+
+/* ── Render the Tezos panel ── */
 function renderTezosPanel() {
   const addr = SHOP_CONFIG.tezosAddress;
-  const xtz  = tezosXtzAmount();
+  const xtz  = tezosXtzAmount(); // null until rate loads
 
-  // Amount + address block
   const amtBlock  = document.getElementById('tezosAmountBlock');
   const toAddrEl  = document.getElementById('tezosToAddr');
   const xtzAmtEl  = document.getElementById('tezosXtzAmount');
@@ -2742,13 +2911,13 @@ function renderTezosPanel() {
   if (addr) {
     amtBlock.style.display = '';
     toAddrEl.textContent   = addr;
-    xtzAmtEl.textContent   = xtz + ' XTZ';
-    if (sendAmtEl) sendAmtEl.textContent = xtz;
+    xtzAmtEl.textContent   = xtz !== null ? xtz + ' XTZ' : 'Fetching rate…';
+    if (sendAmtEl) sendAmtEl.textContent = xtz !== null ? xtz + ' XTZ' : '…';
   } else {
     amtBlock.style.display = 'none';
   }
 
-  // Copy address button
+  // Copy button
   const copyBtn = document.getElementById('tezosCopyBtn');
   if (copyBtn) {
     copyBtn.onclick = () => {
@@ -2759,12 +2928,13 @@ function renderTezosPanel() {
     };
   }
 
-  // Wallet info row
+  // Wallet connection state
   if (_tezosConnectedAddr) {
     document.getElementById('tezosWalletInfo').style.display = '';
     document.getElementById('tezosWalletAddr').textContent = tezosShortAddr(_tezosConnectedAddr);
     document.getElementById('tezosConnectBtn').style.display = 'none';
-    document.getElementById('tezosSendBtn').style.display = addr ? '' : 'none';
+    // Only show Send button once the rate is known
+    document.getElementById('tezosSendBtn').style.display = (addr && xtz !== null) ? '' : 'none';
   } else {
     document.getElementById('tezosWalletInfo').style.display = 'none';
     document.getElementById('tezosConnectBtn').style.display = '';
@@ -2772,69 +2942,60 @@ function renderTezosPanel() {
   }
 }
 
-// Connect wallet
-document.getElementById('tezosConnectBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('tezosConnectBtn');
-  btn.disabled = true; btn.textContent = 'Connecting…';
-  try {
-    const client = await initBeaconClient();
-    // Request permissions triggers wallet popup
-    await client.requestPermissions({ network: { type: 'mainnet' } });
-    const accs = await client.getActiveAccount();
-    _tezosConnectedAddr = accs?.address || null;
-    if (!_tezosConnectedAddr) throw new Error('No account returned');
-    renderTezosPanel();
-    showToast('Wallet connected ✦');
-  } catch (e) {
-    showToast('Could not connect wallet');
-    console.error('Beacon connect error:', e);
-  } finally {
-    btn.disabled = false; btn.textContent = 'Connect Tezos Wallet';
-  }
-});
+// Connect wallet button
+document.getElementById('tezosConnectBtn').addEventListener('click', tezosConnectWallet);
 
 // Disconnect
 document.getElementById('tezosDisconnectBtn').addEventListener('click', async () => {
   try {
-    if (_beaconClient) await _beaconClient.clearActiveAccount();
+    await resetShopBeaconClient(_tezosBeaconClient);
   } catch(_) {}
-  _tezosConnectedAddr = null;
+  _tezosBeaconClient  = null;
+  _tezosWalletProvider = null;
+  _tezosConnectedAddr  = null;
   renderTezosPanel();
+  showToast('Wallet disconnected');
 });
 
-// Send XTZ via wallet
+// Send XTZ via connected wallet
 document.getElementById('tezosSendBtn').addEventListener('click', async () => {
   if (!validateForm()) return;
   const toAddr = SHOP_CONFIG.tezosAddress;
   if (!toAddr) { showToast('Tezos address not configured'); return; }
-  if (!_tezosConnectedAddr) { showToast('Please connect your wallet first'); return; }
+  if (!_tezosConnectedAddr || !_tezosWalletProvider) {
+    showToast('Please connect your wallet first'); return;
+  }
+  const xtzAmt = tezosXtzAmount();
+  if (!xtzAmt) { showToast('XTZ rate still loading — try again in a moment'); return; }
 
   const btn = document.getElementById('tezosSendBtn');
   btn.disabled = true; btn.textContent = 'Waiting for wallet…';
 
   try {
-    const client  = await initBeaconClient();
-    const mutez   = Math.round(parseFloat(tezosXtzAmount()) * 1_000_000);
-    const result  = await client.requestOperation({
-      operationDetails: [{
-        kind: 'transaction',
-        amount: String(mutez),
-        destination: toAddr,
-      }],
-    });
-    const ref = 'KW-XTZ-' + (result.transactionHash || Date.now());
+    const mutez = String(Math.round(parseFloat(xtzAmt) * 1_000_000));
+    const opHash = await _tezosWalletProvider.sendOperations([{
+      kind: 'transaction',
+      amount: mutez,
+      destination: toAddr,
+    }]);
+    const ref = 'KW-XTZ-' + (opHash || Date.now());
     const d = getFormData();
     notifyOrder(d, ref, 'tezos');
     showConfirmation('tezos', ref);
   } catch (e) {
-    showToast('Transaction failed or cancelled');
-    console.error('Beacon send error:', e);
+    const msg = e?.message || String(e);
+    if (/reject|cancel|denied|aborted/i.test(msg)) {
+      showToast('Transaction cancelled');
+    } else {
+      showToast('Transaction failed — check wallet and try again');
+      console.error('[Tezos] send error:', e);
+    }
   } finally {
     btn.disabled = false; btn.textContent = 'Send ' + tezosXtzAmount() + ' XTZ';
   }
 });
 
-// Manual confirm (fallback for Temple / Kukai desktop)
+// Manual confirm (fallback — user sent from wallet app directly)
 document.getElementById('tezosManualBtn').addEventListener('click', () => {
   if (!validateForm()) return;
   const d = getFormData();
@@ -2845,14 +3006,12 @@ document.getElementById('tezosManualBtn').addEventListener('click', () => {
 
 // Re-render Tezos panel whenever that tab becomes active
 const _origSwitchPayTab = switchPayTab;
-// Patch switchPayTab to trigger Tezos render
 const _patchedSwitch = function(tab) {
   _origSwitchPayTab(tab);
   if (tab === 'tezos') renderTezosPanel();
 };
-// Replace all tab click handlers with patched version
 document.querySelectorAll('.pay-tab').forEach(t => {
-  t.replaceWith(t.cloneNode(true)); // remove old listener
+  t.replaceWith(t.cloneNode(true));
 });
 document.querySelectorAll('.pay-tab').forEach(t => {
   t.addEventListener('click', () => _patchedSwitch(t.dataset.pay));
