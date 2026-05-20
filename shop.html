@@ -1112,7 +1112,7 @@ footer a:hover { color:var(--rust); }
         <div class="pay-panel" id="panel-eth">
           <p class="pay-info">Send the exact amount in <strong>USD equivalent</strong> to one of the addresses below, then confirm your transfer using the button.</p>
           <div id="cryptoOptions"></div>
-          <button class="submit-pay-btn" id="cryptoConfirmBtn">I've sent the payment</button>
+          <button class="submit-pay-btn" id="cryptoConfirmBtn" style="display:none">I've sent the payment</button>
         </div>
 
         <!-- Tezos panel -->
@@ -1134,7 +1134,7 @@ footer a:hover { color:var(--rust); }
             </div>
             <button class="submit-pay-btn" id="tezosConnectBtn" style="background:#1a4a6e;margin-bottom:0.7rem">Connect Tezos Wallet</button>
             <button class="submit-pay-btn" id="tezosSendBtn" style="display:none">Send <span id="tezosSendAmt"></span> XTZ</button>
-            <button class="submit-pay-btn" id="tezosManualBtn" style="background:transparent;border:1px solid rgba(90,192,245,0.3);color:#5ac0f5;margin-top:0.5rem">I've sent manually — confirm</button>
+            <button class="submit-pay-btn" id="tezosManualBtn" style="display:none;background:transparent;border:1px solid rgba(90,192,245,0.3);color:#5ac0f5;margin-top:0.5rem">I've sent manually — confirm</button>
           </div>
         </div>
 
@@ -2684,12 +2684,19 @@ let _tezosWalletProvider = null;
 let _tezosConnecting = false;
 let _xtzPerUsd = null; // set by fetchCryptoRates()
 
-/* ── Fetch ETH + XTZ prices from Binance (fast, no auth, no rate limit for simple tickers) ──
-   Falls back to CoinGecko if Binance is unreachable.
-   Both rates are fetched in parallel so neither blocks the other.                              */
+/* ── Fetch ETH + XTZ prices ──
+   Strategy: race Binance and CoinGecko simultaneously — whichever responds
+   first wins. Each source has a hard 3 s timeout so we never hang.          */
 (async function fetchCryptoRates() {
+  function withTimeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
+    ]);
+  }
   async function binancePrice(symbol) {
-    const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
+    const r = await withTimeout(
+      fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`), 3000);
     if (!r.ok) throw new Error('binance ' + r.status);
     const d = await r.json();
     const p = parseFloat(d.price);
@@ -2697,17 +2704,22 @@ let _xtzPerUsd = null; // set by fetchCryptoRates()
     return p;
   }
   async function coingeckoPrice(id) {
-    const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`);
+    const r = await withTimeout(
+      fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`), 3000);
     if (!r.ok) throw new Error('coingecko ' + r.status);
     const d = await r.json();
     const p = d?.[id]?.usd;
     if (!p || p <= 0) throw new Error('bad price');
     return p;
   }
+  // Race both sources — first valid price wins, loser is silently discarded
   async function getPrice(binanceSymbol, coingeckoId) {
-    try { return await binancePrice(binanceSymbol); } catch(_) {}
-    try { return await coingeckoPrice(coingeckoId); } catch(_) {}
-    return null;
+    try {
+      return await Promise.any([
+        binancePrice(binanceSymbol),
+        coingeckoPrice(coingeckoId),
+      ]);
+    } catch(_) { return null; }
   }
 
   const [ethPrice, xtzPrice] = await Promise.all([
@@ -2717,15 +2729,19 @@ let _xtzPerUsd = null; // set by fetchCryptoRates()
 
   if (ethPrice) {
     window._ethUsdPrice = ethPrice;
-    // Refresh ETH panel if open
     const ethPanel = document.getElementById('panel-eth');
     if (ethPanel && ethPanel.classList.contains('active')) buildCryptoOptions();
+    // Reveal the ETH manual confirm button now that rate is known
+    const ethManual = document.getElementById('cryptoConfirmBtn');
+    if (ethManual) ethManual.style.display = '';
   }
   if (xtzPrice) {
     _xtzPerUsd = 1 / xtzPrice;
-    // Refresh Tezos panel if open
     const xtzPanel = document.getElementById('panel-tezos');
     if (xtzPanel && xtzPanel.classList.contains('active')) renderTezosPanel();
+    // Reveal the Tezos manual confirm button now that rate is known
+    const xtzManual = document.getElementById('tezosManualBtn');
+    if (xtzManual) xtzManual.style.display = '';
   }
 })();
 
