@@ -1,0 +1,2713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Shop · Kay's Works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet"/>
+
+<style>
+/* ── Reset ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+a{color:inherit;text-decoration:none;-webkit-tap-highlight-color:transparent}
+button{-webkit-tap-highlight-color:transparent;cursor:pointer}
+img{display:block;max-width:100%}
+
+/* ── Tokens ── */
+:root {
+  --clay:      #c4845a;
+  --rust:      #9e4f2e;
+  --sand:      #e8d5b0;
+  --linen:     #f5ede0;
+  --bark:      #4a3228;
+  --ash:       #8a7060;
+  --gold:      #c9993a;
+  --parchment: #ede0c8;
+  --bg:        var(--linen);
+  --bg-alt:    var(--parchment);
+  --bg-card:   #fff;
+  --text:      var(--bark);
+  --text-muted: var(--ash);
+  --border:    rgba(74,50,40,0.12);
+  --border-hover: rgba(196,132,90,0.45);
+  --nav-scrolled: rgba(245,237,224,0.94);
+  --shadow:    0 2px 24px rgba(74,50,40,0.09);
+  --shadow-hover: 0 8px 40px rgba(74,50,40,0.15);
+}
+body.dark {
+  --bg:        #141010;
+  --bg-alt:    #1e1510;
+  --bg-card:   #1e1510;
+  --text:      #e8d5b0;
+  --text-muted: #b09888;
+  --border:    rgba(196,132,90,0.12);
+  --border-hover: rgba(196,132,90,0.5);
+  --nav-scrolled: rgba(20,16,16,0.94);
+  --shadow:    0 2px 24px rgba(0,0,0,0.35);
+  --shadow-hover: 0 8px 40px rgba(0,0,0,0.5);
+}
+
+/* ── Base ── */
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Crimson Pro', serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.4s, color 0.4s;
+  min-height: 100vh;
+}
+
+/* ── Noise overlay ── */
+body::before {
+  content:'';pointer-events:none;position:fixed;inset:0;z-index:0;opacity:0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Nav ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 clamp(1.2rem,4vw,3rem);
+  height: 60px;
+  background: transparent;
+  transition: background 0.4s, backdrop-filter 0.4s;
+}
+nav.scrolled {
+  background: var(--nav-scrolled);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+  font-family: 'Cinzel', serif;
+  font-size: 0.78rem; letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--gold);
+}
+.nav-right { display: flex; align-items: center; gap: 1.4rem; }
+.nav-links { display: flex; gap: 1.4rem; }
+.nav-links a {
+  font-family: 'Crimson Pro', serif; font-size: 0.92rem;
+  color: var(--text); opacity: 0.78;
+  transition: opacity 0.2s, color 0.2s;
+}
+.nav-links a:hover, .nav-links a.active { opacity: 1; color: var(--rust); }
+.theme-btn {
+  background: none; border: none;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gold); font-size: 1rem; border-radius: 50%;
+  transition: background 0.2s;
+}
+.theme-btn:hover { background: rgba(201,153,58,0.1); }
+.nav-cart {
+  position: relative;
+  background: none; border: none;
+  color: var(--text); font-size: 1.1rem;
+  display: flex; align-items: center; gap: 0.4rem;
+  font-family: 'Crimson Pro', serif; font-size: 0.92rem;
+  opacity: 0.78; transition: opacity 0.2s, color 0.2s;
+}
+.nav-cart:hover { opacity: 1; color: var(--rust); }
+.cart-badge {
+  position: absolute; top: -5px; right: -8px;
+  background: var(--rust); color: #fff;
+  font-family: 'Montserrat', sans-serif; font-size: 0.55rem;
+  font-weight: 600; letter-spacing: 0;
+  width: 16px; height: 16px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transform: scale(0); transition: opacity 0.2s, transform 0.2s;
+}
+.cart-badge.visible { opacity: 1; transform: scale(1); }
+
+/* ── Hero ── */
+.shop-hero {
+  padding: calc(60px + clamp(3rem,8vw,6rem)) clamp(1.2rem,4vw,3rem) clamp(2rem,5vw,4rem);
+  text-align: center;
+  background: var(--bg);
+}
+.shop-hero-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.62rem;
+  letter-spacing: 0.38em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 1rem;
+}
+.shop-hero-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.6rem, 6vw, 4.8rem);
+  font-weight: 300; line-height: 1.05;
+  color: var(--text);
+  margin-bottom: 1rem;
+}
+.shop-hero-title em { font-style: italic; color: var(--rust); }
+.shop-hero-sub {
+  font-size: 1.08rem; color: var(--text-muted);
+  line-height: 1.7; max-width: 520px; margin: 0 auto 2.5rem;
+}
+.divider-ornament {
+  display: flex; align-items: center; gap: 1rem;
+  justify-content: center; margin-bottom: 2.5rem;
+}
+.divider-ornament::before,.divider-ornament::after {
+  content:''; flex: 1; max-width: 100px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--clay), transparent);
+}
+.divider-ornament span {
+  font-family:'Cinzel',serif; font-size:0.62rem;
+  letter-spacing:0.3em; color:var(--gold); text-transform:uppercase;
+}
+
+/* ── Filters ── */
+.shop-filters {
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 0.5rem;
+  padding: 0 clamp(1.2rem,4vw,3rem) 3rem;
+}
+.filter-btn {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  padding: 0.55rem 1.3rem;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--text-muted);
+  border-radius: 2px;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.filter-btn:hover { border-color: var(--clay); color: var(--clay); }
+.filter-btn.active {
+  background: var(--rust); border-color: var(--rust);
+  color: var(--linen);
+}
+
+/* ── Grid ── */
+.shop-section {
+  padding: 0 clamp(1.2rem,4vw,3rem) 5rem;
+}
+.section-label {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.35em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 1.8rem;
+  display: flex; align-items: center; gap: 1rem;
+}
+.section-label::after {
+  content:''; flex:1; height:1px;
+  background: linear-gradient(90deg, var(--border), transparent);
+}
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+/* ── Product Card ── */
+.product-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+  cursor: pointer;
+  position: relative;
+}
+.product-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-3px);
+}
+.product-card.hidden { display: none; }
+
+.card-img {
+  aspect-ratio: 4/3; overflow: hidden;
+  background: var(--bg-alt);
+  position: relative;
+}
+.card-img img { width:100%; height:100%; object-fit:cover; transition: transform 0.5s ease; }
+.product-card:hover .card-img img { transform: scale(1.04); }
+.card-img-placeholder {
+  width:100%; height:100%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2.5rem; color: var(--clay); opacity: 0.3;
+}
+.card-badge {
+  position: absolute; top: 12px; left: 12px;
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  background: var(--rust); color: #fff;
+  padding: 0.3rem 0.6rem; border-radius: 2px;
+}
+.card-body { padding: 1.2rem 1.3rem 1.4rem; }
+.card-category {
+  font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 0.4rem;
+}
+.card-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.22rem; font-weight: 400; line-height: 1.2;
+  color: var(--text); margin-bottom: 0.35rem;
+}
+.card-desc {
+  font-size: 0.88rem; color: var(--text-muted);
+  line-height: 1.55; margin-bottom: 1rem;
+}
+.card-variants {
+  display: flex; flex-wrap: wrap; gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+.variant-chip {
+  font-family: 'Montserrat', sans-serif; font-size: 0.6rem;
+  letter-spacing: 0.06em; font-weight: 500;
+  padding: 0.28rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 2px; color: var(--text-muted);
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  cursor: pointer;
+}
+.variant-chip:hover { border-color: var(--clay); color: var(--clay); }
+.variant-chip.selected {
+  background: rgba(196,132,90,0.1);
+  border-color: var(--clay); color: var(--bark);
+}
+body.dark .variant-chip.selected { color: var(--sand); }
+
+.card-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.card-price { display: flex; flex-direction: column; gap: 0.1rem; }
+.price-ngn {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem; font-weight: 600; color: var(--text);
+}
+.price-usd {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.62rem; font-weight: 500;
+  letter-spacing: 0.06em; color: var(--text-muted);
+}
+.add-btn {
+  font-family: 'Cinzel', serif; font-size: 0.56rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  padding: 0.65rem 1.1rem;
+  background: var(--rust); color: var(--linen);
+  border: none; border-radius: 2px;
+  transition: background 0.2s, transform 0.15s;
+  white-space: nowrap;
+}
+.add-btn:hover { background: var(--bark); transform: translateY(-1px); }
+.add-btn:active { transform: translateY(0); }
+
+/* ── Cart Drawer ── */
+.cart-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(20,16,16,0.6);
+  backdrop-filter: blur(4px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+.cart-overlay.open { opacity: 1; pointer-events: all; }
+.cart-drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 201;
+  width: min(420px, 100vw);
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+.cart-drawer.open { transform: translateX(0); }
+.cart-head {
+  padding: 1.4rem 1.6rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.cart-head-title {
+  font-family: 'Cinzel', serif; font-size: 0.65rem;
+  letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold);
+}
+.cart-close {
+  background: none; border: none; font-size: 1.2rem;
+  color: var(--text-muted); line-height: 1;
+  transition: color 0.2s;
+}
+.cart-close:hover { color: var(--rust); }
+.cart-items {
+  flex: 1; overflow-y: auto; padding: 1rem 1.6rem;
+}
+.cart-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 100%; gap: 1rem;
+  color: var(--text-muted);
+}
+.cart-empty-icon { font-size: 2.5rem; opacity: 0.3; }
+.cart-empty-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem; font-style: italic;
+}
+.cart-item {
+  display: flex; gap: 1rem; padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.cart-item-img {
+  width: 64px; height: 64px; border-radius: 2px;
+  background: var(--bg-alt); overflow: hidden; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; color: var(--clay); opacity: 0.5;
+}
+.cart-item-img img { width:100%; height:100%; object-fit:cover; }
+.cart-item-info { flex:1; min-width:0; }
+.cart-item-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1rem; color: var(--text); line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cart-item-variant {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.6rem; color: var(--text-muted);
+  letter-spacing: 0.06em; margin: 0.2rem 0 0.5rem;
+}
+.cart-item-qty {
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.qty-btn {
+  background: var(--bg-alt); border: 1px solid var(--border);
+  width: 22px; height: 22px; border-radius: 2px;
+  font-size: 0.85rem; color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s;
+}
+.qty-btn:hover { border-color: var(--clay); }
+.qty-val {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.72rem; font-weight: 600; color: var(--text);
+  min-width: 16px; text-align: center;
+}
+.cart-item-price {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.05rem; color: var(--text);
+  white-space: nowrap; text-align: right;
+}
+.cart-item-remove {
+  background: none; border: none; font-size: 0.75rem;
+  color: var(--text-muted); margin-top: 0.2rem;
+  transition: color 0.2s; display: block;
+}
+.cart-item-remove:hover { color: var(--rust); }
+
+.cart-foot {
+  padding: 1.4rem 1.6rem;
+  border-top: 1px solid var(--border);
+}
+.cart-totals {
+  display: flex; flex-direction: column; gap: 0.5rem;
+  margin-bottom: 1.4rem;
+}
+.cart-total-row {
+  display: flex; justify-content: space-between;
+  font-size: 0.88rem; color: var(--text-muted);
+}
+.cart-total-row.grand {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.22rem; color: var(--text);
+  padding-top: 0.6rem; border-top: 1px solid var(--border);
+}
+.checkout-btn {
+  width: 100%;
+  font-family: 'Cinzel', serif; font-size: 0.62rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  padding: 1rem;
+  background: var(--rust); color: var(--linen);
+  border: none; border-radius: 2px;
+  transition: background 0.2s;
+  margin-bottom: 0.8rem;
+}
+.checkout-btn:hover { background: var(--bark); }
+.pay-options {
+  display: flex; gap: 0.5rem;
+}
+.pay-opt-btn {
+  flex: 1;
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--text-muted);
+  border-radius: 2px;
+  transition: border-color 0.2s, color 0.2s;
+}
+.pay-opt-btn:hover { border-color: var(--clay); color: var(--clay); }
+.pay-opt-btn.crypto { color: var(--gold); border-color: rgba(201,153,58,0.3); }
+.pay-opt-btn.crypto:hover { border-color: var(--gold); }
+
+/* ── Checkout Modal ── */
+.modal-overlay {
+  position: fixed; inset:0; z-index:300;
+  background: rgba(14,10,8,0.75);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+.modal-overlay.open { opacity:1; pointer-events:all; }
+.modal {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  width: 100%; max-width: 500px;
+  max-height: 90vh; overflow-y: auto;
+  transform: translateY(16px);
+  transition: transform 0.3s;
+}
+.modal-overlay.open .modal { transform: translateY(0); }
+.modal-head {
+  padding: 1.6rem 2rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; justify-content: space-between; gap:1rem;
+}
+.modal-title {
+  font-family: 'Cinzel', serif; font-size: 0.65rem;
+  letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold);
+}
+.modal-sub {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem; color: var(--text-muted); font-style:italic;
+  margin-top: 0.2rem;
+}
+.modal-close {
+  background: none; border: none; font-size: 1.2rem;
+  color: var(--text-muted); line-height:1;
+  transition: color 0.2s; flex-shrink:0;
+}
+.modal-close:hover { color: var(--rust); }
+.modal-body { padding: 1.8rem 2rem; }
+
+/* Form */
+.form-row { margin-bottom: 1.2rem; }
+.form-label {
+  display: block;
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 0.5rem;
+}
+.form-input, .form-select {
+  width: 100%;
+  font-family: 'Crimson Pro', serif; font-size: 1rem;
+  padding: 0.7rem 1rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 2px; color: var(--text);
+  transition: border-color 0.2s;
+  outline: none; appearance: none;
+}
+.form-input:focus, .form-select:focus { border-color: var(--clay); }
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+/* Order summary inside modal */
+.order-summary {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 1.2rem;
+  margin-bottom: 1.6rem;
+}
+.order-summary-label {
+  font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 0.8rem;
+}
+.order-line {
+  display: flex; justify-content: space-between;
+  font-size: 0.88rem; color: var(--text-muted);
+  padding: 0.3rem 0;
+}
+.order-total {
+  display: flex; justify-content: space-between;
+  padding-top: 0.7rem; margin-top: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+.order-total-label {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--text);
+}
+.order-total-val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.15rem; color: var(--text);
+}
+
+/* Payment tabs */
+.pay-tabs {
+  display: flex; border: 1px solid var(--border);
+  border-radius: 2px; overflow: hidden;
+  margin-bottom: 1.4rem;
+}
+.pay-tab {
+  flex: 1;
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 0.75rem;
+  background: transparent; border: none; color: var(--text-muted);
+  border-right: 1px solid var(--border);
+  transition: background 0.2s, color 0.2s;
+}
+.pay-tab:last-child { border-right: none; }
+.pay-tab:hover { background: var(--bg-alt); color: var(--clay); }
+.pay-tab.active { background: var(--rust); color: var(--linen); }
+
+.pay-panel { display: none; }
+.pay-panel.active { display: block; }
+
+.pay-info {
+  font-size: 0.88rem; color: var(--text-muted); line-height: 1.6;
+  margin-bottom: 1.2rem;
+}
+.pay-info strong { color: var(--clay); }
+
+/* Crypto addresses */
+.crypto-option {
+  border: 1px solid var(--border); border-radius: 2px;
+  padding: 1rem; margin-bottom: 0.8rem;
+  transition: border-color 0.2s;
+}
+.crypto-option:hover { border-color: rgba(201,153,58,0.4); }
+.crypto-name {
+  font-family: 'Cinzel', serif; font-size: 0.54rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 0.4rem;
+}
+.crypto-amount {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem; color: var(--text); margin-bottom: 0.5rem;
+}
+.crypto-address {
+  font-family: 'Montserrat', sans-serif; font-size: 0.62rem;
+  color: var(--text-muted); word-break: break-all;
+  background: var(--bg-alt); padding: 0.5rem 0.7rem;
+  border-radius: 2px; margin-bottom: 0.5rem;
+}
+.copy-btn {
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border); border-radius: 2px;
+  background: none; color: var(--text-muted);
+  transition: border-color 0.15s, color 0.15s;
+}
+.copy-btn:hover { border-color: var(--gold); color: var(--gold); }
+.copy-btn.copied { border-color: #6b7c5c; color: #6b7c5c; }
+
+.submit-pay-btn {
+  width: 100%;
+  font-family: 'Cinzel', serif; font-size: 0.62rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  padding: 1rem;
+  background: var(--rust); color: var(--linen);
+  border: none; border-radius: 2px;
+  transition: background 0.2s, opacity 0.2s;
+  margin-top: 1rem;
+}
+.submit-pay-btn:hover { background: var(--bark); }
+.submit-pay-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Confirmation ── */
+.confirm-screen {
+  display: none; text-align: center;
+  padding: 2.5rem 2rem;
+}
+.confirm-screen.active { display: block; }
+.confirm-icon { font-size: 3rem; margin-bottom: 1.2rem; }
+.confirm-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2rem; font-weight: 300; color: var(--text);
+  margin-bottom: 0.6rem;
+}
+.confirm-sub {
+  font-size: 1rem; color: var(--text-muted); line-height: 1.7;
+  margin-bottom: 2rem;
+}
+.confirm-ref {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.65rem; letter-spacing: 0.15em;
+  color: var(--clay); margin-bottom: 1.8rem;
+}
+.continue-btn {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  padding: 0.85rem 2rem;
+  background: none; border: 1px solid var(--border);
+  color: var(--text-muted); border-radius: 2px;
+  transition: border-color 0.2s, color 0.2s;
+}
+.continue-btn:hover { border-color: var(--clay); color: var(--clay); }
+
+/* ── Admin Panel ── */
+.admin-bar {
+  position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 90;
+  display: none;
+}
+.admin-bar.visible { display: block; }
+.admin-fab {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--bark); border: 1px solid var(--gold);
+  color: var(--gold); font-size: 1.1rem;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  transition: background 0.2s, transform 0.2s;
+}
+.admin-fab:hover { background: var(--rust); transform: scale(1.08); }
+.admin-panel {
+  position: fixed; inset:0; z-index:400;
+  background: rgba(14,10,8,0.8); backdrop-filter:blur(8px);
+  display: flex; align-items: center; justify-content: center; padding:1.5rem;
+  opacity:0; pointer-events:none; transition: opacity 0.3s;
+}
+.admin-panel.open { opacity:1; pointer-events:all; }
+.admin-box {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 4px; width:100%; max-width:680px;
+  max-height:90vh; overflow-y:auto;
+  transform: translateY(16px); transition: transform 0.3s;
+}
+.admin-panel.open .admin-box { transform: translateY(0); }
+.admin-head {
+  padding: 1.4rem 1.8rem; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.admin-head-title {
+  font-family:'Cinzel',serif; font-size:0.65rem;
+  letter-spacing:0.3em; text-transform:uppercase; color:var(--gold);
+}
+.admin-close {
+  background:none; border:none; font-size:1.2rem;
+  color:var(--text-muted); transition:color 0.2s;
+}
+.admin-close:hover { color:var(--rust); }
+.admin-body { padding:1.8rem; }
+.admin-section-title {
+  font-family:'Cinzel',serif; font-size:0.58rem;
+  letter-spacing:0.25em; text-transform:uppercase;
+  color:var(--clay); margin-bottom:1.2rem; padding-bottom:0.6rem;
+  border-bottom:1px solid var(--border);
+}
+.admin-product-row {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:0.8rem; margin-bottom:1rem; padding:1rem;
+  border:1px solid var(--border); border-radius:2px;
+  position:relative;
+}
+.admin-product-row .form-row { margin-bottom:0.5rem; }
+.admin-prod-name {
+  grid-column:1/-1;
+  font-family:'Cormorant Garamond',serif;
+  font-size:1rem; color:var(--text); margin-bottom:0.6rem;
+}
+.admin-save-btn {
+  font-family:'Cinzel',serif; font-size:0.58rem;
+  letter-spacing:0.2em; text-transform:uppercase;
+  padding:0.75rem 1.8rem;
+  background:var(--rust); color:var(--linen);
+  border:none; border-radius:2px;
+  transition:background 0.2s; margin-top:0.8rem;
+}
+.admin-save-btn:hover { background:var(--bark); }
+.admin-add-btn {
+  font-family:'Cinzel',serif; font-size:0.56rem;
+  letter-spacing:0.18em; text-transform:uppercase;
+  padding:0.6rem 1.2rem;
+  border:1px dashed var(--border); background:none;
+  color:var(--text-muted); border-radius:2px;
+  transition:border-color 0.2s, color 0.2s;
+  width:100%; margin-bottom:1.2rem;
+}
+.admin-add-btn:hover { border-color:var(--clay); color:var(--clay); }
+.admin-del-btn {
+  position:absolute; top:0.6rem; right:0.6rem;
+  background:none; border:none; font-size:0.7rem;
+  color:var(--text-muted); transition:color 0.2s;
+}
+.admin-del-btn:hover { color:var(--rust); }
+.admin-login { padding:2rem; }
+.admin-login-title {
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.4rem; color:var(--text); margin-bottom:1.2rem; font-style:italic;
+}
+
+/* ── Size Guide Modal ── */
+.size-guide-overlay {
+  position: fixed; inset:0; z-index:350;
+  background: rgba(14,10,8,0.75);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+.size-guide-overlay.open { opacity:1; pointer-events:all; }
+.size-guide-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  width: 100%; max-width: 580px;
+  max-height: 88vh; overflow-y: auto;
+  transform: translateY(16px);
+  transition: transform 0.3s;
+}
+.size-guide-overlay.open .size-guide-box { transform: translateY(0); }
+.size-guide-head {
+  padding: 1.4rem 1.8rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; justify-content: space-between; gap:1rem;
+  position: sticky; top: 0; background: var(--bg); z-index: 1;
+}
+.size-guide-title {
+  font-family: 'Cinzel', serif; font-size: 0.65rem;
+  letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold);
+}
+.size-guide-sub {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1rem; color: var(--text-muted); font-style: italic;
+  margin-top: 0.2rem;
+}
+.size-guide-close {
+  background: none; border: none; font-size: 1.2rem;
+  color: var(--text-muted); transition: color 0.2s; flex-shrink:0;
+}
+.size-guide-close:hover { color: var(--rust); }
+.size-guide-body { padding: 1.6rem 1.8rem; }
+
+/* Unit toggle */
+.unit-toggle {
+  display: flex; align-items: center; gap: 0; margin-bottom: 1.6rem;
+  border: 1px solid var(--border); border-radius: 2px; overflow: hidden;
+  width: fit-content;
+}
+.unit-btn {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 0.5rem 1rem;
+  background: transparent; border: none; color: var(--text-muted);
+  transition: background 0.2s, color 0.2s;
+}
+.unit-btn.active { background: var(--rust); color: var(--linen); }
+
+/* How to measure */
+.measure-guide {
+  background: var(--bg-alt); border: 1px solid var(--border);
+  border-radius: 2px; padding: 1rem 1.2rem; margin-bottom: 1.6rem;
+}
+.measure-title {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 0.8rem;
+}
+.measure-steps {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem 1.2rem;
+}
+.measure-step {
+  font-size: 0.84rem; color: var(--text-muted); line-height: 1.5;
+}
+.measure-step strong { color: var(--clay); display: block; margin-bottom: 0.1rem; }
+
+/* Size table */
+.size-table-wrap {
+  overflow-x: auto; margin-bottom: 1.4rem;
+  border: 1px solid var(--border); border-radius: 2px;
+}
+.size-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.size-table th {
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--gold); padding: 0.65rem 1rem;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+  text-align: left; white-space: nowrap;
+}
+.size-table td {
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text); font-family: 'Crimson Pro', serif;
+  font-size: 0.92rem;
+}
+.size-table tr:last-child td { border-bottom: none; }
+.size-table tr:hover td { background: var(--bg-alt); }
+.size-table td:first-child {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.15em; color: var(--clay); font-weight: 600;
+}
+.size-table-label {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--text-muted); margin: 1.2rem 0 0.6rem;
+}
+
+.size-fit-note {
+  font-size: 0.84rem; color: var(--text-muted); line-height: 1.65;
+  font-style: italic; border-top: 1px solid var(--border);
+  padding-top: 1rem; margin-top: 0.4rem;
+}
+
+/* Size guide link on card */
+.size-guide-link {
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--clay); background: none; border: none;
+  text-decoration: underline; text-decoration-color: rgba(196,132,90,0.4);
+  text-underline-offset: 3px; margin-left: 0.5rem;
+  transition: color 0.2s;
+}
+.size-guide-link:hover { color: var(--rust); }
+
+/* ── Toast ── */
+.toast {
+  position:fixed; bottom:2rem; left:50%; transform:translateX(-50%) translateY(20px);
+  z-index:500; background:var(--bark); color:var(--sand);
+  font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.18em;
+  text-transform:uppercase; padding:0.85rem 2rem;
+  border-radius:2px; border:1px solid var(--clay);
+  opacity:0; pointer-events:none;
+  transition:opacity 0.25s, transform 0.25s;
+  white-space:nowrap;
+}
+body.dark .toast { background:#2a1c14; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* ── Footer ── */
+footer {
+  text-align:center; padding:3rem 2rem;
+  border-top:1px solid var(--border);
+  font-family:'Crimson Pro',serif; font-size:0.9rem; color:var(--text-muted);
+}
+footer a { color:var(--clay); transition:color 0.2s; }
+footer a:hover { color:var(--rust); }
+
+/* ── Responsive ── */
+@media(max-width:600px){
+  .shop-grid { grid-template-columns:1fr 1fr; gap:1rem; }
+  .nav-links { display:none; }
+  .form-row-2 { grid-template-columns:1fr; }
+  .pay-tabs { flex-wrap:wrap; }
+  .pay-tab { flex:1 1 50%; }
+}
+@media(max-width:400px){
+  .shop-grid { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav id="nav">
+  <a href="/" class="nav-logo">Kay's Works</a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/auction">Auction</a>
+      <a href="/shop" class="active">Shop</a>
+    </div>
+    <button class="theme-btn" id="themeBtn" aria-label="Toggle theme">☀</button>
+    <button class="nav-cart" id="cartBtn" aria-label="Open cart">
+      &#x2715;&#xFE0E;
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:inline-block;vertical-align:middle"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      <span class="cart-badge" id="cartBadge">0</span>
+    </button>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="shop-hero">
+  <p class="shop-hero-eyebrow">Kay's Works · The Shop</p>
+  <h1 class="shop-hero-title">Wear the work.<br><em>Own the story.</em></h1>
+  <p class="shop-hero-sub">Fine art prints, premium merch, and handcrafted notebooks — each piece rooted in the same care Kay puts into the canvas.</p>
+  <div class="divider-ornament"><span>· browse ·</span></div>
+</section>
+
+<!-- Filters -->
+<div class="shop-filters" id="filterBar">
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="prints">Prints</button>
+  <button class="filter-btn" data-filter="merch">Merch</button>
+  <button class="filter-btn" data-filter="notebooks">Notebooks</button>
+  <button class="filter-btn" data-filter="stickers">Stickers</button>
+</div>
+
+<!-- Products -->
+<section class="shop-section" id="shopGrid">
+
+  <!-- PRINTS -->
+  <div class="section-label" data-category="prints">Fine Art Prints</div>
+  <div class="shop-grid" id="printsGrid">
+    <!-- dynamically populated / admin editable -->
+  </div>
+
+  <!-- MERCH -->
+  <div class="section-label" style="margin-top:3.5rem" data-category="merch">Merch</div>
+  <div class="shop-grid" id="merchGrid"></div>
+
+  <!-- NOTEBOOKS -->
+  <div class="section-label" style="margin-top:3.5rem" data-category="notebooks">Notebooks</div>
+  <div class="shop-grid" id="notebooksGrid"></div>
+
+  <!-- STICKERS -->
+  <div class="section-label" style="margin-top:3.5rem" data-category="stickers">Stickers</div>
+  <div class="shop-grid" id="stickersGrid"></div>
+
+</section>
+
+<!-- Cart Drawer -->
+<div class="cart-overlay" id="cartOverlay"></div>
+<aside class="cart-drawer" id="cartDrawer">
+  <div class="cart-head">
+    <span class="cart-head-title">Your Bag</span>
+    <button class="cart-close" id="cartClose">✕</button>
+  </div>
+  <div class="cart-items" id="cartItems">
+    <div class="cart-empty">
+      <div class="cart-empty-icon">&#x2715;&#xFE0E;</div>
+      <p class="cart-empty-text">Your bag is empty.</p>
+    </div>
+  </div>
+  <div class="cart-foot" id="cartFoot" style="display:none">
+    <div class="cart-totals" id="cartTotals"></div>
+    <button class="checkout-btn" id="checkoutBtn">Proceed to checkout</button>
+    <div class="pay-options">
+      <button class="pay-opt-btn" id="paystackQuickBtn">Paystack</button>
+      <button class="pay-opt-btn" id="flutterwaveQuickBtn">Flutterwave</button>
+      <button class="pay-opt-btn crypto" id="ethQuickBtn">⬡ ETH</button>
+      <button class="pay-opt-btn crypto" id="tezosQuickBtn" style="color:#5ac0f5;border-color:rgba(90,192,245,0.3)">꜀ Tezos</button>
+    </div>
+  </div>
+</aside>
+
+<!-- Checkout Modal -->
+<div class="modal-overlay" id="checkoutOverlay">
+  <div class="modal" id="checkoutModal">
+
+    <!-- Form screen -->
+    <div id="formScreen">
+      <div class="modal-head">
+        <div>
+          <p class="modal-title">Checkout</p>
+          <p class="modal-sub">Complete your order</p>
+        </div>
+        <button class="modal-close" id="checkoutClose">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <div class="order-summary" id="orderSummary"></div>
+
+        <div class="form-row">
+          <label class="form-label">Full name</label>
+          <input class="form-input" id="ckName" type="text" placeholder="Your name" autocomplete="name"/>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Email address</label>
+          <input class="form-input" id="ckEmail" type="email" placeholder="your@email.com" autocomplete="email"/>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Phone (optional)</label>
+          <input class="form-input" id="ckPhone" type="tel" placeholder="+234 …"/>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Delivery method</label>
+          <div style="display:flex;gap:0.5rem;margin-bottom:0.8rem">
+            <button class="pay-opt-btn" id="pickupBtn" style="flex:1;padding:0.7rem" onclick="setDeliveryMethod('pickup')">Collect in Kaduna — Free</button>
+            <button class="pay-opt-btn" id="shipBtn" style="flex:1;padding:0.7rem;border-color:var(--clay);color:var(--clay)" onclick="setDeliveryMethod('ship')">Ship to me</button>
+          </div>
+        </div>
+
+        <div id="shippingFields" style="display:none">
+          <div class="form-row">
+            <label class="form-label">Street address</label>
+            <input class="form-input" id="ckAddress" type="text" placeholder="Street, city, state / region"/>
+          </div>
+          <div class="form-row">
+            <label class="form-label">Country</label>
+            <select class="form-select" id="ckCountry">
+              <option value="">— Select country —</option>
+              <optgroup label="Nigeria">
+                <option value="NG-other">Nigeria (other states)</option>
+              </optgroup>
+              <optgroup label="West Africa">
+                <option value="WA">Ghana</option>
+                <option value="WA">Benin</option>
+                <option value="WA">Togo</option>
+                <option value="WA">Senegal</option>
+                <option value="WA">Côte d'Ivoire</option>
+                <option value="WA">Niger</option>
+                <option value="WA">Cameroon</option>
+              </optgroup>
+              <optgroup label="Europe &amp; UK">
+                <option value="EU">United Kingdom</option>
+                <option value="EU">Germany</option>
+                <option value="EU">France</option>
+                <option value="EU">Netherlands</option>
+                <option value="EU">Italy</option>
+                <option value="EU">Spain</option>
+                <option value="EU">Sweden</option>
+                <option value="EU">Norway</option>
+                <option value="EU">Denmark</option>
+                <option value="EU">Switzerland</option>
+                <option value="EU">Belgium</option>
+                <option value="EU">Austria</option>
+                <option value="EU">Poland</option>
+                <option value="EU">Portugal</option>
+                <option value="EU">Ireland</option>
+              </optgroup>
+              <optgroup label="North America">
+                <option value="NA">United States</option>
+                <option value="NA">Canada</option>
+              </optgroup>
+              <optgroup label="Asia &amp; Oceania">
+                <option value="AO">Australia</option>
+                <option value="AO">New Zealand</option>
+                <option value="AO">Japan</option>
+                <option value="AO">South Korea</option>
+                <option value="AO">Singapore</option>
+                <option value="AO">India</option>
+                <option value="AO">China</option>
+                <option value="AO">United Arab Emirates</option>
+              </optgroup>
+              <optgroup label="Rest of world">
+                <option value="ROW">Other country</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <!-- Live delivery estimate -->
+          <div id="deliveryEstimate" style="display:none;margin-bottom:1.2rem;padding:0.9rem 1rem;background:var(--bg-alt);border:1px solid var(--border);border-radius:2px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem">Estimated delivery fee</div>
+                <div id="deliveryZoneLabel" style="font-size:0.82rem;color:var(--text-muted)"></div>
+              </div>
+              <div style="text-align:right">
+                <div id="deliveryFeeDisplay" style="font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:var(--text)"></div>
+                <div id="deliveryFeeNote" style="font-size:0.7rem;color:var(--text-muted);font-style:italic"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="pickupFields">
+          <div style="padding:0.9rem 1rem;background:var(--bg-alt);border:1px solid rgba(107,124,92,0.3);border-radius:2px;margin-bottom:1rem">
+            <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:#6b7c5c;margin-bottom:0.3rem">Collection · Kaduna</div>
+            <div style="font-size:0.88rem;color:var(--text-muted);line-height:1.6">Kay will contact you with pickup details after your order is confirmed. No delivery fee.</div>
+          </div>
+        </div>
+
+        <!-- Payment method tabs -->
+        <div class="pay-tabs" id="payTabs">
+          <button class="pay-tab active" data-pay="paystack">Paystack</button>
+          <button class="pay-tab" data-pay="flutterwave">Flutterwave</button>
+          <button class="pay-tab" data-pay="eth">⬡ ETH</button>
+          <button class="pay-tab" data-pay="tezos" style="color:#5ac0f5">꜀ Tezos</button>
+        </div>
+
+        <!-- Paystack panel -->
+        <div class="pay-panel active" id="panel-paystack">
+          <p class="pay-info">Pay securely in <strong>NGN</strong> via Paystack — cards, bank transfer, or USSD. Nigerian accounts supported natively.</p>
+          <button class="submit-pay-btn" id="paystackPayBtn">Pay with Paystack</button>
+        </div>
+
+        <!-- Flutterwave panel -->
+        <div class="pay-panel" id="panel-flutterwave">
+          <p class="pay-info">Pay in <strong>NGN</strong> via Flutterwave — cards, mobile money, and bank transfers across Africa.</p>
+          <button class="submit-pay-btn" id="flutterwavePayBtn">Pay with Flutterwave</button>
+        </div>
+
+        <!-- Crypto panel -->
+        <div class="pay-panel" id="panel-crypto">
+          <p class="pay-info">Send the exact amount in <strong>USD equivalent</strong> to one of the addresses below, then confirm your transfer using the button.</p>
+          <div id="cryptoOptions"></div>
+          <button class="submit-pay-btn" id="cryptoConfirmBtn">I've sent the payment</button>
+        </div>
+
+        <!-- Tezos panel -->
+        <div class="pay-panel" id="panel-tezos">
+          <p class="pay-info">Connect your <strong style="color:#5ac0f5">Tezos wallet</strong> via Beacon and send XTZ directly. Your wallet will open with the amount pre-filled.</p>
+          <div id="tezosPayBlock">
+            <div class="crypto-option" id="tezosAmountBlock" style="display:none;border-color:rgba(90,192,245,0.25)">
+              <div class="crypto-name" style="color:#5ac0f5">XTZ · Tezos</div>
+              <div class="crypto-amount" id="tezosXtzAmount">— XTZ</div>
+              <div class="crypto-address" id="tezosToAddr">—</div>
+              <button class="copy-btn" id="tezosCopyBtn" style="border-color:rgba(90,192,245,0.3);color:#5ac0f5">Copy address</button>
+            </div>
+            <div id="tezosWalletInfo" style="margin-bottom:1rem;display:none">
+              <div style="display:flex;align-items:center;gap:0.6rem;padding:0.7rem 1rem;background:var(--bg-alt);border:1px solid rgba(90,192,245,0.2);border-radius:2px">
+                <span style="width:8px;height:8px;border-radius:50%;background:#5ac0f5;flex-shrink:0"></span>
+                <span id="tezosWalletAddr" style="font-family:'Montserrat',sans-serif;font-size:0.62rem;color:#5ac0f5;word-break:break-all"></span>
+                <button id="tezosDisconnectBtn" style="margin-left:auto;background:none;border:none;font-size:0.65rem;color:var(--text-muted);font-family:'Cinzel',sans-serif;letter-spacing:0.1em;white-space:nowrap">Disconnect</button>
+              </div>
+            </div>
+            <button class="submit-pay-btn" id="tezosConnectBtn" style="background:#1a4a6e;margin-bottom:0.7rem">Connect Tezos Wallet</button>
+            <button class="submit-pay-btn" id="tezosSendBtn" style="display:none">Send <span id="tezosSendAmt"></span> XTZ</button>
+            <button class="submit-pay-btn" id="tezosManualBtn" style="background:transparent;border:1px solid rgba(90,192,245,0.3);color:#5ac0f5;margin-top:0.5rem">I've sent manually — confirm</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Confirmation screen -->
+    <div class="confirm-screen" id="confirmScreen">
+      <div class="confirm-icon">✦</div>
+      <h2 class="confirm-title">Order received.</h2>
+      <p class="confirm-sub" id="confirmMsg">Thank you for your order. Kay will review and confirm fulfilment within 24 hours — check your email for details.</p>
+      <p class="confirm-ref" id="confirmRef"></p>
+      <button class="continue-btn" id="continueShopping">Continue shopping</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Size Guide Modal -->
+<div class="size-guide-overlay" id="sizeGuideOverlay">
+  <div class="size-guide-box">
+    <div class="size-guide-head">
+      <div>
+        <p class="size-guide-title">Size Guide</p>
+        <p class="size-guide-sub" id="sizeGuideProductName">Kay's Works Apparel</p>
+      </div>
+      <button class="size-guide-close" id="sizeGuideClose">✕</button>
+    </div>
+    <div class="size-guide-body">
+
+      <!-- Unit toggle -->
+      <div class="unit-toggle">
+        <button class="unit-btn active" id="unitCm" onclick="setUnit('cm')">CM</button>
+        <button class="unit-btn" id="unitIn" onclick="setUnit('in')">Inches</button>
+      </div>
+
+      <!-- How to measure -->
+      <div class="measure-guide">
+        <p class="measure-title">How to measure yourself</p>
+        <div class="measure-steps">
+          <div class="measure-step">
+            <strong>Chest</strong>
+            Measure around the fullest part of your chest, keeping the tape horizontal under your arms.
+          </div>
+          <div class="measure-step">
+            <strong>Waist</strong>
+            Measure around your natural waistline, the narrowest part of your torso.
+          </div>
+          <div class="measure-step">
+            <strong>Hips</strong>
+            Stand with feet together and measure around the fullest part of your hips.
+          </div>
+          <div class="measure-step">
+            <strong>Body length</strong>
+            Measure from the top of your shoulder straight down to where you want the garment to end.
+          </div>
+        </div>
+      </div>
+
+      <!-- T-Shirt table -->
+      <div id="sgTeeSection">
+        <p class="size-table-label">T-Shirt — unisex relaxed fit</p>
+        <div class="size-table-wrap">
+          <table class="size-table">
+            <thead>
+              <tr>
+                <th>Size</th>
+                <th>Chest <span class="sg-unit">(cm)</span></th>
+                <th>Body length <span class="sg-unit">(cm)</span></th>
+                <th>Shoulder <span class="sg-unit">(cm)</span></th>
+                <th>Sleeve <span class="sg-unit">(cm)</span></th>
+              </tr>
+            </thead>
+            <tbody id="sgTeeBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Hoodie table -->
+      <div id="sgHoodieSection">
+        <p class="size-table-label">Hoodie — unisex relaxed fit</p>
+        <div class="size-table-wrap">
+          <table class="size-table">
+            <thead>
+              <tr>
+                <th>Size</th>
+                <th>Chest <span class="sg-unit">(cm)</span></th>
+                <th>Body length <span class="sg-unit">(cm)</span></th>
+                <th>Shoulder <span class="sg-unit">(cm)</span></th>
+                <th>Sleeve <span class="sg-unit">(cm)</span></th>
+              </tr>
+            </thead>
+            <tbody id="sgHoodieBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <p class="size-fit-note" id="sgFitNote"></p>
+    </div>
+  </div>
+</div>
+
+<!-- Admin FAB -->
+<div class="admin-bar" id="adminBar">
+  <button class="admin-fab" id="adminFab" title="Admin panel">⚙</button>
+</div>
+
+<!-- Admin Panel -->
+<div class="admin-panel" id="adminPanel">
+  <div class="admin-box">
+
+    <!-- Login -->
+    <div id="adminLogin">
+      <div class="admin-head">
+        <span class="admin-head-title">Admin · Shop Config</span>
+        <button class="admin-close" id="adminClose">✕</button>
+      </div>
+      <div class="admin-login">
+        <p class="admin-login-title">Enter admin password to continue</p>
+        <div class="form-row">
+          <label class="form-label">Password</label>
+          <input class="form-input" id="adminPwInput" type="password" placeholder="Admin password"/>
+        </div>
+        <button class="admin-save-btn" id="adminLoginBtn">Unlock</button>
+      </div>
+    </div>
+
+    <!-- Config -->
+    <div id="adminConfig" style="display:none">
+      <div class="admin-head">
+        <span class="admin-head-title">Shop Config</span>
+        <button class="admin-close" id="adminConfigClose">✕</button>
+      </div>
+      <div class="admin-body">
+
+        <!-- Crypto wallets -->
+        <p class="admin-section-title">Crypto wallet addresses</p>
+        <div class="form-row">
+          <label class="form-label">ETH / USDC / USDT address</label>
+          <input class="form-input" id="cfgEthAddr" type="text" value="0x04CB6Ef95d6fd1c1d2819f5d4e18E38C11dc0d37" readonly style="opacity:0.6;cursor:default"/>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Tezos address</label>
+          <input class="form-input" id="cfgTezosAddr" type="text" value="tz1WpjkcxaoRtKzV3Ni1T6KFEnpUdkYzELwd" readonly style="opacity:0.6;cursor:default;border-color:rgba(90,192,245,0.3)"/>
+        </div>
+        <p style="font-size:0.8rem;color:var(--text-muted);line-height:1.6;margin-bottom:1.2rem">To update wallet addresses, edit the <code style="color:var(--clay);font-size:0.75rem">ethAddress</code> and <code style="color:var(--clay);font-size:0.75rem">tezosAddress</code> values in <code style="color:var(--clay);font-size:0.75rem">SHOP_CONFIG</code> directly.</p>
+
+        <!-- API keys note -->
+        <p class="admin-section-title" style="margin-top:1.4rem">Payment keys (set as env vars)</p>
+        <p style="font-size:0.85rem;color:var(--text-muted);line-height:1.6;margin-bottom:1.2rem">
+          Set <code style="color:var(--clay);font-size:0.78rem">PAYSTACK_PUBLIC_KEY</code>, <code style="color:var(--clay);font-size:0.78rem">FLUTTERWAVE_PUBLIC_KEY</code> in your Vercel environment variables. They are injected at runtime by the page — never stored here.
+        </p>
+
+        <!-- Products -->
+        <p class="admin-section-title" style="margin-top:1.4rem">Products</p>
+        <div id="adminProducts"></div>
+        <button class="admin-add-btn" id="addProductBtn">+ Add product</button>
+
+        <button class="admin-save-btn" id="saveConfigBtn">Save configuration</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Footer -->
+<footer>
+  <p>© 2026 Kay's Works · <a href="mailto:oyeniyikayode4@gmail.com">oyeniyikayode4@gmail.com</a></p>
+</footer>
+
+<!-- Paystack & Flutterwave SDKs -->
+<script src="https://js.paystack.co/v1/inline.js"></script>
+<script src="https://checkout.flutterwave.com/v3.js"></script>
+
+<script>
+'use strict';
+
+/* ─── Config (loaded from Supabase / Edge Config or defaults) ─── */
+let SHOP_CONFIG = {
+  ethAddress:   '0x04CB6Ef95d6fd1c1d2819f5d4e18E38C11dc0d37',
+  tezosAddress: 'tz1WpjkcxaoRtKzV3Ni1T6KFEnpUdkYzELwd',
+  products: [
+    // ── Prints (INPRNT-style specs) ───────────────────────────────────────
+    // Sizes are SHEET sizes in inches. All prints: 100% cotton rag, 300gsm,
+    // archival pigment ink (10-colour system), min 1-inch white border.
+    {
+      id: 'print-giclee', category: 'prints', name: 'Giclée Art Print',
+      desc: 'Gallery-quality giclée on 100% cotton rag archival paper (300gsm). 10-colour pigment ink. Min 1-inch white border. Signed.',
+      emoji: '🖼',
+      printType: 'giclee',
+      variants: ['4×4"', '4×6"', '5×7"', '6×8"', '8×10"', '8×12"', '9×12"', '11×14"', '12×16"', '12×18"', '18×24"', '24×36"'],
+      availableVariants: ['4×4"', '5×7"', '8×10"', '11×14"', '18×24"'],
+      priceNgn: {
+        '4×4"': 12000, '4×6"': 14000, '5×7"': 16000, '6×8"': 18000,
+        '8×10"': 25000, '8×12"': 28000, '9×12"': 30000, '11×14"': 40000,
+        '12×16"': 45000, '12×18"': 50000, '18×24"': 75000, '24×36"': 120000,
+      },
+      priceUsd: {
+        '4×4"': 8, '4×6"': 10, '5×7"': 11, '6×8"': 13,
+        '8×10"': 18, '8×12"': 20, '9×12"': 22, '11×14"': 28,
+        '12×16"': 32, '12×18"': 35, '18×24"': 52, '24×36"': 85,
+      },
+      badge: '', image: '',
+    },
+    {
+      id: 'print-photo', category: 'prints', name: 'Photographic Print',
+      desc: 'Premium luster finish on photo-grade paper with pigment inks. Rich detail, subtle sheen, no glare. Listed by sheet size, min 1-inch border.',
+      emoji: '📷',
+      printType: 'photo',
+      variants: ['4×4"', '4×6"', '5×7"', '8×10"', '8×12"', '11×14"', '12×18"', '18×24"', '24×36"'],
+      availableVariants: ['5×7"', '8×10"', '11×14"', '18×24"'],
+      priceNgn: {
+        '4×4"': 9000, '4×6"': 11000, '5×7"': 13000, '8×10"': 20000,
+        '8×12"': 23000, '11×14"': 32000, '12×18"': 42000, '18×24"': 62000, '24×36"': 95000,
+      },
+      priceUsd: {
+        '4×4"': 6, '4×6"': 8, '5×7"': 9, '8×10"': 14,
+        '8×12"': 16, '11×14"': 22, '12×18"': 30, '18×24"': 44, '24×36"': 66,
+      },
+      badge: '', image: '',
+    },
+    {
+      id: 'print-mini', category: 'prints', name: 'Mini Print',
+      desc: 'Small-format giclée on cotton rag. Perfect for collectors and gifting. Half-inch border minimum. Ships flat.',
+      emoji: '🖼',
+      printType: 'mini',
+      variants: ['4×4"', '4×6"', '5×5"'],
+      availableVariants: ['4×4"', '4×6"', '5×5"'],
+      priceNgn: { '4×4"': 8000, '4×6"': 9500, '5×5"': 9000 },
+      priceUsd: { '4×4"': 5, '4×6"': 6, '5×5"': 6 },
+      badge: '', image: '',
+    },
+    {
+      id: 'tee-001', category: 'merch', name: 'Àpótí T-Shirt',
+      desc: '100% heavyweight cotton. Screen-printed design. Pre-shrunk. Unisex relaxed fit.',
+      emoji: '👕',
+      clothing: true, clothing_type: 'tee',
+      variants: ['S', 'M', 'L', 'XL', 'XXL'],
+      priceNgn: { S: 22000, M: 22000, L: 22000, XL: 24000, XXL: 24000 },
+      priceUsd: { S: 15, M: 15, L: 15, XL: 16, XXL: 16 },
+      badge: 'New', image: '',
+    },
+    {
+      id: 'hoodie-001', category: 'merch', name: 'Àpótí Hoodie',
+      desc: '380gsm heavyweight fleece. Drop-shoulder, oversized silhouette. Screen-printed. Kangaroo pocket.',
+      emoji: '🧥',
+      clothing: true, clothing_type: 'hoodie',
+      variants: ['S', 'M', 'L', 'XL', 'XXL'],
+      priceNgn: { S: 42000, M: 42000, L: 42000, XL: 45000, XXL: 45000 },
+      priceUsd: { S: 28, M: 28, L: 28, XL: 30, XXL: 30 },
+      badge: '', image: '',
+    },
+    {
+      id: 'tote-001', category: 'merch', name: 'Canvas Tote Bag',
+      desc: 'Heavy-duty natural canvas. Screen-printed. Holds everything.',
+      emoji: '🛍',
+      variants: ['One size'],
+      priceNgn: { 'One size': 14000 },
+      priceUsd: { 'One size': 9 },
+      badge: '', image: '',
+    },
+    {
+      id: 'nb-001', category: 'notebooks', name: 'Faux Leather Journal — Classic',
+      desc: 'A5 faux leather bound notebook. 200 ivory pages, lay-flat binding.',
+      emoji: '📓',
+      variants: ['Midnight', 'Cognac', 'Olive'],
+      priceNgn: { Midnight: 19000, Cognac: 19000, Olive: 19000 },
+      priceUsd: { Midnight: 13, Cognac: 13, Olive: 13 },
+      badge: 'Bestseller', image: '',
+    },
+    {
+      id: 'nb-002', category: 'notebooks', name: 'Faux Leather Journal — Large',
+      desc: 'A4 faux leather bound notebook. 240 ivory pages, ribbon marker.',
+      emoji: '📒',
+      variants: ['Midnight', 'Cognac'],
+      priceNgn: { Midnight: 24000, Cognac: 24000 },
+      priceUsd: { Midnight: 16, Cognac: 16 },
+      badge: '', image: '',
+    },
+    {
+      id: 'stk-001', category: 'stickers', name: 'Àpótí Sticker Pack',
+      desc: 'Set of 6 die-cut vinyl stickers. Waterproof. Dishwasher-safe.',
+      emoji: '✦',
+      variants: ['Pack of 6'],
+      priceNgn: { 'Pack of 6': 4500 },
+      priceUsd: { 'Pack of 6': 3 },
+      badge: '', image: '',
+    },
+  ],
+};
+
+/* ─── Cart state ─── */
+let cart = [];
+let selectedVariants = {};
+
+/* ─── Helpers ─── */
+function fmt(n) { return '₦' + Number(n).toLocaleString('en-NG'); }
+function fmtUsd(n) { return '$' + Number(n).toFixed(0); }
+function uid() { return Math.random().toString(36).slice(2,9); }
+function showToast(msg, dur=2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+/* ─── Theme ─── */
+function initTheme() {
+  const saved = localStorage.getItem('kaysworks-theme');
+  const dark = saved ? saved==='dark' : window.matchMedia('(prefers-color-scheme:dark)').matches;
+  document.body.classList.toggle('dark', dark);
+  document.getElementById('themeBtn').textContent = dark ? '☾' : '☀';
+}
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const isDark = document.body.classList.toggle('dark');
+  localStorage.setItem('kaysworks-theme', isDark ? 'dark' : 'light');
+  document.getElementById('themeBtn').textContent = isDark ? '☾' : '☀';
+});
+initTheme();
+
+/* ─── Nav scroll ─── */
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => nav.classList.toggle('scrolled', window.scrollY > 40), { passive: true });
+
+/* ─── Build product cards ─── */
+function buildCard(p) {
+  // For prints, only show the sizes you've marked as available
+  const displayVariants = (p.category === 'prints' && Array.isArray(p.availableVariants) && p.availableVariants.length)
+    ? p.availableVariants
+    : p.variants;
+
+  const defaultVariant = displayVariants[0];
+  selectedVariants[p.id] = defaultVariant;
+  const ngn = p.priceNgn[defaultVariant];
+  const usd = p.priceUsd[defaultVariant];
+
+  const variantHtml = displayVariants.map((v,i) =>
+    `<button class="variant-chip${i===0?' selected':''}" data-pid="${p.id}" data-v="${v}">${v}</button>`
+  ).join('');
+
+  const imgHtml = p.image
+    ? `<img src="${p.image}" alt="${p.name}" loading="lazy"/>`
+    : `<div class="card-img-placeholder">${p.emoji}</div>`;
+
+  const badgeHtml = p.badge ? `<span class="card-badge">${p.badge}</span>` : '';
+
+  // Stock indicator
+  const sbv = p.stock_by_variant || {};
+  function stockForVariant(v) {
+    if (sbv[v] !== undefined) return sbv[v];
+    if (p.stock !== null && p.stock !== undefined) return p.stock;
+    return null; // unlimited
+  }
+  const defaultStock = stockForVariant(defaultVariant);
+  const stockHtml = defaultStock === 0
+    ? `<span style="font-family:'Cinzel',serif;font-size:0.46rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--rust);margin-left:0.5rem">Sold out</span>`
+    : defaultStock !== null && defaultStock <= 3
+    ? `<span style="font-family:'Cinzel',serif;font-size:0.46rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);margin-left:0.5rem">Only ${defaultStock} left</span>`
+    : '';
+
+  const isClothing = p.clothing === true || ['tee','hoodie','shirt'].some(k => p.name.toLowerCase().includes(k) || (p.print_type||'').toLowerCase().includes(k));
+  const sizeGuideLink = isClothing
+    ? `<button class="size-guide-link" onclick="openSizeGuide('${p.id}','${p.name.replace(/'/g,"\\'")}','${p.clothing_type||'tee'}')">Size guide</button>`
+    : '';
+
+  const card = document.createElement('div');
+  card.className = 'product-card';
+  card.dataset.pid = p.id;
+  card.dataset.category = p.category;
+  card.innerHTML = `
+    <div class="card-img">${imgHtml}${badgeHtml}</div>
+    <div class="card-body">
+      <p class="card-category">${p.category}</p>
+      <h3 class="card-title">${p.name}</h3>
+      <p class="card-desc">${p.desc}</p>
+      <div class="card-variants" id="variants-${p.id}">${variantHtml}${sizeGuideLink}</div>
+      <div class="card-footer">
+        <div class="card-price">
+          <span class="price-ngn" id="pngn-${p.id}">${fmt(ngn)}</span>
+          <span class="price-usd" id="pusd-${p.id}">${fmtUsd(usd)} USD</span>
+          <span id="stock-${p.id}">${stockHtml}</span>
+        </div>
+        <button class="add-btn" data-pid="${p.id}" ${defaultStock===0?'disabled style="opacity:0.4;cursor:not-allowed"':''}>
+          ${defaultStock===0?'Sold out':'Add to bag'}
+        </button>
+      </div>
+    </div>`;
+  return card;
+}
+
+function renderProducts() {
+  const grids = {
+    prints: document.getElementById('printsGrid'),
+    merch: document.getElementById('merchGrid'),
+    notebooks: document.getElementById('notebooksGrid'),
+    stickers: document.getElementById('stickersGrid'),
+  };
+  Object.values(grids).forEach(g => g.innerHTML = '');
+  SHOP_CONFIG.products.forEach(p => {
+    const grid = grids[p.category];
+    if (grid) grid.appendChild(buildCard(p));
+  });
+
+  // Variant clicks
+  document.querySelectorAll('.variant-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pid = btn.dataset.pid;
+      const v = btn.dataset.v;
+      selectedVariants[pid] = v;
+      document.querySelectorAll(`.variant-chip[data-pid="${pid}"]`)
+        .forEach(b => b.classList.toggle('selected', b.dataset.v === v));
+      const p = SHOP_CONFIG.products.find(x=>x.id===pid);
+      document.getElementById('pngn-'+pid).textContent = fmt(p.priceNgn[v]);
+      document.getElementById('pusd-'+pid).textContent = fmtUsd(p.priceUsd[v]) + ' USD';
+    });
+  });
+
+  // Add-to-bag clicks
+  document.querySelectorAll('.add-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pid = btn.dataset.pid;
+      const p = SHOP_CONFIG.products.find(x=>x.id===pid);
+      const v = selectedVariants[pid] || p.variants[0];
+      addToCart(p, v);
+    });
+  });
+}
+
+/* ─── Filter ─── */
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const f = btn.dataset.filter;
+    document.querySelectorAll('.product-card').forEach(c => {
+      c.classList.toggle('hidden', f!=='all' && c.dataset.category!==f);
+    });
+    // Hide empty section labels
+    ['prints','merch','notebooks','stickers'].forEach(cat => {
+      const label = document.querySelector(`.section-label[data-category="${cat}"]`);
+      const grid = document.getElementById(cat+'Grid');
+      if (!label || !grid) return;
+      const visible = [...grid.querySelectorAll('.product-card')].some(c=>!c.classList.contains('hidden'));
+      label.style.display = (f==='all'||visible) ? '' : 'none';
+      grid.style.display = (f==='all'||visible) ? '' : 'none';
+    });
+  });
+});
+
+/* ─── Cart ─── */
+function addToCart(p, variant) {
+  const key = p.id + '-' + variant;
+  const existing = cart.find(c=>c.key===key);
+  if (existing) {
+    existing.qty++;
+  } else {
+    cart.push({
+      key, id: p.id, name: p.name, variant,
+      priceNgn: p.priceNgn[variant],
+      priceUsd: p.priceUsd[variant],
+      emoji: p.emoji, image: p.image, qty: 1,
+    });
+  }
+  updateCartUI();
+  openCart();
+  showToast('Added to bag ✦');
+}
+
+function updateCartUI() {
+  const badge = document.getElementById('cartBadge');
+  const total = cart.reduce((a,c)=>a+c.qty, 0);
+  badge.textContent = total;
+  badge.classList.toggle('visible', total > 0);
+
+  const itemsEl = document.getElementById('cartItems');
+  const footEl = document.getElementById('cartFoot');
+
+  if (!cart.length) {
+    itemsEl.innerHTML = `<div class="cart-empty">
+      <div class="cart-empty-icon">⊘</div>
+      <p class="cart-empty-text">Your bag is empty.</p>
+    </div>`;
+    footEl.style.display = 'none';
+    return;
+  }
+  footEl.style.display = '';
+
+  itemsEl.innerHTML = cart.map(c=>`
+    <div class="cart-item">
+      <div class="cart-item-img">
+        ${c.image ? `<img src="${c.image}" alt="${c.name}"/>` : c.emoji}
+      </div>
+      <div class="cart-item-info">
+        <div class="cart-item-name">${c.name}</div>
+        <div class="cart-item-variant">${c.variant}</div>
+        <div class="cart-item-qty">
+          <button class="qty-btn" data-key="${c.key}" data-dir="-1">−</button>
+          <span class="qty-val">${c.qty}</span>
+          <button class="qty-btn" data-key="${c.key}" data-dir="1">+</button>
+          <button class="cart-item-remove" data-key="${c.key}">Remove</button>
+        </div>
+      </div>
+      <div>
+        <div class="cart-item-price">${fmt(c.priceNgn * c.qty)}</div>
+      </div>
+    </div>`).join('');
+
+  const ngnTotal = cartNgnTotal();
+  const usdTotal = cartUsdTotal();
+  const deliveryNgn = deliveryFeeNgn();
+  const deliveryUsd = deliveryFeeUsd();
+  document.getElementById('cartTotals').innerHTML = `
+    <div class="cart-total-row"><span>Subtotal</span><span>${fmt(ngnTotal)}</span></div>
+    <div class="cart-total-row"><span>Delivery</span><span>${_deliveryZone && _deliveryZone !== 'pickup' && _deliveryMethod === 'ship' ? deliveryFeeDisplay() : '<span style="color:#6b7c5c">TBD at checkout</span>'}</span></div>
+    <div class="cart-total-row grand"><span>Est. Total</span><span>${fmt(ngnTotal)} <span style="font-size:0.75rem;color:var(--text-muted)">+ delivery</span></span></div>`;
+
+  // Qty / remove events
+  itemsEl.querySelectorAll('.qty-btn').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const item = cart.find(c=>c.key===b.dataset.key);
+      if(!item) return;
+      item.qty += Number(b.dataset.dir);
+      if(item.qty<=0) cart.splice(cart.indexOf(item),1);
+      updateCartUI();
+    });
+  });
+  itemsEl.querySelectorAll('.cart-item-remove').forEach(b=>{
+    b.addEventListener('click',()=>{
+      cart = cart.filter(c=>c.key!==b.dataset.key);
+      updateCartUI();
+    });
+  });
+}
+
+function openCart() {
+  document.getElementById('cartDrawer').classList.add('open');
+  document.getElementById('cartOverlay').classList.add('open');
+}
+function closeCart() {
+  document.getElementById('cartDrawer').classList.remove('open');
+  document.getElementById('cartOverlay').classList.remove('open');
+}
+document.getElementById('cartBtn').addEventListener('click', openCart);
+document.getElementById('cartClose').addEventListener('click', closeCart);
+document.getElementById('cartOverlay').addEventListener('click', closeCart);
+
+/* ─── Checkout modal ─── */
+/* ─── Size guide engine ─── */
+const SIZE_DATA = {
+  tee: {
+    fitNote: "Kay's tees are cut with a relaxed unisex fit. If you prefer a more fitted look, size down. If you're between sizes, size up for comfort. All measurements are of the garment itself — not body measurements.",
+    sizes: [
+      { label:'S',  chest:[96,100],  length:[68,70],  shoulder:[43,44],  sleeve:[20,21]  },
+      { label:'M',  chest:[100,104], length:[70,72],  shoulder:[45,46],  sleeve:[21,22]  },
+      { label:'L',  chest:[108,112], length:[72,74],  shoulder:[47,48],  sleeve:[22,23]  },
+      { label:'XL', chest:[116,120], length:[74,76],  shoulder:[50,51],  sleeve:[23,24]  },
+      { label:'XXL',chest:[124,128], length:[76,78],  shoulder:[53,54],  sleeve:[24,25]  },
+    ],
+  },
+  hoodie: {
+    fitNote: "The hoodies are oversized and drop-shoulder by design — this is intentional. For a classic fit, size down one. For the full streetwear silhouette, go true to size. Measurements are of the garment.",
+    sizes: [
+      { label:'S',  chest:[104,108], length:[64,66],  shoulder:[52,53],  sleeve:[59,61]  },
+      { label:'M',  chest:[112,116], length:[66,68],  shoulder:[55,56],  sleeve:[61,63]  },
+      { label:'L',  chest:[120,124], length:[68,70],  shoulder:[58,59],  sleeve:[63,65]  },
+      { label:'XL', chest:[128,132], length:[70,72],  shoulder:[61,62],  sleeve:[65,67]  },
+      { label:'XXL',chest:[136,140], length:[72,74],  shoulder:[64,65],  sleeve:[67,69]  },
+    ],
+  },
+};
+
+let _sgUnit = 'cm';
+let _sgCurrentType = 'tee';
+
+function cmToIn(val) { return (val / 2.54).toFixed(1); }
+
+function formatRange(range, unit) {
+  if (unit === 'cm') return `${range[0]}–${range[1]}`;
+  return `${cmToIn(range[0])}–${cmToIn(range[1])}`;
+}
+
+function renderSizeTable(type) {
+  const data = SIZE_DATA[type];
+  if (!data) return;
+  const tbody = document.getElementById('sg' + (type === 'tee' ? 'Tee' : 'Hoodie') + 'Body');
+  if (!tbody) return;
+  tbody.innerHTML = data.sizes.map(s => `
+    <tr>
+      <td>${s.label}</td>
+      <td>${formatRange(s.chest,   _sgUnit)}</td>
+      <td>${formatRange(s.length,  _sgUnit)}</td>
+      <td>${formatRange(s.shoulder,_sgUnit)}</td>
+      <td>${formatRange(s.sleeve,  _sgUnit)}</td>
+    </tr>`).join('');
+}
+
+function renderAllSizeTables() {
+  // Update unit labels
+  document.querySelectorAll('.sg-unit').forEach(el => {
+    el.textContent = `(${_sgUnit})`;
+  });
+  renderSizeTable('tee');
+  renderSizeTable('hoodie');
+}
+
+function setUnit(unit) {
+  _sgUnit = unit;
+  document.getElementById('unitCm').classList.toggle('active', unit === 'cm');
+  document.getElementById('unitIn').classList.toggle('active', unit === 'in');
+  renderAllSizeTables();
+}
+
+function openSizeGuide(pid, name, type) {
+  _sgCurrentType = type || 'tee';
+  document.getElementById('sizeGuideProductName').textContent = name;
+
+  // Show/hide correct table section
+  const isTee    = _sgCurrentType === 'tee';
+  const isHoodie = _sgCurrentType === 'hoodie';
+  document.getElementById('sgTeeSection').style.display    = (isTee || !isHoodie) ? '' : 'none';
+  document.getElementById('sgHoodieSection').style.display = isHoodie ? '' : 'none';
+
+  // Fit note
+  const fitData = SIZE_DATA[_sgCurrentType] || SIZE_DATA['tee'];
+  document.getElementById('sgFitNote').textContent = fitData.fitNote;
+
+  renderAllSizeTables();
+  document.getElementById('sizeGuideOverlay').classList.add('open');
+}
+
+function closeSizeGuide() {
+  document.getElementById('sizeGuideOverlay').classList.remove('open');
+}
+
+document.getElementById('sizeGuideClose').addEventListener('click', closeSizeGuide);
+document.getElementById('sizeGuideOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('sizeGuideOverlay')) closeSizeGuide();
+});
+
+/* ─── Delivery zone engine ─── */
+// Large print = any print variant 12×16" or above, or a tube-shipped item
+// All rates in NGN for domestic, USD for international
+const DELIVERY_RATES = {
+  'pickup':   { label: 'Collect in Kaduna',          small: { ngn: 0,    usd: 0  }, large: { ngn: 0,    usd: 0  } },
+  'NG-other': { label: 'Nigeria — GIG Logistics',    small: { ngn: 4500, usd: 0  }, large: { ngn: 6500, usd: 0  } },
+  'WA':       { label: 'West Africa — UPS Expedited',small: { ngn: 0,    usd: 22 }, large: { ngn: 0,    usd: 30 } },
+  'EU':       { label: 'Europe / UK — UPS Expedited',small: { ngn: 0,    usd: 35 }, large: { ngn: 0,    usd: 48 } },
+  'NA':       { label: 'North America — UPS Expedited',small:{ ngn: 0,   usd: 42 }, large: { ngn: 0,    usd: 58 } },
+  'AO':       { label: 'Asia / Oceania — UPS Expedited',small:{ ngn: 0,  usd: 50 }, large: { ngn: 0,    usd: 68 } },
+  'ROW':      { label: 'Rest of world — UPS Expedited',small:{ ngn: 0,   usd: 48 }, large: { ngn: 0,    usd: 62 } },
+};
+
+// Large print threshold — tube shipped
+const LARGE_PRINT_VARIANTS = ['12×16"','12×18"','18×24"','24×36"'];
+
+let _deliveryMethod = 'pickup'; // 'pickup' | 'ship'
+let _deliveryZone   = 'pickup';
+
+function cartHasLargePrint() {
+  return cart.some(c => {
+    const p = SHOP_CONFIG.products.find(x => x.id === c.id);
+    return p && p.category === 'prints' && LARGE_PRINT_VARIANTS.includes(c.variant);
+  });
+}
+
+function deliveryFeeNgn() {
+  const zone = DELIVERY_RATES[_deliveryZone] || DELIVERY_RATES['ROW'];
+  const tier = cartHasLargePrint() ? zone.large : zone.small;
+  if (tier.ngn > 0) return tier.ngn;
+  // Convert USD fee to NGN at approx 1600 NGN/USD for display/paystack
+  return tier.usd > 0 ? Math.round(tier.usd * 1600) : 0;
+}
+
+function deliveryFeeUsd() {
+  const zone = DELIVERY_RATES[_deliveryZone] || DELIVERY_RATES['ROW'];
+  const tier = cartHasLargePrint() ? zone.large : zone.small;
+  if (tier.usd > 0) return tier.usd;
+  // Convert NGN to USD
+  return tier.ngn > 0 ? +(tier.ngn / 1600).toFixed(2) : 0;
+}
+
+function deliveryFeeDisplay() {
+  const zone = DELIVERY_RATES[_deliveryZone] || DELIVERY_RATES['ROW'];
+  const tier = cartHasLargePrint() ? zone.large : zone.small;
+  if (_deliveryZone === 'pickup') return 'Free';
+  if (tier.ngn > 0) return fmt(tier.ngn);
+  return '$' + tier.usd.toFixed(0) + ' USD (~' + fmt(Math.round(tier.usd * 1600)) + ')';
+}
+
+function setDeliveryMethod(method) {
+  _deliveryMethod = method;
+  document.getElementById('pickupBtn').style.borderColor = method === 'pickup' ? 'var(--clay)' : '';
+  document.getElementById('pickupBtn').style.color       = method === 'pickup' ? 'var(--clay)' : '';
+  document.getElementById('shipBtn').style.borderColor   = method === 'ship'   ? 'var(--clay)' : '';
+  document.getElementById('shipBtn').style.color         = method === 'ship'   ? 'var(--clay)' : '';
+  document.getElementById('shippingFields').style.display = method === 'ship'   ? '' : 'none';
+  document.getElementById('pickupFields').style.display   = method === 'pickup' ? '' : 'none';
+  if (method === 'pickup') {
+    _deliveryZone = 'pickup';
+  } else {
+    _deliveryZone = document.getElementById('ckCountry').value || '';
+  }
+  updateDeliveryEstimate();
+  buildOrderSummary();
+}
+
+function updateDeliveryEstimate() {
+  const el    = document.getElementById('deliveryEstimate');
+  const zone  = _deliveryZone;
+  if (!zone || zone === 'pickup' || _deliveryMethod === 'pickup') {
+    el.style.display = 'none';
+    return;
+  }
+  const info = DELIVERY_RATES[zone] || DELIVERY_RATES['ROW'];
+  const isLarge = cartHasLargePrint();
+  el.style.display = '';
+  document.getElementById('deliveryZoneLabel').textContent = info.label;
+  document.getElementById('deliveryFeeDisplay').textContent = deliveryFeeDisplay();
+  document.getElementById('deliveryFeeNote').textContent =
+    isLarge ? 'Large print(s) shipped in protective tube' : 'Flat-pack envelope shipping';
+}
+
+// Wire up country selector
+document.addEventListener('DOMContentLoaded', () => {});
+// Country change
+document.getElementById('ckCountry') && document.getElementById('ckCountry').addEventListener('change', function() {
+  _deliveryZone = this.value || '';
+  updateDeliveryEstimate();
+  buildOrderSummary();
+});
+
+// Init pickup as default active
+setDeliveryMethod('pickup');
+
+/* ─── Updated total helpers (include delivery) ─── */
+function cartNgnTotal() { return cart.reduce((a,c)=>a+c.priceNgn*c.qty, 0); }
+function cartUsdTotal() { return cart.reduce((a,c)=>a+c.priceUsd*c.qty, 0); }
+function grandTotalNgn() { return cartNgnTotal() + deliveryFeeNgn(); }
+function grandTotalUsd() { return +(cartUsdTotal() + deliveryFeeUsd()).toFixed(2); }
+
+function openCheckout(defaultTab) {
+  if (!cart.length) return;
+  closeCart();
+  buildOrderSummary();
+  buildCryptoOptions();
+  document.getElementById('formScreen').style.display='';
+  document.getElementById('confirmScreen').classList.remove('active');
+  document.getElementById('checkoutOverlay').classList.add('open');
+  if (defaultTab) switchPayTab(defaultTab);
+}
+
+function buildOrderSummary() {
+  const lines = cart.map(c=>`
+    <div class="order-line">
+      <span>${c.name} · ${c.variant} × ${c.qty}</span>
+      <span>${fmt(c.priceNgn * c.qty)}</span>
+    </div>`).join('');
+
+  const deliveryLine = _deliveryZone && _deliveryZone !== 'pickup' && _deliveryMethod === 'ship'
+    ? `<div class="order-line">
+        <span>Delivery${cartHasLargePrint() ? ' (tube)' : ''}</span>
+        <span>${deliveryFeeDisplay()}</span>
+       </div>`
+    : `<div class="order-line"><span>Delivery</span><span style="color:#6b7c5c">Free — Kaduna pickup</span></div>`;
+
+  document.getElementById('orderSummary').innerHTML = `
+    <p class="order-summary-label">Order summary</p>
+    ${lines}
+    ${deliveryLine}
+    <div class="order-total">
+      <span class="order-total-label">Total</span>
+      <span class="order-total-val">${fmt(grandTotalNgn())} <span style="font-size:0.78rem;color:var(--text-muted)">/ $${grandTotalUsd().toFixed(0)}</span></span>
+    </div>`;
+}
+
+function buildCryptoOptions() {
+  const usd     = grandTotalUsd();
+  const ethRate = 0.00033;
+  const xtzRate = 0.33;
+  const ethAmt  = (usd * ethRate).toFixed(5);
+  const usdcAmt = usd.toFixed(2);
+  const xtzAmt  = (usd * xtzRate).toFixed(4);
+
+  let html = '';
+
+  if (SHOP_CONFIG.ethAddress) {
+    html += cryptoBlock('ETH · Ethereum',          `${ethAmt} ETH`,       SHOP_CONFIG.ethAddress);
+    html += cryptoBlock('USDC · ERC-20',           `${usdcAmt} USDC`,     SHOP_CONFIG.ethAddress);
+    html += cryptoBlock('USDT · ERC-20',           `${usdcAmt} USDT`,     SHOP_CONFIG.ethAddress);
+  }
+  if (SHOP_CONFIG.tezosAddress) {
+    html += cryptoBlock('XTZ · Tezos',             `${xtzAmt} XTZ`,       SHOP_CONFIG.tezosAddress);
+  }
+
+  if (!html) html = `<p class="pay-info" style="color:var(--clay)">Crypto addresses not configured yet. Contact Kay directly.</p>`;
+  document.getElementById('cryptoOptions').innerHTML = html;
+
+  // Copy buttons
+  document.querySelectorAll('.copy-btn').forEach(b=>{
+    b.addEventListener('click',()=>{
+      navigator.clipboard.writeText(b.dataset.addr).then(()=>{
+        b.textContent='Copied ✓'; b.classList.add('copied');
+        setTimeout(()=>{ b.textContent='Copy address'; b.classList.remove('copied'); }, 2000);
+      });
+    });
+  });
+}
+
+function cryptoBlock(name, amount, address) {
+  return `<div class="crypto-option">
+    <div class="crypto-name">${name}</div>
+    <div class="crypto-amount">${amount}</div>
+    <div class="crypto-address">${address}</div>
+    <button class="copy-btn" data-addr="${address}">Copy address</button>
+  </div>`;
+}
+
+function switchPayTab(tab) {
+  document.querySelectorAll('.pay-tab').forEach(t=>t.classList.toggle('active', t.dataset.pay===tab));
+  document.querySelectorAll('.pay-panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+tab));
+}
+document.querySelectorAll('.pay-tab').forEach(t=>{
+  t.addEventListener('click',()=>switchPayTab(t.dataset.pay));
+});
+
+function closeCheckout() {
+  document.getElementById('checkoutOverlay').classList.remove('open');
+}
+document.getElementById('checkoutClose').addEventListener('click', closeCheckout);
+document.getElementById('checkoutOverlay').addEventListener('click', e=>{
+  if(e.target===document.getElementById('checkoutOverlay')) closeCheckout();
+});
+
+document.getElementById('checkoutBtn').addEventListener('click', ()=>openCheckout('paystack'));
+document.getElementById('paystackQuickBtn').addEventListener('click', ()=>openCheckout('paystack'));
+document.getElementById('flutterwaveQuickBtn').addEventListener('click', ()=>openCheckout('flutterwave'));
+document.getElementById('cryptoQuickBtn').addEventListener('click', ()=>openCheckout('crypto'));
+document.getElementById('tezosQuickBtn').addEventListener('click', ()=>openCheckout('tezos'));
+
+/* ─── Payment handlers ─── */
+function getFormData() {
+  const countryEl = document.getElementById('ckCountry');
+  const addressEl = document.getElementById('ckAddress');
+  return {
+    name:           document.getElementById('ckName').value.trim(),
+    email:          document.getElementById('ckEmail').value.trim(),
+    phone:          document.getElementById('ckPhone').value.trim(),
+    address:        _deliveryMethod === 'pickup' ? 'Kaduna pickup' : (addressEl ? addressEl.value.trim() : ''),
+    country:        _deliveryMethod === 'pickup' ? 'Nigeria (Kaduna pickup)' : (countryEl ? countryEl.options[countryEl.selectedIndex]?.text || '' : ''),
+    deliveryMethod: _deliveryMethod,
+    deliveryZone:   _deliveryZone,
+    deliveryFeeNgn: deliveryFeeNgn(),
+    deliveryFeeUsd: deliveryFeeUsd(),
+  };
+}
+function validateForm() {
+  const d = getFormData();
+  if (!d.name)  { showToast('Please enter your name'); return false; }
+  if (!d.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) { showToast('Please enter a valid email'); return false; }
+  if (_deliveryMethod === 'ship' && !_deliveryZone) { showToast('Please select your country'); return false; }
+  if (_deliveryMethod === 'ship' && !d.address) { showToast('Please enter your delivery address'); return false; }
+  return true;
+}
+
+function showConfirmation(method, ref) {
+  document.getElementById('formScreen').style.display='none';
+  const screen = document.getElementById('confirmScreen');
+  screen.classList.add('active');
+  document.getElementById('confirmMsg').textContent =
+    (method === 'crypto' || method === 'tezos' || method === 'eth')
+      ? 'Your payment details have been received. Kay will confirm once the transaction is verified on-chain — usually within 30 minutes.'
+      : 'Thank you for your order. Kay will confirm fulfilment within 24 hours — check your inbox for a receipt.';
+  document.getElementById('confirmRef').textContent = ref ? 'Reference: ' + ref : '';
+  cart = [];
+  updateCartUI();
+}
+
+// Paystack
+document.getElementById('paystackPayBtn').addEventListener('click', ()=>{
+  if(!validateForm()) return;
+  const d = getFormData();
+  const key = window.__PAYSTACK_KEY__ || '';
+  if(!key) { showToast('Paystack key not configured'); return; }
+  const handler = PaystackPop.setup({
+    key,
+    email: d.email,
+    amount: grandTotalNgn() * 100,
+    currency: 'NGN',
+    ref: 'KW-' + Date.now(),
+    metadata: { name: d.name, phone: d.phone, address: d.address, cart: JSON.stringify(cart) },
+    callback: (res) => { showConfirmation('paystack', res.reference); notifyOrder(d, res.reference, 'paystack'); },
+    onClose: () => {},
+  });
+  handler.openIframe();
+});
+
+// Flutterwave
+document.getElementById('flutterwavePayBtn').addEventListener('click', ()=>{
+  if(!validateForm()) return;
+  const d = getFormData();
+  const key = window.__FLUTTERWAVE_KEY__ || '';
+  if(!key) { showToast('Flutterwave key not configured'); return; }
+  FlutterwaveCheckout({
+    public_key: key,
+    tx_ref: 'KW-FW-' + Date.now(),
+    amount: grandTotalNgn(),
+    currency: 'NGN',
+    customer: { email: d.email, name: d.name, phone_number: d.phone },
+    customizations: { title: "Kay's Works", description: 'Shop order', logo: '' },
+    meta: { address: d.address, cart: JSON.stringify(cart) },
+    callback: (res) => { FlutterwaveCheckout().close && FlutterwaveCheckout().close(); showConfirmation('flutterwave', res.transaction_id); notifyOrder(d, res.transaction_id, 'flutterwave'); },
+    onclose: () => {},
+  });
+});
+
+// Crypto confirm
+document.getElementById('cryptoConfirmBtn').addEventListener('click', ()=>{
+  if(!validateForm()) return;
+  const d = getFormData();
+  const ref = 'KW-CRYPTO-' + Date.now();
+  notifyOrder(d, ref, 'crypto');
+  showConfirmation('crypto', ref);
+});
+
+// Notify via site-form API (reuse existing backend)
+async function notifyOrder(customer, ref, method) {
+  const deliveryInfo = customer.deliveryMethod === 'pickup'
+    ? 'Kaduna pickup (free)'
+    : `Ship to: ${customer.address}, ${customer.country} — Fee: ${fmt(customer.deliveryFeeNgn)} / $${customer.deliveryFeeUsd}${cartHasLargePrint() ? ' (tube)' : ''}`;
+
+  // 1. Record order in Supabase — decrements stock
+  try {
+    await fetch('/api/shop/order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name:             customer.name,
+        email:            customer.email,
+        phone:            customer.phone || '',
+        address:          customer.address || '',
+        items:            cart.map(c => ({
+          id: c.id, name: c.name, variant: c.variant, qty: c.qty,
+          priceNgn: c.priceNgn, priceUsd: c.priceUsd,
+        })),
+        total_ngn:        grandTotalNgn(),
+        total_usd:        grandTotalUsd(),
+        delivery_fee_ngn: customer.deliveryFeeNgn,
+        delivery_method:  customer.deliveryMethod,
+        delivery_zone:    customer.deliveryZone,
+        payment_method:   method,
+        payment_ref:      ref,
+      }),
+    });
+  } catch(_) {}
+
+  // 2. Email alert to Kay
+  try {
+    await fetch('/api/site-form', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        form_type:       'commission',
+        name:            customer.name,
+        email:           customer.email,
+        commission_type: 'shop-order',
+        message: `Shop order — ${method.toUpperCase()} · Ref: ${ref}\n\nDelivery: ${deliveryInfo}\nPhone: ${customer.phone||'—'}\n\nItems:\n${cart.map(c=>`${c.name} (${c.variant}) × ${c.qty} — ${fmt(c.priceNgn*c.qty)}`).join('\n')}\n\nSubtotal: ${fmt(cartNgnTotal())} / $${cartUsdTotal()}\nDelivery: ${fmt(customer.deliveryFeeNgn)} / $${customer.deliveryFeeUsd}\nGrand total: ${fmt(grandTotalNgn())} / $${grandTotalUsd()}`,
+      }),
+    });
+  } catch(_) {}
+}
+
+document.getElementById('continueShopping').addEventListener('click', ()=>{
+  closeCheckout();
+});
+
+/* ─── Admin ─── */
+const ADMIN_PW = ''; // checked server-side — this is just UX gating
+let adminUnlocked = false;
+
+document.getElementById('adminFab').addEventListener('click', ()=>{
+  document.getElementById('adminPanel').classList.add('open');
+  if (!adminUnlocked) {
+    document.getElementById('adminLogin').style.display='';
+    document.getElementById('adminConfig').style.display='none';
+  }
+});
+
+function closeAdmin() { document.getElementById('adminPanel').classList.remove('open'); }
+document.getElementById('adminClose').addEventListener('click', closeAdmin);
+document.getElementById('adminConfigClose').addEventListener('click', closeAdmin);
+document.getElementById('adminPanel').addEventListener('click', e=>{
+  if(e.target===document.getElementById('adminPanel')) closeAdmin();
+});
+
+document.getElementById('adminLoginBtn').addEventListener('click', async ()=>{
+  const pw = document.getElementById('adminPwInput').value;
+  try {
+    const res = await fetch('/api/admin/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ password: pw }),
+    });
+    if (res.ok) {
+      const { token } = await res.json();
+      localStorage.setItem('kaysworks-admin-token', token);
+      adminUnlocked = true;
+      document.getElementById('adminLogin').style.display='none';
+      document.getElementById('adminConfig').style.display='';
+      renderAdminProducts();
+      loadAdminConfig();
+    } else { showToast('Incorrect password'); }
+  } catch(_) { showToast('Server error'); }
+});
+
+function loadAdminConfig() {
+  // addresses are hardcoded and shown read-only in the admin panel
+}
+
+function renderAdminProducts() {
+  const el = document.getElementById('adminProducts');
+
+  // Separate prints from other products for dedicated sections
+  const prints = SHOP_CONFIG.products.filter(p => p.category === 'prints');
+  const others = SHOP_CONFIG.products.filter(p => p.category !== 'prints');
+
+  let html = '';
+
+  // ── Print admin section ───────────────────────────────────────────────
+  if (prints.length) {
+    html += `<p class="admin-section-title" style="margin-top:0">Print sizes &amp; availability</p>
+    <p style="font-size:0.82rem;color:var(--text-muted);line-height:1.6;margin-bottom:1rem">
+      All prints: 100% cotton rag · 300gsm · 10-colour archival pigment ink · min 1-inch white border (INPRNT spec).<br/>
+      Check the sizes you want to offer. Prices are editable per size.
+    </p>`;
+
+    prints.forEach((p, pi) => {
+      const realIdx = SHOP_CONFIG.products.indexOf(p);
+      html += `<div class="admin-product-row" data-idx="${realIdx}" style="grid-template-columns:1fr;gap:0.6rem">
+        <button class="admin-del-btn" data-idx="${realIdx}" title="Remove">✕</button>
+        <div class="admin-prod-name">${p.name}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem">
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Print name</label>
+            <input class="form-input ap-name" data-idx="${realIdx}" value="${p.name}"/>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Badge (optional)</label>
+            <input class="form-input ap-badge" data-idx="${realIdx}" value="${p.badge||''}"/>
+          </div>
+        </div>
+        <div class="form-row" style="margin:0">
+          <label class="form-label">Description</label>
+          <input class="form-input ap-desc" data-idx="${realIdx}" value="${p.desc}"/>
+        </div>
+        <div class="form-row" style="margin:0">
+          <label class="form-label">Image URL</label>
+          <input class="form-input ap-img" data-idx="${realIdx}" value="${p.image||''}"/>
+        </div>
+        <label class="form-label" style="margin-top:0.4rem">Available sizes &amp; prices</label>
+        <div style="border:1px solid var(--border);border-radius:2px;overflow:hidden" id="size-table-${realIdx}">
+          <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr auto;gap:0;font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);padding:0.6rem 0.8rem;border-bottom:1px solid var(--border);background:var(--bg-alt)">
+            <span style="min-width:20px"></span>
+            <span>Size</span><span>NGN price</span><span>USD price</span><span></span>
+          </div>
+          ${p.variants.map(v => {
+            const isAvail = (p.availableVariants||[]).includes(v);
+            const isCustom = !(p._standardVariants||[]).includes(v);
+            return `<div class="ap-size-row" data-idx="${realIdx}" data-v="${v}" style="display:grid;grid-template-columns:auto 1fr 1fr 1fr auto;gap:0;align-items:center;padding:0.5rem 0.8rem;border-bottom:1px solid var(--border)">
+              <input type="checkbox" class="ap-size-check" data-idx="${realIdx}" data-v="${v}" ${isAvail?'checked':''} style="margin-right:0.7rem;accent-color:var(--rust);width:14px;height:14px"/>
+              <span style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--text)">${v}${isCustom?` <span style="font-size:0.55rem;color:var(--gold);font-family:'Cinzel',serif;letter-spacing:0.1em">custom</span>`:''}</span>
+              <input class="form-input ap-size-ngn" data-idx="${realIdx}" data-v="${v}" value="${p.priceNgn[v]||''}" placeholder="₦" style="padding:0.35rem 0.5rem;font-size:0.78rem;margin:0 0.4rem 0 0"/>
+              <input class="form-input ap-size-usd" data-idx="${realIdx}" data-v="${v}" value="${p.priceUsd[v]||''}" placeholder="$" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+              ${isCustom ? `<button class="ap-remove-custom" data-idx="${realIdx}" data-v="${v}" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem;transition:color 0.15s" title="Remove">✕</button>` : '<span></span>'}
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:0.4rem;margin-top:0.6rem;align-items:flex-end">
+          <div>
+            <label class="form-label">Custom size label</label>
+            <input class="form-input ap-custom-size" data-idx="${realIdx}" placeholder='e.g. 16×20"' style="padding:0.35rem 0.6rem;font-size:0.82rem"/>
+          </div>
+          <div>
+            <label class="form-label">NGN price</label>
+            <input class="form-input ap-custom-ngn" data-idx="${realIdx}" placeholder="₦" type="number" style="padding:0.35rem 0.6rem;font-size:0.82rem"/>
+          </div>
+          <div>
+            <label class="form-label">USD price</label>
+            <input class="form-input ap-custom-usd" data-idx="${realIdx}" placeholder="$" type="number" style="padding:0.35rem 0.6rem;font-size:0.82rem"/>
+          </div>
+          <button class="ap-add-custom-btn admin-save-btn" data-idx="${realIdx}" style="padding:0.5rem 0.9rem;margin:0;white-space:nowrap;font-size:0.52rem">+ Add size</button>
+        </div>
+      </div>`;
+    });
+  }
+
+  // ── Other products ────────────────────────────────────────────────────
+  if (others.length) {
+    html += `<p class="admin-section-title" style="margin-top:1.6rem">Merch, notebooks &amp; stickers</p>`;
+    others.forEach(p => {
+      const realIdx = SHOP_CONFIG.products.indexOf(p);
+      html += `<div class="admin-product-row" data-idx="${realIdx}">
+        <button class="admin-del-btn" data-idx="${realIdx}" title="Remove">✕</button>
+        <div style="grid-column:1/-1" class="admin-prod-name">${p.name}</div>
+        <div class="form-row">
+          <label class="form-label">Name</label>
+          <input class="form-input ap-name" data-idx="${realIdx}" value="${p.name}"/>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Category</label>
+          <select class="form-select ap-cat" data-idx="${realIdx}">
+            ${['prints','merch','notebooks','stickers'].map(c=>`<option${p.category===c?' selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-row" style="grid-column:1/-1">
+          <label class="form-label">Description</label>
+          <input class="form-input ap-desc" data-idx="${realIdx}" value="${p.desc}"/>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Variants (comma-separated)</label>
+          <input class="form-input ap-variants" data-idx="${realIdx}" value="${p.variants.join(', ')}"/>
+        </div>
+        <div class="form-row">
+          <label class="form-label">NGN prices (per variant, comma)</label>
+          <input class="form-input ap-ngn" data-idx="${realIdx}" value="${p.variants.map(v=>p.priceNgn[v]).join(', ')}"/>
+        </div>
+        <div class="form-row">
+          <label class="form-label">USD prices (per variant, comma)</label>
+          <input class="form-input ap-usd" data-idx="${realIdx}" value="${p.variants.map(v=>p.priceUsd[v]).join(', ')}"/>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Badge (optional)</label>
+          <input class="form-input ap-badge" data-idx="${realIdx}" value="${p.badge||''}"/>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Image URL (optional)</label>
+          <input class="form-input ap-img" data-idx="${realIdx}" value="${p.image||''}"/>
+        </div>
+      </div>`;
+    });
+  }
+
+  el.innerHTML = html;
+
+  // Delete product buttons
+  el.querySelectorAll('.admin-del-btn').forEach(b => {
+    b.addEventListener('click', async () => {
+      const idx   = Number(b.dataset.idx);
+      const p     = SHOP_CONFIG.products[idx];
+      const token = localStorage.getItem('kaysworks-admin-token');
+      if (p && token && !String(p.id).startsWith('prod-')) {
+        try { await apiDeleteProduct(p.id, token); } catch(e) { showToast('Delete failed: ' + e.message); return; }
+      }
+      SHOP_CONFIG.products.splice(idx, 1);
+      renderAdminProducts();
+    });
+  });
+
+  // Add custom size buttons
+  el.querySelectorAll('.ap-add-custom-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx     = Number(btn.dataset.idx);
+      const p       = SHOP_CONFIG.products[idx];
+      const row     = btn.closest('.admin-product-row');
+      const sizeEl  = row.querySelector('.ap-custom-size');
+      const ngnEl   = row.querySelector('.ap-custom-ngn');
+      const usdEl   = row.querySelector('.ap-custom-usd');
+      const label   = sizeEl.value.trim();
+      const ngn     = Number(ngnEl.value) || 0;
+      const usd     = Number(usdEl.value) || 0;
+      if (!label) { showToast('Enter a size label first'); return; }
+      if (p.variants.includes(label)) { showToast('That size already exists'); return; }
+
+      // Add to variants, prices and availableVariants
+      p.variants.push(label);
+      p.priceNgn[label] = ngn;
+      p.priceUsd[label] = usd;
+      if (!p.availableVariants) p.availableVariants = [];
+      p.availableVariants.push(label); // custom sizes default to available
+
+      // Clear inputs
+      sizeEl.value = ''; ngnEl.value = ''; usdEl.value = '';
+
+      // Re-render just this print's admin panel
+      renderAdminProducts();
+    });
+  });
+
+  // Remove custom size buttons
+  el.querySelectorAll('.ap-remove-custom').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.idx);
+      const v   = btn.dataset.v;
+      const p   = SHOP_CONFIG.products[idx];
+      p.variants = p.variants.filter(x => x !== v);
+      delete p.priceNgn[v];
+      delete p.priceUsd[v];
+      p.availableVariants = (p.availableVariants||[]).filter(x => x !== v);
+      renderAdminProducts();
+    });
+  });
+
+document.getElementById('addProductBtn').addEventListener('click', ()=>{
+  SHOP_CONFIG.products.push({
+    id: 'prod-'+uid(), category: 'prints', name: 'New Product',
+    desc: 'Product description', emoji: '✦',
+    variants: ['One size'],
+    priceNgn: { 'One size': 10000 },
+    priceUsd: { 'One size': 7 },
+    badge: '', image: '',
+  });
+  renderAdminProducts();
+});
+
+document.getElementById('saveConfigBtn').addEventListener('click', async () => {
+  const token = localStorage.getItem('kaysworks-admin-token');
+  if (!token) { showToast('Not authenticated'); return; }
+
+  const btn = document.getElementById('saveConfigBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  try {
+    // ── Read and save each product ──────────────────────────────────────
+    document.querySelectorAll('.admin-product-row').forEach(row => {
+      const idx = Number(row.dataset.idx);
+      const p   = SHOP_CONFIG.products[idx];
+      if (!p) return;
+
+      const nameEl  = row.querySelector('.ap-name');
+      const descEl  = row.querySelector('.ap-desc');
+      const badgeEl = row.querySelector('.ap-badge');
+      const imgEl   = row.querySelector('.ap-img');
+      if (nameEl)  p.name  = nameEl.value.trim() || p.name;
+      if (descEl)  p.desc  = descEl.value.trim();
+      if (badgeEl) p.badge = badgeEl.value.trim();
+      if (imgEl)   p.image = imgEl.value.trim();
+
+      if (p.category === 'prints') {
+        const availArr = [];
+        row.querySelectorAll('.ap-size-check').forEach(chk => {
+          const v = chk.dataset.v;
+          if (chk.checked) availArr.push(v);
+          const ngnIn = row.querySelector(`.ap-size-ngn[data-v="${v}"]`);
+          const usdIn = row.querySelector(`.ap-size-usd[data-v="${v}"]`);
+          if (ngnIn) p.priceNgn[v] = Number(ngnIn.value) || p.priceNgn[v];
+          if (usdIn) p.priceUsd[v] = Number(usdIn.value) || p.priceUsd[v];
+        });
+        p.availableVariants = availArr;
+      } else {
+        const catEl      = row.querySelector('.ap-cat');
+        const variantsEl = row.querySelector('.ap-variants');
+        const ngnEl      = row.querySelector('.ap-ngn');
+        const usdEl      = row.querySelector('.ap-usd');
+        if (catEl) p.category = catEl.value;
+        if (variantsEl) {
+          const variants = variantsEl.value.split(',').map(v=>v.trim()).filter(Boolean);
+          const ngnVals  = ngnEl ? ngnEl.value.split(',').map(v=>Number(v.trim())||0) : [];
+          const usdVals  = usdEl ? usdEl.value.split(',').map(v=>Number(v.trim())||0) : [];
+          p.variants = variants;
+          p.priceNgn = {}; p.priceUsd = {};
+          variants.forEach((v,j) => { p.priceNgn[v] = ngnVals[j]||0; p.priceUsd[v] = usdVals[j]||0; });
+        }
+      }
+    });
+
+    // Save all products to API
+    await Promise.all(SHOP_CONFIG.products.map(p => apiSaveProduct(p, token)));
+
+    // Save config (wallet addresses handled server-side — just upsert)
+    await fetch('/api/admin/shop-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
+      body: JSON.stringify({
+        eth_address:   SHOP_CONFIG.ethAddress,
+        tezos_address: SHOP_CONFIG.tezosAddress,
+      }),
+    });
+
+    renderProducts();
+    showToast('Saved ✦');
+    closeAdmin();
+  } catch (e) {
+    showToast('Save failed: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save configuration';
+  }
+});
+
+/* ─── Tezos / Beacon payment ─── */
+// Uses the Beacon SDK loaded from the taquito-bundle or unpkg.
+// We load it lazily only when the Tezos panel is first activated.
+
+let _beaconClient = null;
+let _tezosWallet  = null;
+let _tezosConnectedAddr = null;
+const XTZ_PER_USD = 0.33; // rough rate — swap for live fetch if desired
+
+function tezosXtzAmount() {
+  return (grandTotalUsd() * XTZ_PER_USD).toFixed(4);
+}
+
+function tezosShortAddr(addr) {
+  if (!addr) return '';
+  return addr.slice(0,6) + '…' + addr.slice(-4);
+}
+
+async function loadBeacon() {
+  if (window.beacon) return window.beacon;
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/@airgap/beacon-sdk@4.3.0/dist/beacon-sdk.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  return window.beacon || window['@airgap/beacon-sdk'];
+}
+
+async function initBeaconClient() {
+  if (_beaconClient) return _beaconClient;
+  const sdk = await loadBeacon();
+  const BeaconWallet = sdk?.BeaconWallet || sdk?.DAppClient;
+  _beaconClient = new BeaconWallet({
+    name: "Kay's Works Shop",
+    network: { type: 'mainnet' },
+  });
+  return _beaconClient;
+}
+
+function renderTezosPanel() {
+  const addr = SHOP_CONFIG.tezosAddress;
+  const xtz  = tezosXtzAmount();
+
+  // Amount + address block
+  const amtBlock  = document.getElementById('tezosAmountBlock');
+  const toAddrEl  = document.getElementById('tezosToAddr');
+  const xtzAmtEl  = document.getElementById('tezosXtzAmount');
+  const sendAmtEl = document.getElementById('tezosSendAmt');
+
+  if (addr) {
+    amtBlock.style.display = '';
+    toAddrEl.textContent   = addr;
+    xtzAmtEl.textContent   = xtz + ' XTZ';
+    if (sendAmtEl) sendAmtEl.textContent = xtz;
+  } else {
+    amtBlock.style.display = 'none';
+  }
+
+  // Copy address button
+  const copyBtn = document.getElementById('tezosCopyBtn');
+  if (copyBtn) {
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(addr).then(() => {
+        copyBtn.textContent = 'Copied ✓';
+        setTimeout(() => { copyBtn.textContent = 'Copy address'; }, 2000);
+      });
+    };
+  }
+
+  // Wallet info row
+  if (_tezosConnectedAddr) {
+    document.getElementById('tezosWalletInfo').style.display = '';
+    document.getElementById('tezosWalletAddr').textContent = tezosShortAddr(_tezosConnectedAddr);
+    document.getElementById('tezosConnectBtn').style.display = 'none';
+    document.getElementById('tezosSendBtn').style.display = addr ? '' : 'none';
+  } else {
+    document.getElementById('tezosWalletInfo').style.display = 'none';
+    document.getElementById('tezosConnectBtn').style.display = '';
+    document.getElementById('tezosSendBtn').style.display = 'none';
+  }
+}
+
+// Connect wallet
+document.getElementById('tezosConnectBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('tezosConnectBtn');
+  btn.disabled = true; btn.textContent = 'Connecting…';
+  try {
+    const client = await initBeaconClient();
+    // Request permissions triggers wallet popup
+    await client.requestPermissions({ network: { type: 'mainnet' } });
+    const accs = await client.getActiveAccount();
+    _tezosConnectedAddr = accs?.address || null;
+    if (!_tezosConnectedAddr) throw new Error('No account returned');
+    renderTezosPanel();
+    showToast('Wallet connected ✦');
+  } catch (e) {
+    showToast('Could not connect wallet');
+    console.error('Beacon connect error:', e);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Connect Tezos Wallet';
+  }
+});
+
+// Disconnect
+document.getElementById('tezosDisconnectBtn').addEventListener('click', async () => {
+  try {
+    if (_beaconClient) await _beaconClient.clearActiveAccount();
+  } catch(_) {}
+  _tezosConnectedAddr = null;
+  renderTezosPanel();
+});
+
+// Send XTZ via wallet
+document.getElementById('tezosSendBtn').addEventListener('click', async () => {
+  if (!validateForm()) return;
+  const toAddr = SHOP_CONFIG.tezosAddress;
+  if (!toAddr) { showToast('Tezos address not configured'); return; }
+  if (!_tezosConnectedAddr) { showToast('Please connect your wallet first'); return; }
+
+  const btn = document.getElementById('tezosSendBtn');
+  btn.disabled = true; btn.textContent = 'Waiting for wallet…';
+
+  try {
+    const client  = await initBeaconClient();
+    const mutez   = Math.round(parseFloat(tezosXtzAmount()) * 1_000_000);
+    const result  = await client.requestOperation({
+      operationDetails: [{
+        kind: 'transaction',
+        amount: String(mutez),
+        destination: toAddr,
+      }],
+    });
+    const ref = 'KW-XTZ-' + (result.transactionHash || Date.now());
+    const d = getFormData();
+    notifyOrder(d, ref, 'tezos');
+    showConfirmation('tezos', ref);
+  } catch (e) {
+    showToast('Transaction failed or cancelled');
+    console.error('Beacon send error:', e);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send ' + tezosXtzAmount() + ' XTZ';
+  }
+});
+
+// Manual confirm (fallback for Temple / Kukai desktop)
+document.getElementById('tezosManualBtn').addEventListener('click', () => {
+  if (!validateForm()) return;
+  const d = getFormData();
+  const ref = 'KW-XTZ-MANUAL-' + Date.now();
+  notifyOrder(d, ref, 'tezos');
+  showConfirmation('tezos', ref);
+});
+
+// Re-render Tezos panel whenever that tab becomes active
+const _origSwitchPayTab = switchPayTab;
+// Patch switchPayTab to trigger Tezos render
+const _patchedSwitch = function(tab) {
+  _origSwitchPayTab(tab);
+  if (tab === 'tezos') renderTezosPanel();
+};
+// Replace all tab click handlers with patched version
+document.querySelectorAll('.pay-tab').forEach(t => {
+  t.replaceWith(t.cloneNode(true)); // remove old listener
+});
+document.querySelectorAll('.pay-tab').forEach(t => {
+  t.addEventListener('click', () => _patchedSwitch(t.dataset.pay));
+});
+
+/* ─── Inject payment keys (set via env on your server or meta tags) ─── */
+// These should be injected server-side as meta tags, e.g.:
+// <meta name="paystack-key" content="pk_live_…"/>
+// <meta name="flutterwave-key" content="FLWPUBK_TEST-…"/>
+const paystackMeta = document.querySelector('meta[name="paystack-key"]');
+const flwMeta = document.querySelector('meta[name="flutterwave-key"]');
+if (paystackMeta) window.__PAYSTACK_KEY__ = paystackMeta.content;
+if (flwMeta) window.__FLUTTERWAVE_KEY__ = flwMeta.content;
+
+/* ─── Load shop data from API ─── */
+async function loadShopData() {
+  try {
+    const [productsRes, configRes] = await Promise.all([
+      fetch('/api/shop/products'),
+      fetch('/api/shop/config'),
+    ]);
+
+    if (productsRes.ok) {
+      const rows = await productsRes.json();
+      if (Array.isArray(rows) && rows.length) {
+        // Map Supabase rows → SHOP_CONFIG.products shape
+        SHOP_CONFIG.products = rows.map(r => ({
+          id:                 r.id,
+          category:           r.category,
+          print_type:         r.print_type || '',
+          name:               r.name,
+          desc:               r.description || r.desc || '',
+          emoji:              r.emoji || '✦',
+          variants:           r.variants || [],
+          availableVariants:  r.available_variants || [],
+          _standardVariants:  r.variants || [],
+          priceNgn:           r.prices_ngn || {},
+          priceUsd:           r.prices_usd || {},
+          badge:              r.badge || '',
+          image:              r.image_url || '',
+          active:             r.active !== false,
+          sort_order:         r.sort_order || 0,
+        }));
+      }
+    }
+
+    if (configRes.ok) {
+      const cfg = await configRes.json();
+      if (cfg.eth_address)   SHOP_CONFIG.ethAddress   = cfg.eth_address;
+      if (cfg.tezos_address) SHOP_CONFIG.tezosAddress = cfg.tezos_address;
+    }
+  } catch (e) {
+    console.warn('Failed to load shop data from API, using defaults:', e.message);
+  }
+
+  // Stamp _standardVariants for any prints that don't have it yet
+  SHOP_CONFIG.products.forEach(p => {
+    if (p.category === 'prints' && !p._standardVariants) {
+      p._standardVariants = [...p.variants];
+    }
+  });
+
+  renderProducts();
+}
+
+/* ─── Save product via admin API ─── */
+async function apiSaveProduct(p, token) {
+  const isNew = typeof p.id === 'string' && p.id.startsWith('prod-');
+  const method  = isNew ? 'POST' : 'PATCH';
+  const url     = isNew ? '/api/admin/shop-products' : `/api/admin/shop-products/${p.id}`;
+  const body = {
+    name:               p.name,
+    category:           p.category,
+    print_type:         p.print_type || '',
+    description:        p.desc,
+    emoji:              p.emoji || '✦',
+    variants:           p.variants,
+    available_variants: p.availableVariants || [],
+    prices_ngn:         p.priceNgn,
+    prices_usd:         p.priceUsd,
+    badge:              p.badge,
+    image_url:          p.image,
+    sort_order:         p.sort_order || 0,
+    active:             p.active !== false,
+  };
+  const res = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Save failed');
+  return data;
+}
+
+async function apiDeleteProduct(id, token) {
+  const res = await fetch(`/api/admin/shop-products/${id}`, {
+    method: 'DELETE',
+    headers: { 'x-admin-token': token },
+  });
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed'); }
+}
+
+/* ─── Show admin FAB if admin token exists ─── */
+if (localStorage.getItem('kaysworks-admin-token')) {
+  document.getElementById('adminBar').classList.add('visible');
+}
+// Always show for now (remove this line in production)
+document.getElementById('adminBar').classList.add('visible');
+
+/* ─── Init ─── */
+loadShopData();
+</script>
+</body>
+</html>

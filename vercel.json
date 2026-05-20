@@ -8,7 +8,7 @@
       "maxDuration": 15
     },
     "api/admin.js": {
-      "maxDuration": 30
+      "maxDuration": 10
     },
     "api/player.js": {
       "maxDuration": 10
@@ -36,6 +36,20 @@
     { "source": "/api/notify-bid-confirm",       "destination": "/api/game?action=notify-bid-confirm" },
     { "source": "/api/notify-winner",            "destination": "/api/game?action=notify-winner" },
     { "source": "/api/notify-bid",               "destination": "/api/game?action=notify-bid" },
+
+    { "source": "/api/shop/products",            "destination": "/api/game?action=shop-products" },
+    { "source": "/api/shop/config",              "destination": "/api/game?action=shop-config" },
+    { "source": "/api/shop/order",               "destination": "/api/game?action=shop-order" },
+    { "source": "/api/admin/shop-products",      "destination": "/api/admin?action=shop-products" },
+    { "source": "/api/admin/shop-products/:id",  "destination": "/api/admin?action=shop-products&id=:id" },
+    { "source": "/api/admin/shop-config",        "destination": "/api/admin?action=shop-config" },
+    { "source": "/api/admin/shop-orders",        "destination": "/api/admin?action=shop-orders" },
+    { "source": "/api/admin/shop-order/:id",     "destination": "/api/admin?action=shop-order&id=:id" },
+
+    { "source": "/shop",                         "destination": "/shop.html" },
+    { "source": "/shop-orders",                  "destination": "/shop-orders.html" },
+    { "source": "/shop/series/:series",          "destination": "/print-series.html" },
+    { "source": "/shop/:slug",                   "destination": "/print-detail.html" },
 
     { "source": "/api/player/register",          "destination": "/api/player?action=register" },
     { "source": "/api/player/login",             "destination": "/api/player?action=login" },
@@ -112,7 +126,17 @@
       ]
     },
     {
-      "source": "/((?!auction|tezos-pin|burn-redeem|claim-token|taquito-bundle\\.js).*)",
+      "source": "/shop(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn-cgi.cloudflare.com https://va.vercel-scripts.com https://js.paystack.co https://checkout.flutterwave.com https://unpkg.com https://cdnjs.cloudflare.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://vitals.vercel-insights.com https://*.supabase.co wss://*.supabase.co https://api.resend.com https://js.paystack.co https://api.paystack.co https://checkout.flutterwave.com https://api.flutterwave.com https://*.infura.io https://*.alchemy.com https://rpc.tzkt.io https://rpc.ghostnet.teztnets.com https://*.tezos.marigold.dev https://relay.walletbeacon.io https://*.walletbeacon.io wss://relay.walletbeacon.io wss://*.walletbeacon.io https://beacon-node-1.octez.io https://beacon-node-2.octez.io https://beacon-node-3.octez.io https://beacon-node-4.octez.io https://beacon-node-5.octez.io https://beacon-node-6.octez.io https://beacon-node-7.octez.io https://beacon-node-8.octez.io wss://beacon-node-1.octez.io wss://beacon-node-2.octez.io wss://beacon-node-3.octez.io wss://beacon-node-4.octez.io wss://beacon-node-5.octez.io wss://beacon-node-6.octez.io wss://beacon-node-7.octez.io wss://beacon-node-8.octez.io https://beacon-node-1.sky.sx; worker-src 'self' blob:; frame-src 'self' https://js.paystack.co https://checkout.flutterwave.com https://relay.walletbeacon.io https://*.walletbeacon.io; frame-ancestors 'none'"
+        }
+      ]
+    },
+    {
+      "source": "/((?!auction|tezos-pin|burn-redeem|claim-token|shop|taquito-bundle\\.js).*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
