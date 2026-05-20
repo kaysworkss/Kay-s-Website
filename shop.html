@@ -1110,9 +1110,48 @@ footer a:hover { color:var(--rust); }
 
         <!-- ETH/Crypto panel -->
         <div class="pay-panel" id="panel-eth">
-          <p class="pay-info">Send the exact amount in <strong>USD equivalent</strong> to one of the addresses below, then confirm your transfer using the button.</p>
-          <div id="cryptoOptions"></div>
-          <button class="submit-pay-btn" id="cryptoConfirmBtn" style="display:none">I've sent the payment</button>
+          <p class="pay-info">Connect your <strong style="color:#8b9cf7">Ethereum wallet</strong> and send ETH directly — or copy the address and send manually.</p>
+          <div id="ethPayBlock">
+            <!-- Amount + address block -->
+            <div class="crypto-option" id="ethAmountBlock" style="display:none;border-color:rgba(139,156,247,0.25)">
+              <div class="crypto-name" style="color:#8b9cf7">ETH · Ethereum</div>
+              <div class="crypto-amount" id="ethEthAmount">— ETH</div>
+              <div class="crypto-address" id="ethToAddr">—</div>
+              <button class="copy-btn" id="ethCopyBtn" style="border-color:rgba(139,156,247,0.3);color:#8b9cf7">Copy address</button>
+            </div>
+            <!-- USDC / USDT — wallet send -->
+            <div id="ethStableOptions" style="display:none">
+              <div class="crypto-option" style="border-color:rgba(139,156,247,0.15)">
+                <div class="crypto-name" style="color:#8b9cf7">USDC · ERC-20</div>
+                <div class="crypto-amount" id="ethUsdcAmount">— USDC</div>
+                <div class="crypto-address" id="ethUsdcAddr">—</div>
+                <div style="display:flex;gap:0.5rem;margin-top:0.4rem">
+                  <button class="copy-btn ethStableCopy" data-token="usdc" style="border-color:rgba(139,156,247,0.3);color:#8b9cf7">Copy address</button>
+                  <button class="submit-pay-btn" id="ethSendUsdcBtn" style="display:none;flex:1;margin-top:0;padding:0.35rem 0.8rem;font-size:0.56rem;background:#3d3d8f">Send USDC</button>
+                </div>
+              </div>
+              <div class="crypto-option" style="border-color:rgba(139,156,247,0.15)">
+                <div class="crypto-name" style="color:#8b9cf7">USDT · ERC-20</div>
+                <div class="crypto-amount" id="ethUsdtAmount">— USDT</div>
+                <div class="crypto-address" id="ethUsdtAddr">—</div>
+                <div style="display:flex;gap:0.5rem;margin-top:0.4rem">
+                  <button class="copy-btn ethStableCopy" data-token="usdt" style="border-color:rgba(139,156,247,0.3);color:#8b9cf7">Copy address</button>
+                  <button class="submit-pay-btn" id="ethSendUsdtBtn" style="display:none;flex:1;margin-top:0;padding:0.35rem 0.8rem;font-size:0.56rem;background:#3d3d8f">Send USDT</button>
+                </div>
+              </div>
+            </div>
+            <!-- Connected wallet row -->
+            <div id="ethWalletInfo" style="margin-bottom:1rem;display:none">
+              <div style="display:flex;align-items:center;gap:0.6rem;padding:0.7rem 1rem;background:var(--bg-alt);border:1px solid rgba(139,156,247,0.2);border-radius:2px">
+                <span style="width:8px;height:8px;border-radius:50%;background:#8b9cf7;flex-shrink:0"></span>
+                <span id="ethWalletAddr" style="font-family:'Montserrat',sans-serif;font-size:0.62rem;color:#8b9cf7;word-break:break-all"></span>
+                <button id="ethDisconnectBtn" style="margin-left:auto;background:none;border:none;font-size:0.65rem;color:var(--text-muted);font-family:'Cinzel',sans-serif;letter-spacing:0.1em;white-space:nowrap">Disconnect</button>
+              </div>
+            </div>
+            <button class="submit-pay-btn" id="ethConnectBtn" style="background:#2a2a5e;margin-bottom:0.7rem">Connect ETH Wallet</button>
+            <button class="submit-pay-btn" id="ethSendBtn" style="display:none;background:#3d3d8f">Send <span id="ethSendAmt"></span> ETH</button>
+            <button class="submit-pay-btn" id="cryptoConfirmBtn" style="display:none;background:transparent;border:1px solid rgba(139,156,247,0.3);color:#8b9cf7;margin-top:0.5rem">I've sent manually — confirm</button>
+          </div>
         </div>
 
         <!-- Tezos panel -->
@@ -1419,6 +1458,7 @@ footer a:hover { color:var(--rust); }
 <!-- Paystack & Flutterwave SDKs -->
 <script src="https://js.paystack.co/v1/inline.js" async></script>
 <script src="https://checkout.flutterwave.com/v3.js" async></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.8.0/ethers.umd.min.js" async></script>
 
 <script>
 'use strict';
@@ -1989,7 +2029,7 @@ function openCheckout(defaultTab) {
   if (!cart.length) return;
   closeCart();
   buildOrderSummary();
-  buildCryptoOptions();
+  renderEthPanel();
   document.getElementById('formScreen').style.display='';
   document.getElementById('confirmScreen').classList.remove('active');
   document.getElementById('checkoutOverlay').classList.add('open');
@@ -2020,44 +2060,7 @@ function buildOrderSummary() {
     </div>`;
 }
 
-function buildCryptoOptions() {
-  const usd     = grandTotalUsd();
-  const ethPrice = window._ethUsdPrice; // set by fetchCryptoRates()
-  const ethAmt   = ethPrice ? (usd / ethPrice).toFixed(5) : null;
-  const usdcAmt  = usd.toFixed(2);
-
-  let html = '';
-
-  if (SHOP_CONFIG.ethAddress) {
-    html += cryptoBlock('ETH · Ethereum',
-      ethAmt !== null ? `${ethAmt} ETH` : 'Fetching rate…',
-      SHOP_CONFIG.ethAddress);
-    html += cryptoBlock('USDC · ERC-20',           `${usdcAmt} USDC`,     SHOP_CONFIG.ethAddress);
-    html += cryptoBlock('USDT · ERC-20',           `${usdcAmt} USDT`,     SHOP_CONFIG.ethAddress);
-  }
-
-  if (!html) html = `<p class="pay-info" style="color:var(--clay)">ETH address not configured. Contact Kay directly or use the Tezos tab.</p>`;
-  document.getElementById('cryptoOptions').innerHTML = html;
-
-  // Copy buttons
-  document.querySelectorAll('.copy-btn').forEach(b=>{
-    b.addEventListener('click',()=>{
-      navigator.clipboard.writeText(b.dataset.addr).then(()=>{
-        b.textContent='Copied ✓'; b.classList.add('copied');
-        setTimeout(()=>{ b.textContent='Copy address'; b.classList.remove('copied'); }, 2000);
-      });
-    });
-  });
-}
-
-function cryptoBlock(name, amount, address) {
-  return `<div class="crypto-option">
-    <div class="crypto-name">${name}</div>
-    <div class="crypto-amount">${amount}</div>
-    <div class="crypto-address">${address}</div>
-    <button class="copy-btn" data-addr="${address}">Copy address</button>
-  </div>`;
-}
+/* renderEthPanel is defined below in the ETH wallet section */
 
 function switchPayTab(tab) {
   document.querySelectorAll('.pay-tab').forEach(t=>t.classList.toggle('active', t.dataset.pay===tab));
@@ -2154,13 +2157,13 @@ document.getElementById('flutterwavePayBtn').addEventListener('click', ()=>{
   });
 });
 
-// Crypto confirm
-document.getElementById('cryptoConfirmBtn').addEventListener('click', ()=>{
-  if(!validateForm()) return;
+// ETH manual confirm (shown after rate loads, for wallets without MetaMask)
+document.getElementById('cryptoConfirmBtn').addEventListener('click', () => {
+  if (!validateForm()) return;
   const d = getFormData();
-  const ref = 'KW-CRYPTO-' + Date.now();
-  notifyOrder(d, ref, 'crypto');
-  showConfirmation('crypto', ref);
+  const ref = 'KW-ETH-MANUAL-' + Date.now();
+  notifyOrder(d, ref, 'eth');
+  showConfirmation('eth', ref);
 });
 
 // Notify via site-form API (reuse existing backend)
@@ -2674,6 +2677,238 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
   }
 });
 
+/* ─── ETH wallet payment ─── */
+// Uses window.ethereum (MetaMask, Coinbase Wallet, Rabby, any EIP-1193 provider)
+// + ethers.js 5 (loaded from cdnjs) for sending the transaction.
+// ERC-20 transfers use the minimal transfer(address,uint256) ABI — no full ABI needed.
+
+// Mainnet ERC-20 contract addresses
+const ERC20_CONTRACTS = {
+  usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  usdt: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+};
+// Minimal ERC-20 ABI — only transfer() and decimals()
+const ERC20_ABI = [
+  'function transfer(address to, uint256 amount) returns (bool)',
+  'function decimals() view returns (uint8)',
+];
+
+let _ethConnectedAddr    = null;
+let _ethProvider         = null;
+let _ethConnecting       = false;
+
+function ethShortAddr(addr) {
+  if (!addr) return '';
+  return addr.slice(0, 6) + '\u2026' + addr.slice(-4);
+}
+
+function ethEthAmount() {
+  const price = window._ethUsdPrice;
+  if (!price) return null;
+  return (grandTotalUsd() / price).toFixed(5);
+}
+
+/* ── Render ETH panel ── */
+function renderEthPanel() {
+  const addr     = SHOP_CONFIG.ethAddress;
+  const ethAmt   = ethEthAmount();
+  const usd      = grandTotalUsd();
+  const usdcAmt  = usd.toFixed(2);
+
+  const amtBlock = document.getElementById('ethAmountBlock');
+  const stables  = document.getElementById('ethStableOptions');
+
+  if (addr) {
+    // ETH block
+    amtBlock.style.display = '';
+    document.getElementById('ethToAddr').textContent    = addr;
+    document.getElementById('ethEthAmount').textContent = ethAmt !== null ? ethAmt + ' ETH' : 'Fetching rate\u2026';
+    // USDC / USDT blocks
+    stables.style.display = '';
+    document.getElementById('ethUsdcAddr').textContent   = addr;
+    document.getElementById('ethUsdcAmount').textContent = usdcAmt + ' USDC';
+    document.getElementById('ethUsdtAddr').textContent   = addr;
+    document.getElementById('ethUsdtAmount').textContent = usdcAmt + ' USDT';
+  } else {
+    amtBlock.style.display = 'none';
+    stables.style.display  = 'none';
+  }
+
+  // Copy buttons (ETH address)
+  const ethCopy = document.getElementById('ethCopyBtn');
+  if (ethCopy) {
+    ethCopy.onclick = () => {
+      navigator.clipboard.writeText(addr).then(() => {
+        ethCopy.textContent = 'Copied \u2713';
+        setTimeout(() => { ethCopy.textContent = 'Copy address'; }, 2000);
+      });
+    };
+  }
+  // Copy buttons (stables) — wire once
+  document.querySelectorAll('.ethStableCopy').forEach(btn => {
+    btn.onclick = () => {
+      navigator.clipboard.writeText(addr).then(() => {
+        btn.textContent = 'Copied \u2713';
+        setTimeout(() => { btn.textContent = 'Copy address'; }, 2000);
+      });
+    };
+  });
+
+  // Send amount label
+  const sendAmt = document.getElementById('ethSendAmt');
+  if (sendAmt) sendAmt.textContent = ethAmt !== null ? ethAmt + ' ETH' : '\u2026';
+
+  // Wallet connection state
+  const rateReady = addr && ethAmt !== null;
+  if (_ethConnectedAddr) {
+    document.getElementById('ethWalletInfo').style.display   = '';
+    document.getElementById('ethWalletAddr').textContent     = ethShortAddr(_ethConnectedAddr);
+    document.getElementById('ethConnectBtn').style.display   = 'none';
+    document.getElementById('ethSendBtn').style.display      = rateReady ? '' : 'none';
+    document.getElementById('ethSendUsdcBtn').style.display  = rateReady ? '' : 'none';
+    document.getElementById('ethSendUsdtBtn').style.display  = rateReady ? '' : 'none';
+  } else {
+    document.getElementById('ethWalletInfo').style.display   = 'none';
+    document.getElementById('ethConnectBtn').style.display   = '';
+    document.getElementById('ethSendBtn').style.display      = 'none';
+    document.getElementById('ethSendUsdcBtn').style.display  = 'none';
+    document.getElementById('ethSendUsdtBtn').style.display  = 'none';
+  }
+}
+
+/* ── Connect ETH wallet ── */
+async function ethConnectWallet() {
+  if (_ethConnectedAddr || _ethConnecting) return;
+
+  if (!window.ethereum) {
+    showToast('No Ethereum wallet detected — install MetaMask or use manual send');
+    return;
+  }
+
+  _ethConnecting = true;
+  const btn = document.getElementById('ethConnectBtn');
+  btn.disabled = true; btn.textContent = 'Connecting\u2026';
+
+  try {
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    if (!accounts || !accounts[0]) throw new Error('No account returned');
+    _ethConnectedAddr = accounts[0];
+    _ethProvider      = new ethers.providers.Web3Provider(window.ethereum);
+
+    // Listen for account changes
+    window.ethereum.on('accountsChanged', accs => {
+      _ethConnectedAddr = accs[0] || null;
+      if (!_ethConnectedAddr) _ethProvider = null;
+      renderEthPanel();
+    });
+
+    renderEthPanel();
+    showToast('Wallet connected \u2736');
+  } catch (e) {
+    const msg = e?.message || String(e);
+    if (/rejected|denied|cancel/i.test(msg)) {
+      showToast('Connection cancelled');
+    } else {
+      showToast('Could not connect wallet \u2014 try again');
+      console.error('[ETH] connect error:', e);
+    }
+  } finally {
+    _ethConnecting = false;
+    btn.disabled = false; btn.textContent = 'Connect ETH Wallet';
+  }
+}
+
+/* ── Send ETH via connected wallet ── */
+document.getElementById('ethConnectBtn').addEventListener('click', ethConnectWallet);
+
+document.getElementById('ethDisconnectBtn').addEventListener('click', () => {
+  _ethConnectedAddr = null;
+  _ethProvider      = null;
+  renderEthPanel();
+  showToast('Wallet disconnected');
+});
+
+document.getElementById('ethSendBtn').addEventListener('click', async () => {
+  if (!validateForm()) return;
+  const toAddr = SHOP_CONFIG.ethAddress;
+  if (!toAddr)            { showToast('ETH address not configured'); return; }
+  if (!_ethConnectedAddr) { showToast('Please connect your wallet first'); return; }
+  const ethAmt = ethEthAmount();
+  if (!ethAmt)            { showToast('ETH rate still loading \u2014 try again in a moment'); return; }
+
+  const btn = document.getElementById('ethSendBtn');
+  btn.disabled = true; btn.textContent = 'Waiting for wallet\u2026';
+
+  try {
+    const signer = _ethProvider.getSigner();
+    const tx = await signer.sendTransaction({
+      to:    toAddr,
+      value: ethers.utils.parseEther(ethAmt),
+    });
+    const ref = 'KW-ETH-' + tx.hash;
+    const d = getFormData();
+    notifyOrder(d, ref, 'eth');
+    showConfirmation('eth', ref);
+  } catch (e) {
+    const msg = e?.message || String(e);
+    if (/rejected|denied|cancel|user denied/i.test(msg)) {
+      showToast('Transaction cancelled');
+    } else {
+      showToast('Transaction failed \u2014 check wallet and try again');
+      console.error('[ETH] send error:', e);
+    }
+  } finally {
+    btn.disabled = false;
+    const amt = ethEthAmount();
+    btn.textContent = 'Send ' + (amt || '\u2026') + ' ETH';
+  }
+});
+
+/* ── Send ERC-20 (USDC / USDT) via connected wallet ── */
+async function sendErc20(token) {
+  if (!validateForm()) return;
+  const toAddr = SHOP_CONFIG.ethAddress;
+  if (!toAddr)            { showToast('ETH address not configured'); return; }
+  if (!_ethConnectedAddr) { showToast('Please connect your wallet first'); return; }
+
+  const usd = grandTotalUsd();
+  if (!usd)               { showToast('Cart is empty'); return; }
+
+  const btnId = token === 'usdc' ? 'ethSendUsdcBtn' : 'ethSendUsdtBtn';
+  const btn   = document.getElementById(btnId);
+  const label = token.toUpperCase();
+  btn.disabled = true; btn.textContent = 'Waiting for wallet…';
+
+  try {
+    const signer       = _ethProvider.getSigner();
+    const contractAddr = ERC20_CONTRACTS[token];
+    const contract     = new ethers.Contract(contractAddr, ERC20_ABI, signer);
+
+    // Fetch decimals from chain (USDC=6, USDT=6 — but read it to be safe)
+    const decimals = await contract.decimals();
+    const amount   = ethers.utils.parseUnits(usd.toFixed(2), decimals);
+
+    const tx  = await contract.transfer(toAddr, amount);
+    const ref = 'KW-' + label + '-' + tx.hash;
+    const d   = getFormData();
+    notifyOrder(d, ref, token);
+    showConfirmation(token, ref);
+  } catch (e) {
+    const msg = e?.message || String(e);
+    if (/rejected|denied|cancel|user denied/i.test(msg)) {
+      showToast('Transaction cancelled');
+    } else {
+      showToast('Transaction failed — check wallet and try again');
+      console.error('[ETH ' + label + '] send error:', e);
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send ' + label;
+  }
+}
+
+document.getElementById('ethSendUsdcBtn').addEventListener('click', () => sendErc20('usdc'));
+document.getElementById('ethSendUsdtBtn').addEventListener('click', () => sendErc20('usdt'));
+
 /* ─── Tezos / Beacon payment ─── */
 // Robust Beacon connection — matches the working burn-redeem.html pattern.
 // Supports Temple (desktop extension), Beacon QR (mobile), and clean retry.
@@ -2730,8 +2965,8 @@ let _xtzPerUsd = null; // set by fetchCryptoRates()
   if (ethPrice) {
     window._ethUsdPrice = ethPrice;
     const ethPanel = document.getElementById('panel-eth');
-    if (ethPanel && ethPanel.classList.contains('active')) buildCryptoOptions();
-    // Reveal the ETH manual confirm button now that rate is known
+    if (ethPanel && ethPanel.classList.contains('active')) renderEthPanel();
+    // Reveal ETH manual confirm button now that rate is known
     const ethManual = document.getElementById('cryptoConfirmBtn');
     if (ethManual) ethManual.style.display = '';
   }
@@ -3044,7 +3279,7 @@ const _origSwitchPayTab = switchPayTab;
 const _patchedSwitch = function(tab) {
   _origSwitchPayTab(tab);
   if (tab === 'tezos') renderTezosPanel();
-  if (tab === 'eth')   buildCryptoOptions();
+  if (tab === 'eth')   renderEthPanel();
 };
 document.querySelectorAll('.pay-tab').forEach(t => {
   t.replaceWith(t.cloneNode(true));
