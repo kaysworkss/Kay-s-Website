@@ -1247,7 +1247,7 @@ footer a:hover { color:var(--rust); }
 </div>
 
 <!-- Admin FAB -->
-<div class="admin-bar" id="adminBar">
+<div class="admin-bar" id="adminBar" style="display:block;position:fixed;bottom:1.5rem;right:1.5rem;z-index:150">
   <button class="admin-fab" id="adminFab" title="Admin panel">⚙</button>
 </div>
 
@@ -1303,6 +1303,114 @@ footer a:hover { color:var(--rust); }
         <button class="admin-add-btn" id="addProductBtn">+ Add product</button>
 
         <button class="admin-save-btn" id="saveConfigBtn">Save configuration</button>
+
+        <!-- Print pages -->
+        <p class="admin-section-title" style="margin-top:2rem">Print pages &amp; slugs</p>
+        <p style="font-size:0.82rem;color:var(--text-muted);line-height:1.6;margin-bottom:1.2rem">
+          For each print, fill in the slug and story details that power the individual print page at
+          <span style="color:var(--clay);font-size:0.78rem">kaysworks.com/shop/[slug]</span>.
+          Select a print below to edit its page content.
+        </p>
+
+        <!-- Print selector -->
+        <div class="form-row">
+          <label class="form-label">Select a print to edit</label>
+          <select class="form-select" id="printPageSelector">
+            <option value="">— Choose a print —</option>
+          </select>
+        </div>
+
+        <!-- Print page editor — hidden until a print is selected -->
+        <div id="printPageEditor" style="display:none;border:1px solid var(--border);border-radius:3px;padding:1.2rem;margin-top:0.4rem;background:var(--bg-alt)">
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">
+            <div class="form-row" style="margin:0">
+              <label class="form-label">Slug <span style="color:var(--rust)">*</span></label>
+              <input class="form-input" id="ppSlug" type="text" placeholder="apoti-olowe-study-i"
+                style="font-family:'Montserrat',sans-serif;font-size:0.8rem"/>
+              <p style="font-size:0.72rem;color:var(--text-muted);margin-top:0.3rem">URL-safe, lowercase, hyphens only. This becomes the page URL.</p>
+            </div>
+            <div class="form-row" style="margin:0">
+              <label class="form-label">Year</label>
+              <input class="form-input" id="ppYear" type="text" placeholder="2025"/>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-top:0.8rem">
+            <div class="form-row" style="margin:0">
+              <label class="form-label">Series slug</label>
+              <input class="form-input" id="ppSeriesSlug" type="text" placeholder="apoti-olowe"
+                style="font-family:'Montserrat',sans-serif;font-size:0.8rem"/>
+              <p style="font-size:0.72rem;color:var(--text-muted);margin-top:0.3rem">Groups prints into a series page at /shop/series/[slug]</p>
+            </div>
+            <div class="form-row" style="margin:0">
+              <label class="form-label">Series name</label>
+              <input class="form-input" id="ppSeriesName" type="text" placeholder="Àpótí Ọlọ́wẹ̀"/>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top:0.8rem">
+            <label class="form-label">Series description <span style="color:var(--text-muted);font-size:0.65em">(shown on the series page)</span></label>
+            <textarea class="form-input" id="ppSeriesDesc" rows="2"
+              style="resize:vertical" placeholder="A series exploring…"></textarea>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label">Medium</label>
+            <input class="form-input" id="ppMedium" type="text" placeholder="Giclée fine art print · Digital painting"/>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label">Kay's quote <span style="color:var(--text-muted);font-size:0.65em">(shown in a blockquote on the print page)</span></label>
+            <textarea class="form-input" id="ppQuote" rows="2"
+              style="resize:vertical" placeholder="The piece said what I couldn't…"></textarea>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label">The story <span style="color:var(--text-muted);font-size:0.65em">(Kay's voice — shown as the main body text)</span></label>
+            <textarea class="form-input" id="ppStory" rows="5"
+              style="resize:vertical" placeholder="Write about this piece in your own voice. Use a blank line to separate paragraphs."></textarea>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label">Process notes <span style="color:var(--text-muted);font-size:0.65em">(how it was made)</span></label>
+            <textarea class="form-input" id="ppProcess" rows="3"
+              style="resize:vertical" placeholder="This piece began as a pencil sketch…"></textarea>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">
+            <div class="form-row" style="margin:0">
+              <label class="form-label">Signed?</label>
+              <select class="form-select" id="ppSigned">
+                <option value="false">No — open edition</option>
+                <option value="true">Yes — hand signed</option>
+              </select>
+            </div>
+            <div class="form-row" style="margin:0">
+              <label class="form-label">Large print? <span style="color:var(--text-muted);font-size:0.65em">(ships in tube)</span></label>
+              <select class="form-select" id="ppIsLarge">
+                <option value="false">No — flat mailer</option>
+                <option value="true">Yes — archival tube</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top:0.8rem">
+            <label class="form-label">Additional image URLs <span style="color:var(--text-muted);font-size:0.65em">(one per line — for the thumbnail strip)</span></label>
+            <textarea class="form-input" id="ppImages" rows="3"
+              style="resize:vertical;font-family:'Montserrat',sans-serif;font-size:0.72rem"
+              placeholder="https://…&#10;https://…"></textarea>
+          </div>
+
+          <!-- Slug preview -->
+          <div style="padding:0.7rem 0.9rem;background:var(--bg);border:1px solid var(--border);border-radius:2px;margin-bottom:1.2rem">
+            <span style="font-family:'Cinzel',serif;font-size:0.46rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted)">Page URL preview · </span>
+            <span id="ppUrlPreview" style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--clay)">kaysworks.com/shop/</span>
+          </div>
+
+          <button class="admin-save-btn" id="savePrintPageBtn" style="width:100%">Save print page</button>
+          <p id="printPageSaveStatus" style="font-size:0.8rem;color:var(--moss);margin-top:0.6rem;display:none">✦ Saved — visit <a id="printPageLink" href="#" target="_blank" style="color:var(--clay)"></a> to see it live.</p>
+        </div>
       </div>
     </div>
 
@@ -2161,7 +2269,154 @@ document.getElementById('adminLoginBtn').addEventListener('click', async ()=>{
 
 function loadAdminConfig() {
   // addresses are hardcoded and shown read-only in the admin panel
+  populatePrintPageSelector();
 }
+
+/* ─── Print page editor ─── */
+function slugify(s) {
+  return s.toLowerCase()
+    .replace(/[àáâãäå]/g,'a').replace(/[èéêë]/g,'e')
+    .replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o')
+    .replace(/[ùúûü]/g,'u').replace(/[ñ]/g,'n')
+    .replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+}
+
+function populatePrintPageSelector() {
+  const sel = document.getElementById('printPageSelector');
+  if (!sel) return;
+  const prints = SHOP_CONFIG.products.filter(p => p.category === 'prints');
+  sel.innerHTML = '<option value="">— Choose a print —</option>' +
+    prints.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+}
+
+// Auto-suggest slug from product name
+document.getElementById('printPageSelector').addEventListener('change', async function() {
+  const id = this.value;
+  const editor = document.getElementById('printPageEditor');
+  if (!id) { editor.style.display = 'none'; return; }
+
+  const p = SHOP_CONFIG.products.find(x => x.id === id);
+  if (!p) return;
+
+  // Pre-fill slug from name if empty
+  const slugInput = document.getElementById('ppSlug');
+  if (!slugInput.value) slugInput.value = slugify(p.name);
+
+  // Try to load existing data from Supabase
+  const token = localStorage.getItem('kaysworks-admin-token');
+  if (token) {
+    try {
+      const res = await fetch(`/api/admin/shop-products?id=${encodeURIComponent(id)}`, {
+        headers: { 'x-admin-token': token }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && !Array.isArray(data)) fillPrintPageEditor(data);
+        else if (Array.isArray(data) && data.length) fillPrintPageEditor(data[0]);
+      }
+    } catch(_) {}
+  }
+
+  updateUrlPreview();
+  editor.style.display = '';
+  document.getElementById('printPageSaveStatus').style.display = 'none';
+});
+
+function fillPrintPageEditor(row) {
+  const set = (id, val) => { const el = document.getElementById(id); if(el && val !== undefined && val !== null) el.value = val; };
+  set('ppSlug',       row.slug        || '');
+  set('ppYear',       row.year        || '');
+  set('ppSeriesSlug', row.series_slug || '');
+  set('ppSeriesName', row.series_name || '');
+  set('ppSeriesDesc', row.series_desc || '');
+  set('ppMedium',     row.medium      || '');
+  set('ppQuote',      row.quote       || '');
+  set('ppStory',      row.story       || '');
+  set('ppProcess',    row.process     || '');
+  set('ppSigned',     row.signed      ? 'true' : 'false');
+  set('ppIsLarge',    row.is_large_print ? 'true' : 'false');
+  // Images array → one per line
+  const images = Array.isArray(row.images) ? row.images : [];
+  const ppImg = document.getElementById('ppImages');
+  if (ppImg) ppImg.value = images.join('\n');
+  updateUrlPreview();
+}
+
+// Live URL preview as slug is typed
+document.getElementById('ppSlug').addEventListener('input', updateUrlPreview);
+function updateUrlPreview() {
+  const slug = document.getElementById('ppSlug').value.trim();
+  const preview = document.getElementById('ppUrlPreview');
+  const link    = document.getElementById('printPageLink');
+  if (preview) preview.textContent = `kaysworks.com/shop/${slug || '…'}`;
+  if (link && slug) { link.href = `/shop/${slug}`; link.textContent = `/shop/${slug}`; }
+}
+
+// Auto-slugify as user types the slug field
+document.getElementById('ppSlug').addEventListener('blur', function() {
+  this.value = slugify(this.value);
+  updateUrlPreview();
+});
+
+// Save print page
+document.getElementById('savePrintPageBtn').addEventListener('click', async () => {
+  const id    = document.getElementById('printPageSelector').value;
+  const token = localStorage.getItem('kaysworks-admin-token');
+  if (!id)    { showToast('Select a print first'); return; }
+  if (!token) { showToast('Not authenticated'); return; }
+
+  const slug = document.getElementById('ppSlug').value.trim();
+  if (!slug)  { showToast('Slug is required'); return; }
+
+  // Parse images — one URL per line
+  const imagesRaw = document.getElementById('ppImages').value.trim();
+  const images = imagesRaw ? imagesRaw.split('\n').map(s=>s.trim()).filter(Boolean) : [];
+
+  const btn = document.getElementById('savePrintPageBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  try {
+    const res = await fetch(`/api/admin/shop-products/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
+      body: JSON.stringify({
+        slug,
+        year:          document.getElementById('ppYear').value.trim(),
+        series_slug:   document.getElementById('ppSeriesSlug').value.trim(),
+        series_name:   document.getElementById('ppSeriesName').value.trim(),
+        series_desc:   document.getElementById('ppSeriesDesc').value.trim(),
+        medium:        document.getElementById('ppMedium').value.trim(),
+        quote:         document.getElementById('ppQuote').value.trim(),
+        story:         document.getElementById('ppStory').value.trim(),
+        process:       document.getElementById('ppProcess').value.trim(),
+        signed:        document.getElementById('ppSigned').value === 'true',
+        is_large_print:document.getElementById('ppIsLarge').value === 'true',
+        images,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(()=>({}));
+      showToast('Save failed: ' + (err.error || res.status));
+      return;
+    }
+
+    // Update local SHOP_CONFIG so the selector reflects the change
+    const p = SHOP_CONFIG.products.find(x => x.id === id);
+    if (p) p.slug = slug;
+
+    const status = document.getElementById('printPageSaveStatus');
+    const link   = document.getElementById('printPageLink');
+    if (link)   { link.href = `/shop/${slug}`; link.textContent = `/shop/${slug}`; }
+    if (status) status.style.display = '';
+    showToast('Print page saved ✦');
+
+  } catch(e) {
+    showToast('Network error: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save print page';
+  }
+});
 
 function renderAdminProducts() {
   const el = document.getElementById('adminProducts');
@@ -2621,7 +2876,6 @@ async function loadShopData() {
     if (productsRes.ok) {
       const rows = await productsRes.json();
       if (Array.isArray(rows) && rows.length) {
-        // Map Supabase rows → SHOP_CONFIG.products shape
         SHOP_CONFIG.products = rows.map(r => ({
           id:                 r.id,
           category:           r.category,
@@ -2636,11 +2890,17 @@ async function loadShopData() {
           priceUsd:           r.prices_usd || {},
           badge:              r.badge || '',
           image:              r.image_url || '',
+          clothing:           r.clothing || false,
+          clothing_type:      r.clothing_type || '',
+          stock:              r.stock ?? null,
+          stock_by_variant:   r.stock_by_variant || {},
           active:             r.active !== false,
           sort_order:         r.sort_order || 0,
         }));
       }
+      // If API returned empty array, keep hardcoded defaults
     }
+    // If API failed, keep hardcoded defaults silently
 
     if (configRes.ok) {
       const cfg = await configRes.json();
@@ -2648,10 +2908,11 @@ async function loadShopData() {
       if (cfg.tezos_address) SHOP_CONFIG.tezosAddress = cfg.tezos_address;
     }
   } catch (e) {
-    console.warn('Failed to load shop data from API, using defaults:', e.message);
+    // API not reachable or tables don't exist yet — use hardcoded defaults
+    console.warn('Shop API unavailable, using defaults:', e.message);
   }
 
-  // Stamp _standardVariants for any prints that don't have it yet
+  // Always stamp _standardVariants and always render
   SHOP_CONFIG.products.forEach(p => {
     if (p.category === 'prints' && !p._standardVariants) {
       p._standardVariants = [...p.variants];
