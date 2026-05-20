@@ -772,6 +772,144 @@ async function handleCrosschainClaim(req, res, supabase) {
   return res.status(409).json({ ok: false, claim: data || null, error: 'PAIR_ALREADY_CLAIMED' });
 }
 
+// ── GET /api/game?action=shop-products ────────────────────────────────────────
+// Optional ?slug=apoti-olowe-study-i for single product
+// Optional ?series=apoti-olowe for all prints in a series
+async function handleShopProducts(req, res, supabase) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  const slug   = req.query.slug   || '';
+  const series = req.query.series || '';
+
+  if (slug) {
+    const { data, error } = await supabase
+      .from('shop_products')
+      .select('*')
+      .eq('slug', slug)
+      .eq('active', true)
+      .single();
+    if (error) return res.status(error.code === 'PGRST116' ? 404 : 500).json({ error: error.message });
+    return res.status(200).json(data);
+  }
+
+  if (series) {
+    const { data, error } = await supabase
+      .from('shop_products')
+      .select('*')
+      .eq('series_slug', series)
+      .eq('active', true)
+      .order('sort_order', { ascending: true });
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data || []);
+  }
+
+  const { data, error } = await supabase
+    .from('shop_products')
+    .select('*')
+    .eq('active', true)
+    .order('sort_order', { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data || []);
+}
+
+// ── POST /api/game?action=shop-order ──────────────────────────────────────────
+// Records an order and decrements stock per variant.
+// Called from shop.html after payment confirmation.
+async function handleShopOrder(req, res, supabase) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const body = req.body || {};
+  const items = Array.isArray(body.items) ? body.items : [];
+  if (!items.length) return res.status(400).json({ error: 'No items in order' });
+
+  // 1. Check stock for all items before doing anything
+  for (const item of items) {
+    if (!item.id || !item.variant || !item.qty) continue;
+    const { data: product, error } = await supabase
+      .from('shop_products')
+      .select('stock, stock_by_variant, name')
+      .eq('id', item.id)
+      .single();
+    if (error) continue; // no stock tracking on this product — allow
+
+    // Per-variant stock check
+    const stockByVariant = product.stock_by_variant || {};
+    if (stockByVariant[item.variant] !== undefined) {
+      if (stockByVariant[item.variant] < item.qty) {
+        return res.status(409).json({
+          error: `Only ${stockByVariant[item.variant]} left in stock for ${product.name} · ${item.variant}`,
+          product_id: item.id, variant: item.variant,
+        });
+      }
+    } else if (product.stock !== null && product.stock !== undefined) {
+      // Flat stock check
+      if (product.stock < item.qty) {
+        return res.status(409).json({
+          error: `Only ${product.stock} left in stock for ${product.name}`,
+          product_id: item.id,
+        });
+      }
+    }
+  }
+
+  // 2. Insert order
+  const { data: order, error: orderError } = await supabase
+    .from('shop_orders')
+    .insert({
+      customer_name:   String(body.name    || '').slice(0, 200),
+      email:           String(body.email   || '').slice(0, 320),
+      phone:           String(body.phone   || '').slice(0, 60),
+      address:         String(body.address || '').slice(0, 500),
+      items:           items,
+      total_ngn:       Number(body.total_ngn) || 0,
+      total_usd:       Number(body.total_usd) || 0,
+      delivery_fee_ngn: Number(body.delivery_fee_ngn) || 0,
+      delivery_method:  String(body.delivery_method || '').slice(0, 40),
+      delivery_zone:    String(body.delivery_zone   || '').slice(0, 40),
+      payment_method:  String(body.payment_method || '').slice(0, 40),
+      payment_ref:     String(body.payment_ref    || '').slice(0, 200),
+      status: 'pending',
+    })
+    .select('id')
+    .single();
+  if (orderError) return res.status(500).json({ error: orderError.message });
+
+  // 3. Decrement stock
+  for (const item of items) {
+    if (!item.id || !item.variant || !item.qty) continue;
+    const { data: product } = await supabase
+      .from('shop_products')
+      .select('stock, stock_by_variant')
+      .eq('id', item.id)
+      .single();
+    if (!product) continue;
+
+    const sbv = product.stock_by_variant || {};
+    if (sbv[item.variant] !== undefined) {
+      sbv[item.variant] = Math.max(0, sbv[item.variant] - item.qty);
+      await supabase.from('shop_products').update({ stock_by_variant: sbv }).eq('id', item.id);
+    } else if (product.stock !== null && product.stock !== undefined) {
+      await supabase.from('shop_products')
+        .update({ stock: Math.max(0, product.stock - item.qty) })
+        .eq('id', item.id);
+    }
+  }
+
+  return res.status(200).json({ ok: true, order_id: order.id });
+}
+
+// ── GET /api/game?action=shop-config ──────────────────────────────────────────
+async function handleShopConfig(req, res, supabase) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const { data, error } = await supabase
+    .from('shop_config')
+    .select('*')
+    .order('id', { ascending: true })
+    .limit(1)
+    .single();
+  if (error && error.code !== 'PGRST116') return res.status(500).json({ error: error.message });
+  return res.status(200).json(data || {});
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 module.exports = async (req, res) => {
@@ -801,6 +939,9 @@ module.exports = async (req, res) => {
     else if (urlPath.includes('/notify-bid-confirm')) action = 'notify-bid-confirm';
     else if (urlPath.includes('/notify-winner'))      action = 'notify-winner';
     else if (urlPath.includes('/notify-bid'))          action = 'notify-bid';
+    else if (urlPath.includes('/shop-products'))      action = 'shop-products';
+    else if (urlPath.includes('/shop-config'))        action = 'shop-config';
+    else if (urlPath.includes('/shop-order'))         action = 'shop-order';
   }
 
   const supabase = getSupabase();
@@ -817,6 +958,9 @@ module.exports = async (req, res) => {
     case 'notify-bid-confirm': return handleNotifyBidConfirm(req, res);
     case 'notify-winner':      return handleNotifyWinner(req, res);
     case 'notify-bid':         return handleNotifyBid(req, res);
+    case 'shop-products':      return handleShopProducts(req, res, supabase);
+    case 'shop-config':        return handleShopConfig(req, res, supabase);
+    case 'shop-order':         return handleShopOrder(req, res, supabase);
     default:
       return res.status(404).json({ error: `Unknown action: ${action}` });
   }
