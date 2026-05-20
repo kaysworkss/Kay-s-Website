@@ -421,22 +421,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   margin-bottom: 0.8rem;
 }
 .checkout-btn:hover { background: var(--bark); }
-.pay-options {
-  display: flex; gap: 0.5rem;
-}
-.pay-opt-btn {
-  flex: 1;
-  font-family: 'Cinzel', serif; font-size: 0.52rem;
-  letter-spacing: 0.12em; text-transform: uppercase;
-  padding: 0.7rem;
-  border: 1px solid var(--border);
-  background: transparent; color: var(--text-muted);
-  border-radius: 2px;
-  transition: border-color 0.2s, color 0.2s;
-}
-.pay-opt-btn:hover { border-color: var(--clay); color: var(--clay); }
-.pay-opt-btn.crypto { color: var(--gold); border-color: rgba(201,153,58,0.3); }
-.pay-opt-btn.crypto:hover { border-color: var(--gold); }
+
 
 /* ── Checkout Modal ── */
 .modal-overlay {
@@ -584,6 +569,17 @@ body.dark .variant-chip.selected { color: var(--sand); }
   background: var(--bg-alt); padding: 0.5rem 0.7rem;
   border-radius: 2px; margin-bottom: 0.5rem;
 }
+.pay-opt-btn {
+  flex: 1;
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--text-muted);
+  border-radius: 2px;
+  transition: border-color 0.2s, color 0.2s;
+}
+.pay-opt-btn:hover { border-color: var(--clay); color: var(--clay); }
 .copy-btn {
   font-family: 'Cinzel', serif; font-size: 0.48rem;
   letter-spacing: 0.15em; text-transform: uppercase;
@@ -971,12 +967,7 @@ footer a:hover { color:var(--rust); }
   <div class="cart-foot" id="cartFoot" style="display:none">
     <div class="cart-totals" id="cartTotals"></div>
     <button class="checkout-btn" id="checkoutBtn">Proceed to checkout</button>
-    <div class="pay-options">
-      <button class="pay-opt-btn" id="paystackQuickBtn">Paystack</button>
-      <button class="pay-opt-btn" id="flutterwaveQuickBtn">Flutterwave</button>
-      <button class="pay-opt-btn crypto" id="ethQuickBtn">⬡ ETH</button>
-      <button class="pay-opt-btn crypto" id="tezosQuickBtn" style="color:#5ac0f5;border-color:rgba(90,192,245,0.3)">꜀ Tezos</button>
-    </div>
+
   </div>
 </aside>
 
@@ -2031,14 +2022,16 @@ function buildOrderSummary() {
 
 function buildCryptoOptions() {
   const usd     = grandTotalUsd();
-  const ethRate = 0.00033;
-  const ethAmt  = (usd * ethRate).toFixed(5);
-  const usdcAmt = usd.toFixed(2);
+  const ethPrice = window._ethUsdPrice; // set by fetchCryptoRates()
+  const ethAmt   = ethPrice ? (usd / ethPrice).toFixed(5) : null;
+  const usdcAmt  = usd.toFixed(2);
 
   let html = '';
 
   if (SHOP_CONFIG.ethAddress) {
-    html += cryptoBlock('ETH · Ethereum',          `${ethAmt} ETH`,       SHOP_CONFIG.ethAddress);
+    html += cryptoBlock('ETH · Ethereum',
+      ethAmt !== null ? `${ethAmt} ETH` : 'Fetching rate…',
+      SHOP_CONFIG.ethAddress);
     html += cryptoBlock('USDC · ERC-20',           `${usdcAmt} USDC`,     SHOP_CONFIG.ethAddress);
     html += cryptoBlock('USDT · ERC-20',           `${usdcAmt} USDT`,     SHOP_CONFIG.ethAddress);
   }
@@ -2083,10 +2076,7 @@ document.getElementById('checkoutOverlay').addEventListener('click', e=>{
 });
 
 document.getElementById('checkoutBtn').addEventListener('click', ()=>openCheckout('paystack'));
-document.getElementById('paystackQuickBtn').addEventListener('click', ()=>openCheckout('paystack'));
-document.getElementById('flutterwaveQuickBtn').addEventListener('click', ()=>openCheckout('flutterwave'));
-document.getElementById('ethQuickBtn').addEventListener('click', ()=>openCheckout('eth'));
-document.getElementById('tezosQuickBtn').addEventListener('click', ()=>openCheckout('tezos'));
+
 
 /* ─── Payment handlers ─── */
 function getFormData() {
@@ -2692,22 +2682,51 @@ let _tezosConnectedAddr = null;
 let _tezosBeaconClient  = null;
 let _tezosWalletProvider = null;
 let _tezosConnecting = false;
-let _xtzPerUsd = null; // set by live fetch only — null until resolved
+let _xtzPerUsd = null; // set by fetchCryptoRates()
 
-/* ── Tezos rate: fetch live XTZ/USD from CoinGecko ── */
-(async function fetchXtzRate() {
-  try {
-    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tezos&vs_currencies=usd');
-    if (!r.ok) return;
-    const data = await r.json();
-    const usdPerXtz = data?.tezos?.usd;
-    if (usdPerXtz && usdPerXtz > 0) {
-      _xtzPerUsd = 1 / usdPerXtz;
-      // If the Tezos panel is already open, refresh the displayed amount
-      const panel = document.getElementById('panel-tezos');
-      if (panel && panel.classList.contains('active')) renderTezosPanel();
-    }
-  } catch(_) {}
+/* ── Fetch ETH + XTZ prices from Binance (fast, no auth, no rate limit for simple tickers) ──
+   Falls back to CoinGecko if Binance is unreachable.
+   Both rates are fetched in parallel so neither blocks the other.                              */
+(async function fetchCryptoRates() {
+  async function binancePrice(symbol) {
+    const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
+    if (!r.ok) throw new Error('binance ' + r.status);
+    const d = await r.json();
+    const p = parseFloat(d.price);
+    if (!p || p <= 0) throw new Error('bad price');
+    return p;
+  }
+  async function coingeckoPrice(id) {
+    const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`);
+    if (!r.ok) throw new Error('coingecko ' + r.status);
+    const d = await r.json();
+    const p = d?.[id]?.usd;
+    if (!p || p <= 0) throw new Error('bad price');
+    return p;
+  }
+  async function getPrice(binanceSymbol, coingeckoId) {
+    try { return await binancePrice(binanceSymbol); } catch(_) {}
+    try { return await coingeckoPrice(coingeckoId); } catch(_) {}
+    return null;
+  }
+
+  const [ethPrice, xtzPrice] = await Promise.all([
+    getPrice('ETHUSDT', 'ethereum'),
+    getPrice('XTZUSDT', 'tezos'),
+  ]);
+
+  if (ethPrice) {
+    window._ethUsdPrice = ethPrice;
+    // Refresh ETH panel if open
+    const ethPanel = document.getElementById('panel-eth');
+    if (ethPanel && ethPanel.classList.contains('active')) buildCryptoOptions();
+  }
+  if (xtzPrice) {
+    _xtzPerUsd = 1 / xtzPrice;
+    // Refresh Tezos panel if open
+    const xtzPanel = document.getElementById('panel-tezos');
+    if (xtzPanel && xtzPanel.classList.contains('active')) renderTezosPanel();
+  }
 })();
 
 function tezosXtzAmount() {
@@ -3004,11 +3023,12 @@ document.getElementById('tezosManualBtn').addEventListener('click', () => {
   showConfirmation('tezos', ref);
 });
 
-// Re-render Tezos panel whenever that tab becomes active
+// Re-render crypto panels whenever their tab becomes active
 const _origSwitchPayTab = switchPayTab;
 const _patchedSwitch = function(tab) {
   _origSwitchPayTab(tab);
   if (tab === 'tezos') renderTezosPanel();
+  if (tab === 'eth')   buildCryptoOptions();
 };
 document.querySelectorAll('.pay-tab').forEach(t => {
   t.replaceWith(t.cloneNode(true));
