@@ -187,6 +187,143 @@ async function handleExtendChallenge(req, res, supabase) {
   return res.status(200).json({ ok: true });
 }
 
+// ── GET/POST/PATCH/DELETE /api/admin?action=shop-products ────────────────────
+async function handleShopProducts(req, res, supabase) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('shop_products')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data || []);
+  }
+
+  if (req.method === 'POST') {
+    const body = req.body || {};
+    const { data, error } = await supabase
+      .from('shop_products')
+      .insert({
+        name:               String(body.name || '').slice(0, 200),
+        category:           String(body.category || 'prints').slice(0, 40),
+        print_type:         String(body.print_type || '').slice(0, 40),
+        description:        String(body.desc || '').slice(0, 1000),
+        emoji:              String(body.emoji || '✦').slice(0, 10),
+        variants:           body.variants || [],
+        available_variants: body.available_variants || [],
+        prices_ngn:         body.prices_ngn || {},
+        prices_usd:         body.prices_usd || {},
+        badge:              String(body.badge || '').slice(0, 60),
+        image_url:          String(body.image_url || '').slice(0, 500),
+        sort_order:         Number(body.sort_order) || 0,
+        active:             body.active !== false,
+      })
+      .select('id')
+      .single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(201).json({ ok: true, id: data.id });
+  }
+
+  if (req.method === 'PATCH') {
+    const id = req.query.id;
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const body = req.body || {};
+    const patch = {};
+    if (body.name               !== undefined) patch.name               = String(body.name).slice(0, 200);
+    if (body.category           !== undefined) patch.category           = String(body.category).slice(0, 40);
+    if (body.desc !== undefined) patch.description               = String(body.desc).slice(0, 1000);
+    if (body.variants           !== undefined) patch.variants           = body.variants;
+    if (body.available_variants !== undefined) patch.available_variants = body.available_variants;
+    if (body.prices_ngn         !== undefined) patch.prices_ngn         = body.prices_ngn;
+    if (body.prices_usd         !== undefined) patch.prices_usd         = body.prices_usd;
+    if (body.badge              !== undefined) patch.badge              = String(body.badge).slice(0, 60);
+    if (body.image_url          !== undefined) patch.image_url          = String(body.image_url).slice(0, 500);
+    if (body.sort_order         !== undefined) patch.sort_order         = Number(body.sort_order);
+    if (body.active             !== undefined) patch.active             = Boolean(body.active);
+    const { error } = await supabase.from('shop_products').update(patch).eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method === 'DELETE') {
+    const id = req.query.id;
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const { error } = await supabase.from('shop_products').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ ok: true });
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+
+// ── GET/POST /api/admin?action=shop-config ────────────────────────────────────
+async function handleShopConfig(req, res, supabase) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('shop_config')
+      .select('*')
+      .limit(1)
+      .single();
+    if (error && error.code !== 'PGRST116') return res.status(500).json({ error: error.message });
+    return res.status(200).json(data || {});
+  }
+
+  if (req.method === 'POST') {
+    const body = req.body || {};
+    const patch = {
+      eth_address:    String(body.eth_address   || '').slice(0, 100),
+      tezos_address:  String(body.tezos_address || '').slice(0, 100),
+      announcement:   String(body.announcement  || '').slice(0, 500),
+      updated_at:     new Date().toISOString(),
+    };
+    // Upsert — always keep exactly one config row (id = 1)
+    const { error } = await supabase
+      .from('shop_config')
+      .upsert({ id: 1, ...patch }, { onConflict: 'id' });
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ ok: true });
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+
+// ── GET /api/admin?action=shop-orders ─────────────────────────────────────────
+async function handleShopOrders(req, res, supabase) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const status = req.query.status || 'all';
+  let query = supabase
+    .from('shop_orders')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (status !== 'all') query = query.eq('status', status);
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data || []);
+}
+
+// ── PATCH /api/admin?action=shop-order ────────────────────────────────────────
+async function handleShopOrderUpdate(req, res, supabase) {
+  if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
+  const id = req.query.id;
+  if (!id) return res.status(400).json({ error: 'id required' });
+  const body = req.body || {};
+  const patch = { updated_at: new Date().toISOString() };
+
+  if (body.status !== undefined) {
+    if (!['pending', 'processing', 'shipped', 'fulfilled', 'cancelled'].includes(body.status))
+      return res.status(422).json({ error: 'Invalid status' });
+    patch.status = body.status;
+    if (body.status === 'fulfilled') patch.fulfilled_at = new Date().toISOString();
+  }
+  if (body.tracking_number !== undefined) patch.tracking_number = String(body.tracking_number).slice(0, 200);
+  if (body.tracking_carrier !== undefined) patch.tracking_carrier = String(body.tracking_carrier).slice(0, 100);
+  if (body.admin_note !== undefined) patch.admin_note = String(body.admin_note).slice(0, 1000);
+
+  const { error } = await supabase.from('shop_orders').update(patch).eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json({ ok: true });
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 module.exports = async (req, res) => {
@@ -223,6 +360,10 @@ module.exports = async (req, res) => {
                            : handleCreateChallenge(req, res, supabase);
     case 'upload-image': return handleUploadImage(req, res, supabase);
     case 'wallets':      return handleGetWallets(req, res, supabase);
+    case 'shop-products': return handleShopProducts(req, res, supabase);
+    case 'shop-config':   return handleShopConfig(req, res, supabase);
+    case 'shop-orders':   return handleShopOrders(req, res, supabase);
+    case 'shop-order':    return handleShopOrderUpdate(req, res, supabase);
     default:
       return res.status(404).json({ error: `Unknown admin action: ${action}` });
   }
