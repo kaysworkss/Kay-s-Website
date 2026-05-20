@@ -190,6 +190,16 @@ async function handleExtendChallenge(req, res, supabase) {
 // ── GET/POST/PATCH/DELETE /api/admin?action=shop-products ────────────────────
 async function handleShopProducts(req, res, supabase) {
   if (req.method === 'GET') {
+    const id = req.query.id;
+    if (id) {
+      const { data, error } = await supabase
+        .from('shop_products')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (error) return res.status(error.code === 'PGRST116' ? 404 : 500).json({ error: error.message });
+      return res.status(200).json(data);
+    }
     const { data, error } = await supabase
       .from('shop_products')
       .select('*')
@@ -230,7 +240,8 @@ async function handleShopProducts(req, res, supabase) {
     const patch = {};
     if (body.name               !== undefined) patch.name               = String(body.name).slice(0, 200);
     if (body.category           !== undefined) patch.category           = String(body.category).slice(0, 40);
-    if (body.desc !== undefined) patch.description               = String(body.desc).slice(0, 1000);
+    if (body.desc               !== undefined) patch.description        = String(body.desc).slice(0, 1000);
+    if (body.description        !== undefined) patch.description        = String(body.description).slice(0, 1000);
     if (body.variants           !== undefined) patch.variants           = body.variants;
     if (body.available_variants !== undefined) patch.available_variants = body.available_variants;
     if (body.prices_ngn         !== undefined) patch.prices_ngn         = body.prices_ngn;
@@ -239,6 +250,20 @@ async function handleShopProducts(req, res, supabase) {
     if (body.image_url          !== undefined) patch.image_url          = String(body.image_url).slice(0, 500);
     if (body.sort_order         !== undefined) patch.sort_order         = Number(body.sort_order);
     if (body.active             !== undefined) patch.active             = Boolean(body.active);
+    if (body.stock_by_variant   !== undefined) patch.stock_by_variant   = body.stock_by_variant;
+    // Print page fields
+    if (body.slug               !== undefined) patch.slug               = String(body.slug).slice(0, 200);
+    if (body.year               !== undefined) patch.year               = String(body.year).slice(0, 10);
+    if (body.series_slug        !== undefined) patch.series_slug        = String(body.series_slug).slice(0, 200);
+    if (body.series_name        !== undefined) patch.series_name        = String(body.series_name).slice(0, 200);
+    if (body.series_desc        !== undefined) patch.series_desc        = String(body.series_desc).slice(0, 1000);
+    if (body.medium             !== undefined) patch.medium             = String(body.medium).slice(0, 200);
+    if (body.quote              !== undefined) patch.quote              = String(body.quote).slice(0, 500);
+    if (body.story              !== undefined) patch.story              = body.story;
+    if (body.process            !== undefined) patch.process            = body.process;
+    if (body.signed             !== undefined) patch.signed             = Boolean(body.signed);
+    if (body.is_large_print     !== undefined) patch.is_large_print     = Boolean(body.is_large_print);
+    if (body.images             !== undefined) patch.images             = body.images;
     const { error } = await supabase.from('shop_products').update(patch).eq('id', id);
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ ok: true });
