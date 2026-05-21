@@ -1459,6 +1459,7 @@ footer a:hover { color:var(--rust); }
 <script src="https://js.paystack.co/v1/inline.js" async></script>
 <script src="https://checkout.flutterwave.com/v3.js" async></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.8.0/ethers.umd.min.js" async></script>
+<script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
 
 <script>
 'use strict';
@@ -2029,7 +2030,9 @@ function openCheckout(defaultTab) {
   if (!cart.length) return;
   closeCart();
   buildOrderSummary();
+  ensureCryptoRateUpdates();
   renderEthPanel();
+  renderTezosPanel();
   document.getElementById('formScreen').style.display='';
   document.getElementById('confirmScreen').classList.remove('active');
   document.getElementById('checkoutOverlay').classList.add('open');
@@ -2980,6 +2983,94 @@ let _xtzPerUsd = null; // set by fetchCryptoRates()
   }
 })();
 
+let _cryptoRateTimer = null;
+let _cryptoRatesLoading = false;
+let _lastCryptoRateAt = 0;
+
+function withCryptoTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
+  ]);
+}
+
+function validUsdPrice(value) {
+  const price = Number(value);
+  return Number.isFinite(price) && price > 0 ? price : null;
+}
+
+async function fetchJsonPrice(url, pick) {
+  const r = await withCryptoTimeout(fetch(url, { cache: 'no-store' }), 4500);
+  if (!r.ok) throw new Error('rate ' + r.status);
+  const d = await r.json();
+  const price = validUsdPrice(pick(d));
+  if (!price) throw new Error('bad price');
+  return price;
+}
+
+function cryptoRateSources(asset) {
+  if (asset === 'eth') {
+    return [
+      () => fetchJsonPrice('https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT', d => d.price),
+      () => fetchJsonPrice('https://api.coinbase.com/v2/exchange-rates?currency=ETH', d => d?.data?.rates?.USD),
+      () => fetchJsonPrice('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd', d => d?.ethereum?.usd),
+    ];
+  }
+  return [
+    () => fetchJsonPrice('https://api.binance.com/api/v3/ticker/price?symbol=XTZUSDT', d => d.price),
+    () => fetchJsonPrice('https://api.coinbase.com/v2/exchange-rates?currency=XTZ', d => d?.data?.rates?.USD),
+    () => fetchJsonPrice('https://api.coingecko.com/api/v3/simple/price?ids=tezos&vs_currencies=usd', d => d?.tezos?.usd),
+  ];
+}
+
+async function getLiveCryptoPrice(asset) {
+  try {
+    return await Promise.any(cryptoRateSources(asset).map(source => source()));
+  } catch (_) {
+    return null;
+  }
+}
+
+async function refreshCryptoRates() {
+  if (_cryptoRatesLoading) return;
+  _cryptoRatesLoading = true;
+  try {
+    const [ethPrice, xtzPrice] = await Promise.all([
+      getLiveCryptoPrice('eth'),
+      getLiveCryptoPrice('xtz'),
+    ]);
+
+    if (ethPrice) window._ethUsdPrice = ethPrice;
+    if (xtzPrice) _xtzPerUsd = 1 / xtzPrice;
+    if (ethPrice || xtzPrice) _lastCryptoRateAt = Date.now();
+
+    if (ethPrice) {
+      const ethManual = document.getElementById('cryptoConfirmBtn');
+      if (ethManual) ethManual.style.display = '';
+    }
+    if (xtzPrice) {
+      const xtzManual = document.getElementById('tezosManualBtn');
+      if (xtzManual) xtzManual.style.display = '';
+    }
+
+    const ethPanel = document.getElementById('panel-eth');
+    if (ethPanel && ethPanel.classList.contains('active')) renderEthPanel();
+    const xtzPanel = document.getElementById('panel-tezos');
+    if (xtzPanel && xtzPanel.classList.contains('active')) renderTezosPanel();
+  } catch (e) {
+    console.warn('[Rates] refresh failed:', e);
+  } finally {
+    _cryptoRatesLoading = false;
+  }
+}
+
+function ensureCryptoRateUpdates() {
+  refreshCryptoRates();
+  if (!_cryptoRateTimer) _cryptoRateTimer = setInterval(refreshCryptoRates, 60000);
+}
+
+ensureCryptoRateUpdates();
+
 function tezosXtzAmount() {
   if (!_xtzPerUsd) return null; // rate not yet available
   return (grandTotalUsd() * _xtzPerUsd).toFixed(4);
@@ -3018,7 +3109,7 @@ async function loadBeaconSdk() {
   if (!_beaconSdkLoadPromise) {
     _beaconSdkLoadPromise = new Promise((resolve, reject) => {
       const s = document.createElement('script');
-      s.src = 'https://unpkg.com/@airgap/beacon-sdk@4.3.0/dist/beacon-sdk.min.js';
+      s.src = 'https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js';
       s.onload = resolve; s.onerror = reject;
       document.head.appendChild(s);
     });
@@ -3111,11 +3202,11 @@ async function beaconShopConnectAttempt(DAppClient, sdk, resetFirst) {
 
   let permission;
   try {
-    permission = await client.requestPermissions({ scopes });
+    permission = await withCryptoTimeout(client.requestPermissions({ scopes }), 90000);
   } catch (e) {
     const msg = e?.message || String(e);
     if (/not accepted|invalid|unknown|unexpected/i.test(msg)) {
-      permission = await client.requestPermissions(); // retry without scopes
+      permission = await withCryptoTimeout(client.requestPermissions(), 90000); // retry without scopes
     } else throw e;
   }
 
