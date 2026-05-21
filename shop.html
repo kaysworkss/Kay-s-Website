@@ -505,6 +505,32 @@ body.dark .variant-chip.selected { color: var(--sand); }
   font-size: 0.88rem; color: var(--text-muted);
   padding: 0.3rem 0;
 }
+.order-line.item {
+  align-items: center;
+  gap: 0.9rem;
+}
+.order-line-main {
+  min-width: 0;
+  flex: 1;
+}
+.order-line-name {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.order-line-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+}
+.order-line-controls .qty-btn {
+  width: 1.55rem;
+  height: 1.55rem;
+}
+.order-line-price {
+  white-space: nowrap;
+  color: var(--text);
+}
 .order-total {
   display: flex; justify-content: space-between;
   padding-top: 0.7rem; margin-top: 0.4rem;
@@ -1754,6 +1780,37 @@ function addToCart(p, variant) {
   showToast('Added to bag ✦');
 }
 
+function refreshCheckoutPricing() {
+  const overlay = document.getElementById('checkoutOverlay');
+  if (!overlay || !overlay.classList.contains('open')) return;
+  updateDeliveryEstimate();
+  if (typeof renderEthPanel === 'function') renderEthPanel();
+  if (typeof renderTezosPanel === 'function') renderTezosPanel();
+}
+
+function changeCartQty(key, dir) {
+  const item = cart.find(c=>c.key===key);
+  if (!item) return;
+  item.qty += Number(dir);
+  if (item.qty <= 0) cart.splice(cart.indexOf(item), 1);
+  updateCartUI();
+  if (cart.length) {
+    buildOrderSummary();
+    refreshCheckoutPricing();
+  } else {
+    closeCheckout();
+  }
+}
+
+function cartDomKey(key) {
+  return encodeURIComponent(key);
+}
+
+function cartKeyFromButton(btn) {
+  try { return decodeURIComponent(btn.dataset.key || ''); }
+  catch (_) { return btn.dataset.key || ''; }
+}
+
 function updateCartUI() {
   const badge = document.getElementById('cartBadge');
   const total = cart.reduce((a,c)=>a+c.qty, 0);
@@ -1782,10 +1839,10 @@ function updateCartUI() {
         <div class="cart-item-name">${c.name}</div>
         <div class="cart-item-variant">${c.variant}</div>
         <div class="cart-item-qty">
-          <button class="qty-btn" data-key="${c.key}" data-dir="-1">−</button>
+          <button class="qty-btn" data-key="${cartDomKey(c.key)}" data-dir="-1">−</button>
           <span class="qty-val">${c.qty}</span>
-          <button class="qty-btn" data-key="${c.key}" data-dir="1">+</button>
-          <button class="cart-item-remove" data-key="${c.key}">Remove</button>
+          <button class="qty-btn" data-key="${cartDomKey(c.key)}" data-dir="1">+</button>
+          <button class="cart-item-remove" data-key="${cartDomKey(c.key)}">Remove</button>
         </div>
       </div>
       <div>
@@ -1805,16 +1862,13 @@ function updateCartUI() {
   // Qty / remove events
   itemsEl.querySelectorAll('.qty-btn').forEach(b=>{
     b.addEventListener('click',()=>{
-      const item = cart.find(c=>c.key===b.dataset.key);
-      if(!item) return;
-      item.qty += Number(b.dataset.dir);
-      if(item.qty<=0) cart.splice(cart.indexOf(item),1);
-      updateCartUI();
+      changeCartQty(cartKeyFromButton(b), b.dataset.dir);
     });
   });
   itemsEl.querySelectorAll('.cart-item-remove').forEach(b=>{
     b.addEventListener('click',()=>{
-      cart = cart.filter(c=>c.key!==b.dataset.key);
+      const key = cartKeyFromButton(b);
+      cart = cart.filter(c=>c.key!==key);
       updateCartUI();
     });
   });
@@ -2041,9 +2095,16 @@ function openCheckout(defaultTab) {
 
 function buildOrderSummary() {
   const lines = cart.map(c=>`
-    <div class="order-line">
-      <span>${c.name} · ${c.variant} × ${c.qty}</span>
-      <span>${fmt(c.priceNgn * c.qty)}</span>
+    <div class="order-line item">
+      <div class="order-line-main">
+        <div class="order-line-name">${c.name} · ${c.variant}</div>
+        <div class="order-line-controls">
+          <button type="button" class="qty-btn order-qty-btn" data-key="${cartDomKey(c.key)}" data-dir="-1">−</button>
+          <span class="qty-val">${c.qty}</span>
+          <button type="button" class="qty-btn order-qty-btn" data-key="${cartDomKey(c.key)}" data-dir="1">+</button>
+        </div>
+      </div>
+      <span class="order-line-price">${fmt(c.priceNgn * c.qty)}</span>
     </div>`).join('');
 
   const deliveryLine = _deliveryZone && _deliveryZone !== 'pickup' && _deliveryMethod === 'ship'
@@ -2061,6 +2122,12 @@ function buildOrderSummary() {
       <span class="order-total-label">Total</span>
       <span class="order-total-val">${fmt(grandTotalNgn())} <span style="font-size:0.78rem;color:var(--text-muted)">/ $${grandTotalUsd().toFixed(0)}</span></span>
     </div>`;
+
+  document.querySelectorAll('.order-qty-btn').forEach(b=>{
+    b.addEventListener('click',()=>{
+      changeCartQty(cartKeyFromButton(b), b.dataset.dir);
+    });
+  });
 }
 
 /* renderEthPanel is defined below in the ETH wallet section */
