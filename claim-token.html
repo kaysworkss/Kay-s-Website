@@ -242,6 +242,10 @@
         </div>
 
         <form class="claim-form" id="claimForm">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.85rem;">
+            <span style="font-family:'Cinzel',serif; letter-spacing:0.22em; text-transform:uppercase; color:var(--clay); font-size:0.64rem;">Your Details</span>
+            <button type="button" id="closeForm" style="background:none; border:none; color:rgba(232,213,176,0.5); font-family:'Cinzel',serif; letter-spacing:0.14em; text-transform:uppercase; font-size:0.6rem; cursor:pointer; padding:0.2rem 0.4rem; transition:color 0.2s;" onmouseover="this.style.color='var(--sand)'" onmouseout="this.style.color='rgba(232,213,176,0.5)'">✕ Close</button>
+          </div>
           <input type="hidden" name="_subject" value="Matching Entry Token Claim" />
           <input type="hidden" name="source_chain" id="sourceChain" />
           <input type="hidden" name="source_wallet" id="sourceWallet" />
@@ -342,7 +346,8 @@ const els = {
   connectTezBeacon: document.getElementById('connectTezBeacon'),
   connectTezTemple: document.getElementById('connectTezTemple'),
   dismissTezWallet: document.getElementById('dismissTezWallet'),
-  submit: document.getElementById('submitClaim')
+  submit: document.getElementById('submitClaim'),
+  closeForm: document.getElementById('closeForm')
 };
 
 function setStatus(kind, message) {
@@ -673,6 +678,13 @@ els.connectTez.addEventListener('click', connectTezos);
 els.connectTezBeacon.addEventListener('click', () => connectTezosWith(() => connectBeaconWallet(false)));
 els.connectTezTemple.addEventListener('click', () => connectTezosWith(connectTempleDirect));
 els.dismissTezWallet.addEventListener('click', () => els.tezosWalletModal.classList.remove('show'));
+els.closeForm.addEventListener('click', () => {
+  els.form.classList.remove('show');
+  els.form.reset();
+  setStatus('', 'Mint first, then connect the wallet that holds your Entry Token. No transaction is sent when verifying.');
+  els.connectEth.classList.remove('active');
+  els.connectTez.classList.remove('active');
+});
 
 els.form.addEventListener('submit', async (event) => {
   event.preventDefault();
