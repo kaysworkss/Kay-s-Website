@@ -1676,6 +1676,11 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             Hall of Fame
           </a>
         </div>
+
+        <!-- Cross-chain simulation — shown when the upcoming piece is paired -->
+        <button class="cc-sim-trigger" id="upcoming-cc-sim-trigger" onclick="openCcSim()" style="display:none;margin-top:16px">
+          ◈ &nbsp;How does cross-chain bidding work? &nbsp;→
+        </button>
       </div>
     </div>
   </div>
@@ -2971,6 +2976,12 @@ function _loadUpcomingPiece(idx) {
   } else if (gateLinkEl) { gateLinkEl.style.display = "none"; }
 
   loadStaticImage("upcoming", slot);
+
+  // Show the cross-chain simulation trigger only for paired pieces
+  const upcomingSimBtn = document.getElementById("upcoming-cc-sim-trigger");
+  if (upcomingSimBtn) {
+    upcomingSimBtn.style.display = _pairKeyForSlot(slot) ? "block" : "none";
+  }
 
   if (upcomingTimer) { clearInterval(upcomingTimer); upcomingTimer = null; }
   // Use the piece's own launchDate, falling back to the global cfg.launchDate
