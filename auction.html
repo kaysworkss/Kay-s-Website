@@ -260,6 +260,316 @@ body {
 }
 .chat-settled-lock.show { display:flex; }
 
+
+/* ── Cross-chain chooser (inside bid panel) ── */
+.cc-chooser {
+  display: none; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;
+}
+.cc-chooser.show { display: grid; }
+.cc-choice {
+  background: var(--bg-alt); border: 1px solid var(--divider);
+  border-radius: var(--r); overflow: hidden; cursor: pointer;
+  transition: border-color .2s, opacity .3s;
+  position: relative;
+}
+.cc-choice:hover:not(.locked) { border-color: var(--clay); }
+.cc-choice.locked { opacity: 0.25; pointer-events: none; }
+.cc-choice-head {
+  padding: 9px 12px; border-bottom: 1px solid var(--divider);
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+}
+.cc-choice-head.eth { color: #6ea8d8; background: rgba(98,126,234,0.07); }
+.cc-choice-head.xtz { color: #a88fd8; background: rgba(168,143,216,0.07); }
+.cc-choice-body { padding: 10px 12px; }
+.cc-choice-desc {
+  font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+  color: var(--text-muted); line-height: 1.5; margin-bottom: 10px;
+}
+.cc-choice-btn {
+  width: 100%; font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  border-radius: var(--r); padding: 8px; cursor: pointer;
+  border: 1px solid; transition: background .2s;
+}
+.cc-choice-btn.eth {
+  color: #6ea8d8; border-color: rgba(110,168,216,.4);
+  background: rgba(110,168,216,.08);
+}
+.cc-choice-btn.eth:hover { background: rgba(110,168,216,.16); }
+.cc-choice-btn.xtz {
+  color: #a88fd8; border-color: rgba(168,143,216,.4);
+  background: rgba(168,143,216,.08);
+}
+.cc-choice-btn.xtz:hover { background: rgba(168,143,216,.16); }
+.cc-lock-overlay {
+  position: absolute; inset: 0; display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(30,21,16,.65); text-align: center; padding: 8px; gap: 3px;
+}
+.cc-choice.locked .cc-lock-overlay { display: flex; }
+.cc-lock-icon { font-size: 14px; color: var(--text-muted); opacity: .5; }
+.cc-lock-lbl {
+  font-family: 'Cinzel', serif; font-size: 0.46rem;
+  letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted);
+}
+.cc-lock-sub { font-size: 0.75rem; color: var(--text-muted); font-style: italic; }
+.cc-nobid-bar-wrap {
+  display: none; height: 2px; background: var(--divider);
+  border-radius: 1px; overflow: hidden; margin-bottom: 14px;
+}
+.cc-nobid-bar-wrap.show { display: block; }
+.cc-nobid-bar {
+  height: 100%; background: var(--gold); border-radius: 1px; width: 100%;
+}
+.cc-reset-notice {
+  display: none; padding: 11px 13px; border-radius: var(--r);
+  background: rgba(201,153,58,.06); border: 1px solid rgba(201,153,58,.28);
+  font-family: 'Crimson Pro', serif; font-size: 0.85rem;
+  color: var(--text-muted); font-style: italic; margin-bottom: 14px;
+}
+.cc-reset-notice.show { display: block; }
+
+
+/* ── Chain chooser — waiting state (another browser is mid-claim) ── */
+.cc-choice.waiting { cursor: default; pointer-events: none; }
+.cc-choice.waiting .cc-choice-btn { opacity: 0.35; cursor: not-allowed; }
+.cc-wait-overlay {
+  position: absolute; inset: 0; display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(30,21,16,.72); text-align: center; padding: 10px; gap: 4px;
+  backdrop-filter: blur(1px);
+}
+.cc-choice.waiting .cc-wait-overlay { display: flex; }
+.cc-wait-spinner {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid rgba(196,132,90,.2);
+  border-top-color: var(--gold);
+  animation: spin .7s linear infinite; margin-bottom: 4px;
+}
+.cc-wait-lbl {
+  font-family: 'Cinzel', serif; font-size: 0.46rem;
+  letter-spacing: .15em; text-transform: uppercase; color: var(--gold);
+}
+.cc-wait-sub {
+  font-size: 0.75rem; color: var(--text-muted); font-style: italic; line-height: 1.4;
+}
+.cc-wait-timer {
+  font-family: 'Cinzel', serif; font-size: 0.9rem; font-weight: 600;
+  color: var(--gold); letter-spacing: .08em; margin-top: 2px;
+}
+/* No-bid bar — gold when waiting, green once live */
+.cc-nobid-bar.live { background: var(--moss); }
+/* Notify-me button inside chooser */
+.cc-notify-btn {
+  display: none; width: 100%; margin-top: 8px;
+  font-family: 'Cinzel', serif; font-size: 0.46rem;
+  letter-spacing: .14em; text-transform: uppercase;
+  border: 1px solid rgba(196,132,90,.35); border-radius: var(--r);
+  background: transparent; color: var(--text-muted);
+  padding: 6px; cursor: pointer; transition: all .18s;
+}
+.cc-notify-btn:hover { border-color: var(--clay); color: var(--clay); }
+.cc-notify-btn.show { display: block; }
+.cc-notify-status {
+  font-family: 'Crimson Pro', serif; font-size: 0.78rem;
+  font-style: italic; color: var(--moss); margin-top: 5px;
+  display: none; text-align: center;
+}
+.cc-notify-status.show { display: block; }
+
+
+/* ── Cross-chain simulation modal ── */
+.cc-sim-trigger {
+  display: none; width: 100%; margin-top: 10px;
+  font-family: 'Cinzel', serif; font-size: 0.46rem;
+  letter-spacing: .14em; text-transform: uppercase;
+  border: 1px solid rgba(196,132,90,.22); border-radius: var(--r);
+  background: transparent; color: var(--text-muted);
+  padding: 7px; cursor: pointer; transition: all .18s; text-align: center;
+}
+.cc-sim-trigger:hover { border-color: var(--clay); color: var(--clay); }
+.cc-sim-trigger.show { display: block; }
+.cc-sim-overlay {
+  display: none; position: fixed; inset: 0; z-index: 4000;
+  background: rgba(10,7,4,.82); align-items: flex-start;
+  justify-content: center; padding: 24px 16px; overflow-y: auto;
+}
+.cc-sim-overlay.show { display: flex; }
+.cc-sim-modal {
+  background: #1e1510; border: 1px solid rgba(196,132,90,.32);
+  border-radius: 6px; width: 100%; max-width: 560px;
+  overflow: hidden; position: relative;
+}
+.cc-sim-head {
+  padding: 14px 18px 11px; border-bottom: 1px solid rgba(196,132,90,.18);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+}
+.cc-sim-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.46rem;
+  letter-spacing: .22em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 4px;
+}
+.cc-sim-title {
+  font-family: 'Cormorant Garamond', serif; font-size: 1rem;
+  font-weight: 300; color: var(--text);
+}
+.cc-sim-close {
+  background: transparent; border: none; color: var(--text-muted);
+  font-size: 18px; cursor: pointer; padding: 2px 6px; line-height: 1; flex-shrink: 0;
+}
+.cc-sim-close:hover { color: var(--text); }
+.cc-sim-body { padding: 16px 18px; }
+/* Guide tip */
+.cc-sim-guide {
+  font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+  font-style: italic; color: var(--text-muted);
+  text-align: center; margin-bottom: 12px; min-height: 18px;
+}
+/* Sim chain chooser */
+.cc-sim-chooser { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.cc-sim-card {
+  background: #2a1c14; border: 1px solid rgba(196,132,90,.2);
+  border-radius: var(--r); overflow: hidden; cursor: pointer;
+  transition: border-color .2s, opacity .3s; position: relative;
+}
+.cc-sim-card:hover:not(.sim-locked):not(.sim-waiting) { border-color: rgba(196,132,90,.5); }
+.cc-sim-card.sim-locked { opacity: .25; pointer-events: none; }
+.cc-sim-card.sim-waiting { pointer-events: none; }
+.cc-sim-card.sim-active  { border-color: rgba(107,124,92,.5); background: rgba(107,124,92,.06); }
+.cc-sim-card-head {
+  padding: 8px 11px; border-bottom: 1px solid rgba(196,132,90,.14);
+  font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: .18em; text-transform: uppercase;
+}
+.cc-sim-card-head.eth { color: #6ea8d8; background: rgba(98,126,234,.06); }
+.cc-sim-card-head.xtz { color: #a88fd8; background: rgba(168,143,216,.06); }
+.cc-sim-card-body { padding: 9px 11px; }
+.cc-sim-card-lbl {
+  font-family: 'Crimson Pro', serif; font-size: 0.8rem;
+  color: var(--text-muted); line-height: 1.4; margin-bottom: 8px;
+}
+.cc-sim-card-stat {
+  font-family: 'Cormorant Garamond', serif; font-size: 1.1rem;
+  font-weight: 500; color: var(--text); line-height: 1; margin-bottom: 2px;
+}
+.cc-sim-card-usd { font-size: 0.75rem; color: var(--text-muted); font-style: italic; }
+.cc-sim-card-status {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;
+  font-family: 'Cinzel', serif; font-size: 0.42rem;
+  letter-spacing: .12em; text-transform: uppercase;
+}
+.cc-sim-sdot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.cc-sim-card-btn {
+  width: 100%; margin-top: 8px; font-family: 'Cinzel', serif;
+  font-size: 0.46rem; letter-spacing: .13em; text-transform: uppercase;
+  border-radius: var(--r); padding: 7px; cursor: pointer;
+  border: 1px solid; transition: background .2s;
+}
+.cc-sim-card-btn.eth { color: #6ea8d8; border-color: rgba(110,168,216,.4); background: rgba(110,168,216,.08); }
+.cc-sim-card-btn.eth:hover { background: rgba(110,168,216,.16); }
+.cc-sim-card-btn.xtz { color: #a88fd8; border-color: rgba(168,143,216,.4); background: rgba(168,143,216,.08); }
+.cc-sim-card-btn.xtz:hover { background: rgba(168,143,216,.16); }
+.cc-sim-card-btn:disabled { opacity: .35; cursor: not-allowed; }
+/* Sim lock overlay */
+.cc-sim-lock-overlay {
+  position: absolute; inset: 0; display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(30,21,16,.65); text-align: center; gap: 3px; padding: 8px;
+}
+.cc-sim-card.sim-locked .cc-sim-lock-overlay { display: flex; }
+.cc-sim-lock-lbl {
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted);
+}
+/* Sim nobid bar */
+.cc-sim-bar-wrap { height: 2px; background: rgba(196,132,90,.14); border-radius: 1px; overflow: hidden; margin-bottom: 10px; display: none; }
+.cc-sim-bar-wrap.show { display: block; }
+.cc-sim-bar { height: 100%; background: var(--gold); border-radius: 1px; width: 100%; }
+/* Sim bid area */
+.cc-sim-bid-area {
+  background: #2a1c14; border: 1px solid rgba(196,132,90,.16);
+  border-radius: var(--r); padding: 11px 13px; margin-bottom: 10px; display: none;
+}
+.cc-sim-bid-area.show { display: block; }
+.cc-sim-bid-row { display: flex; gap: 7px; margin-top: 7px; }
+.cc-sim-bid-inp {
+  flex: 1; background: #1e1510; border: 1px solid rgba(196,132,90,.3);
+  border-radius: var(--r); color: var(--text);
+  font-family: 'Cormorant Garamond', serif; font-size: 1rem;
+  padding: 7px 10px; outline: none; min-width: 0;
+}
+.cc-sim-bid-inp:focus { border-color: var(--clay); }
+.cc-sim-bid-btn {
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: .13em; text-transform: uppercase;
+  border: none; border-radius: var(--r);
+  padding: 7px 13px; cursor: pointer; white-space: nowrap; transition: opacity .2s;
+}
+.cc-sim-bid-btn:disabled { opacity: .3; cursor: not-allowed; }
+.cc-sim-bid-btn.eth { background: #627eea; color: #fff; }
+.cc-sim-bid-btn.xtz { background: #2c7df7; color: #fff; }
+.cc-sim-bid-msg {
+  font-family: 'Crimson Pro', serif; font-size: 0.8rem;
+  font-style: italic; color: var(--text-muted); margin-top: 5px; min-height: 14px;
+}
+.cc-sim-bid-msg.ok  { color: var(--moss); font-style: normal; }
+.cc-sim-bid-msg.err { color: var(--rust); font-style: normal; }
+/* Sim outcome */
+.cc-sim-outcome {
+  background: rgba(107,124,92,.08); border: 1px solid rgba(107,124,92,.28);
+  border-radius: var(--r); padding: 13px 15px; display: none; margin-bottom: 10px;
+}
+.cc-sim-outcome.show { display: block; }
+.cc-sim-outcome-title {
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--moss); margin-bottom: 7px;
+}
+.cc-sim-outcome-body {
+  font-family: 'Crimson Pro', serif; font-size: 0.88rem;
+  color: var(--text-muted); line-height: 1.65;
+}
+.cc-sim-outcome-body strong { color: var(--text); }
+/* Sim reset notice */
+.cc-sim-reset {
+  display: none; padding: 10px 12px; border-radius: var(--r); margin-bottom: 10px;
+  background: rgba(201,153,58,.06); border: 1px solid rgba(201,153,58,.25);
+  font-family: 'Crimson Pro', serif; font-size: 0.82rem;
+  color: var(--text-muted); font-style: italic;
+}
+.cc-sim-reset.show { display: block; }
+/* Sim log */
+.cc-sim-log {
+  background: #2a1c14; border: 1px solid rgba(196,132,90,.12);
+  border-radius: var(--r); padding: 8px 10px;
+  max-height: 72px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px;
+}
+.cc-sim-log-entry {
+  display: flex; gap: 8px;
+  font-family: 'Crimson Pro', serif; font-size: 0.75rem; line-height: 1.4;
+}
+.cc-sim-log-time { color: var(--text-muted); opacity: .45; flex-shrink: 0; }
+.cc-sim-log-txt  { color: var(--text-muted); }
+.cc-sim-log-txt.eth { color: #6ea8d8; }
+.cc-sim-log-txt.xtz { color: #a88fd8; }
+.cc-sim-log-txt.ok  { color: var(--moss); }
+.cc-sim-log-txt.warn { color: var(--gold); }
+.cc-sim-log-txt.sys { color: var(--sand); }
+/* Sim action row */
+.cc-sim-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+.cc-sim-act-btn {
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: .13em; text-transform: uppercase;
+  border-radius: var(--r); padding: 7px 12px; cursor: pointer;
+  border: 1px solid; transition: all .15s; flex: 1; min-width: 80px; text-align: center;
+}
+.cc-sim-act-btn.eth  { color: #6ea8d8; border-color: rgba(110,168,216,.4); background: rgba(110,168,216,.08); }
+.cc-sim-act-btn.xtz  { color: #a88fd8; border-color: rgba(168,143,216,.4); background: rgba(168,143,216,.08); }
+.cc-sim-act-btn.mute { color: var(--text-muted); border-color: rgba(196,132,90,.3); background: transparent; }
+.cc-sim-act-btn.mute:hover { border-color: var(--clay); color: var(--clay); }
+.cc-sim-act-btn:disabled { opacity: .3; cursor: not-allowed; }
+
 /* ── Mode toggle ── */
 .mode-toggle-bar { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px 24px; padding:8px 28px; border-bottom:1px solid var(--divider); background:var(--bg-alt); }
 .mode-tabs { display:none; gap:6px; justify-self:center; min-width:0; }
@@ -1191,6 +1501,21 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   color: var(--text-muted); font-style: italic;
   margin-bottom: 14px; line-height: 1.6;
 }
+
+/* ── Cross-chain status banner ── */
+.cc-banner {
+  display:none; align-items:center; gap:8px; margin-bottom:16px;
+  padding:10px 13px; border-radius:3px; border:1px solid;
+  font-family:'Crimson Pro',serif; font-size:0.86rem; line-height:1.5;
+}
+.cc-banner.cc-waiting  { background:rgba(201,153,58,0.08); border-color:rgba(201,153,58,0.35); color:var(--gold); }
+.cc-banner.cc-live     { background:rgba(107,124,92,0.08); border-color:rgba(107,124,92,0.35); color:var(--moss); }
+.cc-banner.cc-locked   { background:rgba(158,79,46,0.08);  border-color:rgba(158,79,46,0.35);  color:var(--clay); }
+.cc-banner.cc-settled  { background:rgba(107,124,92,0.06); border-color:rgba(107,124,92,0.25); color:var(--text-muted); }
+.cc-banner strong      { color:inherit; font-style:normal; }
+.cc-banner-dot         { width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; animation:live-blink 1.4s ease-in-out infinite; }
+.cc-dot-locked         { animation:none; opacity:0.55; }
+
 </style>
 <!-- Vercel Web Analytics -->
 <script>
@@ -1422,8 +1747,60 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             <div class="settled-sub" id="settled-sub"></div>
           </div>
 
-          <!-- Countdown -->
-          <div id="countdown-section" style="display:none;margin-bottom:24px">
+          <!-- Cross-chain chooser — shown when piece has crossChainPairKey, hidden once chain claimed -->
+          <div class="cc-chooser" id="cc-chooser">
+            <div class="cc-choice" id="cc-eth-choice">
+              <div class="cc-lock-overlay">
+                <div class="cc-lock-icon">✕</div>
+                <div class="cc-lock-lbl">Locked</div>
+                <div class="cc-lock-sub" id="cc-eth-lock-sub">Auction on Tezos</div>
+              </div>
+              <div class="cc-wait-overlay" id="cc-eth-wait-overlay">
+                <div class="cc-wait-spinner"></div>
+                <div class="cc-wait-lbl">Claim in progress</div>
+                <div class="cc-wait-sub">Another collector is starting this chain</div>
+                <div class="cc-wait-timer" id="cc-eth-wait-timer"></div>
+              </div>
+              <div class="cc-choice-head eth">⟠ Ethereum</div>
+              <div class="cc-choice-body">
+                <div class="cc-choice-desc">Bid in ETH. Outbid amounts refunded automatically.</div>
+                <button class="cc-choice-btn eth" onclick="_ccChooseChain('eth')">Start on Ethereum</button>
+              </div>
+            </div>
+            <div class="cc-choice" id="cc-xtz-choice">
+              <div class="cc-lock-overlay">
+                <div class="cc-lock-icon">✕</div>
+                <div class="cc-lock-lbl">Locked</div>
+                <div class="cc-lock-sub" id="cc-xtz-lock-sub">Auction on Ethereum</div>
+              </div>
+              <div class="cc-wait-overlay" id="cc-xtz-wait-overlay">
+                <div class="cc-wait-spinner"></div>
+                <div class="cc-wait-lbl">Claim in progress</div>
+                <div class="cc-wait-sub">Another collector is starting this chain</div>
+                <div class="cc-wait-timer" id="cc-xtz-wait-timer"></div>
+              </div>
+              <div class="cc-choice-head xtz">ꜩ Tezos</div>
+              <div class="cc-choice-body">
+                <div class="cc-choice-desc">Bid in XTZ. Outbid amounts returned immediately.</div>
+                <button class="cc-choice-btn xtz" onclick="_ccChooseChain('tezos')">Start on Tezos</button>
+              </div>
+            </div>
+          </div>
+          <div class="cc-nobid-bar-wrap" id="cc-nobid-bar-wrap">
+            <div class="cc-nobid-bar" id="cc-nobid-bar"></div>
+          </div>
+          <div class="cc-reset-notice" id="cc-reset-notice"></div>
+          <button class="cc-notify-btn" id="cc-notify-btn" onclick="_ccRequestNotification()">
+            ↗ Notify me when the auction goes live
+          </button>
+          <div class="cc-notify-status" id="cc-notify-status"></div>
+          <button class="cc-sim-trigger show" id="cc-sim-trigger" onclick="openCcSim()">
+            ◈ &nbsp;How does cross-chain bidding work? &nbsp;→
+          </button>
+
+          <!-- Cross-chain status banner (shown after chain is claimed) -->
+          <div id="cc-status-banner" class="cc-banner" style="display:none"></div>
+        <div id="countdown-section" style="display:none;margin-bottom:24px">
             <div class="slabel">Time remaining</div>
             <div class="countdown">
               <div class="count-cell"><div class="count-num" id="cd-d">00</div><div class="count-label">Days</div></div>
@@ -1662,6 +2039,16 @@ let _switchToken = 0;
 let _auctionSwitching = false;
 let _manualSoldKeys = new Set();
 
+// ─── Cross-chain claim state ──────────────────────────────────────────────────
+// All state lives in Supabase (crosschain_auction_claims table) — never localStorage.
+// These are in-memory mirrors of the server row, refreshed by polling.
+let _ccPairKey       = null;   // pair key for the active paired piece, or null
+let _ccClaimRow      = null;   // current claim row from server, or null
+let _ccPollTimer     = null;   // interval for polling claim state
+let _ccBidSignalled  = false;  // true once we've sent the "bid" action for this slot
+const CC_API         = "/api/crosschain-claim";
+const CC_POLL_MS     = 8000;   // poll every 8 seconds
+
 function normaliseStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   return ["live","upcoming","off"].includes(value) ? value : "";
@@ -1696,6 +2083,399 @@ function _pieceSoldKeys(piece, idx) {
 
 function _isManualSold(piece, idx) {
   return _pieceSoldKeys(piece, idx).some(key => _manualSoldKeys.has(key));
+}
+
+
+
+// ── Cross-chain chooser UI ────────────────────────────────────────────────────
+
+
+// ── Cross-chain waiting state (another browser is mid-claim) ─────────────────
+// Shown when poll returns waiting-bid for the OTHER chain — this browser
+// landed on the page while someone else is working through the 60s window.
+// Both cards enter "waiting" state with a live countdown and a spinner.
+// A notify-me button lets the collector get a browser notification when
+// the auction goes live (if bid placed) or resets (if timer expires).
+
+let _ccWaitTickRef = null;
+
+function _ccSetWaitingState(claimRow) {
+  const activeChain = claimRow.active_chain;
+  const resetAt     = claimRow.reset_at ? new Date(claimRow.reset_at).getTime() : 0;
+
+  // Both cards go into waiting mode — neither is clickable while claim is pending
+  const ethChoice = document.getElementById("cc-eth-choice");
+  const xtzChoice = document.getElementById("cc-xtz-choice");
+  if (ethChoice) ethChoice.classList.add("waiting");
+  if (xtzChoice) xtzChoice.classList.add("waiting");
+
+  // Show the draining no-bid bar (gold = waiting, not started by this browser)
+  const barWrap = document.getElementById("cc-nobid-bar-wrap");
+  const bar     = document.getElementById("cc-nobid-bar");
+  if (barWrap) barWrap.classList.add("show");
+  if (bar) {
+    bar.classList.remove("live");
+    const remMs = Math.max(0, resetAt - Date.now());
+    bar.style.transition = "none"; bar.style.width = "100%";
+    bar.getBoundingClientRect();
+    bar.style.transition = `width ${remMs}ms linear`;
+    bar.style.width = "0%";
+  }
+
+  // Show notify-me button
+  const notifyBtn = document.getElementById("cc-notify-btn");
+  if (notifyBtn) notifyBtn.classList.add("show");
+
+  // Tick the wait timers every second on both overlays
+  clearInterval(_ccWaitTickRef);
+  _ccWaitTickRef = setInterval(() => {
+    const rem = Math.max(0, Math.floor((resetAt - Date.now()) / 1000));
+    const mm  = String(Math.floor(rem / 60)).padStart(2, "0");
+    const ss  = String(rem % 60).padStart(2, "0");
+    const label = `${mm}:${ss} remaining`;
+    const ethTimer = document.getElementById("cc-eth-wait-timer");
+    const xtzTimer = document.getElementById("cc-xtz-wait-timer");
+    if (ethTimer) ethTimer.textContent = label;
+    if (xtzTimer) xtzTimer.textContent = label;
+    if (rem === 0) clearInterval(_ccWaitTickRef);
+  }, 1000);
+}
+
+function _ccClearWaitingState() {
+  clearInterval(_ccWaitTickRef);
+  _ccWaitTickRef = null;
+  const ethChoice = document.getElementById("cc-eth-choice");
+  const xtzChoice = document.getElementById("cc-xtz-choice");
+  if (ethChoice) ethChoice.classList.remove("waiting");
+  if (xtzChoice) xtzChoice.classList.remove("waiting");
+  const notifyBtn = document.getElementById("cc-notify-btn");
+  if (notifyBtn) notifyBtn.classList.remove("show");
+}
+
+async function _ccRequestNotification() {
+  const statusEl = document.getElementById("cc-notify-status");
+  if (!statusEl) return;
+  if (!("Notification" in window)) {
+    statusEl.textContent = "Your browser doesn't support notifications.";
+    statusEl.classList.add("show"); return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm === "granted") {
+    statusEl.textContent = "✓ You'll be notified when the auction opens or resets.";
+    statusEl.classList.add("show");
+    // Store flag so _ccPoll can fire the notification when state changes
+    window._ccNotifyRequested = true;
+  } else {
+    statusEl.textContent = "Notification permission denied — check your browser settings.";
+    statusEl.classList.add("show");
+  }
+}
+
+function _ccFireNotification(title, body) {
+  if (!window._ccNotifyRequested) return;
+  if (Notification.permission !== "granted") return;
+  try { new Notification(title, { body, tag: "cc-auction", renotify: true }); } catch(_) {}
+}
+
+function _ccShowChooser() {
+  // Show the two-chain chooser, hide bid form and countdown until chosen
+  const chooser = document.getElementById("cc-chooser");
+  if (chooser) chooser.classList.add("show");
+  // Hide bid panel elements — collector hasn't picked a chain yet
+  document.getElementById("countdown-section").style.display = "none";
+  document.getElementById("stats-grid").style.display        = "none";
+  document.getElementById("bid-form").style.display          = "none";
+  document.getElementById("history-section").style.display   = "none";
+  document.getElementById("buynow-section").style.display    = "none";
+  document.getElementById("status-line").textContent         = "";
+}
+
+function _ccHideChooser() {
+  const chooser = document.getElementById("cc-chooser");
+  if (chooser) chooser.classList.remove("show");
+}
+
+// Called when collector clicks one of the two chain buttons.
+// This is the moment the 60-second no-bid window starts.
+async function _ccChooseChain(chain) {
+  if (!_ccPairKey) return;
+  const slot    = _activeCfg();
+  const aucKey  = (slot.contractAddr || slot.tezosContractAddr || "").toLowerCase();
+
+  // Disable both buttons immediately to prevent double-click
+  const ethBtn = document.querySelector("#cc-eth-choice .cc-choice-btn");
+  const xtzBtn = document.querySelector("#cc-xtz-choice .cc-choice-btn");
+  if (ethBtn) ethBtn.disabled = true;
+  if (xtzBtn) xtzBtn.disabled = true;
+
+  // Register the claim — starts the 60s no-bid window in Supabase
+  await _ccRegisterClaim(_ccPairKey, chain, aucKey, 60);
+
+  // If claim succeeded (our chain is now active), show the bid UI
+  if (_ccClaimRow && _ccClaimRow.active_chain === chain) {
+    _ccHideChooser();
+    _ccStartNoBidCountdown();
+  } else if (_ccClaimRow && _ccClaimRow.active_chain !== chain) {
+    // Another browser already claimed the other chain — show locked state
+    _ccUpdateChooserLock(_ccClaimRow.active_chain);
+    if (ethBtn) ethBtn.disabled = false;
+    if (xtzBtn) xtzBtn.disabled = false;
+  } else {
+    // Claim failed (network error) — re-enable
+    if (ethBtn) ethBtn.disabled = false;
+    if (xtzBtn) xtzBtn.disabled = false;
+  }
+}
+
+// Start the draining no-bid bar and update banner countdown every second.
+// Cancelled the moment _ccSignalBid fires (first bid confirmed).
+let _ccNoBidCountdownRef = null;
+function _ccStartNoBidCountdown() {
+  const barWrap = document.getElementById("cc-nobid-bar-wrap");
+  const bar     = document.getElementById("cc-nobid-bar");
+  const resetEl = document.getElementById("cc-reset-notice");
+  if (resetEl) resetEl.classList.remove("show");
+
+  if (barWrap) barWrap.classList.add("show");
+  if (bar) {
+    bar.style.transition = "none";
+    bar.style.width = "100%";
+    // Force reflow then animate
+    bar.getBoundingClientRect();
+    bar.style.transition = "width 60000ms linear";
+    bar.style.width = "0%";
+  }
+
+  clearInterval(_ccNoBidCountdownRef);
+  _ccNoBidCountdownRef = setInterval(() => {
+    if (!_ccClaimRow || _ccClaimRow.status !== "waiting-bid") {
+      clearInterval(_ccNoBidCountdownRef);
+      if (barWrap) barWrap.classList.remove("show");
+      return;
+    }
+    _renderCcBanner();
+  }, 1000);
+}
+
+function _ccStopNoBidCountdown() {
+  clearInterval(_ccNoBidCountdownRef);
+  _ccNoBidCountdownRef = null;
+  const barWrap = document.getElementById("cc-nobid-bar-wrap");
+  const bar     = document.getElementById("cc-nobid-bar");
+  if (barWrap) barWrap.classList.remove("show");
+  if (bar) { bar.style.transition = "none"; bar.style.width = "100%"; }
+}
+
+// Update the chooser lock state when another browser has claimed a chain.
+function _ccUpdateChooserLock(activeChain) {
+  const ethChoice = document.getElementById("cc-eth-choice");
+  const xtzChoice = document.getElementById("cc-xtz-choice");
+  const ethSub    = document.getElementById("cc-eth-lock-sub");
+  const xtzSub    = document.getElementById("cc-xtz-lock-sub");
+  if (!ethChoice || !xtzChoice) return;
+  if (activeChain === "eth") {
+    ethChoice.classList.remove("locked");
+    xtzChoice.classList.add("locked");
+    if (xtzSub) xtzSub.textContent = "Auction running on Ethereum";
+  } else {
+    xtzChoice.classList.remove("locked");
+    ethChoice.classList.add("locked");
+    if (ethSub) ethSub.textContent = "Auction running on Tezos";
+  }
+}
+
+// ─── Cross-chain claim API ────────────────────────────────────────────────────
+// All reads and writes go to the server (game.js → Supabase).
+// No localStorage is used — every participant sees the same state.
+
+async function _ccFetch(method, body) {
+  try {
+    const opts = { method, headers: { "Content-Type": "application/json" } };
+    if (body) opts.body = JSON.stringify(body);
+    const res  = await fetch(CC_API + (method === "GET" && body?.pair_key ? "?pair_key=" + encodeURIComponent(body.pair_key) : ""), opts);
+    return res.ok ? res.json() : null;
+  } catch(_) { return null; }
+}
+
+// Called when a paired piece goes live — claims the chain in Supabase.
+// No-bid timeout is 60 seconds; server enforces the window (min 15s, max 3600s).
+async function _ccRegisterClaim(pairKey, activeChain, auctionKey, timeoutSec = 60) {
+  const data = await _ccFetch("POST", {
+    pair_key: pairKey,
+    active_chain: activeChain,
+    active_auction_key: auctionKey,
+    no_bid_timeout_sec: timeoutSec,
+  });
+  if (data?.ok) {
+    _ccClaimRow = data.claim;
+    _ccPairKey = pairKey;
+    _renderCcBanner();
+  }
+}
+
+// Called the moment the first real bid is confirmed on-chain.
+// Permanently cancels the no-bid timeout so the chain stays locked.
+async function _ccSignalBid(pairKey) {
+  if (_ccBidSignalled) return;
+  _ccBidSignalled = true;
+  const data = await _ccFetch("POST", { pair_key: pairKey, action: "bid" });
+  if (data?.ok) {
+    _ccClaimRow = data.claim;
+    _ccStopNoBidCountdown(); // first bid placed — cancel the no-bid window
+    _renderCcBanner();
+  }
+}
+
+// Called after AuctionSettled fires — marks the pair permanently closed.
+async function _ccSignalSettle(pairKey) {
+  const data = await _ccFetch("POST", { pair_key: pairKey, action: "settle" });
+  if (data?.ok) { _ccClaimRow = data.claim; _renderCcBanner(); }
+}
+
+// Poll the server for the current claim state.
+// If the no-bid window has expired (bid_count=0, reset_at passed),
+// the server returns reset:true and deletes the row — both chains unlock.
+async function _ccPoll(pairKey) {
+  const data = await _ccFetch("GET", { pair_key: pairKey });
+  if (!data) return;
+  if (data.reset) {
+    // No bid placed before timeout — Supabase deleted the row, both chains unlock.
+    _ccClaimRow = null;
+    _ccStopNoBidCountdown();
+    _renderCcBanner();
+    // Restore the chooser so collectors can pick a chain again
+    const ethChoice = document.getElementById("cc-eth-choice");
+    const xtzChoice = document.getElementById("cc-xtz-choice");
+    if (ethChoice) ethChoice.classList.remove("locked");
+    if (xtzChoice) xtzChoice.classList.remove("locked");
+    const ethBtn = document.querySelector("#cc-eth-choice .cc-choice-btn");
+    const xtzBtn = document.querySelector("#cc-xtz-choice .cc-choice-btn");
+    if (ethBtn) ethBtn.disabled = false;
+    if (xtzBtn) xtzBtn.disabled = false;
+    _ccShowChooser();
+    // Show the reset notice
+    const resetEl = document.getElementById("cc-reset-notice");
+    if (resetEl) {
+      resetEl.textContent = "No bid was placed in time — both chains are unlocked. Choose a chain to start again.";
+      resetEl.classList.add("show");
+    }
+    _ccClearWaitingState();
+    _ccFireNotification("Auction reset", "No bid was placed in time. Both chains are unlocked — you can now choose a chain.");
+    notify("info", "Auction reset", "No bid placed in time — both chains are now open.");
+    return;
+  }
+  _ccClaimRow = data.claim;
+  _renderCcBanner();
+
+  // React to claim state — handle all cases for browsers that didn't initiate the claim
+  if (_ccClaimRow?.status === "waiting-bid" || _ccClaimRow?.status === "live") {
+    const activeChain = _ccClaimRow.active_chain;
+    const slot = _activeCfg();
+    const thisChain = (slot?.chain || "eth") === "tezos" ? "tezos" : "eth";
+
+    if (activeChain === thisChain) {
+      // This browser is on the active chain — hide chooser, show bid UI
+      _ccClearWaitingState();
+      _ccHideChooser();
+      if (_ccClaimRow.status === "waiting-bid") _ccStartNoBidCountdown();
+      if (_ccClaimRow.status === "live") {
+        // Bid was placed while this browser was waiting — fire notification
+        _ccFireNotification("Auction is live!", "A bid was placed. The auction is now running.");
+      }
+    } else {
+      // This browser is on the passive chain — show waiting state with countdown
+      if (_ccClaimRow.status === "waiting-bid") {
+        _ccSetWaitingState(_ccClaimRow);
+      } else if (_ccClaimRow.status === "live") {
+        // Bid placed by someone on the other chain — lock this chain out
+        _ccClearWaitingState();
+        _ccUpdateChooserLock(activeChain);
+        _ccFireNotification("Auction is live on another chain", "The auction started on " + (activeChain === "eth" ? "Ethereum" : "Tezos") + ". This chain is now locked.");
+      }
+    }
+  }
+
+  // Stop polling once settled — state is permanent
+  if (_ccClaimRow?.status === "settled") {
+    _ccClearWaitingState();
+    _ccStopPolling();
+  }
+}
+
+function _ccStartPolling(pairKey) {
+  _ccStopPolling();
+  _ccPollTimer = setInterval(() => _ccPoll(pairKey), CC_POLL_MS);
+}
+
+function _ccStopPolling() {
+  if (_ccPollTimer) { clearInterval(_ccPollTimer); _ccPollTimer = null; }
+}
+
+// Reset all cross-chain state when switching pieces
+function _ccReset() {
+  _ccStopPolling();
+  _ccStopNoBidCountdown();
+  _ccClearWaitingState();
+  _ccPairKey      = null;
+  _ccClaimRow     = null;
+  _ccBidSignalled = false;
+  _ccNoBidCountdownRef = null;
+  window._ccNotifyRequested = false;
+  _renderCcBanner();
+  // Restore chooser to clean state when switching pieces
+  const ethChoice = document.getElementById("cc-eth-choice");
+  const xtzChoice = document.getElementById("cc-xtz-choice");
+  if (ethChoice) ethChoice.classList.remove("locked");
+  if (xtzChoice) xtzChoice.classList.remove("locked");
+  const ethBtn = document.querySelector("#cc-eth-choice .cc-choice-btn");
+  const xtzBtn = document.querySelector("#cc-xtz-choice .cc-choice-btn");
+  if (ethBtn) ethBtn.disabled = false;
+  if (xtzBtn) xtzBtn.disabled = false;
+  const resetEl = document.getElementById("cc-reset-notice");
+  if (resetEl) resetEl.classList.remove("show");
+}
+
+// Render the cross-chain status banner in the bid panel.
+// The banner element is injected into the DOM below.
+function _renderCcBanner() {
+  const el = document.getElementById("cc-status-banner");
+  if (!el) return;
+  if (!_ccClaimRow) { el.style.display = "none"; return; }
+
+  const { status, active_chain, reset_at } = _ccClaimRow;
+  const slot       = _activeCfg();
+  const thisChain  = (slot?.chain || "eth") === "tezos" ? "tezos" : "eth";
+  const otherChain = active_chain === "eth" ? "Tezos" : "Ethereum";
+  const sameChain  = active_chain === thisChain;
+
+  el.style.display = "flex";
+
+  if (status === "settled") {
+    el.className = "cc-banner cc-settled";
+    el.innerHTML = `<span class="cc-banner-dot"></span><span>Auction settled — the ${otherChain} listing is permanently closed.</span>`;
+    return;
+  }
+
+  if (status === "waiting-bid") {
+    // No bid yet — show the no-bid countdown
+    const resetMs  = reset_at ? new Date(reset_at).getTime() - Date.now() : 0;
+    const remSec   = Math.max(0, Math.floor(resetMs / 1000));
+    const mm       = String(Math.floor(remSec / 60)).padStart(2, "0");
+    const ss       = String(remSec % 60).padStart(2, "0");
+    el.className   = "cc-banner cc-waiting";
+    el.innerHTML   = `<span class="cc-banner-dot"></span><span><strong>${mm}:${ss}</strong> to place a bid — or both chains unlock and reset automatically.</span>`;
+    return;
+  }
+
+  if (status === "live") {
+    if (sameChain) {
+      el.className = "cc-banner cc-live";
+      el.innerHTML = `<span class="cc-banner-dot"></span><span>Auction live on this chain — ${otherChain} is locked.</span>`;
+    } else {
+      el.className = "cc-banner cc-locked";
+      el.innerHTML = `<span class="cc-banner-dot cc-dot-locked"></span><span>Auction is running on ${active_chain === "eth" ? "Ethereum" : "Tezos"} — this chain is locked out.</span>`;
+    }
+  }
 }
 
 async function _loadManualSoldOverrides() {
@@ -2263,6 +3043,7 @@ async function _switchAuction(idx) {
   if (auctionContract) { try { auctionContract.removeAllListeners(); } catch(_) {} }
   bidHistory = [];
   endTimestamp = 0; isLive = false; minNextBid = 0n;
+  _ccReset(); // clear cross-chain banner and polling for previous piece
   // Reset chat lock state for this piece
   clearTimeout(_chatLockTimer);
   _auctionSettled     = false;
@@ -2365,7 +3146,10 @@ async function _switchAuction(idx) {
   }
 
   countdownTimer = setInterval(() => {
-    if (switchToken === _switchToken) tickCountdown();
+    if (switchToken !== _switchToken) return;
+    tickCountdown();
+    // Re-render the cross-chain banner every tick so the no-bid countdown stays live
+    if (_ccClaimRow?.status === "waiting-bid") _renderCcBanner();
   }, 1000);
   pollTimer = setInterval(() => refreshState(switchToken, activeContract), 15000);
 
@@ -2387,10 +3171,14 @@ async function _switchAuction(idx) {
     clearInterval(countdownTimer);
     clearInterval(pollTimer);
     _pollAllTabBids();
+    // Mark the cross-chain pair as permanently settled in Supabase
+    if (_ccPairKey) _ccSignalSettle(_ccPairKey);
   });
   activeContract.on("ReserveActivated",(firstBidder, amount, endTime) => {
     if (switchToken !== _switchToken) return;
     endTimestamp = Number(endTime); isLive = true;
+    // First bid on-chain in reserve mode — signal to server to lock the other chain
+    if (_ccPairKey) _ccSignalBid(_ccPairKey);
     notify("info", "Reserve met — auction is live!", `First bid of ${ethers.formatEther(amount)} ETH started the countdown.`);
     refreshState(switchToken, activeContract);
   });
@@ -2414,6 +3202,19 @@ async function _switchAuction(idx) {
 
   _auctionSwitching = false;
   _setPieceTabsBusy(false);
+
+  // ── Cross-chain: show chooser if paired, else start polling for existing claim ──
+  // The claim is NOT registered on page load — it fires when a collector
+  // explicitly clicks a chain button (_ccChooseChain). This matches the
+  // intended UX: both chains dormant, no timer, until a chain is chosen.
+  const _ccKey = (slot.crossChainPairKey || "").trim().toLowerCase();
+  if (_ccKey) {
+    _ccPairKey = _ccKey;
+    // Show the chooser, hide the bid UI until a chain is picked
+    _ccShowChooser();
+    // Poll so existing claim state (from another browser) is reflected immediately
+    _ccStartPolling(_ccKey);
+  }
 }
 
 // ─── About panel ──────────────────────────────────────────────────────────────
@@ -3015,6 +3816,8 @@ async function placeBid() {
     notify("ok","Bid confirmed",`Your bid of ${amt} ETH is now leading`);
     document.getElementById("bid-input").value = "";
     const _confirmedBid = { bidder: signerAddress, amount: wei };
+    // Signal first bid to server — permanently locks the other chain for all participants
+    if (_ccPairKey) _ccSignalBid(_ccPairKey);
     await refreshState();
     await checkEligibility();
     aucOnBid(_confirmedBid, true);
@@ -4207,6 +5010,68 @@ function _renderPresenceCounts(total, eligible) {
 }
 
 </script>
+
+<!-- ── Cross-chain simulation modal ── -->
+<div class="cc-sim-overlay" id="cc-sim-overlay">
+  <div class="cc-sim-modal">
+    <div class="cc-sim-head">
+      <div>
+        <div class="cc-sim-eyebrow">Interactive simulation</div>
+        <div class="cc-sim-title">One artwork · One chain · One winner</div>
+      </div>
+      <button class="cc-sim-close" onclick="closeCcSim()">×</button>
+    </div>
+    <div class="cc-sim-body">
+      <div class="cc-sim-guide" id="sim-guide">Choose a chain below to start the auction — watch what happens to the other one.</div>
+      <div id="sim-cc-banner" class="cc-banner" style="margin-bottom:10px;display:none"></div>
+      <div class="cc-sim-bar-wrap" id="sim-bar-wrap"><div class="cc-sim-bar" id="sim-bar"></div></div>
+      <div class="cc-sim-chooser" id="sim-chooser">
+        <div class="cc-sim-card" id="sim-eth-card">
+          <div class="cc-sim-lock-overlay"><div class="cc-sim-lock-lbl">Locked</div></div>
+          <div class="cc-sim-card-head eth">⟠ Ethereum</div>
+          <div class="cc-sim-card-body">
+            <div class="cc-sim-card-lbl">Bid in ETH. Outbid amounts refunded by the contract.</div>
+            <div class="cc-sim-card-stat" id="sim-eth-amt">0.25 ETH</div>
+            <div class="cc-sim-card-usd">≈ $506 reserve</div>
+            <div class="cc-sim-card-status s-open" id="sim-eth-status" style="color:var(--text-muted)"><span class="cc-sim-sdot"></span><span>Open</span></div>
+            <button class="cc-sim-card-btn eth" id="sim-eth-btn" onclick="simChooseChain('eth')">Start on Ethereum</button>
+          </div>
+        </div>
+        <div class="cc-sim-card" id="sim-xtz-card">
+          <div class="cc-sim-lock-overlay"><div class="cc-sim-lock-lbl">Locked</div></div>
+          <div class="cc-sim-card-head xtz">ꜩ Tezos</div>
+          <div class="cc-sim-card-body">
+            <div class="cc-sim-card-lbl">Bid in XTZ. Outbid amounts returned immediately.</div>
+            <div class="cc-sim-card-stat" id="sim-xtz-amt">1,583 XTZ</div>
+            <div class="cc-sim-card-usd">≈ $506 reserve</div>
+            <div class="cc-sim-card-status" id="sim-xtz-status" style="color:var(--text-muted)"><span class="cc-sim-sdot"></span><span>Open</span></div>
+            <button class="cc-sim-card-btn xtz" id="sim-xtz-btn" onclick="simChooseChain('xtz')">Start on Tezos</button>
+          </div>
+        </div>
+      </div>
+      <div class="cc-sim-bid-area" id="sim-bid-area">
+        <div class="slabel">Place your bid</div>
+        <div class="cc-sim-bid-row">
+          <input class="cc-sim-bid-inp" type="number" id="sim-bid-inp" step="0.001" placeholder="—" disabled>
+          <button class="cc-sim-bid-btn" id="sim-bid-btn" onclick="simDoBid()" disabled>Bid</button>
+          <button class="cc-sim-bid-btn mute" id="sim-auto-btn" onclick="simAutoBid()" disabled style="background:rgba(196,132,90,.08);border:1px solid rgba(196,132,90,.3);color:var(--text-muted)">Auto bid</button>
+        </div>
+        <div class="cc-sim-bid-msg" id="sim-bid-msg"></div>
+      </div>
+      <div class="cc-sim-outcome" id="sim-outcome">
+        <div class="cc-sim-outcome-title">◈ &nbsp;Auction concluded</div>
+        <div class="cc-sim-outcome-body" id="sim-outcome-body"></div>
+      </div>
+      <div class="cc-sim-reset" id="sim-reset-notice"></div>
+      <div class="cc-sim-log" id="sim-log"></div>
+      <div class="cc-sim-actions">
+        <button class="cc-sim-act-btn mute" id="sim-settle-btn" onclick="simSettle()" disabled>End auction</button>
+        <button class="cc-sim-act-btn mute" onclick="simReset()">↺ Reset</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Custom cursor -->
 <div class="cursor" id="cursor" style="opacity:0;transition:opacity 0.3s;">
   <div class="cursor-ring" id="cursorRing"></div>
@@ -4257,6 +5122,273 @@ function _renderPresenceCounts(total, eligible) {
   document.addEventListener('mouseleave', () => { cursorEl.style.opacity = '0'; });
   document.addEventListener('mouseenter', () => { cursorEl.style.opacity = '1'; });
 }());
+</script>
+
+<script>
+// ── Cross-chain simulation ────────────────────────────────────────────────────
+// Self-contained — uses no real contracts or Supabase.
+// All state is local to this simulation.
+
+const SIM = {
+  RESERVE_ETH: 0.25, RESERVE_USD: 506, RESERVE_XTZ: 1583,
+  NO_BID_SEC: 60, AUC_SEC: 90,
+  phase: 'idle', chain: null,
+  bid: 0, bidCount: 0, leader: null, minBid: 0,
+  noBidRef: null, aucRef: null, noBidStart: 0,
+};
+
+function simFE(e) { return e.toFixed(2) + ' ETH'; }
+function simFX(x) { return Math.round(x).toLocaleString() + ' XTZ'; }
+function simFA(a) { return SIM.chain === 'xtz' ? simFX(a) : simFE(a); }
+function simFU(a) {
+  const rate = SIM.chain === 'xtz' ? SIM.RESERVE_USD / SIM.RESERVE_XTZ : SIM.RESERVE_USD / SIM.RESERVE_ETH;
+  return '≈ $' + Math.round(a * rate).toLocaleString();
+}
+function simFmt(s) {
+  s = Math.max(0, Math.floor(s));
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+
+function openCcSim() {
+  document.getElementById('cc-sim-overlay').classList.add('show');
+  simReset();
+}
+function closeCcSim() {
+  document.getElementById('cc-sim-overlay').classList.remove('show');
+  simStop();
+}
+
+function simLog(type, msg) {
+  const wrap = document.getElementById('sim-log');
+  if (!wrap) return;
+  const t = new Date().toLocaleTimeString('en-GB', { hour12: false });
+  const el = document.createElement('div');
+  el.className = 'cc-sim-log-entry';
+  el.innerHTML = `<span class="cc-sim-log-time">${t}</span><span class="cc-sim-log-txt ${type}">${msg}</span>`;
+  wrap.appendChild(el);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function simSetGuide(msg) {
+  const el = document.getElementById('sim-guide'); if (el) el.textContent = msg;
+}
+
+function simSetBanner(cls, html) {
+  const b = document.getElementById('sim-cc-banner');
+  if (!b) return;
+  if (!cls) { b.style.display = 'none'; return; }
+  b.className = 'cc-banner ' + cls;
+  b.innerHTML = html;
+  b.style.display = 'flex';
+}
+
+function simSetCardStatus(chain, cls, txt) {
+  const el = document.getElementById('sim-' + chain + '-status');
+  if (!el) return;
+  const colors = { open: 'var(--text-muted)', live: 'var(--moss)', locked: 'rgba(122,90,64,.9)', won: 'var(--moss)' };
+  el.style.color = colors[cls] || 'var(--text-muted)';
+  el.innerHTML = `<span class="cc-sim-sdot"></span><span>${txt}</span>`;
+}
+
+// ── Choose chain ──────────────────────────────────────────────────────────────
+function simChooseChain(chain) {
+  if (SIM.phase !== 'idle') return;
+  SIM.chain = chain;
+  SIM.phase = 'waiting-bid';
+  SIM.minBid = chain === 'eth' ? SIM.RESERVE_ETH : SIM.RESERVE_XTZ;
+  SIM.noBidStart = Date.now() / 1000;
+
+  const other = chain === 'eth' ? 'xtz' : 'eth';
+
+  // Lock other card
+  document.getElementById('sim-' + other + '-card').classList.add('sim-locked');
+  simSetCardStatus(other, 'locked', 'Locked');
+
+  // Activate this card
+  document.getElementById('sim-' + chain + '-card').classList.add('sim-active');
+  simSetCardStatus(chain, 'live', 'Waiting for first bid');
+
+  // Disable chooser buttons
+  document.getElementById('sim-eth-btn').disabled = true;
+  document.getElementById('sim-xtz-btn').disabled = true;
+
+  // Show bid area
+  const bidArea = document.getElementById('sim-bid-area');
+  if (bidArea) bidArea.classList.add('show');
+  const bidBtn = document.getElementById('sim-bid-btn');
+  const autoBtn = document.getElementById('sim-auto-btn');
+  const bidInp = document.getElementById('sim-bid-inp');
+  if (bidBtn) { bidBtn.disabled = false; bidBtn.className = 'cc-sim-bid-btn ' + chain; }
+  if (autoBtn) autoBtn.disabled = false;
+  if (bidInp) {
+    bidInp.disabled = false;
+    bidInp.step = chain === 'eth' ? '0.001' : '1';
+    bidInp.value = chain === 'eth' ? SIM.RESERVE_ETH : SIM.RESERVE_XTZ;
+    bidInp.placeholder = simFA(SIM.minBid);
+  }
+  document.getElementById('sim-settle-btn').disabled = false;
+
+  // Start no-bid bar
+  simStartNoBidBar();
+
+  const chainName = chain === 'eth' ? 'Ethereum ⟠' : 'Tezos ꜩ';
+  const otherName = chain === 'eth' ? 'Tezos' : 'Ethereum';
+  simSetBanner('cc-waiting', `<span class="cc-banner-dot"></span><span><strong id="sim-nobid-txt">${simFmt(SIM.NO_BID_SEC)}</strong> to place a bid — or both chains unlock and reset automatically.</span>`);
+  simSetGuide('You have 60 seconds to bid on ' + chainName + '. Place a bid or hit "Auto bid" — or wait and watch both chains reset.');
+  simLog('sys', chainName + ' claimed — 60s no-bid window started. ' + otherName + ' locked.');
+}
+
+// ── No-bid bar ────────────────────────────────────────────────────────────────
+function simStartNoBidBar() {
+  const wrap = document.getElementById('sim-bar-wrap');
+  const bar  = document.getElementById('sim-bar');
+  if (wrap) wrap.classList.add('show');
+  if (bar) {
+    bar.style.transition = 'none'; bar.style.width = '100%';
+    bar.getBoundingClientRect();
+    bar.style.transition = `width ${SIM.NO_BID_SEC * 1000}ms linear`;
+    bar.style.width = '0%';
+  }
+  clearInterval(SIM.noBidRef);
+  SIM.noBidRef = setInterval(() => {
+    if (SIM.phase !== 'waiting-bid') { clearInterval(SIM.noBidRef); return; }
+    const rem = Math.max(0, SIM.NO_BID_SEC - (Date.now() / 1000 - SIM.noBidStart));
+    const el = document.getElementById('sim-nobid-txt');
+    if (el) el.textContent = simFmt(rem);
+    simSetBanner('cc-waiting', `<span class="cc-banner-dot"></span><span><strong>${simFmt(rem)}</strong> to place a bid — or both chains unlock and reset automatically.</span>`);
+    if (rem <= 0) { clearInterval(SIM.noBidRef); simAutoCancel(); }
+  }, 500);
+}
+
+function simStopBar() {
+  clearInterval(SIM.noBidRef); SIM.noBidRef = null;
+  const wrap = document.getElementById('sim-bar-wrap');
+  const bar  = document.getElementById('sim-bar');
+  if (wrap) wrap.classList.remove('show');
+  if (bar) { bar.style.transition = 'none'; bar.style.width = '100%'; }
+}
+
+// ── Auto-cancel (no bids) ─────────────────────────────────────────────────────
+function simAutoCancel() {
+  if (SIM.bidCount > 0 || SIM.phase !== 'waiting-bid') return;
+  simStop();
+  SIM.phase = 'idle'; SIM.chain = null;
+
+  document.getElementById('sim-eth-card').classList.remove('sim-locked', 'sim-active');
+  document.getElementById('sim-xtz-card').classList.remove('sim-locked', 'sim-active');
+  simSetCardStatus('eth', 'open', 'Open');
+  simSetCardStatus('xtz', 'open', 'Open');
+  document.getElementById('sim-eth-btn').disabled = false;
+  document.getElementById('sim-xtz-btn').disabled = false;
+  document.getElementById('sim-bid-area').classList.remove('show');
+  document.getElementById('sim-settle-btn').disabled = true;
+  simSetBanner('cc-reset', `<span class="cc-banner-dot" style="animation:none;opacity:.5"></span><span>No bid placed — <strong>both chains unlocked</strong>. Choose a chain to try again.</span>`);
+  const rn = document.getElementById('sim-reset-notice');
+  if (rn) { rn.textContent = 'No bid was placed in time — both chains are unlocked. Choose either chain to start again.'; rn.classList.add('show'); }
+  simSetGuide('The 60-second window expired. Both chains are open again — choose one to restart.');
+  simLog('warn', 'No bids placed — auction cancelled. Both chains unlocked.');
+}
+
+// ── Bid ───────────────────────────────────────────────────────────────────────
+function simDoBid() {
+  const val = parseFloat(document.getElementById('sim-bid-inp').value);
+  _simBid(val, 'You (0x4f2a…)');
+  document.getElementById('sim-bid-inp').value = '';
+}
+function simAutoBid() {
+  const names = ['0x9c1b…', 'tz1Rx…', '0x7a3f…', 'tz1Kp…', '0xae88…'];
+  const name  = names[SIM.bidCount % names.length];
+  const bump  = SIM.chain === 'eth' ? 0.03 : 100;
+  _simBid(+(SIM.minBid + bump).toFixed(SIM.chain === 'eth' ? 3 : 0), name);
+}
+function _simBid(amount, bidder) {
+  if (!['waiting-bid', 'live'].includes(SIM.phase)) { simSetBidMsg('Auction not accepting bids.', 'err'); return; }
+  if (!amount || amount < SIM.minBid - 0.0001) { simSetBidMsg('Too low — minimum is ' + simFA(SIM.minBid), 'err'); return; }
+
+  const isFirst = SIM.bidCount === 0;
+  if (isFirst) {
+    simStopBar();
+    SIM.phase = 'live';
+    const chain = SIM.chain, otherName = chain === 'eth' ? 'Tezos' : 'Ethereum';
+    simSetBanner('cc-live', `<span class="cc-banner-dot"></span><span>Auction live on ${chain === 'eth' ? 'Ethereum' : 'Tezos'} — ${otherName} is locked.</span>`);
+    simSetCardStatus(SIM.chain, 'live', 'Live');
+    simSetGuide('Bid placed — the auction is live. Keep bidding or hit "End auction" to settle.');
+    simLog(chain, 'First bid placed — 60s window cancelled. ' + otherName + ' permanently locked.');
+    document.getElementById('sim-settle-btn').disabled = false;
+    // Auction countdown
+    const aucStart = Date.now() / 1000;
+    clearInterval(SIM.aucRef);
+    SIM.aucRef = setInterval(() => {
+      if (SIM.phase !== 'live') { clearInterval(SIM.aucRef); return; }
+      const rem = Math.max(0, SIM.AUC_SEC - (Date.now() / 1000 - aucStart));
+      if (rem <= 0) { clearInterval(SIM.aucRef); simSettle(); }
+    }, 500);
+  }
+
+  if (SIM.bid > 0 && SIM.leader) simLog(SIM.chain, 'Refund → ' + SIM.leader + ': ' + simFA(SIM.bid));
+  SIM.bid = amount; SIM.leader = bidder; SIM.bidCount++;
+  SIM.minBid = +(amount * 1.05).toFixed(SIM.chain === 'eth' ? 4 : 0);
+  simSetBidMsg('✓ Bid placed: ' + simFA(amount) + ' (' + simFU(amount) + ')', 'ok');
+  simLog(SIM.chain, 'Bid #' + SIM.bidCount + ': ' + bidder + ' — ' + simFA(amount) + ' ' + simFU(amount));
+
+  const inp = document.getElementById('sim-bid-inp');
+  if (inp) { inp.value = ''; inp.placeholder = simFA(SIM.minBid); }
+}
+function simSetBidMsg(msg, cls) {
+  const el = document.getElementById('sim-bid-msg'); if (el) { el.textContent = msg; el.className = 'cc-sim-bid-msg ' + (cls || ''); }
+}
+
+// ── Settle ────────────────────────────────────────────────────────────────────
+function simSettle() {
+  if (SIM.phase === 'settled') return;
+  if (SIM.bidCount === 0) { simAutoCancel(); return; }
+  simStop();
+  SIM.phase = 'settled';
+  const chainName  = SIM.chain === 'eth' ? 'Ethereum' : 'Tezos';
+  const otherName  = SIM.chain === 'eth' ? 'Tezos' : 'Ethereum';
+  simSetBanner('cc-settled', `<span class="cc-banner-dot" style="animation:none;opacity:.5"></span><span>Auction settled on ${chainName} — ${otherName} listing permanently closed.</span>`);
+  simSetCardStatus(SIM.chain, 'won', 'Sold');
+  document.getElementById('sim-bid-area').classList.remove('show');
+  document.getElementById('sim-settle-btn').disabled = true;
+  const oc = document.getElementById('sim-outcome'); if (oc) oc.classList.add('show');
+  const ob = document.getElementById('sim-outcome-body');
+  if (ob) ob.innerHTML = `<strong>${SIM.leader}</strong> wins on <strong>${chainName}</strong> — ${simFA(SIM.bid)} &nbsp;·&nbsp; ${simFU(SIM.bid)}<br><br>The 1/1 original transfers to ${SIM.leader} on ${chainName}. The <strong>${otherName}</strong> listing is permanently closed.`;
+  simSetGuide('Auction complete. Hit ↺ Reset to run the simulation again.');
+  simLog('ok', 'Settled — ' + SIM.leader + ' wins with ' + simFA(SIM.bid) + ' (' + simFU(SIM.bid) + ')');
+  simLog('sys', otherName + ' listing permanently closed.');
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+function simStop() {
+  clearInterval(SIM.noBidRef); clearInterval(SIM.aucRef);
+  SIM.noBidRef = null; SIM.aucRef = null;
+}
+function simReset() {
+  simStop();
+  Object.assign(SIM, { phase: 'idle', chain: null, bid: 0, bidCount: 0, leader: null, minBid: 0, noBidStart: 0 });
+  ['sim-eth-card', 'sim-xtz-card'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('sim-locked', 'sim-active');
+  });
+  simSetCardStatus('eth', 'open', 'Open'); simSetCardStatus('xtz', 'open', 'Open');
+  document.getElementById('sim-eth-btn').disabled = false;
+  document.getElementById('sim-xtz-btn').disabled = false;
+  document.getElementById('sim-bid-area').classList.remove('show');
+  document.getElementById('sim-outcome').classList.remove('show');
+  const rn = document.getElementById('sim-reset-notice'); if (rn) rn.classList.remove('show');
+  document.getElementById('sim-settle-btn').disabled = true;
+  const bidInp = document.getElementById('sim-bid-inp');
+  if (bidInp) { bidInp.value = ''; bidInp.disabled = true; }
+  const bidBtn = document.getElementById('sim-bid-btn'); if (bidBtn) bidBtn.disabled = true;
+  const autoBtn = document.getElementById('sim-auto-btn'); if (autoBtn) autoBtn.disabled = true;
+  const bidMsg = document.getElementById('sim-bid-msg'); if (bidMsg) { bidMsg.textContent = ''; bidMsg.className = 'cc-sim-bid-msg'; }
+  const logWrap = document.getElementById('sim-log'); if (logWrap) logWrap.innerHTML = '';
+  simSetBanner('', '');
+  const barWrap = document.getElementById('sim-bar-wrap'); if (barWrap) barWrap.classList.remove('show');
+  const bar = document.getElementById('sim-bar'); if (bar) { bar.style.transition = 'none'; bar.style.width = '100%'; }
+  simSetGuide('Choose a chain below to start the auction — watch what happens to the other one.');
+  simLog('sys', 'Simulation ready — choose a chain to begin.');
+}
 </script>
 </body>
 </html>
