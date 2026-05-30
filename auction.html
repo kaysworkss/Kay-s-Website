@@ -9,6 +9,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Auction</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<script src="https://unpkg.com/@taquito/taquito@20.1.0/dist/taquito.min.js"></script>
+<script src="https://unpkg.com/@taquito/beacon-wallet@20.1.0/dist/taquito-beacon-wallet.umd.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap');
 
@@ -1725,7 +1727,8 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
               <span id="wallet-label">Not connected</span>
             </div>
             <div class="wallet-btns">
-              <button class="btn-sm" id="connect-btn" onclick="connectWallet()">Connect wallet</button>
+              <button class="btn-sm" id="connect-btn" onclick="connectWallet()">Connect ETH</button>
+              <button class="btn-sm" id="connect-tezos-btn" onclick="connectTezosWallet()">Connect Tezos</button>
               <button class="btn-sm danger" id="disconnect-btn" style="display:none" onclick="disconnectWallet()">Disconnect</button>
             </div>
           </div>
@@ -2027,8 +2030,11 @@ let _activeIdx = 0;           // which auction slot is currently displayed
 let _visibleLiveIndexes = [];
 
 let provider = null, signer = null, signerAddress = null;
+let walletChain = null;
+let tezosWallet = null, tezosToolkit = null, tezosAddress = null;
 let auctionContract = null;
 let endTimestamp = 0, isLive = false, minNextBid = 0n;
+let minNextBidMutez = 0;
 let bidHistory = [];
 let countdownTimer = null, pollTimer = null, upcomingTimer = null;
 let landingCdTimer = null;
@@ -2083,6 +2089,40 @@ function _pieceSoldKeys(piece, idx) {
 
 function _isManualSold(piece, idx) {
   return _pieceSoldKeys(piece, idx).some(key => _manualSoldKeys.has(key));
+}
+
+function _pairKeyForSlot(slot) {
+  return String(slot?.crossChainPairKey || "").trim().toLowerCase();
+}
+
+function _slotChain(slot) {
+  return (slot?.chain || "eth") === "tezos" ? "tezos" : "eth";
+}
+
+function _findPairedSlotIndex(pairKey, chain) {
+  const key = String(pairKey || "").trim().toLowerCase();
+  if (!key) return -1;
+  return _auctions.findIndex(slot => _pairKeyForSlot(slot) === key && _slotChain(slot) === chain);
+}
+
+function _auctionKeyForSlot(slot) {
+  if (!slot) return "";
+  if (_slotChain(slot) === "tezos") {
+    return (slot.tezosContractAddr && slot.tezosAuctionId !== undefined && slot.tezosAuctionId !== "")
+      ? `${slot.tezosContractAddr}:${slot.tezosAuctionId}`.toLowerCase()
+      : String(slot.tezosContractAddr || "").toLowerCase();
+  }
+  return String(slot.contractAddr || "").toLowerCase();
+}
+
+function _roomIdForSlot(slot) {
+  const pairKey = _pairKeyForSlot(slot);
+  if (pairKey) return "pair-" + _soldSlug(pairKey);
+  return _auctionKeyForSlot(slot);
+}
+
+function _isEthAuctionSlot(slot) {
+  return _slotChain(slot) !== "tezos" && slot?.contractAddr && ethers.isAddress(slot.contractAddr);
 }
 
 
@@ -2199,8 +2239,15 @@ function _ccHideChooser() {
 // This is the moment the 60-second no-bid window starts.
 async function _ccChooseChain(chain) {
   if (!_ccPairKey) return;
-  const slot    = _activeCfg();
-  const aucKey  = (slot.contractAddr || slot.tezosContractAddr || "").toLowerCase();
+  const targetIdx = _findPairedSlotIndex(_ccPairKey, chain);
+  const slot      = targetIdx >= 0 ? _auctions[targetIdx] : _activeCfg();
+  const aucKey    = _auctionKeyForSlot(slot);
+  if (!aucKey) {
+    notify("err", "Chain not configured", chain === "tezos"
+      ? "Add a Tezos contract and auction id for this paired listing."
+      : "Add an Ethereum auction contract for this paired listing.");
+    return;
+  }
 
   // Disable both buttons immediately to prevent double-click
   const ethBtn = document.querySelector("#cc-eth-choice .cc-choice-btn");
@@ -2213,8 +2260,21 @@ async function _ccChooseChain(chain) {
 
   // If claim succeeded (our chain is now active), show the bid UI
   if (_ccClaimRow && _ccClaimRow.active_chain === chain) {
+    if (targetIdx >= 0 && targetIdx !== _activeIdx) {
+      const savedClaim = _ccClaimRow;
+      await _switchAuction(targetIdx);
+      _ccPairKey = savedClaim.pair_key || _ccPairKey;
+      _ccClaimRow = savedClaim;
+      _ccStartPolling(_ccPairKey);
+      _renderCcBanner();
+    }
     _ccHideChooser();
     _ccStartNoBidCountdown();
+    notify(
+      "info",
+      "Bidding window open",
+      `You have 60 seconds to place the first bid on ${chain === "tezos" ? "Tezos" : "Ethereum"} before both chains unlock again.`
+    );
   } else if (_ccClaimRow && _ccClaimRow.active_chain !== chain) {
     // Another browser already claimed the other chain — show locked state
     _ccUpdateChooserLock(_ccClaimRow.active_chain);
@@ -2689,6 +2749,9 @@ function _buildUpcomingPieceSelector() {
     const thumbHtml = slot.artImage
       ? `<img class="piece-tab-thumb" src="${toHTTP(slot.artImage)}" alt="" onerror="this.style.display='none'">`
       : "";
+    const pairBadge = pairKey && ethIdx >= 0 && tezIdx >= 0
+      ? `<span class="piece-tab-sold-badge" style="display:inline-flex;background:rgba(201,153,58,0.12);border-color:rgba(201,153,58,.35);color:var(--gold)">ETH / XTZ</span>`
+      : "";
     btn.innerHTML = `${thumbHtml}<span>${slot.artTitle || "Piece " + (i+1)}</span>`;
     btn.addEventListener("click", () => {
       strip.querySelectorAll(".piece-tab").forEach((b,j) => b.classList.toggle("active", j===vi));
@@ -2795,7 +2858,8 @@ async function initLive() {
       provider = new ethers.BrowserProvider(window.ethereum);
     }
   }
-  if (!provider) return;
+  const hasEthLive = _auctions.some(slot => _slotMatchesStatus(slot, "live") && _slotChain(slot) !== "tezos");
+  if (!provider && hasEthLive) return;
 
   await _loadManualSoldOverrides();
 
@@ -2808,7 +2872,7 @@ async function initLive() {
   if (cfg._preview && typeof cfg._pieceIdx === "number") {
     startIdx = cfg._pieceIdx;
   } else {
-    const firstLive = _auctions.findIndex(p => p._effectiveStatus === "live");
+    const firstLive = _visibleLiveIndexes[0] ?? _auctions.findIndex(p => p._effectiveStatus === "live");
     startIdx = firstLive >= 0 ? firstLive : 0;
   }
   await _switchAuction(startIdx);
@@ -2849,9 +2913,24 @@ async function _buildPieceSelector() {
   const visible = _auctions
     .map((slot, i) => ({ slot, i }))
     .filter(({ slot }) => _slotMatchesStatus(slot, "live"));
-  _visibleLiveIndexes = visible.map(({ i }) => i);
+  const grouped = [];
+  const seenPairs = new Set();
+  for (const item of visible) {
+    const pairKey = _pairKeyForSlot(item.slot);
+    if (pairKey) {
+      if (seenPairs.has(pairKey)) continue;
+      seenPairs.add(pairKey);
+      const ethIdx = _findPairedSlotIndex(pairKey, "eth");
+      const tezIdx = _findPairedSlotIndex(pairKey, "tezos");
+      const repIdx = ethIdx >= 0 ? ethIdx : (tezIdx >= 0 ? tezIdx : item.i);
+      grouped.push({ slot: _auctions[repIdx], i: repIdx, pairKey, ethIdx, tezIdx });
+    } else {
+      grouped.push(item);
+    }
+  }
+  _visibleLiveIndexes = grouped.map(({ i }) => i);
 
-  if (visible.length <= 1) {
+  if (grouped.length <= 1) {
     strip.classList.remove("show");
     updateAuctionNav();
     return;
@@ -2859,7 +2938,7 @@ async function _buildPieceSelector() {
 
   strip.classList.add("show");
 
-  for (const { slot, i } of visible) {
+  for (const { slot, i, pairKey, ethIdx, tezIdx } of grouped) {
     const btn  = document.createElement("button");
     btn.className = "piece-tab";
     btn.dataset.idx = i;
@@ -2872,6 +2951,7 @@ async function _buildPieceSelector() {
     btn.innerHTML = `
       ${thumbHtml}
       <span>${slot.artTitle || "Piece " + (i + 1)}</span>
+      ${pairBadge}
       <span class="piece-tab-bid" id="tab-bid-${i}">—</span>
       <span class="piece-tab-sold-badge" id="tab-sold-${i}" style="display:none">Sold</span>
       <span class="piece-tab-live-dot" id="tab-dot-${i}"></span>`;
@@ -2903,6 +2983,7 @@ function _setTabSoldState(i, sold, bidText = "") {
 }
 
 async function _pollAllTabBids() {
+  if (!provider) return;
   for (let i = 0; i < _auctions.length; i++) {
     const slot = _auctions[i];
     const manualSold = _isManualSold(slot, i);
@@ -3017,6 +3098,24 @@ function initAuctionSwipe() {
   });
 }
 
+function _syncCollectorRoomForSlot(slot) {
+  const roomId = _roomIdForSlot(slot);
+  if (!roomId || _auctionId === roomId) return;
+  _auctionId = roomId;
+  _seenMsgIds = new Set();
+  document.getElementById("chat-feed").innerHTML = "";
+  if (_realtimeWS) { try { _realtimeWS.close(); } catch(_) {} }
+  _loadAucProfile().then(() => { _loadHistory(); _subscribeRoom(); });
+}
+
+function _setupCrossChainForSlot(slot) {
+  const ccKey = _pairKeyForSlot(slot);
+  if (!ccKey) return;
+  _ccPairKey = ccKey;
+  _ccShowChooser();
+  _ccStartPolling(ccKey);
+}
+
 async function _switchAuction(idx) {
   if (idx < 0 || idx >= _auctions.length) return;
   if (!_slotMatchesStatus(_auctions[idx], "live")) {
@@ -3042,7 +3141,7 @@ async function _switchAuction(idx) {
   clearInterval(pollTimer);
   if (auctionContract) { try { auctionContract.removeAllListeners(); } catch(_) {} }
   bidHistory = [];
-  endTimestamp = 0; isLive = false; minNextBid = 0n;
+  endTimestamp = 0; isLive = false; minNextBid = 0n; minNextBidMutez = 0;
   _ccReset(); // clear cross-chain banner and polling for previous piece
   // Reset chat lock state for this piece
   clearTimeout(_chatLockTimer);
@@ -3107,10 +3206,38 @@ async function _switchAuction(idx) {
 
   populateAbout("live", slot);
   loadStaticImage("live", slot);
+  _syncCollectorRoomForSlot(slot);
+  _setupCrossChainForSlot(slot);
   _auctionSwitching = false;
   _setPieceTabsBusy(false);
 
-  if (!slot.contractAddr || !ethers.isAddress(slot.contractAddr)) {
+  if (!_isEthAuctionSlot(slot)) {
+    const sl = document.getElementById("status-line");
+    if (sl) {
+      sl.textContent = _slotChain(slot) === "tezos"
+        ? "Reading Tezos auction..."
+        : "Auction contract not configured";
+      sl.className = "status-line upcoming-line";
+      document.getElementById("countdown-section").style.display = "block";
+    }
+    if (_slotChain(slot) === "tezos") {
+      await refreshTezosState(switchToken);
+      if (switchToken !== _switchToken) return;
+      countdownTimer = setInterval(() => {
+        if (switchToken !== _switchToken) return;
+        tickCountdown();
+        if (_ccClaimRow?.status === "waiting-bid") _renderCcBanner();
+      }, 1000);
+      pollTimer = setInterval(() => refreshTezosState(switchToken), 15000);
+    }
+    if (tezosAddress) {
+      checkEligibility(switchToken)
+        .then(ok => {
+          if (switchToken !== _switchToken) return;
+          ok ? onRoomEligibilityGranted() : onRoomEligibilityRevoked();
+        })
+        .catch(e => console.warn("checkEligibility:", e));
+    }
     return;
   }
 
@@ -3190,15 +3317,6 @@ async function _switchAuction(idx) {
     showSettled(buyer, price);
     clearInterval(countdownTimer); clearInterval(pollTimer);
   });
-
-  // Re-wire collector room to this auction's contract address
-  if (_auctionId !== slot.contractAddr.toLowerCase()) {
-    _auctionId = slot.contractAddr.toLowerCase();
-    _seenMsgIds = new Set();
-    document.getElementById("chat-feed").innerHTML = "";
-    if (_realtimeWS) { try { _realtimeWS.close(); } catch(_) {} }
-    _loadAucProfile().then(() => { _loadHistory(); _subscribeRoom(); });
-  }
 
   _auctionSwitching = false;
   _setPieceTabsBusy(false);
@@ -3451,19 +3569,23 @@ function setWalletUi(state, addr) {
   const dot = document.getElementById("dot");
   const label = document.getElementById("wallet-label");
   const connectBtn = document.getElementById("connect-btn");
+  const connectTezosBtn = document.getElementById("connect-tezos-btn");
   const disconnectBtn = document.getElementById("disconnect-btn");
 
   if (!dot || !label || !connectBtn || !disconnectBtn) return;
 
   dot.className = "dot";
   connectBtn.style.display = "inline-flex";
+  if (connectTezosBtn) connectTezosBtn.style.display = "inline-flex";
   disconnectBtn.style.display = "none";
   connectBtn.disabled = false;
+  if (connectTezosBtn) connectTezosBtn.disabled = false;
 
   if (state === "connecting") {
     label.textContent = "Waiting for wallet";
     connectBtn.textContent = "Connecting...";
     connectBtn.disabled = true;
+    if (connectTezosBtn) connectTezosBtn.disabled = true;
     return;
   }
 
@@ -3471,15 +3593,18 @@ function setWalletUi(state, addr) {
     label.textContent = "Signature required";
     connectBtn.textContent = "Sign to verify...";
     connectBtn.disabled = true;
+    if (connectTezosBtn) connectTezosBtn.disabled = true;
     return;
   }
 
   if (state === "connected" && addr) {
     dot.className = "dot on";
-    label.innerHTML = `<span class="addr">${addr.slice(0,6)}...${addr.slice(-4)}</span>`;
+    const prefix = walletChain === "tezos" ? "Tezos" : "ETH";
+    label.innerHTML = `${prefix} <span class="addr">${addr.slice(0,6)}...${addr.slice(-4)}</span>`;
     connectBtn.textContent = "Connected";
     connectBtn.disabled = true;
     connectBtn.style.display = "none";
+    if (connectTezosBtn) connectTezosBtn.style.display = "none";
     disconnectBtn.style.display = "inline-flex";
     return;
   }
@@ -3487,17 +3612,20 @@ function setWalletUi(state, addr) {
   if (state === "failed") {
     dot.className = "dot err";
     label.textContent = "Connect failed";
-    connectBtn.textContent = "Connect wallet";
+    connectBtn.textContent = "Connect ETH";
+    if (connectTezosBtn) connectTezosBtn.textContent = "Connect Tezos";
     return;
   }
 
   label.textContent = "Not connected";
-  connectBtn.textContent = "Connect wallet";
+  connectBtn.textContent = "Connect ETH";
+  if (connectTezosBtn) connectTezosBtn.textContent = "Connect Tezos";
 }
 
 async function connectWallet() {
   if (_walletConnecting) return;
   _walletConnecting = true;
+  walletChain = "eth";
   setWalletUi("connecting");
 
   try {
@@ -3517,6 +3645,7 @@ async function connectWallet() {
     if (rec.toLowerCase() !== addr.toLowerCase()) throw new Error("Signature mismatch");
 
     signerAddress = addr;
+    tezosAddress = null;
     sessionStorage.removeItem("wallet_disconnected");
 
     setWalletUi("connected", addr);
@@ -3554,9 +3683,70 @@ async function connectWallet() {
   }
 }
 
+function _tezosRpcForSlot(slot = _activeCfg()) {
+  return slot?.tezosRpcUrl
+    || (slot?.tezosNetwork === "ghostnet" ? "https://rpc.ghostnet.teztnets.com" : "https://rpc.tzkt.io/mainnet");
+}
+
+function _beaconWalletCtor() {
+  return window.taquitoBeaconWallet?.BeaconWallet
+    || window.taquito_beacon_wallet?.BeaconWallet
+    || window.beaconwallet?.BeaconWallet
+    || window.BeaconWallet;
+}
+
+async function connectTezosWallet() {
+  if (_walletConnecting) return;
+  _walletConnecting = true;
+  walletChain = "tezos";
+  setWalletUi("connecting");
+
+  try {
+    if (!window.taquito?.TezosToolkit) throw new Error("Taquito did not load. Check the page script/CSP settings.");
+    const BeaconWallet = _beaconWalletCtor();
+    if (!BeaconWallet) throw new Error("Beacon wallet connector did not load.");
+
+    const slot = _activeCfg();
+    const networkType = slot?.tezosNetwork === "ghostnet" ? "ghostnet" : "mainnet";
+    const Tezos = new window.taquito.TezosToolkit(_tezosRpcForSlot(slot));
+    tezosWallet = new BeaconWallet({ name: "Kay's Works Auction", preferredNetwork: networkType });
+    Tezos.setWalletProvider(tezosWallet);
+    tezosToolkit = Tezos;
+    await tezosWallet.requestPermissions({ network: { type: networkType } });
+    const addr = await tezosWallet.getPKH();
+
+    signer = null;
+    signerAddress = addr;
+    tezosAddress = addr;
+    sessionStorage.removeItem("wallet_disconnected");
+    setWalletUi("connected", addr);
+
+    const ok = await checkEligibility().catch(e => {
+      console.warn("checkEligibility:", e);
+      return false;
+    });
+    ok ? onRoomEligibilityGranted() : onRoomEligibilityRevoked();
+    _loadMyProfile().catch(e => console.warn("_loadMyProfile:", e));
+  } catch(e) {
+    tezosWallet = null;
+    tezosToolkit = null;
+    tezosAddress = null;
+    signerAddress = null;
+    walletChain = null;
+    setWalletUi("failed");
+    notify("err", "Tezos connection failed", e?.message || "Could not connect Tezos wallet");
+  } finally {
+    _walletConnecting = false;
+  }
+}
+
 function disconnectWallet() {
   signer = null;
   signerAddress = null;
+  tezosWallet = null;
+  tezosToolkit = null;
+  tezosAddress = null;
+  walletChain = null;
   sessionStorage.setItem("wallet_disconnected", "true");
   _walletConnecting = false;
 
@@ -3684,6 +3874,15 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
 }
 
 function updateBidHint() {
+  if (_slotChain(_activeCfg()) === "tezos") {
+    const min = (minNextBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "");
+    document.getElementById("bid-hint").textContent = `Minimum bid: ${min} XTZ`;
+    if (!document.getElementById("bid-input").value) document.getElementById("bid-input").value = min;
+    const btn = document.getElementById("bid-btn");
+    if (btn) btn.textContent = "Place XTZ bid";
+    onBidInput();
+    return;
+  }
   const min = ethers.formatEther(minNextBid);
   document.getElementById("bid-hint").textContent = `Minimum bid: ${min} ETH`;
   if (!document.getElementById("bid-input").value) document.getElementById("bid-input").value = min;
@@ -3692,7 +3891,8 @@ function updateBidHint() {
 
 function onBidInput() {
   const val = parseFloat(document.getElementById("bid-input").value || "0");
-  const min = parseFloat(ethers.formatEther(minNextBid));
+  const isTezos = _slotChain(_activeCfg()) === "tezos";
+  const min = isTezos ? (minNextBidMutez / 1000000) : parseFloat(ethers.formatEther(minNextBid));
   const ok  = document.getElementById("eligibility").classList.contains("yes");
   document.getElementById("bid-btn").disabled = val < min || !ok || !isLive;
 }
@@ -3744,8 +3944,159 @@ function withTimeout(promise, ms, message) {
   ]);
 }
 
+function _unwrapTezosOption(value) {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (value.Some != null) return value.Some;
+  if (value.some != null) return value.some;
+  if (value.value != null) return value.value;
+  return value;
+}
+
+function _tezosNat(value) {
+  const raw = _unwrapTezosOption(value);
+  if (raw == null) return 0;
+  if (typeof raw === "number") return raw;
+  if (typeof raw === "bigint") return Number(raw);
+  if (typeof raw.toNumber === "function") return raw.toNumber();
+  return Number(raw);
+}
+
+function _tezosTimestampMs(value) {
+  const raw = _unwrapTezosOption(value);
+  if (!raw) return 0;
+  const date = raw instanceof Date ? raw : new Date(raw);
+  const ms = date.getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function _tezosAddressValue(value) {
+  const raw = _unwrapTezosOption(value);
+  if (!raw) return "";
+  if (typeof raw === "string") return raw;
+  if (raw.address) return raw.address;
+  return String(raw);
+}
+
+function _normalizeTezosAuction(raw) {
+  const a = raw?.value != null ? raw.value : raw;
+  if (!a) return null;
+  const highestBidMutez = _tezosNat(a.highest_bid);
+  const incrementBps = Math.max(1, _tezosNat(a.min_bid_increment));
+  const reserveMutez = _tezosNat(a.reserve_price);
+  const minNext = highestBidMutez > 0
+    ? highestBidMutez + Math.floor((highestBidMutez * incrementBps) / 10000)
+    : reserveMutez;
+  return {
+    auctionId: _tezosNat(a.auction_id),
+    mode: _tezosNat(a.mode),
+    started: Boolean(a.started),
+    settled: Boolean(a.settled),
+    cancelled: Boolean(a.cancelled),
+    highestBidder: _tezosAddressValue(a.highest_bidder),
+    highestBidMutez,
+    minNextBidMutez: Math.max(minNext, reserveMutez),
+    reserveMutez,
+    buyNowMutez: _tezosNat(a.buy_now_price),
+    endTimeMs: _tezosTimestampMs(a.end_time),
+    gateTokens: Array.isArray(a.gate_tokens) ? a.gate_tokens : [],
+  };
+}
+
+async function _readTezosAuction(slot = _activeCfg()) {
+  if (!slot?.tezosContractAddr) throw new Error("Tezos contract not configured.");
+  const auctionId = Number(slot.tezosAuctionId || 0);
+  const Tezos = tezosToolkit || new window.taquito.TezosToolkit(_tezosRpcForSlot(slot));
+  const contract = await Tezos.contract.at(slot.tezosContractAddr);
+  if (contract.contractViews?.get_auction) {
+    return contract.contractViews.get_auction(auctionId).executeView({ viewCaller: slot.tezosContractAddr });
+  }
+  const storage = await contract.storage();
+  if (storage?.auctions?.get) return storage.auctions.get(auctionId);
+  if (storage?.auctions && storage.auctions[auctionId] != null) return storage.auctions[auctionId];
+  throw new Error("Could not read Tezos auction storage.");
+}
+
+async function refreshTezosState(runToken = _switchToken) {
+  const slot = _activeCfg();
+  if (_slotChain(slot) !== "tezos" || !slot.tezosContractAddr || runToken !== _switchToken) return;
+  try {
+    if (!window.taquito?.TezosToolkit) throw new Error("Taquito did not load.");
+    const auction = _normalizeTezosAuction(await _readTezosAuction(slot));
+    if (!auction) throw new Error("Auction data was empty.");
+    if (runToken !== _switchToken) return;
+
+    const nowMs = Date.now();
+    endTimestamp = auction.endTimeMs ? Math.floor(auction.endTimeMs / 1000) : 0;
+    minNextBidMutez = auction.minNextBidMutez;
+    const noBids = !auction.highestBidder;
+    const acceptingBids =
+      !auction.settled && !auction.cancelled && (
+        (auction.started && auction.endTimeMs > nowMs) ||
+        (auction.mode === 2 && !auction.started && noBids)
+      );
+    isLive = acceptingBids;
+
+    const countdownSection = document.getElementById("countdown-section");
+    countdownSection.style.display = "block";
+    countdownSection.classList.toggle("reserve-waiting", auction.mode === 2 && !auction.started && noBids && !auction.settled && !auction.cancelled);
+    if (auction.started && auction.endTimeMs > 0) tickCountdown();
+    else ["cd-d","cd-h","cd-m","cd-s"].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = "00"; });
+
+    const sl = document.getElementById("status-line");
+    if (auction.cancelled)                         { sl.textContent = "Tezos auction cancelled"; sl.className = "status-line ended"; }
+    else if (auction.settled)                      { sl.textContent = "Tezos auction settled"; sl.className = "status-line settled"; }
+    else if (auction.mode === 2 && !auction.started && noBids) { sl.textContent = "Open - first XTZ bid starts the clock"; sl.className = "status-line live"; }
+    else if (auction.started && auction.endTimeMs > nowMs)     { sl.textContent = "Live - XTZ bids open"; sl.className = "status-line live"; }
+    else if (!auction.started)                     { sl.textContent = "Waiting for Tezos auction start"; sl.className = "status-line upcoming-line"; }
+    else                                           { sl.textContent = "Ended - awaiting settlement"; sl.className = "status-line ended"; }
+
+    document.getElementById("stats-grid").style.display = "grid";
+    document.getElementById("stat-bid").textContent = noBids ? "—" : `${(auction.highestBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "")} XTZ`;
+    document.getElementById("stat-bidder").textContent = noBids ? "No bids yet" : shortAddr(auction.highestBidder);
+    document.getElementById("stat-min").textContent = `${(auction.minNextBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "")} XTZ`;
+    document.getElementById("stat-min-sub").textContent = noBids ? "Reserve price" : "Min increment";
+    document.getElementById("bid-form").style.display = acceptingBids ? "block" : "none";
+    document.getElementById("history-section").style.display = "block";
+    document.getElementById("history-list").innerHTML = noBids ? "" : `
+      <div class="history-item leader">
+        <div>
+          <div class="history-addr">${shortAddr(auction.highestBidder)} · <span style='color:var(--accent);font-size:10px'>Leading</span></div>
+          <div class="history-meta">Current Tezos leader</div>
+        </div>
+        <div class="history-amount">${(auction.highestBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "")} XTZ</div>
+      </div>`;
+    document.getElementById("history-count").textContent = noBids ? "" : "Current leader";
+    updateBidHint();
+  } catch(e) {
+    console.error("refreshTezosState:", e);
+    const sl = document.getElementById("status-line");
+    if (sl) {
+      sl.textContent = e?.message || "Could not read Tezos auction";
+      sl.className = "status-line ended";
+    }
+  }
+}
+
+async function _checkTezosEligibility(slot, address) {
+  if (!slot?.tezosContractAddr || !address) return !slot?.gateName;
+  if (!window.taquito?.TezosToolkit) throw new Error("Taquito did not load.");
+  const Tezos = tezosToolkit || new window.taquito.TezosToolkit(_tezosRpcForSlot(slot));
+  const contract = await Tezos.contract.at(slot.tezosContractAddr);
+  const views = contract.contractViews || {};
+  if (views.is_gated_holder) {
+    const auction = _normalizeTezosAuction(await _readTezosAuction(slot));
+    const result = await views.is_gated_holder({ holder: address, gate_tokens: auction?.gateTokens || [] }).executeView({ viewCaller: slot.tezosContractAddr });
+    return Boolean(result);
+  }
+  if (!slot.gateName) return true;
+  throw new Error("This Tezos contract does not expose is_gated_holder.");
+}
+
 async function checkEligibility(runToken = _switchToken, contract = auctionContract) {
-  if (!contract || !signerAddress || runToken !== _switchToken) return false;
+  if (!signerAddress || runToken !== _switchToken) return false;
+  if (walletChain === "tezos") return checkTezosEligibility(runToken);
+  if (!contract) return false;
   setEligibilityChecking();
   try {
     const ok = await withTimeout(
@@ -3794,9 +4145,51 @@ async function checkEligibility(runToken = _switchToken, contract = auctionContr
   }
 }
 
+async function checkTezosEligibility(runToken = _switchToken) {
+  if (!tezosAddress || runToken !== _switchToken) return false;
+  setEligibilityChecking("Checking Tezos gate token...");
+  try {
+    const slot = _activeCfg();
+    const ok = await withTimeout(
+      _checkTezosEligibility(slot, tezosAddress),
+      9000,
+      "Tezos eligibility check is taking longer than expected."
+    );
+    if (runToken !== _switchToken) return false;
+    const el = document.getElementById("eligibility");
+    el.className = `eligibility show ${ok ? "yes" : "no"}`;
+    if (!ok && cfg.gateLink) {
+      el.onclick = () => window.open(cfg.gateLink, "_blank", "noopener,noreferrer");
+      el.title = "Tap to acquire your entry token and join the auction";
+    } else {
+      el.onclick = null;
+      el.title = "";
+    }
+    document.getElementById("elig-icon").textContent = ok ? "✓" : "🔑";
+    document.getElementById("elig-text").textContent = ok
+      ? "Tezos wallet eligible"
+      : "Get your Tezos entry token to join";
+    const detail = document.getElementById("elig-detail");
+    detail.textContent = ok ? "" : (cfg.gateName ? `Requires: ${cfg.gateName}` : "");
+    onBidInput();
+    return !!ok;
+  } catch(e) {
+    const el = document.getElementById("eligibility");
+    if (el && runToken === _switchToken) {
+      el.className = "eligibility show no";
+      document.getElementById("elig-icon").textContent = "!";
+      document.getElementById("elig-text").textContent = "Tezos eligibility unavailable";
+      document.getElementById("elig-detail").textContent = e?.message || "Could not verify this Tezos wallet.";
+      onBidInput();
+    }
+    return false;
+  }
+}
+
 // ─── Bid ─────────────────────────────────────────────────────────────────────
 
 async function placeBid() {
+  if (_slotChain(_activeCfg()) === "tezos") return placeTezosBid();
   if (!signer || !auctionContract) { notify("err","Not connected","Connect wallet first"); return; }
   const amt = document.getElementById("bid-input").value.trim();
   if (!amt || isNaN(+amt) || +amt <= 0) { notify("err","Invalid amount","Enter a valid ETH amount"); return; }
@@ -3831,6 +4224,52 @@ async function placeBid() {
 }
 
 // ─── Buy now ─────────────────────────────────────────────────────────────────
+
+async function placeTezosBid() {
+  const slot = _activeCfg();
+  if (!tezosWallet || !tezosToolkit || !tezosAddress) {
+    notify("err", "Not connected", "Connect Tezos wallet first");
+    return;
+  }
+  if (!slot.tezosContractAddr || slot.tezosAuctionId === "" || slot.tezosAuctionId == null) {
+    notify("err", "Tezos auction missing", "Add a Tezos contract address and auction id in admin.");
+    return;
+  }
+
+  const amt = document.getElementById("bid-input").value.trim();
+  if (!amt || isNaN(+amt) || +amt <= 0) {
+    notify("err", "Invalid amount", "Enter a valid XTZ amount");
+    return;
+  }
+  const mutez = Math.round(Number(amt) * 1000000);
+  if (mutez < minNextBidMutez) {
+    notify("err", "Bid too low", `Minimum is ${(minNextBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "")} XTZ`);
+    return;
+  }
+
+  const btn = document.getElementById("bid-btn");
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spin"></div> Submitting...`;
+
+  try {
+    const contract = await tezosToolkit.wallet.at(slot.tezosContractAddr);
+    const op = await contract.methods.bid(Number(slot.tezosAuctionId)).send({ amount: mutez, mutez: true });
+    notify("info", "Tezos bid submitted", `Op: ${op.opHash.slice(0,12)}...`);
+    await op.confirmation(1);
+    notify("ok", "Bid confirmed", `Your bid of ${amt} XTZ is now leading`);
+    document.getElementById("bid-input").value = "";
+    if (_ccPairKey) _ccSignalBid(_ccPairKey);
+    await refreshTezosState();
+    await checkEligibility();
+    await _postMsg("collector", `${amt} XTZ`).catch(() => {});
+  } catch(e) {
+    notify("err", "Tezos bid failed", e?.message || "Transaction failed");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "Place XTZ bid";
+    onBidInput();
+  }
+}
 
 async function executeBuyNow() {
   if (!signer || !auctionContract) { notify("err","Not connected","Connect your wallet first"); return; }
