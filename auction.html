@@ -1976,6 +1976,18 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 const AUCTION_API = "/api/auction-config";
 
 async function loadConfig() {
+  // Preview mode: admin stored config in localStorage and opened /auction?preview=1
+  if (new URLSearchParams(location.search).get("preview") === "1") {
+    try {
+      const raw = localStorage.getItem("kw_preview_cfg");
+      if (raw) {
+        console.log("[auction] Preview mode — loading config from localStorage");
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn("[auction] Could not read preview config from localStorage:", e);
+    }
+  }
   try {
     const res  = await fetch(AUCTION_API);
     const json = await res.json();
@@ -2739,10 +2751,27 @@ function _buildUpcomingPieceSelector() {
     .map((slot, i) => ({ slot, i }))
     .filter(({ slot }) => _slotMatchesStatus(slot, "upcoming"));
 
-  if (visible.length <= 1) { strip.classList.remove("show"); return; }
+  // Group paired cross-chain slots into a single tab (same logic as live selector)
+  const grouped = [];
+  const seenPairs = new Set();
+  for (const item of visible) {
+    const pairKey = _pairKeyForSlot(item.slot);
+    if (pairKey) {
+      if (seenPairs.has(pairKey)) continue;
+      seenPairs.add(pairKey);
+      const ethIdx = _findPairedSlotIndex(pairKey, "eth");
+      const tezIdx = _findPairedSlotIndex(pairKey, "tezos");
+      const repIdx = ethIdx >= 0 ? ethIdx : (tezIdx >= 0 ? tezIdx : item.i);
+      grouped.push({ slot: _auctions[repIdx], i: repIdx, pairKey, ethIdx, tezIdx });
+    } else {
+      grouped.push({ ...item, pairKey: "", ethIdx: -1, tezIdx: -1 });
+    }
+  }
+
+  if (grouped.length <= 1) { strip.classList.remove("show"); return; }
   strip.classList.add("show");
 
-  visible.forEach(({ slot, i }, vi) => {
+  grouped.forEach(({ slot, i, pairKey, ethIdx, tezIdx }, vi) => {
     const btn = document.createElement("button");
     btn.className = "piece-tab" + (vi === 0 ? " active" : "");
     btn.dataset.idx = i;
@@ -2752,7 +2781,7 @@ function _buildUpcomingPieceSelector() {
     const pairBadge = pairKey && ethIdx >= 0 && tezIdx >= 0
       ? `<span class="piece-tab-sold-badge" style="display:inline-flex;background:rgba(201,153,58,0.12);border-color:rgba(201,153,58,.35);color:var(--gold)">ETH / XTZ</span>`
       : "";
-    btn.innerHTML = `${thumbHtml}<span>${slot.artTitle || "Piece " + (i+1)}</span>`;
+    btn.innerHTML = `${thumbHtml}<span>${slot.artTitle || "Piece " + (i+1)}</span>${pairBadge}`;
     btn.addEventListener("click", () => {
       strip.querySelectorAll(".piece-tab").forEach((b,j) => b.classList.toggle("active", j===vi));
       _loadUpcomingPiece(i);
@@ -2946,6 +2975,11 @@ async function _buildPieceSelector() {
     // Thumb
     const thumbHtml = slot.artImage
       ? `<img class="piece-tab-thumb" src="${toHTTP(slot.artImage)}" alt="" onerror="this.style.display='none'">`
+      : "";
+
+    // Cross-chain badge — shown when this tab represents a paired ETH+XTZ auction
+    const pairBadge = pairKey && ethIdx >= 0 && tezIdx >= 0
+      ? `<span class="piece-tab-sold-badge" style="display:inline-flex;background:rgba(201,153,58,0.12);border-color:rgba(201,153,58,.35);color:var(--gold)">ETH / XTZ</span>`
       : "";
 
     btn.innerHTML = `
