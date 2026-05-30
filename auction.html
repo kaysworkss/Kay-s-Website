@@ -389,6 +389,16 @@ body {
 }
 .cc-notify-btn:hover { border-color: var(--clay); color: var(--clay); }
 .cc-notify-btn.show { display: block; }
+.cc-cancel-claim-btn {
+  display: none; width: 100%; margin-top: 8px;
+  font-family: 'Cinzel', serif; font-size: 0.46rem;
+  letter-spacing: .14em; text-transform: uppercase;
+  border: 1px solid rgba(158,79,46,.4); border-radius: var(--r);
+  background: transparent; color: var(--ash);
+  padding: 7px; cursor: pointer; transition: all .18s;
+}
+.cc-cancel-claim-btn:hover { border-color: var(--rust); color: var(--rust); }
+.cc-cancel-claim-btn.show { display: block; }
 .cc-notify-status {
   font-family: 'Crimson Pro', serif; font-size: 0.78rem;
   font-style: italic; color: var(--moss); margin-top: 5px;
@@ -1818,6 +1828,9 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           <div class="cc-nobid-bar-wrap" id="cc-nobid-bar-wrap">
             <div class="cc-nobid-bar" id="cc-nobid-bar"></div>
           </div>
+          <button class="cc-cancel-claim-btn" id="cc-cancel-claim-btn" onclick="_ccCancelClaim()">
+            ← Back to chain selection
+          </button>
           <div class="cc-reset-notice" id="cc-reset-notice"></div>
           <button class="cc-notify-btn" id="cc-notify-btn" onclick="_ccRequestNotification()">
             ↗ Notify me when the auction goes live
@@ -1873,6 +1886,9 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             <div class="bid-hint" id="bid-hint">Enter an amount above the minimum bid</div>
             <button class="btn-bid" id="bid-btn" onclick="placeBid()" disabled>Place bid</button>
             <button class="btn-sm" onclick="refreshState()" style="width:100%;margin-top:8px;justify-content:center">↻ Refresh</button>
+            <button class="cc-cancel-claim-btn" id="cc-cancel-claim-btn-bid" onclick="_ccCancelClaim()" style="margin-top:6px">
+              ← Back to chain selection
+            </button>
           </div>
 
           <!-- Buy now section -->
@@ -2331,58 +2347,80 @@ function _ccStartNoBidCountdown() {
   const resetEl = document.getElementById("cc-reset-notice");
   if (resetEl) resetEl.classList.remove("show");
 
-  // Grab the server-authoritative expiry time before the interval starts
-  const resetAt = _ccClaimRow?.reset_at ? new Date(_ccClaimRow.reset_at).getTime() : 0;
+  // Use the server-authoritative expiry. If missing, default to 60s from now.
+  const resetAt = _ccClaimRow?.reset_at
+    ? new Date(_ccClaimRow.reset_at).getTime()
+    : Date.now() + 60000;
 
   if (barWrap) barWrap.classList.add("show");
+  // Show "go back" button while the no-bid window is open
+  const _cancelBtn    = document.getElementById("cc-cancel-claim-btn");
+  const _cancelBtnBid = document.getElementById("cc-cancel-claim-btn-bid");
+  if (_cancelBtn)    _cancelBtn.classList.add("show");
+  if (_cancelBtnBid) _cancelBtnBid.classList.add("show");
   if (bar) {
     bar.style.transition = "none";
     bar.style.width = "100%";
     bar.getBoundingClientRect();
-    const remaining = resetAt > 0 ? Math.max(0, resetAt - Date.now()) : 60000;
+    const remaining = Math.max(0, resetAt - Date.now());
     bar.style.transition = `width ${remaining}ms linear`;
     bar.style.width = "0%";
   }
 
   clearInterval(_ccNoBidCountdownRef);
   _ccNoBidCountdownRef = setInterval(() => {
-    // If a bid was placed or we switched pieces, stop
+    // Bid placed or piece switched — stop
     if (!_ccClaimRow || _ccClaimRow.status !== "waiting-bid") {
       clearInterval(_ccNoBidCountdownRef);
+      _ccNoBidCountdownRef = null;
       if (barWrap) barWrap.classList.remove("show");
       return;
     }
+    // Update the countdown banner text
     _renderCcBanner();
-    // Local timer expired — don't wait for next poll cycle, act immediately
-    if (resetAt > 0 && Date.now() >= resetAt) {
+    // Local clock passed expiry — reset immediately without waiting for a poll
+    if (Date.now() >= resetAt) {
       clearInterval(_ccNoBidCountdownRef);
       _ccNoBidCountdownRef = null;
-      // Fire an immediate poll so the server row is deleted and we get reset:true.
-      // If the server confirms reset, _ccPoll will call _ccHandleReset().
-      // If there's a network hiccup, fall back to the local reset after a short delay.
-      let _serverConfirmed = false;
-      if (_ccPairKey) {
-        _ccPoll(_ccPairKey).then(() => { _serverConfirmed = true; });
-      }
-      setTimeout(() => {
-        if (!_serverConfirmed && _ccClaimRow?.status === "waiting-bid") {
-          _ccHandleReset();
-        }
-      }, 2500);
+      _ccHandleReset();
     }
-  }, 1000);
+  }, 500);
 }
 
-// Shared reset handler — called by both _ccPoll (server-confirmed) and the
-// countdown interval (local fallback). Safe to call multiple times.
-function _ccHandleReset() {
-  if (!_ccClaimRow && !document.getElementById("cc-chooser")?.classList.contains("show")) {
-    // Already reset (e.g. server poll already handled it)
-    return;
+// Called when the collector explicitly cancels their chain claim before placing a bid.
+// Tells the server to delete the claim row (same as a reset), then restores the chooser.
+async function _ccCancelClaim() {
+  const btn     = document.getElementById("cc-cancel-claim-btn");
+  const btnBid  = document.getElementById("cc-cancel-claim-btn-bid");
+  if (btn)    { btn.disabled    = true; btn.textContent    = "Cancelling…"; }
+  if (btnBid) { btnBid.disabled = true; btnBid.textContent = "Cancelling…"; }
+  // Ask the server to delete the row so the other chain is also freed
+  if (_ccPairKey) {
+    await _ccFetch("POST", { pair_key: _ccPairKey, action: "reset" }).catch(() => {});
   }
+  // Re-enable buttons before calling handle reset (which hides them anyway)
+  if (btn)    { btn.disabled    = false; btn.textContent    = "← Back to chain selection"; }
+  if (btnBid) { btnBid.disabled = false; btnBid.textContent = "← Back to chain selection"; }
+  // Treat this as a normal reset
+  _ccClaimRow = null;
+  _ccHandleReset(/* isCancelledByUser */ true);
+}
+
+// Single reset handler — called by countdown (local expiry), _ccPoll (server reset),
+// and _ccCancelClaim (user-initiated). Idempotent: safe to call more than once.
+function _ccHandleReset(cancelledByUser = false) {
   _ccClaimRow = null;
   _ccStopNoBidCountdown();
+  _ccStopPolling();
   _renderCcBanner();
+
+  // Hide both cancel buttons
+  const btn    = document.getElementById("cc-cancel-claim-btn");
+  const btnBid = document.getElementById("cc-cancel-claim-btn-bid");
+  if (btn)    btn.classList.remove("show");
+  if (btnBid) btnBid.classList.remove("show");
+
+  // Restore both chain cards to unlocked/enabled
   const ethChoice = document.getElementById("cc-eth-choice");
   const xtzChoice = document.getElementById("cc-xtz-choice");
   if (ethChoice) ethChoice.classList.remove("locked", "waiting");
@@ -2391,15 +2429,28 @@ function _ccHandleReset() {
   const xtzBtn = document.querySelector("#cc-xtz-choice .cc-choice-btn");
   if (ethBtn) ethBtn.disabled = false;
   if (xtzBtn) xtzBtn.disabled = false;
+
+  // Show the chooser (hides bid-form / countdown / stats per _ccShowChooser)
   _ccShowChooser();
+
+  // Show the appropriate notice
   const resetEl = document.getElementById("cc-reset-notice");
   if (resetEl) {
-    resetEl.textContent = "No bid was placed in time — both chains are unlocked. Choose a chain to start again.";
+    resetEl.textContent = cancelledByUser
+      ? "Selection cancelled — both chains are unlocked. Choose a chain to start again."
+      : "No bid was placed in time — both chains are unlocked. Choose a chain to start again.";
     resetEl.classList.add("show");
   }
+
   _ccClearWaitingState();
-  _ccFireNotification("Auction reset", "No bid was placed in time. Both chains are unlocked — you can now choose a chain.");
-  notify("info", "Auction reset", "No bid placed in time — both chains are now open.");
+
+  // Restart polling so the next claim is detected
+  if (_ccPairKey) _ccStartPolling(_ccPairKey);
+
+  if (!cancelledByUser) {
+    _ccFireNotification("Auction reset", "No bid was placed in time. Both chains are unlocked — you can now choose a chain.");
+    notify("info", "Auction reset", "No bid placed in time — both chains are now open.");
+  }
 }
 
 function _ccStopNoBidCountdown() {
@@ -2409,6 +2460,11 @@ function _ccStopNoBidCountdown() {
   const bar     = document.getElementById("cc-nobid-bar");
   if (barWrap) barWrap.classList.remove("show");
   if (bar) { bar.style.transition = "none"; bar.style.width = "100%"; }
+  // Hide the cancel buttons — once a bid is placed the chain is locked
+  const btn    = document.getElementById("cc-cancel-claim-btn");
+  const btnBid = document.getElementById("cc-cancel-claim-btn-bid");
+  if (btn)    btn.classList.remove("show");
+  if (btnBid) btnBid.classList.remove("show");
 }
 
 // Update the chooser lock state when another browser has claimed a chain.
@@ -2556,6 +2612,10 @@ function _ccReset() {
   if (xtzBtn) xtzBtn.disabled = false;
   const resetEl = document.getElementById("cc-reset-notice");
   if (resetEl) resetEl.classList.remove("show");
+  const cancelBtn    = document.getElementById("cc-cancel-claim-btn");
+  const cancelBtnBid = document.getElementById("cc-cancel-claim-btn-bid");
+  if (cancelBtn)    cancelBtn.classList.remove("show");
+  if (cancelBtnBid) cancelBtnBid.classList.remove("show");
 }
 
 // Render the cross-chain status banner in the bid panel.
@@ -4055,6 +4115,9 @@ function disconnectWallet() {
 
 async function refreshState(runToken = _switchToken, contract = auctionContract) {
   if (!contract || runToken !== _switchToken) return;
+  // Cross-chain chooser is active — no chain chosen yet. Update internal state
+  // only; do not touch any bid-panel DOM elements (chooser owns the panel now).
+  const _ccChooserActive = !!_ccPairKey && !_ccClaimRow;
   try {
     const s = await contract.auctionState();
     if (runToken !== _switchToken) return;
@@ -4075,6 +4138,18 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     endTimestamp = Number(endTime);
     minNextBid   = mnb;
     const noBids = highestBidder === ethers.ZeroAddress;
+
+    const now = Math.floor(Date.now() / 1000);
+    const acceptingBids =
+      deposited && !settled && (
+        (live && Number(endTime) > now) ||
+        (mode === 1 && !live && noBids)
+      );
+    isLive = acceptingBids;
+
+    // Don't touch bid-panel DOM while the cross-chain chooser is active
+    if (_ccChooserActive) return;
+
     const countdownSection = document.getElementById("countdown-section");
     countdownSection.classList.remove("reserve-waiting");
 
@@ -4084,17 +4159,6 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
       tickCountdown();
     }
 
-    // Status line — covers all FlexAuction states
-    // _isOpen = "no token gate" (open to all wallets), NOT "currently accepting bids".
-    // Bidding is accepted whenever (deposited && !settled) AND
-    //   (mode 0 timed: live AND time remaining)  OR  (mode 1 reserve: live AND time remaining, OR pre-first-bid)
-    const now = Math.floor(Date.now() / 1000);
-    const acceptingBids =
-      deposited && !settled && (
-        (live && Number(endTime) > now) ||              // any mode, clock running
-        (mode === 1 && !live && noBids)                  // reserve mode, awaiting first bid
-      );
-
     const sl = document.getElementById("status-line");
     if (!deposited)                              { sl.textContent = "Awaiting NFT deposit";            sl.className = "status-line"; }
     else if (settled)                            { sl.textContent = "Auction settled";                  sl.className = "status-line settled"; }
@@ -4103,7 +4167,6 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     else if (live && Number(endTime) > now)      { sl.textContent = "Live — bids open";                 sl.className = "status-line live"; }
     else                                         { sl.textContent = "Ended — awaiting settlement";      sl.className = "status-line ended"; }
 
-    // isLive used elsewhere (countdown, bid button) — track whether bids are accepted right now
     if (mode === 1 && !live && noBids && deposited && !settled) {
       countdownSection.style.display = "block";
       countdownSection.classList.add("reserve-waiting");
@@ -4115,8 +4178,6 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
       sl.className = "status-line live";
     }
 
-    isLive = acceptingBids;
-
     // Stats
     if (deposited) {
       document.getElementById("stats-grid").style.display = "grid";
@@ -4126,7 +4187,7 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
       document.getElementById("stat-min-sub").textContent = noBids ? "Reserve price" : "Min increment";
     }
 
-    // Bid form — show whenever bids are accepted (covers reserve mode pre-first-bid too)
+    // Bid form
     if (acceptingBids) {
       document.getElementById("bid-form").style.display = "block";
       document.getElementById("history-section").style.display = "block";
@@ -4138,16 +4199,12 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     if (deposited) document.getElementById("history-section").style.display = "block";
     if (settled)   showSettled(highestBidder, highestBid);
 
-    // Settle / cancel buttons
-    // Settle requires: clock has expired (live=true, endTime passed), bids exist, not settled
-    // Cancel requires: deposited, no bids, not settled
     const settleBtn = document.getElementById("settle-btn");
     const cancelBtn = document.getElementById("cancel-btn");
     const clockExpired = live && Number(endTime) > 0 && Number(endTime) <= now;
     if (settleBtn) settleBtn.style.display = (_isKay() && clockExpired && !settled && !noBids) ? "block" : "none";
     if (cancelBtn) cancelBtn.style.display = (_isKay() && !settled && noBids && deposited) ? "block" : "none";
 
-    // Buy now — show when available (deposited, no bids, not settled, price set)
     const buyNowSection = document.getElementById("buynow-section");
     const buyNowBtn     = document.getElementById("buynow-btn");
     if (buyNowAvail && !settled) {
@@ -4320,6 +4377,8 @@ async function _readTezosAuction(slot = _activeCfg()) {
 async function refreshTezosState(runToken = _switchToken) {
   const slot = _activeCfg();
   if (_slotChain(slot) !== "tezos" || !slot.tezosContractAddr || runToken !== _switchToken) return;
+  // Cross-chain chooser is active — update internal state only, don't touch bid-panel DOM
+  const _ccChooserActive = !!_ccPairKey && !_ccClaimRow;
   try {
     if (!window.taquito?.TezosToolkit) throw new Error("Taquito did not load.");
     const auction = _normalizeTezosAuction(await _readTezosAuction(slot));
@@ -4337,6 +4396,9 @@ async function refreshTezosState(runToken = _switchToken) {
         (auction.mode === 2 && !auction.started && noBids)
       );
     isLive = acceptingBids;
+
+    // Don't touch bid-panel DOM while the cross-chain chooser is active
+    if (_ccChooserActive) return;
 
     const countdownSection = document.getElementById("countdown-section");
     countdownSection.style.display = "block";
@@ -4371,6 +4433,7 @@ async function refreshTezosState(runToken = _switchToken) {
     updateBidHint();
   } catch(e) {
     console.error("refreshTezosState:", e);
+    if (_ccChooserActive) return; // don't show error state in chooser phase
     const sl = document.getElementById("status-line");
     if (sl) {
       sl.textContent = e?.message || "Could not read Tezos auction";
