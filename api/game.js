@@ -735,7 +735,7 @@ async function handleCrosschainClaim(req, res, supabase) {
 
   const activeChain = String(body.active_chain || '').trim().toLowerCase();
   const activeAuctionKey = String(body.active_auction_key || '').trim().toLowerCase();
-  const timeoutSec = Math.max(60, Math.min(3600, Number(body.no_bid_timeout_sec || 600)));
+  const timeoutSec = Math.max(15, Math.min(3600, Number(body.no_bid_timeout_sec || 600)));
   if (!['eth','tezos'].includes(activeChain) || !activeAuctionKey) {
     return res.status(400).json({ error: 'active_chain and active_auction_key required' });
   }
