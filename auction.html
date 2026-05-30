@@ -962,6 +962,7 @@ body {
 .status-line.upcoming-line { color: var(--gold); }
 #countdown-section {
   min-height: 142px;
+  margin-top: 20px;
 }
 #countdown-section.reserve-waiting .countdown {
   opacity: 0;
@@ -1838,7 +1839,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             ↗ Notify me when the auction goes live
           </button>
           <div class="cc-notify-status" id="cc-notify-status"></div>
-          <button class="cc-sim-trigger show" id="cc-sim-trigger" onclick="openCcSim()">
+          <button class="cc-sim-trigger" id="cc-sim-trigger" onclick="openCcSim()">
             ◈ &nbsp;How does cross-chain bidding work? &nbsp;→
           </button>
 
@@ -2271,6 +2272,8 @@ function _ccShowChooser() {
   // Show the two-chain chooser, hide bid form and countdown until chosen
   const chooser = document.getElementById("cc-chooser");
   if (chooser) chooser.classList.add("show");
+  const simTrigger = document.getElementById("cc-sim-trigger");
+  if (simTrigger) simTrigger.classList.add("show");
   // Hide bid panel elements — collector hasn't picked a chain yet
   document.getElementById("countdown-section").style.display = "none";
   document.getElementById("stats-grid").style.display        = "none";
@@ -2283,6 +2286,8 @@ function _ccShowChooser() {
 function _ccHideChooser() {
   const chooser = document.getElementById("cc-chooser");
   if (chooser) chooser.classList.remove("show");
+  const simTrigger = document.getElementById("cc-sim-trigger");
+  if (simTrigger) simTrigger.classList.remove("show");
 }
 
 // Called when collector clicks one of the two chain buttons.
@@ -2623,7 +2628,10 @@ function _ccReset() {
   _ccNoBidCountdownRef = null;
   window._ccNotifyRequested = false;
   _renderCcBanner();
-  // Restore chooser to clean state when switching pieces
+  // Always hide the chooser and sim trigger — _setupCrossChainForSlot re-shows
+  // them only for paired slots; single-chain auctions never see them.
+  _ccHideChooser();
+  // Restore chooser cards to clean state
   const ethChoice = document.getElementById("cc-eth-choice");
   const xtzChoice = document.getElementById("cc-xtz-choice");
   if (ethChoice) ethChoice.classList.remove("locked");
