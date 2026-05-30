@@ -286,7 +286,23 @@ body {
 .cc-choice-body { padding: 10px 12px; }
 .cc-choice-desc {
   font-family: 'Crimson Pro', serif; font-size: 0.82rem;
-  color: var(--text-muted); line-height: 1.5; margin-bottom: 10px;
+  color: var(--text-muted); line-height: 1.5; margin-bottom: 8px;
+}
+.cc-choice-price {
+  font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 500;
+  color: var(--text); line-height: 1; margin-bottom: 2px;
+}
+.cc-choice-price-sub {
+  font-family: 'Crimson Pro', serif; font-size: 0.75rem;
+  color: var(--text-muted); font-style: italic; margin-bottom: 10px;
+}
+.cc-choice-status {
+  display: flex; align-items: center; gap: 5px; margin-bottom: 10px;
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted);
+}
+.cc-choice-status-dot {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--moss); flex-shrink: 0;
 }
 .cc-choice-btn {
   width: 100%; font-family: 'Cinzel', serif; font-size: 0.5rem;
@@ -1766,7 +1782,12 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
               </div>
               <div class="cc-choice-head eth">⟠ Ethereum</div>
               <div class="cc-choice-body">
-                <div class="cc-choice-desc">Bid in ETH. Outbid amounts refunded automatically.</div>
+                <div class="cc-choice-desc">Bid in ETH. Outbid amounts refunded by the contract.</div>
+                <div class="cc-choice-price" id="cc-eth-price"></div>
+                <div class="cc-choice-price-sub" id="cc-eth-price-sub"></div>
+                <div class="cc-choice-status" id="cc-eth-status" style="display:none">
+                  <span class="cc-choice-status-dot"></span><span>Open</span>
+                </div>
                 <button class="cc-choice-btn eth" onclick="_ccChooseChain('eth')">Start on Ethereum</button>
               </div>
             </div>
@@ -1785,6 +1806,11 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
               <div class="cc-choice-head xtz">ꜩ Tezos</div>
               <div class="cc-choice-body">
                 <div class="cc-choice-desc">Bid in XTZ. Outbid amounts returned immediately.</div>
+                <div class="cc-choice-price" id="cc-xtz-price"></div>
+                <div class="cc-choice-price-sub" id="cc-xtz-price-sub"></div>
+                <div class="cc-choice-status" id="cc-xtz-status" style="display:none">
+                  <span class="cc-choice-status-dot"></span><span>Open</span>
+                </div>
                 <button class="cc-choice-btn xtz" onclick="_ccChooseChain('tezos')">Start on Tezos</button>
               </div>
             </div>
@@ -1842,7 +1868,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             <div class="slabel">Place your bid</div>
             <div class="bid-row">
               <input class="bid-input" id="bid-input" type="number" step="0.001" placeholder="0.00" oninput="onBidInput()" />
-              <div class="bid-eth">ETH</div>
+              <div class="bid-eth" id="bid-currency-label">ETH</div>
             </div>
             <div class="bid-hint" id="bid-hint">Enter an amount above the minimum bid</div>
             <button class="btn-bid" id="bid-btn" onclick="placeBid()" disabled>Place bid</button>
@@ -1976,17 +2002,11 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 const AUCTION_API = "/api/auction-config";
 
 async function loadConfig() {
-  // Preview mode: admin stored config in localStorage and opened /auction?preview=1
   if (new URLSearchParams(location.search).get("preview") === "1") {
     try {
       const raw = localStorage.getItem("kw_preview_cfg");
-      if (raw) {
-        console.log("[auction] Preview mode — loading config from localStorage");
-        return JSON.parse(raw);
-      }
-    } catch (e) {
-      console.warn("[auction] Could not read preview config from localStorage:", e);
-    }
+      if (raw) { console.log("[auction] Preview mode"); return JSON.parse(raw); }
+    } catch (e) { console.warn("[auction] preview cfg:", e); }
   }
   try {
     const res  = await fetch(AUCTION_API);
@@ -2270,8 +2290,7 @@ async function _ccChooseChain(chain) {
   // Register the claim — starts the 60s no-bid window in Supabase
   await _ccRegisterClaim(_ccPairKey, chain, aucKey, 60);
 
-  // Always start polling so this browser detects the reset if no bid is placed,
-  // regardless of whether the claim succeeded or was already taken by another chain.
+  // Always start polling so this browser detects reset if no bid is placed
   _ccStartPolling(_ccPairKey);
 
   // If claim succeeded (our chain is now active), show the bid UI
@@ -2312,25 +2331,75 @@ function _ccStartNoBidCountdown() {
   const resetEl = document.getElementById("cc-reset-notice");
   if (resetEl) resetEl.classList.remove("show");
 
+  // Grab the server-authoritative expiry time before the interval starts
+  const resetAt = _ccClaimRow?.reset_at ? new Date(_ccClaimRow.reset_at).getTime() : 0;
+
   if (barWrap) barWrap.classList.add("show");
   if (bar) {
     bar.style.transition = "none";
     bar.style.width = "100%";
-    // Force reflow then animate
     bar.getBoundingClientRect();
-    bar.style.transition = "width 60000ms linear";
+    const remaining = resetAt > 0 ? Math.max(0, resetAt - Date.now()) : 60000;
+    bar.style.transition = `width ${remaining}ms linear`;
     bar.style.width = "0%";
   }
 
   clearInterval(_ccNoBidCountdownRef);
   _ccNoBidCountdownRef = setInterval(() => {
+    // If a bid was placed or we switched pieces, stop
     if (!_ccClaimRow || _ccClaimRow.status !== "waiting-bid") {
       clearInterval(_ccNoBidCountdownRef);
       if (barWrap) barWrap.classList.remove("show");
       return;
     }
     _renderCcBanner();
+    // Local timer expired — don't wait for next poll cycle, act immediately
+    if (resetAt > 0 && Date.now() >= resetAt) {
+      clearInterval(_ccNoBidCountdownRef);
+      _ccNoBidCountdownRef = null;
+      // Fire an immediate poll so the server row is deleted and we get reset:true.
+      // If the server confirms reset, _ccPoll will call _ccHandleReset().
+      // If there's a network hiccup, fall back to the local reset after a short delay.
+      let _serverConfirmed = false;
+      if (_ccPairKey) {
+        _ccPoll(_ccPairKey).then(() => { _serverConfirmed = true; });
+      }
+      setTimeout(() => {
+        if (!_serverConfirmed && _ccClaimRow?.status === "waiting-bid") {
+          _ccHandleReset();
+        }
+      }, 2500);
+    }
   }, 1000);
+}
+
+// Shared reset handler — called by both _ccPoll (server-confirmed) and the
+// countdown interval (local fallback). Safe to call multiple times.
+function _ccHandleReset() {
+  if (!_ccClaimRow && !document.getElementById("cc-chooser")?.classList.contains("show")) {
+    // Already reset (e.g. server poll already handled it)
+    return;
+  }
+  _ccClaimRow = null;
+  _ccStopNoBidCountdown();
+  _renderCcBanner();
+  const ethChoice = document.getElementById("cc-eth-choice");
+  const xtzChoice = document.getElementById("cc-xtz-choice");
+  if (ethChoice) ethChoice.classList.remove("locked", "waiting");
+  if (xtzChoice) xtzChoice.classList.remove("locked", "waiting");
+  const ethBtn = document.querySelector("#cc-eth-choice .cc-choice-btn");
+  const xtzBtn = document.querySelector("#cc-xtz-choice .cc-choice-btn");
+  if (ethBtn) ethBtn.disabled = false;
+  if (xtzBtn) xtzBtn.disabled = false;
+  _ccShowChooser();
+  const resetEl = document.getElementById("cc-reset-notice");
+  if (resetEl) {
+    resetEl.textContent = "No bid was placed in time — both chains are unlocked. Choose a chain to start again.";
+    resetEl.classList.add("show");
+  }
+  _ccClearWaitingState();
+  _ccFireNotification("Auction reset", "No bid was placed in time. Both chains are unlocked — you can now choose a chain.");
+  notify("info", "Auction reset", "No bid placed in time — both chains are now open.");
 }
 
 function _ccStopNoBidCountdown() {
@@ -2415,29 +2484,7 @@ async function _ccPoll(pairKey) {
   const data = await _ccFetch("GET", { pair_key: pairKey });
   if (!data) return;
   if (data.reset) {
-    // No bid placed before timeout — Supabase deleted the row, both chains unlock.
-    _ccClaimRow = null;
-    _ccStopNoBidCountdown();
-    _renderCcBanner();
-    // Restore the chooser so collectors can pick a chain again
-    const ethChoice = document.getElementById("cc-eth-choice");
-    const xtzChoice = document.getElementById("cc-xtz-choice");
-    if (ethChoice) ethChoice.classList.remove("locked");
-    if (xtzChoice) xtzChoice.classList.remove("locked");
-    const ethBtn = document.querySelector("#cc-eth-choice .cc-choice-btn");
-    const xtzBtn = document.querySelector("#cc-xtz-choice .cc-choice-btn");
-    if (ethBtn) ethBtn.disabled = false;
-    if (xtzBtn) xtzBtn.disabled = false;
-    _ccShowChooser();
-    // Show the reset notice
-    const resetEl = document.getElementById("cc-reset-notice");
-    if (resetEl) {
-      resetEl.textContent = "No bid was placed in time — both chains are unlocked. Choose a chain to start again.";
-      resetEl.classList.add("show");
-    }
-    _ccClearWaitingState();
-    _ccFireNotification("Auction reset", "No bid was placed in time. Both chains are unlocked — you can now choose a chain.");
-    notify("info", "Auction reset", "No bid placed in time — both chains are now open.");
+    _ccHandleReset();
     return;
   }
   _ccClaimRow = data.claim;
@@ -2744,18 +2791,12 @@ function initUpcoming() {
 }
 
 function _buildUpcomingPieceSelector() {
-  // Use the upcoming-specific piece-selector strip (sits inside #view-upcoming)
   const strip = document.getElementById("upcoming-piece-selector");
   if (!strip) return;
   strip.innerHTML = "";
-
-  // Show only upcoming pieces. Preview mode also allows Off pieces so admins
-  // can inspect unpublished work without making Live/Upcoming overrides leak.
   const visible = _auctions
     .map((slot, i) => ({ slot, i }))
     .filter(({ slot }) => _slotMatchesStatus(slot, "upcoming"));
-
-  // Group paired cross-chain slots into a single tab (same logic as live selector)
   const grouped = [];
   const seenPairs = new Set();
   for (const item of visible) {
@@ -2771,10 +2812,8 @@ function _buildUpcomingPieceSelector() {
       grouped.push({ ...item, pairKey: "", ethIdx: -1, tezIdx: -1 });
     }
   }
-
   if (grouped.length <= 1) { strip.classList.remove("show"); return; }
   strip.classList.add("show");
-
   grouped.forEach(({ slot, i, pairKey, ethIdx, tezIdx }, vi) => {
     const btn = document.createElement("button");
     btn.className = "piece-tab" + (vi === 0 ? " active" : "");
@@ -2981,11 +3020,9 @@ async function _buildPieceSelector() {
       ? `<img class="piece-tab-thumb" src="${toHTTP(slot.artImage)}" alt="" onerror="this.style.display='none'">`
       : "";
 
-    // Cross-chain badge — shown when this tab represents a paired ETH+XTZ auction
     const pairBadge = pairKey && ethIdx >= 0 && tezIdx >= 0
       ? `<span class="piece-tab-sold-badge" style="display:inline-flex;background:rgba(201,153,58,0.12);border-color:rgba(201,153,58,.35);color:var(--gold)">ETH / XTZ</span>`
       : "";
-
     btn.innerHTML = `
       ${thumbHtml}
       <span>${slot.artTitle || "Piece " + (i + 1)}</span>
@@ -3152,6 +3189,45 @@ function _setupCrossChainForSlot(slot) {
   _ccPairKey = ccKey;
   _ccShowChooser();
   _ccStartPolling(ccKey);
+  _ccPopulateChooserPrices(ccKey).catch(e => console.warn("_ccPopulateChooserPrices:", e));
+}
+
+async function _ccPopulateChooserPrices(pairKey) {
+  const ethIdx = _findPairedSlotIndex(pairKey, "eth");
+  const tezIdx = _findPairedSlotIndex(pairKey, "tezos");
+  const ethSlot = ethIdx >= 0 ? _auctions[ethIdx] : null;
+  const tezSlot = tezIdx >= 0 ? _auctions[tezIdx] : null;
+  const ethPriceEl  = document.getElementById("cc-eth-price");
+  const ethSubEl    = document.getElementById("cc-eth-price-sub");
+  const ethStatusEl = document.getElementById("cc-eth-status");
+  const xtzPriceEl  = document.getElementById("cc-xtz-price");
+  const xtzSubEl    = document.getElementById("cc-xtz-price-sub");
+  const xtzStatusEl = document.getElementById("cc-xtz-status");
+  if (ethSlot?.contractAddr && provider && ethers.isAddress(ethSlot.contractAddr)) {
+    try {
+      let c = _contractCache[ethSlot.contractAddr];
+      if (!c) { c = new ethers.Contract(ethSlot.contractAddr, AUCTION_ABI, provider); _contractCache[ethSlot.contractAddr] = c; }
+      const s = await c.auctionState();
+      const noBids = s[5] === ethers.ZeroAddress;
+      const displayWei = s[1] && !noBids ? s[6] : s[7];
+      if (ethPriceEl) ethPriceEl.textContent = ethers.formatEther(displayWei) + " ETH";
+      if (ethSubEl)   ethSubEl.textContent   = noBids ? "≈ reserve price" : "≈ current bid";
+      if (ethStatusEl) ethStatusEl.style.display = "";
+    } catch(_) {}
+  }
+  if (tezSlot?.tezosContractAddr) {
+    try {
+      const auction = _normalizeTezosAuction(await _readTezosAuction(tezSlot));
+      if (auction) {
+        const noBids = !auction.highestBidder;
+        const mutez  = noBids ? auction.minNextBidMutez : auction.highestBidMutez;
+        const xtz    = (mutez / 1_000_000).toFixed(6).replace(/\.?0+$/, "");
+        if (xtzPriceEl) xtzPriceEl.textContent = xtz + " XTZ";
+        if (xtzSubEl)   xtzSubEl.textContent   = noBids ? "≈ reserve price" : "≈ current bid";
+        if (xtzStatusEl) xtzStatusEl.style.display = "";
+      }
+    } catch(_) {}
+  }
 }
 
 async function _switchAuction(idx) {
@@ -3210,6 +3286,10 @@ async function _switchAuction(idx) {
   document.getElementById("bid-input").value                   = "";
   document.getElementById("bid-hint").textContent              = "Enter an amount above the minimum bid";
   document.getElementById("bid-btn").disabled                  = true;
+  const _currLabel = document.getElementById("bid-currency-label");
+  if (_currLabel) _currLabel.textContent = "ETH";
+  const _bidBtnReset = document.getElementById("bid-btn");
+  if (_bidBtnReset) _bidBtnReset.textContent = "Place bid";
   if (signerAddress) setWalletUi("connected", signerAddress);
   else if (!_walletConnecting) setWalletUi("disconnected");
   const _bnBtn = document.getElementById("buynow-btn");
@@ -4084,10 +4164,14 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
 }
 
 function updateBidHint() {
+  const currLabel = document.getElementById("bid-currency-label");
+  const bidInput  = document.getElementById("bid-input");
   if (_slotChain(_activeCfg()) === "tezos") {
     const min = (minNextBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "");
     document.getElementById("bid-hint").textContent = `Minimum bid: ${min} XTZ`;
-    if (!document.getElementById("bid-input").value) document.getElementById("bid-input").value = min;
+    if (!bidInput.value) bidInput.value = min;
+    bidInput.step = "0.000001";
+    if (currLabel) currLabel.textContent = "XTZ";
     const btn = document.getElementById("bid-btn");
     if (btn) btn.textContent = "Place XTZ bid";
     onBidInput();
@@ -4095,7 +4179,11 @@ function updateBidHint() {
   }
   const min = ethers.formatEther(minNextBid);
   document.getElementById("bid-hint").textContent = `Minimum bid: ${min} ETH`;
-  if (!document.getElementById("bid-input").value) document.getElementById("bid-input").value = min;
+  if (!bidInput.value) bidInput.value = min;
+  bidInput.step = "0.001";
+  if (currLabel) currLabel.textContent = "ETH";
+  const btn = document.getElementById("bid-btn");
+  if (btn && btn.textContent !== "Place bid") btn.textContent = "Place bid";
   onBidInput();
 }
 
@@ -4292,32 +4380,17 @@ async function refreshTezosState(runToken = _switchToken) {
 }
 
 async function _checkTezosEligibility(slot, address) {
-  // No gate configured — everyone is eligible
   if (!slot?.gateName) return true;
   if (!address) return false;
-
-  // Gate token is checked via TzKT's public token balance API.
-  // The gate token contract and id come from the slot config (gateLink encodes them),
-  // with a hardcoded fallback to the known Objkt entry token.
   const GATE_CONTRACT = "KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8";
   const GATE_TOKEN_ID = "1";
-
-  // Parse contract + tokenId out of gateLink if it's an objkt.com URL
-  // e.g. https://objkt.com/tokens/KT1.../1
   let gateContract = GATE_CONTRACT;
   let gateTokenId  = GATE_TOKEN_ID;
   const gateLink   = slot.gateLink || "";
   const objktMatch = gateLink.match(/objkt\.com\/tokens\/(KT[^/]+)\/(\d+)/);
-  if (objktMatch) {
-    gateContract = objktMatch[1];
-    gateTokenId  = objktMatch[2];
-  }
-
-  const network = (slot.tezosNetwork || "mainnet") === "ghostnet" ? "ghostnet" : "mainnet";
-  const tzktBase = network === "ghostnet"
-    ? "https://api.ghostnet.tzkt.io"
-    : "https://api.tzkt.io";
-
+  if (objktMatch) { gateContract = objktMatch[1]; gateTokenId = objktMatch[2]; }
+  const network  = (slot.tezosNetwork || "mainnet") === "ghostnet" ? "ghostnet" : "mainnet";
+  const tzktBase = network === "ghostnet" ? "https://api.ghostnet.tzkt.io" : "https://api.tzkt.io";
   try {
     const url = `${tzktBase}/v1/tokens/balances?account=${encodeURIComponent(address)}&token.contract=${encodeURIComponent(gateContract)}&token.tokenId=${encodeURIComponent(gateTokenId)}&balance.gt=0&limit=1`;
     const res  = await fetch(url);
@@ -4400,24 +4473,15 @@ async function checkTezosEligibility(runToken = _switchToken) {
     if (!ok && gateLink) {
       el.onclick = () => window.open(gateLink, "_blank", "noopener,noreferrer");
       el.title = "Tap to acquire your entry token and join the auction";
-    } else {
-      el.onclick = null;
-      el.title = "";
-    }
+    } else { el.onclick = null; el.title = ""; }
     document.getElementById("elig-icon").textContent = ok ? "✓" : "🔑";
-    document.getElementById("elig-text").textContent = ok
-      ? "Tezos wallet eligible"
-      : "Get your Tezos entry token to join";
+    document.getElementById("elig-text").textContent = ok ? "Tezos wallet eligible" : "Get your Tezos entry token to join";
     const detail = document.getElementById("elig-detail");
     if (!ok && gateName) {
       if (gateLink) {
-        detail.innerHTML = `<a href="${gateLink}" target="_blank" rel="noopener noreferrer" style="color:var(--gold);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-style:normal;letter-spacing:0.02em;" title="Tap to acquire your entry token">Tap here to acquire the ${gateName} →</a>`;
-      } else {
-        detail.textContent = `Requires: ${gateName}`;
-      }
-    } else {
-      detail.textContent = "";
-    }
+        detail.innerHTML = `<a href="${gateLink}" target="_blank" rel="noopener noreferrer" style="color:var(--gold);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-style:normal;letter-spacing:0.02em;">Tap here to acquire the ${gateName} →</a>`;
+      } else { detail.textContent = `Requires: ${gateName}`; }
+    } else { detail.textContent = ""; }
     onBidInput();
     return !!ok;
   } catch(e) {
