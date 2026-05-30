@@ -345,8 +345,10 @@ body {
   background: rgba(201,153,58,.06); border: 1px solid rgba(201,153,58,.28);
   font-family: 'Crimson Pro', serif; font-size: 0.85rem;
   color: var(--text-muted); font-style: italic; margin-bottom: 14px;
+  opacity: 1; transition: opacity 0.8s ease;
 }
 .cc-reset-notice.show { display: block; }
+.cc-reset-notice.fading { opacity: 0; }
 
 
 /* ── Chain chooser — waiting state (another browser is mid-claim) ── */
@@ -2321,6 +2323,13 @@ async function _ccChooseChain(chain) {
     }
     _ccHideChooser();
     _ccStartNoBidCountdown();
+    // Immediately populate the bid panel — don't wait for the 15s poll timer
+    const _refreshChain = _slotChain(_activeCfg());
+    if (_refreshChain === "tezos") {
+      refreshTezosState(_switchToken).catch(() => {});
+    } else {
+      refreshState(_switchToken, auctionContract).catch(() => {});
+    }
     notify(
       "info",
       "Bidding window open",
@@ -2345,7 +2354,8 @@ function _ccStartNoBidCountdown() {
   const barWrap = document.getElementById("cc-nobid-bar-wrap");
   const bar     = document.getElementById("cc-nobid-bar");
   const resetEl = document.getElementById("cc-reset-notice");
-  if (resetEl) resetEl.classList.remove("show");
+  if (resetEl) resetEl.classList.remove("show", "fading");
+  clearTimeout(_ccResetNoticeTimer);
 
   // Use the server-authoritative expiry. If missing, default to 60s from now.
   const resetAt = _ccClaimRow?.reset_at
@@ -2387,7 +2397,22 @@ function _ccStartNoBidCountdown() {
   }, 500);
 }
 
-// Called when the collector explicitly cancels their chain claim before placing a bid.
+// Show the reset notice and auto-fade it out after 5 seconds
+let _ccResetNoticeTimer = null;
+function _ccShowResetNotice(text) {
+  const el = document.getElementById("cc-reset-notice");
+  if (!el) return;
+  clearTimeout(_ccResetNoticeTimer);
+  el.classList.remove("fading");
+  el.textContent = text;
+  el.classList.add("show");
+  _ccResetNoticeTimer = setTimeout(() => {
+    el.classList.add("fading");
+    setTimeout(() => {
+      el.classList.remove("show", "fading");
+    }, 850); // matches the 0.8s CSS transition
+  }, 5000);
+}
 // Tells the server to delete the claim row (same as a reset), then restores the chooser.
 async function _ccCancelClaim() {
   const btn     = document.getElementById("cc-cancel-claim-btn");
@@ -2433,14 +2458,11 @@ function _ccHandleReset(cancelledByUser = false) {
   // Show the chooser (hides bid-form / countdown / stats per _ccShowChooser)
   _ccShowChooser();
 
-  // Show the appropriate notice
-  const resetEl = document.getElementById("cc-reset-notice");
-  if (resetEl) {
-    resetEl.textContent = cancelledByUser
-      ? "Selection cancelled — both chains are unlocked. Choose a chain to start again."
-      : "No bid was placed in time — both chains are unlocked. Choose a chain to start again.";
-    resetEl.classList.add("show");
-  }
+  // Show the appropriate notice with auto-fade
+  _ccShowResetNotice(cancelledByUser
+    ? "Selection cancelled — both chains are unlocked. Choose a chain to start again."
+    : "No bid was placed in time — both chains are unlocked. Choose a chain to start again."
+  );
 
   _ccClearWaitingState();
 
@@ -2611,7 +2633,8 @@ function _ccReset() {
   if (ethBtn) ethBtn.disabled = false;
   if (xtzBtn) xtzBtn.disabled = false;
   const resetEl = document.getElementById("cc-reset-notice");
-  if (resetEl) resetEl.classList.remove("show");
+  if (resetEl) resetEl.classList.remove("show", "fading");
+  clearTimeout(_ccResetNoticeTimer);
   const cancelBtn    = document.getElementById("cc-cancel-claim-btn");
   const cancelBtnBid = document.getElementById("cc-cancel-claim-btn-bid");
   if (cancelBtn)    cancelBtn.classList.remove("show");
