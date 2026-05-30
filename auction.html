@@ -2270,6 +2270,10 @@ async function _ccChooseChain(chain) {
   // Register the claim — starts the 60s no-bid window in Supabase
   await _ccRegisterClaim(_ccPairKey, chain, aucKey, 60);
 
+  // Always start polling so this browser detects the reset if no bid is placed,
+  // regardless of whether the claim succeeded or was already taken by another chain.
+  _ccStartPolling(_ccPairKey);
+
   // If claim succeeded (our chain is now active), show the bid UI
   if (_ccClaimRow && _ccClaimRow.active_chain === chain) {
     if (targetIdx >= 0 && targetIdx !== _activeIdx) {
@@ -4288,18 +4292,42 @@ async function refreshTezosState(runToken = _switchToken) {
 }
 
 async function _checkTezosEligibility(slot, address) {
-  if (!slot?.tezosContractAddr || !address) return !slot?.gateName;
-  if (!window.taquito?.TezosToolkit) throw new Error("Taquito did not load.");
-  const Tezos = tezosToolkit || new window.taquito.TezosToolkit(_tezosRpcForSlot(slot));
-  const contract = await Tezos.contract.at(slot.tezosContractAddr);
-  const views = contract.contractViews || {};
-  if (views.is_gated_holder) {
-    const auction = _normalizeTezosAuction(await _readTezosAuction(slot));
-    const result = await views.is_gated_holder({ holder: address, gate_tokens: auction?.gateTokens || [] }).executeView({ viewCaller: slot.tezosContractAddr });
-    return Boolean(result);
+  // No gate configured — everyone is eligible
+  if (!slot?.gateName) return true;
+  if (!address) return false;
+
+  // Gate token is checked via TzKT's public token balance API.
+  // The gate token contract and id come from the slot config (gateLink encodes them),
+  // with a hardcoded fallback to the known Objkt entry token.
+  const GATE_CONTRACT = "KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8";
+  const GATE_TOKEN_ID = "1";
+
+  // Parse contract + tokenId out of gateLink if it's an objkt.com URL
+  // e.g. https://objkt.com/tokens/KT1.../1
+  let gateContract = GATE_CONTRACT;
+  let gateTokenId  = GATE_TOKEN_ID;
+  const gateLink   = slot.gateLink || "";
+  const objktMatch = gateLink.match(/objkt\.com\/tokens\/(KT[^/]+)\/(\d+)/);
+  if (objktMatch) {
+    gateContract = objktMatch[1];
+    gateTokenId  = objktMatch[2];
   }
-  if (!slot.gateName) return true;
-  throw new Error("This Tezos contract does not expose is_gated_holder.");
+
+  const network = (slot.tezosNetwork || "mainnet") === "ghostnet" ? "ghostnet" : "mainnet";
+  const tzktBase = network === "ghostnet"
+    ? "https://api.ghostnet.tzkt.io"
+    : "https://api.tzkt.io";
+
+  try {
+    const url = `${tzktBase}/v1/tokens/balances?account=${encodeURIComponent(address)}&token.contract=${encodeURIComponent(gateContract)}&token.tokenId=${encodeURIComponent(gateTokenId)}&balance.gt=0&limit=1`;
+    const res  = await fetch(url);
+    if (!res.ok) throw new Error(`TzKT responded ${res.status}`);
+    const rows = await res.json();
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (e) {
+    console.warn("_checkTezosEligibility (TzKT):", e);
+    throw e;
+  }
 }
 
 async function checkEligibility(runToken = _switchToken, contract = auctionContract) {
@@ -4367,8 +4395,10 @@ async function checkTezosEligibility(runToken = _switchToken) {
     if (runToken !== _switchToken) return false;
     const el = document.getElementById("eligibility");
     el.className = `eligibility show ${ok ? "yes" : "no"}`;
-    if (!ok && cfg.gateLink) {
-      el.onclick = () => window.open(cfg.gateLink, "_blank", "noopener,noreferrer");
+    const gateLink = slot.gateLink || cfg.gateLink || "";
+    const gateName = slot.gateName || cfg.gateName || "";
+    if (!ok && gateLink) {
+      el.onclick = () => window.open(gateLink, "_blank", "noopener,noreferrer");
       el.title = "Tap to acquire your entry token and join the auction";
     } else {
       el.onclick = null;
@@ -4379,7 +4409,15 @@ async function checkTezosEligibility(runToken = _switchToken) {
       ? "Tezos wallet eligible"
       : "Get your Tezos entry token to join";
     const detail = document.getElementById("elig-detail");
-    detail.textContent = ok ? "" : (cfg.gateName ? `Requires: ${cfg.gateName}` : "");
+    if (!ok && gateName) {
+      if (gateLink) {
+        detail.innerHTML = `<a href="${gateLink}" target="_blank" rel="noopener noreferrer" style="color:var(--gold);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-style:normal;letter-spacing:0.02em;" title="Tap to acquire your entry token">Tap here to acquire the ${gateName} →</a>`;
+      } else {
+        detail.textContent = `Requires: ${gateName}`;
+      }
+    } else {
+      detail.textContent = "";
+    }
     onBidInput();
     return !!ok;
   } catch(e) {
