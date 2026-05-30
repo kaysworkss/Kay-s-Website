@@ -2973,8 +2973,9 @@ function _loadUpcomingPiece(idx) {
   loadStaticImage("upcoming", slot);
 
   if (upcomingTimer) { clearInterval(upcomingTimer); upcomingTimer = null; }
-  const isLegacySingle = _auctions.length <= 1;
-  const dateStr = slot.launchDate || (isLegacySingle ? (cfg.launchDate || "") : "");
+  // Use the piece's own launchDate, falling back to the global cfg.launchDate
+  // for any piece that doesn't have one set individually.
+  const dateStr = slot.launchDate || cfg.launchDate || "";
   const dateEl  = document.getElementById("upcoming-launch-date");
   const labelEl = document.getElementById("upcoming-launch-label");
 
