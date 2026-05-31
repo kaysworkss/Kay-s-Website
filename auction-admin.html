@@ -436,6 +436,18 @@ body {
 }
 .piece-tab-move:hover:not(:disabled) { color:var(--clay); background:rgba(196,132,90,0.07); }
 .piece-tab-move:disabled { opacity:0.28; cursor:default; }
+.piece-duplicate-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  padding: 0 5px;
+  cursor: pointer;
+  transition: color .15s;
+  line-height: 1;
+  display: flex; align-items: center;
+}
+.piece-duplicate-btn:hover { color: var(--gold); }
 .piece-remove-btn {
   font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.1em; text-transform:uppercase;
   background:transparent; border:1px solid rgba(158,79,46,.35); color:var(--clay);
@@ -1265,11 +1277,14 @@ function _renderPieceTabItems() {
       <button type="button" class="piece-tab-main" data-action="select" title="Select ${label}">
         <span class="piece-tab-status-dot ${eff}" title="${dotTitle}"></span>${label}
       </button>
+      <button type="button" class="piece-duplicate-btn" data-action="duplicate" title="Duplicate ${label}">⧉</button>
       ${canReorder ? `
         <button type="button" class="piece-tab-move" data-action="move-prev" title="Move earlier" ${i===0 ? 'disabled' : ''}>‹</button>
         <button type="button" class="piece-tab-move" data-action="move-next" title="Move later" ${i===_pieces.length-1 ? 'disabled' : ''}>›</button>
         <button type="button" class="piece-remove-btn" data-action="remove" title="Remove ${label}">✕</button>
-      ` : ''}
+      ` : `
+        <button type="button" class="piece-remove-btn" data-action="remove" title="Remove ${label}" style="display:none">✕</button>
+      `}
     </div>`;
   }).join("");
 }
@@ -1290,6 +1305,11 @@ function _handlePieceTabClick(e) {
   if (action === "remove") {
     e.stopPropagation();
     removePiece(idx);
+    return;
+  }
+  if (action === "duplicate") {
+    e.stopPropagation();
+    duplicatePiece(idx);
     return;
   }
   if (action === "move-prev" || action === "move-next") {
@@ -1330,7 +1350,7 @@ function _initTabDrag(container) {
 
   btns.forEach(btn => {
     btn.addEventListener("dragstart", e => {
-      if (e.target.closest("[data-action='remove'], .piece-tab-move")) {
+      if (e.target.closest("[data-action='remove'], [data-action='duplicate'], .piece-tab-move")) {
         e.preventDefault();
         return;
       }
@@ -1366,7 +1386,7 @@ function _initTabDrag(container) {
     });
 
     btn.addEventListener("pointerdown", e => {
-      if (!e.isPrimary || e.button !== 0 || e.target.closest("[data-action='remove'], .piece-tab-move")) return;
+      if (!e.isPrimary || e.button !== 0 || e.target.closest("[data-action='remove'], [data-action='duplicate'], .piece-tab-move")) return;
       _pointerDrag = {
         srcIdx: parseInt(btn.dataset.idx, 10),
         pointerId: e.pointerId,
@@ -1631,6 +1651,20 @@ function addPiece() {
   _activePieceIdx = _pieces.length - 1;
   _renderPieceTabs();
   _populateHofSelect(selectedRefs);
+}
+
+function duplicatePiece(idx) {
+  const selectedRefs = _capturePieceSelectRefs();
+  _savePieceFormValues(_activePieceIdx);
+  // Deep-clone the source piece, assign a fresh pieceId
+  const src  = _pieces[idx];
+  const copy = Object.assign({}, src, { pieceId: _newPieceId() });
+  // Insert the duplicate right after the source
+  _pieces.splice(idx + 1, 0, copy);
+  _activePieceIdx = idx + 1;
+  _renderPieceTabs();
+  _populateHofSelect(selectedRefs);
+  toast("ok", "Piece duplicated", "Edit the copy below — save to publish.");
 }
 
 function removePiece(idx) {
