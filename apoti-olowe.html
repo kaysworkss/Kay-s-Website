@@ -352,6 +352,17 @@
   }
   .ao-chapter-card.chapter-active .ao-chapter-num,
   .ao-chapter-card.chapter-active .ao-chapter-date { color: #6db36d; }
+  /* Past chapters with content: no green, just View Chapter text */
+  .ao-chapter-card.chapter-past[role="button"]::after {
+    content: 'View Chapter';
+    grid-column: 2 / 3;
+    margin-top: 0.55rem;
+    font-family: 'Cinzel', serif;
+    font-size: 0.56rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
   .ao-chapter-num {
     font-family: 'Cormorant Garamond', serif; font-size: 1.6rem;
     font-weight: 300; color: rgba(201,153,58,0.25); line-height: 1;
@@ -2482,19 +2493,24 @@ if (imgGrey.complete) loop();
   var currentPhase = document.getElementById('aoCurrentPhase');
   if (currentPhase) currentPhase.textContent = active.label + ' - now live · ' + active.range;
 
+  // Chapters that have a panel with content — add new keys here as chapters are built
+  var hasContent = { precursor: true, ch1: true, ch2: true };
+
   phases.forEach(function(phase) {
     var state = today < phase.start ? 'upcoming' : (today > phase.end ? 'past' : 'active');
     var cards = document.querySelectorAll('[data-release-card="' + phase.key + '"]');
     cards.forEach(function(card) {
-      card.classList.toggle('chapter-active', state === 'active' && card.classList.contains('ao-chapter-card'));
+      var isChapterCard = card.classList.contains('ao-chapter-card');
+      card.classList.toggle('chapter-active', state === 'active' && isChapterCard);
+      card.classList.toggle('chapter-past',   state === 'past' && hasContent[phase.key] && isChapterCard);
       card.classList.toggle('phase-past', state === 'past' && card.classList.contains('ao-precursor-row'));
 
       var status = card.querySelector('[data-release-status]');
       if (!status) return;
       status.classList.toggle('ao-status-live', state === 'active');
       status.classList.toggle('ao-status-next', state !== 'active');
-      if (state === 'active') status.textContent = '● Now live';
-      if (state === 'past') status.textContent = '◯ Complete';
+      if (state === 'active')   status.textContent = '● Now live';
+      if (state === 'past')     status.textContent = hasContent[phase.key] ? '◯ View Chapter' : '◯ Complete';
       if (state === 'upcoming') status.textContent = '◯ ' + phase.dateLabel;
     });
   });
