@@ -208,133 +208,59 @@ body {
 .live-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; flex: 0 0 calc(100% - 320px); min-width: 0; min-height: 0; overflow: hidden; height: 100%; }
 
 /* ── Piece selector strip ── */
-/* ── Piece selector strip ─────────────────────────────────────────────────── */
-.piece-selector-wrap {
-  display: none; position: sticky; top: 0; z-index: 80;
-  background: var(--bg); border-bottom: 1px solid var(--divider);
-}
-.piece-selector-wrap.show { display: block; }
-
-.piece-selector-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 20px 0;
-}
-.piece-selector-count {
-  font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.2em;
-  text-transform: uppercase; color: var(--gold);
-  display: flex; align-items: center; gap: 7px;
-}
-.piece-selector-count-dot {
-  width: 6px; height: 6px; border-radius: 50%; background: var(--gold);
-  animation: live-blink 1.4s ease-in-out infinite; flex-shrink: 0;
-}
-.piece-selector-hint {
-  font-family: 'Crimson Pro', serif; font-size: 0.75rem;
-  font-style: italic; color: var(--text-muted);
-}
-
-.piece-selector-scroll-wrap {
-  position: relative;
-}
-.piece-selector-scroll-wrap::before,
-.piece-selector-scroll-wrap::after {
-  content: ''; position: absolute; top: 0; bottom: 0; width: 36px; z-index: 2;
-  pointer-events: none; opacity: 0; transition: opacity .25s;
-}
-.piece-selector-scroll-wrap::before {
-  left: 0;
-  background: linear-gradient(to right, var(--bg) 20%, transparent);
-}
-.piece-selector-scroll-wrap::after {
-  right: 0;
-  background: linear-gradient(to left, var(--bg) 20%, transparent);
-}
-.piece-selector-scroll-wrap.can-scroll-left::before  { opacity: 1; }
-.piece-selector-scroll-wrap.can-scroll-right::after  { opacity: 1; }
-
-.piece-selector {
-  display: none; padding: 10px 20px 12px;
-  overflow-x: auto; white-space: nowrap;
-  -webkit-overflow-scrolling: touch; scrollbar-width: none;
-  gap: 10px;
-}
-.piece-selector::-webkit-scrollbar { display: none; }
-.piece-selector.show { display: flex; align-items: stretch; }
-
+.piece-selector { display:none; border-bottom:1px solid var(--divider); background:var(--bg-alt); padding:0 28px; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.piece-selector::-webkit-scrollbar { display:none; }
+.piece-selector.show { display:flex; gap:4px; align-items:stretch; }
 .piece-tab {
-  display: inline-flex; flex-direction: column; align-items: flex-start;
-  gap: 5px; flex-shrink: 0;
-  width: 148px;
-  padding: 0; border: 1px solid var(--divider); border-radius: 5px;
-  background: var(--bg-alt);
-  font-family: 'Cinzel', serif; font-size: 0.48rem;
-  letter-spacing: 0.13em; text-transform: uppercase;
-  color: var(--text-muted); cursor: pointer;
-  transition: border-color .2s, background .2s, color .2s;
-  overflow: hidden; white-space: normal; text-align: left;
-  position: relative;
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 16px; border:none; background:transparent;
+  font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.16em; text-transform:uppercase;
+  color:var(--text-muted); cursor:pointer; border-bottom:2px solid transparent;
+  transition:color .2s, border-color .2s; white-space:nowrap; flex-shrink:0;
 }
-.piece-tab:hover {
-  border-color: rgba(196,132,90,.55);
-  background: rgba(196,132,90,.06);
-  color: var(--sand);
-}
-.piece-tab.active {
-  border-color: var(--clay);
-  background: rgba(196,132,90,.09);
-  color: var(--sand);
-  box-shadow: 0 0 0 1px rgba(196,132,90,.18);
-}
-.piece-tab:disabled { cursor: wait; opacity: .6; }
-
-/* Active indicator bar at top of card */
-.piece-tab.active::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0;
-  height: 2px; background: var(--clay);
-}
-
+.piece-tab:hover { color:var(--clay); }
+.piece-tab.active { color:var(--sand); border-bottom-color:var(--clay); }
+.piece-tab:disabled { cursor: wait; opacity: .7; }
 .piece-tab-thumb {
-  width: 100%; height: 80px; object-fit: cover;
-  display: block; border-bottom: 1px solid var(--divider);
-  background: var(--bg); flex-shrink: 0;
-}
-.piece-tab-info {
-  padding: 7px 9px 9px; width: 100%; display: flex;
-  flex-direction: column; gap: 3px; flex: 1;
-}
-.piece-tab-title {
-  font-family: 'Cinzel', serif; font-size: 0.47rem;
-  letter-spacing: 0.13em; text-transform: uppercase;
-  color: inherit; line-height: 1.3;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden; white-space: normal;
+  width:28px; height:28px; border-radius:2px; object-fit:cover;
+  border:1px solid var(--divider); background:var(--bg); flex-shrink:0;
 }
 .piece-tab-bid {
-  font-family: 'Cormorant Garamond', serif; font-size: 0.9rem; font-weight: 600;
-  color: var(--clay); letter-spacing: 0; text-transform: none; line-height: 1;
-}
-.piece-tab-footer {
-  display: flex; align-items: center; gap: 5px; margin-top: 2px;
+  font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-weight:600;
+  color:var(--clay); letter-spacing:0; text-transform:none;
 }
 .piece-tab-live-dot {
-  width: 5px; height: 5px; border-radius: 50%; background: var(--moss);
-  animation: live-blink 1.4s ease-in-out infinite; flex-shrink: 0;
+  width:5px; height:5px; border-radius:50%; background:var(--moss);
+  animation:live-blink 1.4s ease-in-out infinite; flex-shrink:0;
 }
 .piece-tab-sold-badge {
-  font-family: 'Cinzel', serif; font-size: 0.38rem; letter-spacing: 0.1em;
-  text-transform: uppercase; background: rgba(107,124,92,0.18);
-  border: 1px solid rgba(107,124,92,0.45); border-radius: 2px;
-  padding: 1px 4px; color: var(--moss); flex-shrink: 0; line-height: 1.4;
+  font-family:'Cinzel',serif; font-size:0.42rem; letter-spacing:0.12em;
+  text-transform:uppercase; background:rgba(107,124,92,0.18);
+  border:1px solid rgba(107,124,92,0.45); border-radius:2px;
+  padding:1px 5px; color:var(--moss); flex-shrink:0; line-height:1.4;
 }
-
 .chat-settled-lock {
-  display: none; align-items: center; gap: 8px;
-  padding: 10px 13px; border-top: 1px solid var(--divider);
-  background: rgba(107,124,92,0.06);
-  font-family: 'Crimson Pro', serif; font-size: 0.82rem;
-  color: var(--text-muted); font-style: italic;
+  display:none; align-items:center; gap:8px;
+  padding:10px 13px; border-top:1px solid var(--divider);
+  background:rgba(107,124,92,0.06);
+  font-family:'Crimson Pro',serif; font-size:0.82rem;
+  color:var(--text-muted); font-style:italic;
 }
-.chat-settled-lock.show { display: flex; }
+.chat-settled-lock.show { display:flex; }
+.piece-tab-sold-badge {
+  font-family:'Cinzel',serif; font-size:0.42rem; letter-spacing:0.12em;
+  text-transform:uppercase; background:rgba(107,124,92,0.18);
+  border:1px solid rgba(107,124,92,0.45); border-radius:2px;
+  padding:1px 5px; color:var(--moss); flex-shrink:0; line-height:1.4;
+}
+.chat-settled-lock {
+  display:none; align-items:center; gap:8px;
+  padding:10px 13px; border-top:1px solid var(--divider);
+  background:rgba(107,124,92,0.06);
+  font-family:'Crimson Pro',serif; font-size:0.82rem;
+  color:var(--text-muted); font-style:italic;
+}
+.chat-settled-lock.show { display:flex; }
 
 
 /* ── Cross-chain chooser (inside bid panel) ── */
@@ -1436,12 +1362,11 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   #collector-room { position: relative; width: 100%; flex: 0 0 auto; height: auto; visibility:hidden; pointer-events:none; }
   #collector-room.show { visibility:visible; pointer-events:auto; }
 
-  /* ── Piece selector strip — compact cards on mobile ── */
-  .piece-selector { padding: 8px 12px 10px; gap: 8px; }
-  .piece-tab { width: 120px; }
-  .piece-tab-thumb { height: 60px; }
-  .piece-selector-header { padding: 7px 12px 0; }
-  .piece-selector-hint { display: none; }
+  /* ── Piece selector strip — smaller tabs, horizontal scroll ── */
+  .piece-selector { padding: 0 12px; }
+  .piece-tab { padding: 8px 10px; font-size: 0.46rem; gap: 5px; }
+  .piece-tab-thumb { width: 20px; height: 20px; }
+  .piece-tab-bid { font-size: 0.72rem; }
   #view-upcoming > .series-back-link { margin: 12px 0 0 16px; }
   .mode-toggle-bar .series-back-link { min-width: 0; }
   .swipe-hint.show { display: block; }
@@ -1557,7 +1482,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 /* Extra small — sub 380px (small iPhones) */
 @media (max-width: 380px) {
   .landing-title { font-size: 1.8rem; }
-  .piece-tab-bid { font-size: 0.82rem; }
+  .piece-tab-bid { display: none; }
   .count-num { font-size: 1.3rem; }
   .bid-inner { padding: 14px 12px 28px; }
   .landing-nav-links { gap: 10px; }
@@ -1717,18 +1642,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 <!-- ── UPCOMING VIEW ── -->
 <div id="view-upcoming">
   <!-- Piece selector for upcoming — only shown when multiple auctions are configured -->
-  <div class="piece-selector-wrap" id="upcoming-piece-selector-wrap">
-    <div class="piece-selector-header">
-      <div class="piece-selector-count">
-        <span class="piece-selector-count-dot"></span>
-        <span id="upcoming-piece-selector-count"></span>
-      </div>
-      <div class="piece-selector-hint">Tap a piece to preview</div>
-    </div>
-    <div class="piece-selector-scroll-wrap" id="upcoming-piece-selector-scroll-wrap">
-      <div class="piece-selector" id="upcoming-piece-selector"></div>
-    </div>
-  </div>
+  <div class="piece-selector" id="upcoming-piece-selector"></div>
   <a href="/apoti-olowe" class="series-back-link"><span>&larr;</span> Àpótí Ọlọ́wẹ̀</a>
   <div class="upcoming-layout">
     <div class="art-col" id="upcoming-art-col">
@@ -1826,18 +1740,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   </div>
 
   <!-- Piece selector — only shown when multiple live auctions are configured -->
-  <div class="piece-selector-wrap" id="piece-selector-wrap">
-    <div class="piece-selector-header">
-      <div class="piece-selector-count">
-        <span class="piece-selector-count-dot"></span>
-        <span id="piece-selector-count"></span>
-      </div>
-      <div class="piece-selector-hint">Tap a piece to switch</div>
-    </div>
-    <div class="piece-selector-scroll-wrap" id="piece-selector-scroll-wrap">
-      <div class="piece-selector" id="piece-selector"></div>
-    </div>
-  </div>
+  <div class="piece-selector" id="piece-selector"></div>
 
   <div id="live-flex-wrap" style="display:flex;flex:1;min-height:0;overflow:hidden;">
     <div class="live-layout" style="flex:1">
@@ -3024,13 +2927,9 @@ function initUpcoming() {
 }
 
 function _buildUpcomingPieceSelector() {
-  const strip     = document.getElementById("upcoming-piece-selector");
-  const wrap      = document.getElementById("upcoming-piece-selector-wrap");
-  const count     = document.getElementById("upcoming-piece-selector-count");
-  const scrollWrap = document.getElementById("upcoming-piece-selector-scroll-wrap");
+  const strip = document.getElementById("upcoming-piece-selector");
   if (!strip) return;
   strip.innerHTML = "";
-
   const visible = _auctions
     .map((slot, i) => ({ slot, i }))
     .filter(({ slot }) => _slotMatchesStatus(slot, "upcoming"));
@@ -3049,53 +2948,25 @@ function _buildUpcomingPieceSelector() {
       grouped.push({ ...item, pairKey: "", ethIdx: -1, tezIdx: -1 });
     }
   }
-
-  if (grouped.length <= 1) {
-    strip.classList.remove("show");
-    if (wrap) wrap.classList.remove("show");
-    return;
-  }
+  if (grouped.length <= 1) { strip.classList.remove("show"); return; }
   strip.classList.add("show");
-  if (wrap) wrap.classList.add("show");
-  if (count) count.textContent = `${grouped.length} pieces upcoming`;
-
   grouped.forEach(({ slot, i, pairKey, ethIdx, tezIdx }, vi) => {
     const btn = document.createElement("button");
     btn.className = "piece-tab" + (vi === 0 ? " active" : "");
     btn.dataset.idx = i;
-
     const thumbHtml = slot.artImage
       ? `<img class="piece-tab-thumb" src="${toHTTP(slot.artImage)}" alt="" onerror="this.style.display='none'">`
-      : `<div class="piece-tab-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:18px">◈</div>`;
-
+      : "";
     const pairBadge = pairKey && ethIdx >= 0 && tezIdx >= 0
       ? `<span class="piece-tab-sold-badge" style="display:inline-flex;background:rgba(201,153,58,0.12);border-color:rgba(201,153,58,.35);color:var(--gold)">ETH / XTZ</span>`
       : "";
-
-    btn.innerHTML = `
-      ${thumbHtml}
-      <div class="piece-tab-info">
-        <div class="piece-tab-title">${slot.artTitle || "Piece " + (i + 1)}</div>
-        <div class="piece-tab-footer">${pairBadge}</div>
-      </div>`;
-
+    btn.innerHTML = `${thumbHtml}<span>${slot.artTitle || "Piece " + (i+1)}</span>${pairBadge}`;
     btn.addEventListener("click", () => {
-      strip.querySelectorAll(".piece-tab").forEach((b, j) => b.classList.toggle("active", j === vi));
+      strip.querySelectorAll(".piece-tab").forEach((b,j) => b.classList.toggle("active", j===vi));
       _loadUpcomingPiece(i);
     });
     strip.appendChild(btn);
   });
-
-  // Scroll-fade indicators
-  if (scrollWrap) {
-    const updateFades = () => {
-      scrollWrap.classList.toggle("can-scroll-left",  strip.scrollLeft > 4);
-      scrollWrap.classList.toggle("can-scroll-right",
-        strip.scrollLeft < strip.scrollWidth - strip.clientWidth - 4);
-    };
-    strip.addEventListener("scroll", updateFades, { passive: true });
-    setTimeout(updateFades, 100);
-  }
 }
 
 function _loadUpcomingPiece(idx) {
@@ -3160,21 +3031,15 @@ function _loadUpcomingPiece(idx) {
   const labelEl = document.getElementById("upcoming-launch-label");
 
   if (dateStr) {
-    // Force timezone-naive strings (from datetime-local inputs) to GMT+1.
-    // Strings that already carry an explicit offset (Z, +HH:MM, -HH:MM) are trusted as-is.
+    // Force timezone-naive strings to GMT+1; explicit timezone suffixes are trusted as-is
     const _gmt1 = s => /Z$|[+-]\d{2}:?\d{2}$/.test(s.trim()) ? s : s.trim() + "+01:00";
     const launchMs = new Date(_gmt1(dateStr)).getTime();
     if (isFinite(launchMs)) {
-      // Display the date pinned to GMT+1 — Etc/GMT-1 is POSIX notation for UTC+1
-      // and always renders as "GMT+1" (no DST shifts, no ambiguous WAT/CET labels).
-      if (dateEl) {
-        const displayStr = new Date(_gmt1(dateStr)).toLocaleString("en-GB", {
-          timeZone: "Etc/GMT-1",
-          day: "numeric", month: "long", year: "numeric",
-          hour: "2-digit", minute: "2-digit",
-        });
-        dateEl.textContent = displayStr + " GMT+1";
-      }
+      if (dateEl) dateEl.textContent = new Date(_gmt1(dateStr)).toLocaleString("en-GB", {
+        timeZone: "Africa/Lagos", // WAT = UTC+1, same as GMT+1 year-round
+        day: "numeric", month: "long", year: "numeric",
+        hour: "2-digit", minute: "2-digit", timeZoneName: "short"
+      });
       if (labelEl) labelEl.textContent = "Auction opens";
       tickUpcoming(launchMs);
       upcomingTimer = setInterval(() => tickUpcoming(launchMs), 1000);
@@ -3266,10 +3131,6 @@ async function _buildPieceSelector() {
 
   // Show only live pieces. Preview mode also allows Off pieces so admins
   // can inspect unpublished work without making Live/Upcoming overrides leak.
-  const wrap  = document.getElementById("piece-selector-wrap");
-  const count = document.getElementById("piece-selector-count");
-  const scrollWrap = document.getElementById("piece-selector-scroll-wrap");
-
   const visible = _auctions
     .map((slot, i) => ({ slot, i }))
     .filter(({ slot }) => _slotMatchesStatus(slot, "live"));
@@ -3285,64 +3146,45 @@ async function _buildPieceSelector() {
       const repIdx = ethIdx >= 0 ? ethIdx : (tezIdx >= 0 ? tezIdx : item.i);
       grouped.push({ slot: _auctions[repIdx], i: repIdx, pairKey, ethIdx, tezIdx });
     } else {
-      grouped.push({ ...item, pairKey: "", ethIdx: -1, tezIdx: -1 });
+      grouped.push(item);
     }
   }
   _visibleLiveIndexes = grouped.map(({ i }) => i);
 
   if (grouped.length <= 1) {
     strip.classList.remove("show");
-    if (wrap) wrap.classList.remove("show");
     updateAuctionNav();
     return;
   }
 
   strip.classList.add("show");
-  if (wrap) wrap.classList.add("show");
-  if (count) count.textContent = `${grouped.length} auctions live`;
 
   for (const { slot, i, pairKey, ethIdx, tezIdx } of grouped) {
-    const btn = document.createElement("button");
+    const btn  = document.createElement("button");
     btn.className = "piece-tab";
     btn.dataset.idx = i;
 
+    // Thumb
     const thumbHtml = slot.artImage
       ? `<img class="piece-tab-thumb" src="${toHTTP(slot.artImage)}" alt="" onerror="this.style.display='none'">`
-      : `<div class="piece-tab-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:18px">◈</div>`;
+      : "";
 
     const pairBadge = pairKey && ethIdx >= 0 && tezIdx >= 0
       ? `<span class="piece-tab-sold-badge" style="display:inline-flex;background:rgba(201,153,58,0.12);border-color:rgba(201,153,58,.35);color:var(--gold)">ETH / XTZ</span>`
       : "";
-
     btn.innerHTML = `
       ${thumbHtml}
-      <div class="piece-tab-info">
-        <div class="piece-tab-title">${slot.artTitle || "Piece " + (i + 1)}</div>
-        <div class="piece-tab-bid" id="tab-bid-${i}">—</div>
-        <div class="piece-tab-footer">
-          <span class="piece-tab-live-dot" id="tab-dot-${i}"></span>
-          ${pairBadge}
-          <span class="piece-tab-sold-badge" id="tab-sold-${i}" style="display:none">Sold</span>
-        </div>
-      </div>`;
+      <span>${slot.artTitle || "Piece " + (i + 1)}</span>
+      ${pairBadge}
+      <span class="piece-tab-bid" id="tab-bid-${i}">—</span>
+      <span class="piece-tab-sold-badge" id="tab-sold-${i}" style="display:none">Sold</span>
+      <span class="piece-tab-live-dot" id="tab-dot-${i}"></span>`;
 
     btn.addEventListener("click", () => _switchAuction(i));
     strip.appendChild(btn);
     if (_isManualSold(slot, i)) _setTabSoldState(i, true);
   }
-
   updateAuctionNav();
-
-  // Scroll-fade indicators
-  if (scrollWrap) {
-    const updateFades = () => {
-      scrollWrap.classList.toggle("can-scroll-left",  strip.scrollLeft > 4);
-      scrollWrap.classList.toggle("can-scroll-right",
-        strip.scrollLeft < strip.scrollWidth - strip.clientWidth - 4);
-    };
-    strip.addEventListener("scroll", updateFades, { passive: true });
-    setTimeout(updateFades, 100);
-  }
 
   // Poll all tab bids every 20s
   _pollAllTabBids();
@@ -3350,9 +3192,9 @@ async function _buildPieceSelector() {
 }
 
 function _setTabSoldState(i, sold, bidText = "") {
-  const bidEl  = document.getElementById("tab-bid-"  + i);
-  const soldEl = document.getElementById("tab-sold-" + i);
-  const dotEl  = document.getElementById("tab-dot-"  + i);
+  const bidEl   = document.getElementById("tab-bid-"  + i);
+  const soldEl  = document.getElementById("tab-sold-" + i);
+  const dotEl   = document.getElementById("tab-dot-"  + i);
   if (sold) {
     if (bidEl)  bidEl.style.display  = "none";
     if (soldEl) soldEl.style.display = "";
@@ -3365,62 +3207,35 @@ function _setTabSoldState(i, sold, bidText = "") {
 }
 
 async function _pollAllTabBids() {
-  // Run all slot polls in parallel — no sequential waiting
-  await Promise.allSettled(_auctions.map(async (slot, i) => {
+  if (!provider) return;
+  for (let i = 0; i < _auctions.length; i++) {
+    const slot = _auctions[i];
     const manualSold = _isManualSold(slot, i);
-    const chain      = _slotChain(slot);
-
-    // ── ETH slot ──────────────────────────────────────────────────────────────
-    if (chain !== "tezos") {
-      if (!slot.contractAddr || !ethers.isAddress(slot.contractAddr)) {
-        if (manualSold) _setTabSoldState(i, true);
-        return;
-      }
-      if (!provider) return;
+    if (!slot.contractAddr || !ethers.isAddress(slot.contractAddr)) {
+      if (manualSold) _setTabSoldState(i, true);
+      continue;
+    }
+    try {
       let c = _contractCache[slot.contractAddr];
       if (!c) { c = new ethers.Contract(slot.contractAddr, AUCTION_ABI, provider); _contractCache[slot.contractAddr] = c; }
       const s       = await c.auctionState();
       const bid     = s[6]; // _highestBid
       const settled = s[2]; // _settled
-      if (manualSold || settled) {
-        _setTabSoldState(i, true);
+      const bidEl   = document.getElementById("tab-bid-"  + i);
+      const soldEl  = document.getElementById("tab-sold-" + i);
+      const dotEl   = document.getElementById("tab-dot-"  + i);
+      if (settled) {
+        if (bidEl)  bidEl.style.display  = "none";
+        if (soldEl) soldEl.style.display = "";
+        if (dotEl)  dotEl.style.display  = "none";
       } else {
-        _setTabSoldState(i, false, bid > 0n ? ethers.formatEther(bid) + " ETH" : "—");
+        if (bidEl)  { bidEl.style.display = ""; bidEl.textContent = bid > 0n ? ethers.formatEther(bid) + " ETH" : "—"; }
+        if (soldEl) soldEl.style.display = "none";
+        if (dotEl)  dotEl.style.display  = "";
       }
-      return;
-    }
-
-    // ── Tezos slot — use TzKT for speed ───────────────────────────────────────
-    if (!slot.tezosContractAddr) {
       if (manualSold) _setTabSoldState(i, true);
-      return;
-    }
-    const network  = _tezosNetworkForSlot(slot);
-    const tzktBase = network === "ghostnet" ? "https://api.ghostnet.tzkt.io" : "https://api.tzkt.io";
-    const res      = await fetch(`${tzktBase}/v1/contracts/${encodeURIComponent(slot.tezosContractAddr)}/storage`);
-    if (!res.ok) return;
-    const raw      = await res.json();
-    const auctionId = Number(slot.tezosAuctionId || 0);
-
-    // Pull auction record from storage (same logic as _readTezosAuction)
-    let aucRaw = raw;
-    if (raw?.auctions != null) {
-      aucRaw = typeof raw.auctions === "object" && !Array.isArray(raw.auctions)
-        ? raw.auctions[auctionId] ?? raw.auctions
-        : raw.auctions;
-    }
-
-    const auction  = _normalizeTezosAuction(aucRaw);
-    if (!auction) return;
-
-    if (manualSold || auction.settled || auction.cancelled) {
-      _setTabSoldState(i, true);
-    } else {
-      const mutez = auction.highestBidMutez || auction.minNextBidMutez || 0;
-      const xtz   = mutez > 0 ? (mutez / 1_000_000).toFixed(2).replace(/\.?0+$/, "") + " XTZ" : "—";
-      _setTabSoldState(i, false, xtz);
-    }
-  }));
+    } catch(_) {}
+  }
 }
 
 function _setPieceTabsBusy(isBusy) {
@@ -3551,27 +3366,14 @@ async function _ccPopulateChooserPrices(pairKey) {
   }
   if (tezSlot?.tezosContractAddr) {
     try {
-      const network  = _tezosNetworkForSlot(tezSlot);
-      const tzktBase = network === "ghostnet" ? "https://api.ghostnet.tzkt.io" : "https://api.tzkt.io";
-      const res      = await fetch(`${tzktBase}/v1/contracts/${encodeURIComponent(tezSlot.tezosContractAddr)}/storage`);
-      if (res.ok) {
-        const raw      = await res.json();
-        const auctionId = Number(tezSlot.tezosAuctionId || 0);
-        let aucRaw = raw;
-        if (raw?.auctions != null) {
-          aucRaw = typeof raw.auctions === "object" && !Array.isArray(raw.auctions)
-            ? raw.auctions[auctionId] ?? raw.auctions
-            : raw.auctions;
-        }
-        const auction = _normalizeTezosAuction(aucRaw);
-        if (auction) {
-          const noBids = !auction.highestBidder;
-          const mutez  = noBids ? auction.minNextBidMutez : auction.highestBidMutez;
-          const xtz    = (mutez / 1_000_000).toFixed(6).replace(/\.?0+$/, "");
-          if (xtzPriceEl) xtzPriceEl.textContent = xtz + " XTZ";
-          if (xtzSubEl)   xtzSubEl.textContent   = noBids ? "≈ reserve price" : "≈ current bid";
-          if (xtzStatusEl) xtzStatusEl.style.display = "";
-        }
+      const auction = _normalizeTezosAuction(await _readTezosAuction(tezSlot));
+      if (auction) {
+        const noBids = !auction.highestBidder;
+        const mutez  = noBids ? auction.minNextBidMutez : auction.highestBidMutez;
+        const xtz    = (mutez / 1_000_000).toFixed(6).replace(/\.?0+$/, "");
+        if (xtzPriceEl) xtzPriceEl.textContent = xtz + " XTZ";
+        if (xtzSubEl)   xtzSubEl.textContent   = noBids ? "≈ reserve price" : "≈ current bid";
+        if (xtzStatusEl) xtzStatusEl.style.display = "";
       }
     } catch(_) {}
   }
@@ -3589,12 +3391,10 @@ async function _switchAuction(idx) {
   const switchToken = ++_switchToken;
   _activeIdx = idx;
 
-  // Update tab UI — match by dataset.idx, scroll active card into view
+  // Update tab UI — match by dataset.idx since we filter the visible set
   document.querySelectorAll(".piece-tab").forEach(btn => {
     const tabIdx = parseInt(btn.dataset.idx, 10);
-    const active = tabIdx === idx;
-    btn.classList.toggle("active", active);
-    if (active) btn.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+    btn.classList.toggle("active", tabIdx === idx);
   });
 
   const slot = _activeCfg();
@@ -3688,12 +3488,6 @@ async function _switchAuction(idx) {
       document.getElementById("countdown-section").style.display = "block";
     }
     if (_slotChain(slot) === "tezos") {
-      // Pre-fetch storage from TzKT immediately — by the time refreshTezosState
-      // runs, the browser cache will already have the response, making it instant.
-      const _network  = _tezosNetworkForSlot(slot);
-      const _tzktBase = _network === "ghostnet" ? "https://api.ghostnet.tzkt.io" : "https://api.tzkt.io";
-      fetch(`${_tzktBase}/v1/contracts/${encodeURIComponent(slot.tezosContractAddr)}/storage`)
-        .catch(() => {});
       await refreshTezosState(switchToken);
       if (switchToken !== _switchToken) return;
       countdownTimer = setInterval(() => {
@@ -4655,51 +4449,17 @@ function _normalizeTezosAuction(raw) {
   };
 }
 
-// Fetch Tezos auction data via TzKT's REST API — a single CDN-cached GET,
-// orders of magnitude faster than Taquito's contract.at() + storage() path.
-// Falls back to Taquito RPC if TzKT returns an unusable response.
 async function _readTezosAuction(slot = _activeCfg()) {
   if (!slot?.tezosContractAddr) throw new Error("Tezos contract not configured.");
   const auctionId = Number(slot.tezosAuctionId || 0);
-  const network   = _tezosNetworkForSlot(slot);
-  const tzktBase  = network === "ghostnet" ? "https://api.ghostnet.tzkt.io" : "https://api.tzkt.io";
-
-  // Primary: TzKT /v1/contracts/{addr}/storage — single fast GET
-  try {
-    const res  = await fetch(`${tzktBase}/v1/contracts/${encodeURIComponent(slot.tezosContractAddr)}/storage`);
-    if (res.ok) {
-      const storage = await res.json();
-      // Support both map-style (auctions.{id}) and direct storage
-      if (storage?.auctions != null) {
-        const auc = typeof storage.auctions === "object" && !Array.isArray(storage.auctions)
-          ? storage.auctions[auctionId] ?? storage.auctions
-          : storage.auctions;
-        if (auc != null) return auc;
-      }
-      // Single-auction contracts store everything at the top level
-      if (storage?.reserve_price != null || storage?.highest_bid != null) return storage;
-    }
-  } catch (_) {}
-
-  // Fallback: TzKT bigmap endpoint for contracts using a bigmap for auctions
-  try {
-    const bmRes = await fetch(`${tzktBase}/v1/contracts/${encodeURIComponent(slot.tezosContractAddr)}/bigmaps/auctions/keys/${auctionId}`);
-    if (bmRes.ok) {
-      const key = await bmRes.json();
-      if (key?.value != null) return key.value;
-    }
-  } catch (_) {}
-
-  // Last resort: Taquito RPC (slow but guaranteed)
-  if (!window.taquito?.TezosToolkit) throw new Error("Taquito did not load.");
-  const Tezos   = tezosToolkit || new window.taquito.TezosToolkit(_tezosRpcForSlot(slot));
+  const Tezos = tezosToolkit || new window.taquito.TezosToolkit(_tezosRpcForSlot(slot));
   const contract = await Tezos.contract.at(slot.tezosContractAddr);
   if (contract.contractViews?.get_auction) {
     return contract.contractViews.get_auction(auctionId).executeView({ viewCaller: slot.tezosContractAddr });
   }
   const storage = await contract.storage();
   if (storage?.auctions?.get) return storage.auctions.get(auctionId);
-  if (storage?.auctions?.[auctionId] != null) return storage.auctions[auctionId];
+  if (storage?.auctions && storage.auctions[auctionId] != null) return storage.auctions[auctionId];
   throw new Error("Could not read Tezos auction storage.");
 }
 
