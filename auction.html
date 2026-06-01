@@ -2819,22 +2819,32 @@ function initLandingCountdown() {
 
   // Robust parsing — handles datetime-local output ("2026-06-15T18:00"),
   // full ISO ("2026-06-15T18:00:00.000Z"), and "YYYY-MM-DD HH:MM" variants.
-  // Treats values without explicit timezone as the visitor's local time.
+  // Treats values without explicit timezone as GMT+1.
   function parseTarget(s) {
     if (typeof s !== "string") return NaN;
     s = s.trim();
     if (!s) return NaN;
 
-    // Try native parser first (handles full ISO with timezone)
-    let t = new Date(s).getTime();
+    // Helper: force a timezone-naive string to be interpreted as GMT+1.
+    // Strings that already carry a timezone (Z, +HH:MM, -HH:MM) are left alone.
+    function forceGMT1(str) {
+      // Already has a timezone indicator — trust it as-is
+      if (/Z$|[+-]\d{2}:?\d{2}$/.test(str.trim())) return str;
+      // Append GMT+1 offset so the browser parses it correctly
+      return str.trim() + "+01:00";
+    }
+
+    // Try native parser with GMT+1 enforcement
+    let t = new Date(forceGMT1(s)).getTime();
     if (!isNaN(t)) return t;
 
     // datetime-local format: YYYY-MM-DDTHH:MM or YYYY-MM-DDTHH:MM:SS
     const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?/);
     if (m) {
       const [, y, mo, d, h, mi, se] = m;
-      // Construct as local time
-      t = new Date(+y, +mo - 1, +d, +h, +mi, +(se || 0)).getTime();
+      // Build an explicit ISO string at GMT+1 so it's timezone-unambiguous
+      const iso = `${y}-${mo}-${d}T${h}:${mi}:${(se || "00").padStart(2,"0")}+01:00`;
+      t = new Date(iso).getTime();
       if (!isNaN(t)) return t;
     }
     return NaN;
@@ -3021,9 +3031,15 @@ function _loadUpcomingPiece(idx) {
   const labelEl = document.getElementById("upcoming-launch-label");
 
   if (dateStr) {
-    const launchMs = new Date(dateStr).getTime();
+    // Force timezone-naive strings to GMT+1; explicit timezone suffixes are trusted as-is
+    const _gmt1 = s => /Z$|[+-]\d{2}:?\d{2}$/.test(s.trim()) ? s : s.trim() + "+01:00";
+    const launchMs = new Date(_gmt1(dateStr)).getTime();
     if (isFinite(launchMs)) {
-      if (dateEl)  dateEl.textContent = new Date(dateStr).toLocaleString();
+      if (dateEl) dateEl.textContent = new Date(_gmt1(dateStr)).toLocaleString("en-GB", {
+        timeZone: "Africa/Lagos", // WAT = UTC+1, same as GMT+1 year-round
+        day: "numeric", month: "long", year: "numeric",
+        hour: "2-digit", minute: "2-digit", timeZoneName: "short"
+      });
       if (labelEl) labelEl.textContent = "Auction opens";
       tickUpcoming(launchMs);
       upcomingTimer = setInterval(() => tickUpcoming(launchMs), 1000);
