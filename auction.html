@@ -5945,8 +5945,16 @@ function _showDeleteConfirm(wrap, msgId) {
 
 async function _loadHistory(loadFor = _auctionId) {
   if (!loadFor) return;
-  const rows = await _sb.select("collector_messages",
-    `auction_id=eq.${encodeURIComponent(loadFor)}&order=created_at.asc&limit=100`);
+
+  // Build the query — for paired rooms also pull messages stored under the
+  // raw contract address (inserted before the pair-key was introduced).
+  const slot = _activeCfg();
+  const rawKey = _auctionKeyForSlot(slot);
+  const query = (loadFor !== rawKey && rawKey)
+    ? `auction_id=in.(${encodeURIComponent(loadFor)},${encodeURIComponent(rawKey)})&order=created_at.asc&limit=200`
+    : `auction_id=eq.${encodeURIComponent(loadFor)}&order=created_at.asc&limit=100`;
+
+  const rows = await _sb.select("collector_messages", query);
   if (_auctionId !== loadFor) return; // room changed while fetching — discard
   if (Array.isArray(rows)) rows.forEach(_renderMsg);
 }
@@ -6014,13 +6022,15 @@ window._roomHookBid = async function(bidder, amount) {
 };
 
 function initCollectorRoom() {
-  const addr = (_activeCfg().contractAddr || cfg.contractAddr || cfg.auctionId || new Date().toISOString().slice(0,10)).toLowerCase();
-  _auctionId = addr;
+  const slot        = _activeCfg();
+  const roomId      = _roomIdForSlot(slot);
+  const effectiveId = roomId || ("slot-" + _auctions.indexOf(slot));
+  _auctionId = effectiveId;
   setMode("collector");
   _updateChatInputState();
   if (!_aucProfileLoaded) { _aucProfileLoaded = true; _loadAucProfile().catch(() => {}); }
-  _loadHistory(addr).then(() => {
-    if (_auctionId !== addr) return;
+  _loadHistory(effectiveId).then(() => {
+    if (_auctionId !== effectiveId) return;
     _subscribeRoom();
   });
   _initPresence();
