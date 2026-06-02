@@ -2085,7 +2085,10 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
     <div id="collector-room">
       <div class="room-header">
         <div class="room-title">Collector room</div>
-        <div class="room-sub"><span class="live-dot"></span><span>Live</span></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="room-sub"><span class="live-dot"></span><span>Live</span></div>
+          <button onclick="_refreshChat()" title="Reload messages" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;padding:2px 4px;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--clay)'" onmouseout="this.style.color='var(--text-muted)'">↻</button>
+        </div>
       </div>
       <div class="chat-feed" id="chat-feed"></div>
       <!-- Collector profile (shown when eligible) -->
@@ -3493,20 +3496,54 @@ function initAuctionSwipe() {
   });
 }
 
+let _chatSwitchToken = 0; // incremented on every piece switch to cancel stale fetches
+
 function _syncCollectorRoomForSlot(slot) {
   const roomId = _roomIdForSlot(slot);
-  if (!roomId || _auctionId === roomId) return;
-  _auctionId  = roomId;
+  // Use slot index as fallback key so slots with no contract still get their own room
+  const effectiveId = roomId || ("slot-" + (_auctions.indexOf(slot)));
+
+  // Close existing socket immediately regardless of whether room changed
+  if (_realtimeWS) { try { _realtimeWS.close(); } catch(_) {} _realtimeWS = null; }
+
+  // Always switch rooms — don't bail out if roomId matches, in case the feed
+  // was cleared by a piece switch and needs restoring
+  _auctionId = effectiveId;
   _seenMsgIds = new Set();
-  if (_realtimeWS) { try { _realtimeWS.close(); } catch(_) {} }
+  _chatSwitchToken++;
+  const myToken = _chatSwitchToken;
 
-  // Restore from cache instantly — collector sees previous messages immediately
-  // while _loadHistory fetches any new ones from Supabase in the background.
+  // Restore from cache immediately — no blank flash
   const feed = document.getElementById("chat-feed");
-  feed.innerHTML = "";
-  (_msgCache.get(roomId) || []).forEach(row => _renderMsg(row));
+  if (feed) {
+    feed.innerHTML = "";
+    (_msgCache.get(effectiveId) || []).forEach(row => _renderMsg(row));
+  }
 
-  _loadAucProfile().then(() => { _loadHistory(); _subscribeRoom(); });
+  // Only load from Supabase if the room has a real contract-based ID
+  if (!roomId) return;
+
+  _loadAucProfile().then(() => {
+    if (_chatSwitchToken !== myToken) return; // piece switched again, abort
+    _loadHistory(myToken);
+    _subscribeRoom();
+  });
+}
+
+function _refreshChat() {
+  // Clear cache for current room and reload — useful if messages are missing
+  if (_auctionId) _msgCache.delete(_auctionId);
+  _seenMsgIds = new Set();
+  const feed = document.getElementById("chat-feed");
+  if (feed) feed.innerHTML = "";
+  if (_realtimeWS) { try { _realtimeWS.close(); } catch(_) {} _realtimeWS = null; }
+  if (!_auctionId) return;
+  _chatSwitchToken++;
+  const myToken = _chatSwitchToken;
+  _loadHistory(myToken).then(() => {
+    if (_chatSwitchToken !== myToken) return;
+    _subscribeRoom();
+  });
 }
 
 function _setupCrossChainForSlot(slot) {
@@ -5763,10 +5800,12 @@ function _renderMsg(row) {
   // Cache the row for instant restore when the collector switches back to this piece
   if (_auctionId) {
     if (!_msgCache.has(_auctionId)) _msgCache.set(_auctionId, []);
-    _msgCache.get(_auctionId).push(row);
-    // Keep cache bounded to 200 messages per room
     const cached = _msgCache.get(_auctionId);
-    if (cached.length > 200) cached.splice(0, cached.length - 200);
+    // Only add if not already in cache (realtime may deliver duplicates)
+    if (!cached.some(r => r.id === row.id)) {
+      cached.push(row);
+      if (cached.length > 200) cached.splice(0, cached.length - 200);
+    }
   }
   const feed = document.getElementById("chat-feed");
   if (!feed) return;
@@ -5903,9 +5942,10 @@ function _showDeleteConfirm(wrap, msgId) {
   setTimeout(() => { if (confirm.parentNode) confirm.remove(); }, 4000);
 }
 
-async function _loadHistory() {
+async function _loadHistory(token = _chatSwitchToken) {
   if (!_auctionId) return;
   const rows = await _sb.select("collector_messages", `auction_id=eq.${encodeURIComponent(_auctionId)}&order=created_at.asc&limit=100`);
+  if (_chatSwitchToken !== token) return; // piece switched while fetching — discard
   if (Array.isArray(rows)) rows.forEach(_renderMsg);
 }
 
@@ -5974,10 +6014,13 @@ window._roomHookBid = async function(bidder, amount) {
 function initCollectorRoom() {
   const addr = (_activeCfg().contractAddr || cfg.contractAddr || cfg.auctionId || new Date().toISOString().slice(0,10)).toLowerCase();
   _auctionId = addr;
+  _chatSwitchToken++;
+  const _initToken = _chatSwitchToken;
   setMode("collector");
   _updateChatInputState();
   _loadAucProfile().then(() => {
-    _loadHistory();
+    if (_chatSwitchToken !== _initToken) return;
+    _loadHistory(_initToken);
     _subscribeRoom();
   });
   _initPresence();
