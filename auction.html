@@ -3496,20 +3496,16 @@ function initAuctionSwipe() {
   });
 }
 
-let _chatSwitchToken = 0; // incremented on every piece switch to cancel stale fetches
-let _aucProfileLoaded = false; // load auctioneer profile once only
+let _aucProfileLoaded = false;
 
 function _syncCollectorRoomForSlot(slot) {
-  const roomId = _roomIdForSlot(slot);
-  const effectiveId = roomId || ("slot-" + (_auctions.indexOf(slot)));
+  const roomId      = _roomIdForSlot(slot);
+  const effectiveId = roomId || ("slot-" + _auctions.indexOf(slot));
 
-  // Close existing socket
   if (_realtimeWS) { try { _realtimeWS.close(); } catch(_) {} _realtimeWS = null; }
 
-  _auctionId = effectiveId;
+  _auctionId  = effectiveId;
   _seenMsgIds = new Set();
-  _chatSwitchToken++;
-  const myToken = _chatSwitchToken;
 
   // Restore from cache immediately
   const feed = document.getElementById("chat-feed");
@@ -3520,29 +3516,33 @@ function _syncCollectorRoomForSlot(slot) {
 
   if (!roomId) return;
 
-  // Load auctioneer profile once, then fetch history immediately — don't block on profile
-  if (!_aucProfileLoaded) {
-    _aucProfileLoaded = true;
-    _loadAucProfile().catch(() => {});
-  }
+  if (!_aucProfileLoaded) { _aucProfileLoaded = true; _loadAucProfile().catch(() => {}); }
 
-  _loadHistory(myToken).then(() => {
-    if (_chatSwitchToken !== myToken) return;
-    _subscribeRoom();
-  });
+  // Capture which room we're loading for — stale fetches are detected by
+  // comparing this against _auctionId when the response arrives, not by a
+  // shared counter (which gets stomped by rapid taps on mobile).
+  const loadFor = effectiveId;
+
+  // setTimeout(0) escapes the iOS touch-event stack so fetch() is not throttled
+  setTimeout(() => {
+    if (_auctionId !== loadFor) return; // already switched again
+    _loadHistory(loadFor).then(() => {
+      if (_auctionId !== loadFor) return;
+      _subscribeRoom();
+    });
+  }, 0);
 }
 
 function _refreshChat() {
-  if (_auctionId) _msgCache.delete(_auctionId);
+  const loadFor = _auctionId;
+  if (!loadFor) return;
+  _msgCache.delete(loadFor);
   _seenMsgIds = new Set();
   const feed = document.getElementById("chat-feed");
   if (feed) feed.innerHTML = "";
   if (_realtimeWS) { try { _realtimeWS.close(); } catch(_) {} _realtimeWS = null; }
-  if (!_auctionId) return;
-  _chatSwitchToken++;
-  const myToken = _chatSwitchToken;
-  _loadHistory(myToken).then(() => {
-    if (_chatSwitchToken !== myToken) return;
+  _loadHistory(loadFor).then(() => {
+    if (_auctionId !== loadFor) return;
     _subscribeRoom();
   });
 }
@@ -5943,10 +5943,11 @@ function _showDeleteConfirm(wrap, msgId) {
   setTimeout(() => { if (confirm.parentNode) confirm.remove(); }, 4000);
 }
 
-async function _loadHistory(token = _chatSwitchToken) {
-  if (!_auctionId) return;
-  const rows = await _sb.select("collector_messages", `auction_id=eq.${encodeURIComponent(_auctionId)}&order=created_at.asc&limit=100`);
-  if (_chatSwitchToken !== token) return; // piece switched while fetching — discard
+async function _loadHistory(loadFor = _auctionId) {
+  if (!loadFor) return;
+  const rows = await _sb.select("collector_messages",
+    `auction_id=eq.${encodeURIComponent(loadFor)}&order=created_at.asc&limit=100`);
+  if (_auctionId !== loadFor) return; // room changed while fetching — discard
   if (Array.isArray(rows)) rows.forEach(_renderMsg);
 }
 
@@ -6015,16 +6016,11 @@ window._roomHookBid = async function(bidder, amount) {
 function initCollectorRoom() {
   const addr = (_activeCfg().contractAddr || cfg.contractAddr || cfg.auctionId || new Date().toISOString().slice(0,10)).toLowerCase();
   _auctionId = addr;
-  _chatSwitchToken++;
-  const _initToken = _chatSwitchToken;
   setMode("collector");
   _updateChatInputState();
-  if (!_aucProfileLoaded) {
-    _aucProfileLoaded = true;
-    _loadAucProfile().catch(() => {});
-  }
-  _loadHistory(_initToken).then(() => {
-    if (_chatSwitchToken !== _initToken) return;
+  if (!_aucProfileLoaded) { _aucProfileLoaded = true; _loadAucProfile().catch(() => {}); }
+  _loadHistory(addr).then(() => {
+    if (_auctionId !== addr) return;
     _subscribeRoom();
   });
   _initPresence();
