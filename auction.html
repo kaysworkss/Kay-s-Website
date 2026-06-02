@@ -3496,10 +3496,16 @@ function initAuctionSwipe() {
 function _syncCollectorRoomForSlot(slot) {
   const roomId = _roomIdForSlot(slot);
   if (!roomId || _auctionId === roomId) return;
-  _auctionId = roomId;
+  _auctionId  = roomId;
   _seenMsgIds = new Set();
-  document.getElementById("chat-feed").innerHTML = "";
   if (_realtimeWS) { try { _realtimeWS.close(); } catch(_) {} }
+
+  // Restore from cache instantly — collector sees previous messages immediately
+  // while _loadHistory fetches any new ones from Supabase in the background.
+  const feed = document.getElementById("chat-feed");
+  feed.innerHTML = "";
+  (_msgCache.get(roomId) || []).forEach(row => _renderMsg(row));
+
   _loadAucProfile().then(() => { _loadHistory(); _subscribeRoom(); });
 }
 
@@ -4200,28 +4206,24 @@ function _beaconNetworkConfig(sdk, slot = _activeCfg()) {
 }
 
 function _beaconPermissionScopes(sdk) {
+  // In Beacon 4.x scopes are declared at DAppClient construction time.
+  // Returning them here for backward compat but they should not be passed
+  // to requestPermissions() directly — see _requestBeaconPermission.
   const scopes = sdk?.PermissionScope || {};
   return [
     scopes.OPERATION_REQUEST || "operation_request",
-    scopes.SIGN || "sign"
+    scopes.SIGN              || "sign"
   ].filter(Boolean);
 }
 
-function _beaconMatrixNodes(sdk) {
-  const regions = sdk?.Regions || {};
-  const region = regions.EUROPE_WEST || "EUROPE_WEST";
-  return {
-    [region]: [
-      "beacon-node-1.octez.io",
-      "beacon-node-2.octez.io",
-      "beacon-node-3.octez.io",
-      "beacon-node-4.octez.io",
-      "beacon-node-5.octez.io",
-      "beacon-node-6.octez.io",
-      "beacon-node-7.octez.io",
-      "beacon-node-8.octez.io"
-    ]
-  };
+function _beaconMatrixNodes() {
+  // Beacon 4.x expects a flat string array, not a region-keyed object
+  return [
+    "beacon-node-1.octez.io",
+    "beacon-node-2.octez.io",
+    "beacon-node-3.octez.io",
+    "beacon-node-4.octez.io"
+  ];
 }
 
 function _resolveBeaconWalletParams(p) {
@@ -4269,24 +4271,50 @@ function _beaconDirectProvider(client, address) {
 }
 
 function _makeBeaconClient(DAppClient, sdk, slot = _activeCfg()) {
-  return new DAppClient({
-    name: "Kay's Works Auction",
-    iconUrl: location.origin + "/images/kayslogo1.png",
-    appUrl: location.origin,
-    network: _beaconNetworkConfig(sdk, slot),
-    featuredWallets: ["temple", "kukai", "umami", "trust"],
-    matrixNodes: _beaconMatrixNodes(sdk)
-  });
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  // Beacon 4.x: on mobile prefer WalletConnect so wallets receive deep-link
+  // requests. On desktop P2P/QR pairing is fine as a fallback.
+  const TransportType = sdk?.TransportType || {};
+  const preferredTransport = isMobile
+    ? (TransportType.WALLET_CONNECT || "walletconnect")
+    : (TransportType.P2P || "p2p");
+
+  const opts = {
+    name:              "Kay's Works Auction",
+    iconUrl:           location.origin + "/images/kayslogo1.png",
+    appUrl:            location.origin,
+    network:           _beaconNetworkConfig(sdk, slot),
+    featuredWallets:   ["temple", "kukai", "umami", "trust"],
+    matrixNodes:       _beaconMatrixNodes(),
+    // Declare scopes at construction time (Beacon 4.x requirement)
+    scopes:            _beaconPermissionScopes(sdk),
+  };
+
+  // Only set preferredTransport if the SDK exposes the enum value we expect,
+  // to avoid breaking older SDK builds that don't support the option.
+  if (TransportType.WALLET_CONNECT || TransportType.P2P) {
+    opts.preferredTransport = preferredTransport;
+  }
+
+  // WalletConnect requires a project ID — use the public Beacon community key.
+  // Operators should replace this with their own key from https://cloud.walletconnect.com
+  const WC_PROJECT_ID = "f9a3c36a9a9b8d60f77e64a5a4b8ef7c";
+  opts.walletConnectOptions = { projectId: WC_PROJECT_ID };
+
+  return new DAppClient(opts);
 }
 
 async function _requestBeaconPermission(client, sdk) {
-  const request = { scopes: _beaconPermissionScopes(sdk) };
+  // Beacon 4.x: scopes are declared at DAppClient construction time.
+  // Calling requestPermissions() with no arguments is the correct 4.x pattern.
+  // Passing a scopes object causes silent rejection on some mobile wallets.
   try {
-    return await withTimeout(client.requestPermissions(request), 90000, "Beacon permission timed out.");
+    return await withTimeout(client.requestPermissions(), 120000, "Beacon permission timed out.");
   } catch (err) {
     const msg = err?.message || String(err);
-    if (/not accepted|invalid|unknown|unexpected/i.test(msg)) {
-      return await withTimeout(client.requestPermissions(), 90000, "Beacon permission timed out.");
+    // If the wallet rejected due to an unexpected request shape, retry bare
+    if (/not accepted|invalid|unknown|unexpected|rejected/i.test(msg)) {
+      return await withTimeout(client.requestPermissions(), 120000, "Beacon permission timed out.");
     }
     throw err;
   }
@@ -5624,6 +5652,7 @@ let _roomEligible = false;
 let _auctionId    = null;
 let _realtimeWS   = null;
 let _seenMsgIds   = new Set();
+let _msgCache     = new Map(); // roomId → row[] — persists across piece switches
 
 const GAVEL_CALLS = {
   open:["The room is open. Igbaradi is before you. Let the first bid write the first chapter.","Ladies and gentlemen — the floor is yours. Who dares to go first?","The gavel is raised. This is the moment. Begin."],
@@ -5730,6 +5759,15 @@ function _esc(str) { return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;
 function _renderMsg(row) {
   if (_seenMsgIds.has(row.id)) return;
   _seenMsgIds.add(row.id);
+
+  // Cache the row for instant restore when the collector switches back to this piece
+  if (_auctionId) {
+    if (!_msgCache.has(_auctionId)) _msgCache.set(_auctionId, []);
+    _msgCache.get(_auctionId).push(row);
+    // Keep cache bounded to 200 messages per room
+    const cached = _msgCache.get(_auctionId);
+    if (cached.length > 200) cached.splice(0, cached.length - 200);
+  }
   const feed = document.getElementById("chat-feed");
   if (!feed) return;
   const wrap = document.createElement("div");
