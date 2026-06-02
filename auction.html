@@ -3497,41 +3497,42 @@ function initAuctionSwipe() {
 }
 
 let _chatSwitchToken = 0; // incremented on every piece switch to cancel stale fetches
+let _aucProfileLoaded = false; // load auctioneer profile once only
 
 function _syncCollectorRoomForSlot(slot) {
   const roomId = _roomIdForSlot(slot);
-  // Use slot index as fallback key so slots with no contract still get their own room
   const effectiveId = roomId || ("slot-" + (_auctions.indexOf(slot)));
 
-  // Close existing socket immediately regardless of whether room changed
+  // Close existing socket
   if (_realtimeWS) { try { _realtimeWS.close(); } catch(_) {} _realtimeWS = null; }
 
-  // Always switch rooms — don't bail out if roomId matches, in case the feed
-  // was cleared by a piece switch and needs restoring
   _auctionId = effectiveId;
   _seenMsgIds = new Set();
   _chatSwitchToken++;
   const myToken = _chatSwitchToken;
 
-  // Restore from cache immediately — no blank flash
+  // Restore from cache immediately
   const feed = document.getElementById("chat-feed");
   if (feed) {
     feed.innerHTML = "";
     (_msgCache.get(effectiveId) || []).forEach(row => _renderMsg(row));
   }
 
-  // Only load from Supabase if the room has a real contract-based ID
   if (!roomId) return;
 
-  _loadAucProfile().then(() => {
-    if (_chatSwitchToken !== myToken) return; // piece switched again, abort
-    _loadHistory(myToken);
+  // Load auctioneer profile once, then fetch history immediately — don't block on profile
+  if (!_aucProfileLoaded) {
+    _aucProfileLoaded = true;
+    _loadAucProfile().catch(() => {});
+  }
+
+  _loadHistory(myToken).then(() => {
+    if (_chatSwitchToken !== myToken) return;
     _subscribeRoom();
   });
 }
 
 function _refreshChat() {
-  // Clear cache for current room and reload — useful if messages are missing
   if (_auctionId) _msgCache.delete(_auctionId);
   _seenMsgIds = new Set();
   const feed = document.getElementById("chat-feed");
@@ -6018,9 +6019,12 @@ function initCollectorRoom() {
   const _initToken = _chatSwitchToken;
   setMode("collector");
   _updateChatInputState();
-  _loadAucProfile().then(() => {
+  if (!_aucProfileLoaded) {
+    _aucProfileLoaded = true;
+    _loadAucProfile().catch(() => {});
+  }
+  _loadHistory(_initToken).then(() => {
     if (_chatSwitchToken !== _initToken) return;
-    _loadHistory(_initToken);
     _subscribeRoom();
   });
   _initPresence();
