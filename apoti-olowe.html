@@ -2733,61 +2733,47 @@ lbPanel.addEventListener('touchend', function(e) {
     return src;
   }
 
-  // Mirror the auction page: normalise to live/upcoming/off only.
-  function _normStatus(value) {
-    const v = String(value == null ? "" : value).trim().toLowerCase();
-    return ["live", "upcoming", "off"].includes(v) ? v : "";
-  }
-
   function _slotStatus(slot, cfgStatus) {
     // 1. Explicit per-slot override wins
-    if (slot && slot._effectiveStatus) return slot._effectiveStatus;
-    const own = _normStatus(slot && slot.status);
-    if (own) return own;
+    const explicit = String(slot._effectiveStatus || slot.status || "").trim().toLowerCase();
+    if (explicit) return explicit;
     // 2. If the slot has its own endTime and it has passed, treat as settled
-    if (slot && slot.endTime && Number(slot.endTime) > 0 &&
-        Number(slot.endTime) < Math.floor(Date.now() / 1000)) {
+    if (slot.endTime && Number(slot.endTime) > 0 && Number(slot.endTime) < Math.floor(Date.now() / 1000)) {
       return "settled";
     }
-    // 3. Inherit the top-level status (single-slot mode)
-    return _normStatus(cfgStatus) || "off";
+    // 3. Only inherit the top-level status when there is exactly ONE auction (single-slot mode)
+    return cfgStatus || "off";
   }
 
-  function _pairKey(slot) {
-    return String((slot && slot.crossChainPairKey) || "").trim().toLowerCase();
+  function _pairKeyForSlot(slot) {
+    return String(slot && slot.crossChainPairKey || "").trim().toLowerCase();
   }
+
   function _slotChain(slot) {
-    return (slot && slot.chain) === "tezos" ? "tezos" : "eth";
+    return (slot && slot.chain || "eth") === "tezos" ? "tezos" : "eth";
   }
 
   function _liveSlots(cfg) {
     const slots = Array.isArray(cfg.auctions) && cfg.auctions.length ? cfg.auctions : [cfg];
-    const cfgStatus = _normStatus(cfg.status) || "off";
-
-    // Only show slots that are live or already settled/sold. Off and upcoming
-    // slots never appear — matching what the auction page itself displays.
-    const visible = slots
-      .map((slot, i) => ({ slot, i }))
-      .filter(({ slot }) => {
-        const st = _slotStatus(slot, slots.length === 1 ? cfgStatus : null);
-        return st === "live" || st === "settled" || st === "sold";
-      });
-
-    // Collapse cross-chain pairs (same crossChainPairKey) into a single card.
-    // Prefer the ETH slot as the representative, then Tezos, then first seen.
+    const cfgStatus = String(cfg.status || "off").trim().toLowerCase();
+    const visible = slots.filter(s => {
+      const st = _slotStatus(s, cfgStatus);
+      return st === "live" || st === "settled" || st === "sold";
+    });
     const grouped = [];
-    const seen = new Set();
-    for (const item of visible) {
-      const key = _pairKey(item.slot);
-      if (!key) { grouped.push(item.slot); continue; }
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const members = visible.filter(v => _pairKey(v.slot) === key);
-      const eth = members.find(v => _slotChain(v.slot) === "eth");
-      const tez = members.find(v => _slotChain(v.slot) === "tezos");
-      grouped.push((eth || tez || members[0]).slot);
-    }
-
+    const seenPairs = new Set();
+    visible.forEach(function(slot) {
+      const pairKey = _pairKeyForSlot(slot);
+      if (!pairKey) {
+        grouped.push(slot);
+        return;
+      }
+      if (seenPairs.has(pairKey)) return;
+      seenPairs.add(pairKey);
+      const pairSlots = visible.filter(s => _pairKeyForSlot(s) === pairKey);
+      const ethSlot = pairSlots.find(s => _slotChain(s) === "eth");
+      grouped.push(ethSlot || pairSlots[0] || slot);
+    });
     return grouped;
   }
 
@@ -2807,11 +2793,12 @@ lbPanel.addEventListener('touchend', function(e) {
     if (!slots.length) return;
 
     liveTrack.innerHTML = slots.map(function(slot, i) {
-      const slotStatus = _slotStatus(slot, slots.length === 1 ? (cfg.status || "off") : null);
+      const slotStatus = _slotStatus(slot, cfg.status || "off");
       const isSold     = slotStatus === "settled" || slotStatus === "sold";
       const title  = slot.artTitle  || ("Auction " + (i + 1));
       const artist = slot.artArtist ? slot.artArtist + " \u2013 " : "";
-      const meta   = artist + (slot.artMedium || "Chapter auction");
+      const pairMeta = _pairKeyForSlot(slot) ? " · ETH / XTZ" : "";
+      const meta   = artist + (slot.artMedium || "Chapter auction") + pairMeta;
       const img    = _http(slot.artImage) || "images/IjokooB.png";
       const href   = slot.auctionUrl || "/auction";
 
@@ -2837,7 +2824,7 @@ lbPanel.addEventListener('touchend', function(e) {
         '</div></a>';
     }).join("");
 
-    const liveCount = slots.filter(s => _slotStatus(s, slots.length === 1 ? (cfg.status || "off") : null) === "live").length;
+    const liveCount = slots.filter(s => _slotStatus(s, cfg.status || "off") === "live").length;
     const showControls = slots.length > 1;
     if (livePrev) livePrev.disabled = !showControls;
     if (liveNext) liveNext.disabled = !showControls;
