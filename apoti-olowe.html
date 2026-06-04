@@ -1940,14 +1940,20 @@ function endPointer() {
 }
 
 interactor.addEventListener('pointerenter', e => {
-  if (e.pointerType === 'mouse') setPointer(e);
+  if (e.pointerType === 'mouse') {
+    setPointer(e);
+    cursorDot.style.display = 'block';
+  }
 });
 interactor.addEventListener('pointermove', e => {
   if (activePointerId !== null && e.pointerId !== activePointerId) return;
   if (e.pointerType !== 'mouse') e.preventDefault();
   setPointer(e);
-  cursorDot.style.left = e.clientX + 'px';
-  cursorDot.style.top  = e.clientY + 'px';
+  if (e.pointerType === 'mouse') {
+    cursorDot.style.display = 'block';
+    cursorDot.style.left = e.clientX + 'px';
+    cursorDot.style.top  = e.clientY + 'px';
+  }
 }, { passive: false });
 interactor.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'mouse') e.preventDefault();
@@ -1967,6 +1973,7 @@ interactor.addEventListener('pointercancel', e => {
   endPointer();
 });
 interactor.addEventListener('pointerleave', e => {
+  if (e.pointerType === 'mouse') cursorDot.style.display = 'none';
   if (activePointerId !== null) return;
   endPointer();
 });
