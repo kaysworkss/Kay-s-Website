@@ -1876,7 +1876,6 @@ ijokooImgDark.src = SRC_DARK;
 ijokooImgReveal.src = SRC_DARK;
 
 const imgGrey = new Image();
-imgGrey.src = SRC_GREY;
 
 // ── Elements ────────────────────────────────────────────────────────────────
 const stage      = document.getElementById('ijokoo-stage');
@@ -2086,8 +2085,17 @@ function loop() {
   draw();
 }
 
-imgGrey.onload = () => loop();
-if (imgGrey.complete) loop();
+let started = false;
+function startLoop() {
+  if (started) return;
+  started = true;
+  loop();
+}
+
+imgGrey.onload = startLoop;
+imgGrey.onerror = startLoop;   // still run the loop so the dark image stays visible
+imgGrey.src = SRC_GREY;
+if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
   })();
   </script>
 
