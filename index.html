@@ -1029,7 +1029,7 @@
 
   /* ── SHOP TEASER ── */
   #shop {
-    background: var(--bark); padding: 5rem;
+    background: var(--bark); padding: 4.5rem 5rem;
     text-align: center; position: relative; overflow: hidden;
   }
   #shop::before {
@@ -1040,11 +1040,56 @@
   #shop .section-label { color: var(--clay); text-align: center; }
   #shop .section-title { color: var(--sand); text-align: center; }
   #shop .section-title em { color: var(--gold); }
-  #shop .divider { margin: 1.8rem auto; }
+  #shop .divider { margin: 1.5rem auto; }
   .shop-desc {
     color: rgba(232,213,176,0.7); font-size: 1.1rem;
-    max-width: 520px; margin: 0 auto 3rem; line-height: 1.7;
+    max-width: 560px; margin: 0 auto 3rem; line-height: 1.7;
   }
+
+  /* Collect layout: physical path and on-chain grid side by side */
+  .collect-grid {
+    display: grid;
+    grid-template-columns: 0.8fr 1px 2fr;
+    gap: 3rem; align-items: stretch;
+    max-width: 1040px; margin: 0 auto;
+    position: relative; z-index: 1;
+    text-align: left;
+  }
+  .collect-divider {
+    width: 1px; align-self: stretch;
+    background: linear-gradient(to bottom, transparent, rgba(196,132,90,0.35) 20%, rgba(196,132,90,0.35) 80%, transparent);
+  }
+  .collect-physical {
+    position: relative; z-index: 1; text-align: center;
+    display: flex; flex-direction: column;
+  }
+  /* Heading + sub stay at top; shop card centers in the remaining height */
+  .collect-physical .shop-items {
+    flex: 1; align-items: center;
+  }
+  .collect-onchain {
+    position: relative; z-index: 1; text-align: center;
+  }
+  /* Shared heading row — both column headings align on the same baseline */
+  .collect-physical .mkt-heading,
+  .collect-onchain .mkt-heading {
+    min-height: 1.1em;
+  }
+  .collect-physical .mkt-sub,
+  .collect-onchain .mkt-sub {
+    min-height: 2.85em;
+  }
+  /* Three staggered columns, two square boxes each — alternating down/up/down */
+  .mkt-stagger {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem; align-items: start;
+    margin-top: 0;
+  }
+  .mkt-col { display: flex; flex-direction: column; gap: 1rem; }
+  .mkt-col:nth-child(1) { margin-top: 2.6rem; }   /* down */
+  .mkt-col:nth-child(2) { margin-top: 0; }         /* up */
+  .mkt-col:nth-child(3) { margin-top: 2.6rem; }   /* down */
   .shop-items {
     display: flex; justify-content: center; gap: 1.5rem;
     flex-wrap: wrap; margin-bottom: 0; position: relative; z-index: 1;
@@ -1052,7 +1097,7 @@
   .shop-item {
     background: rgba(232,213,176,0.05);
     border: 1px solid rgba(196,132,90,0.25);
-    padding: 2rem 1.5rem; width: 200px; cursor: none; border-radius: 10px;
+    padding: 2.5rem 1.5rem; width: 100%; cursor: none; border-radius: 10px;
     transition: background 0.3s, border-color 0.3s, transform 0.3s;
     text-align: center;
   }
@@ -1075,54 +1120,51 @@
   .mkt-heading {
     font-family: 'Cinzel', serif; font-size: 0.72rem;
     letter-spacing: 0.24em; text-transform: uppercase;
-    color: var(--clay); margin: 1.5rem auto 0.4rem;
+    color: var(--clay); margin: 0 0 0.4rem;
     position: relative; z-index: 1;
-  }
-  .mkt-heading.mkt-heading-onchain {
-    margin-top: 3.5rem;
-    padding-top: 3rem;
-    border-top: 1px solid rgba(196,132,90,0.18);
-    max-width: 360px;
   }
   .mkt-sub {
     color: rgba(232,213,176,0.55); font-size: 0.95rem;
-    margin: 0 auto 2rem; position: relative; z-index: 1;
-  }
-  .mkt-buttons {
-    display: flex; justify-content: center; gap: 0.9rem;
-    flex-wrap: wrap; position: relative; z-index: 1;
+    margin: 0 0 1.5rem; line-height: 1.5;
+    position: relative; z-index: 1;
   }
   .mkt-btn {
-    display: inline-flex; align-items: center; gap: 0.5rem;
-    font-family: 'Cinzel', serif; font-size: 0.7rem;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 0.7rem; aspect-ratio: 1 / 1;
+    font-family: 'Cinzel', serif; font-size: 0.66rem;
     letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--sand);
+    color: var(--sand); text-align: center;
     background: rgba(232,213,176,0.05);
     border: 1px solid rgba(196,132,90,0.3);
-    padding: 0.8rem 1.4rem; border-radius: 6px;
+    border-radius: 8px;
     cursor: none;
+    padding: 1rem;
+    position: relative;
     transition: background 0.3s, border-color 0.3s, color 0.3s, transform 0.3s;
   }
   .mkt-btn:hover {
     background: rgba(196,132,90,0.12);
     border-color: var(--clay);
     color: var(--gold);
-    transform: translateY(-3px);
+    transform: translateY(-4px);
   }
+  .mkt-btn .mkt-name { display: block; line-height: 1.3; }
   .mkt-btn .mkt-arrow {
-    font-size: 0.85rem; opacity: 0.7;
+    font-size: 0.8rem; opacity: 0.6;
+    position: absolute; top: 0.7rem; right: 0.85rem;
     font-family: 'Cinzel', 'Times New Roman', serif;
     font-variant-emoji: text;
   }
   .mkt-btn .mkt-logo {
-    height: 15px; width: auto; max-width: 60px; flex-shrink: 0;
+    height: 30px; width: auto; max-width: 80%; flex-shrink: 0;
     display: block; object-fit: contain;
     /* Logos are monochrome white SVGs; tint toward sand text, shift to gold on hover. */
     filter: brightness(0) saturate(100%) invert(86%) sepia(18%) saturate(420%) hue-rotate(2deg) brightness(95%);
     transition: filter 0.3s, opacity 0.3s;
   }
   .mkt-btn .mkt-logo-wordmark {
-    height: 18px; max-width: 75px;
+    height: 34px; max-width: 90%;
   }
   .mkt-btn:hover .mkt-logo {
     filter: brightness(0) saturate(100%) invert(70%) sepia(45%) saturate(700%) hue-rotate(2deg) brightness(92%);
@@ -1764,9 +1806,25 @@
     .about-stats { grid-template-columns: repeat(3, 1fr); }
 
     /* SHOP */
-    #shop { padding: 4rem 1.5rem; }
+    #shop { padding: 3.5rem 1.5rem; }
+    .collect-grid {
+      grid-template-columns: 1fr;
+      gap: 2.5rem; max-width: 400px;
+    }
+    .collect-divider { display: none; }
+    .collect-physical { max-width: 320px; margin: 0 auto; }
+    .collect-physical .mkt-sub,
+    .collect-onchain .mkt-sub { min-height: 0; }
+    .mkt-stagger {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.8rem;
+    }
+    .mkt-col { gap: 0.8rem; }
+    .mkt-col:nth-child(1) { margin-top: 0; }
+    .mkt-col:nth-child(2) { margin-top: 2rem; }
+    .mkt-col:nth-child(3) { margin-top: 0; }
     .shop-items { gap: 1rem; }
-    .shop-item { width: 140px; padding: 1.5rem 1rem; }
+    .shop-item { width: 100%; padding: 2rem 1rem; }
 
     /* FOOTER */
     footer { flex-direction: column; gap: 1.2rem; text-align: center; padding: 2.5rem 1.5rem; }
@@ -2379,27 +2437,40 @@
   <div class="divider"></div>
   <p class="shop-desc">Take a piece of the work home — whether as a physical print or original, or as a digital edition held on-chain. Two paths, one body of work.</p>
 
-  <p class="mkt-heading">🖼 Prints &amp; Originals</p>
-  <p class="mkt-sub">Archival prints and original paintings, shipped worldwide.</p>
-  <div class="shop-items">
-    <div class="shop-item">
-      <div class="shop-item-icon">🖼️</div>
-      <p class="shop-item-name">The Shop</p>
-      <p class="shop-item-price">Prints · Originals · More</p>
-      <p style="font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--clay);margin-top:0.6rem;">Coming Soon</p>
+  <div class="collect-grid">
+  <div class="collect-physical">
+    <p class="mkt-heading">🖼 Prints &amp; Originals</p>
+    <p class="mkt-sub">Archival prints and original paintings, shipped worldwide.</p>
+    <div class="shop-items">
+      <div class="shop-item">
+        <div class="shop-item-icon">🖼️</div>
+        <p class="shop-item-name">The Shop</p>
+        <p class="shop-item-price">Prints · Originals · More</p>
+        <p style="font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--clay);margin-top:0.6rem;">Coming Soon</p>
+      </div>
     </div>
   </div>
 
-  <!-- ── BLOCKCHAIN MARKETPLACES ── -->
-  <p class="mkt-heading mkt-heading-onchain">⛓ Collect On-Chain</p>
-  <p class="mkt-sub">1/1s and editions, live now across the marketplaces I mint on.</p>
-  <div class="mkt-buttons">
-    <a href="https://www.transient.xyz/@kaysworks" target="_blank" rel="noopener noreferrer" class="mkt-btn"><img class="mkt-logo" src="images/logo-transient.svg" alt="Transient Labs" onerror="this.style.display='none'">Transient Labs <span class="mkt-arrow">&#x2197;&#xFE0E;</span></a>
-    <a href="https://manifold.xyz/@kaysworks" target="_blank" rel="noopener noreferrer" class="mkt-btn"><img class="mkt-logo" src="images/logo-manifold.svg" alt="Manifold" onerror="this.style.display='none'">Manifold <span class="mkt-arrow">&#x2197;&#xFE0E;</span></a>
-    <a href="https://objkt.com/@kaysworks" target="_blank" rel="noopener noreferrer" class="mkt-btn"><img class="mkt-logo mkt-logo-wordmark" src="images/logo-objkt.svg" alt="objkt" onerror="this.style.display='none'"> <span class="mkt-arrow">&#x2197;&#xFE0E;</span></a>
-    <a href="https://mallow.art/kaysworks" target="_blank" rel="noopener noreferrer" class="mkt-btn"><img class="mkt-logo" src="images/logo-mallow.svg" alt="Mallow" onerror="this.style.display='none'">Mallow <span class="mkt-arrow">&#x2197;&#xFE0E;</span></a>
-    <a href="https://opensea.io/Kaysworks" target="_blank" rel="noopener noreferrer" class="mkt-btn"><img class="mkt-logo" src="images/logo-opensea.svg" alt="OpenSea" onerror="this.style.display='none'">OpenSea <span class="mkt-arrow">&#x2197;&#xFE0E;</span></a>
-    <a href="https://t.co/LQQK6JZcH5" target="_blank" rel="noopener noreferrer" class="mkt-btn"><img class="mkt-logo" src="images/logo-buildtree.svg" alt="Buildtree" onerror="this.style.display='none'">Buildtree <span class="mkt-arrow">&#x2197;&#xFE0E;</span></a>
+  <div class="collect-divider"></div>
+
+  <div class="collect-onchain">
+    <p class="mkt-heading">⛓ Collect On-Chain</p>
+    <p class="mkt-sub">1/1s and editions, live now across the marketplaces I mint on.</p>
+    <div class="mkt-stagger">
+      <div class="mkt-col">
+        <a href="https://www.transient.xyz/@kaysworks" target="_blank" rel="noopener noreferrer" class="mkt-btn"><span class="mkt-arrow">&#x2197;&#xFE0E;</span><img class="mkt-logo" src="images/logo-transient.svg" alt="Transient Labs" onerror="this.style.display='none'"><span class="mkt-name">Transient Labs</span></a>
+        <a href="https://mallow.art/kaysworks" target="_blank" rel="noopener noreferrer" class="mkt-btn"><span class="mkt-arrow">&#x2197;&#xFE0E;</span><img class="mkt-logo" src="images/logo-mallow.svg" alt="Mallow" onerror="this.style.display='none'"><span class="mkt-name">Mallow</span></a>
+      </div>
+      <div class="mkt-col">
+        <a href="https://manifold.xyz/@kaysworks" target="_blank" rel="noopener noreferrer" class="mkt-btn"><span class="mkt-arrow">&#x2197;&#xFE0E;</span><img class="mkt-logo" src="images/logo-manifold.svg" alt="Manifold" onerror="this.style.display='none'"><span class="mkt-name">Manifold</span></a>
+        <a href="https://opensea.io/Kaysworks" target="_blank" rel="noopener noreferrer" class="mkt-btn"><span class="mkt-arrow">&#x2197;&#xFE0E;</span><img class="mkt-logo" src="images/logo-opensea.svg" alt="OpenSea" onerror="this.style.display='none'"><span class="mkt-name">OpenSea</span></a>
+      </div>
+      <div class="mkt-col">
+        <a href="https://objkt.com/@kaysworks" target="_blank" rel="noopener noreferrer" class="mkt-btn"><span class="mkt-arrow">&#x2197;&#xFE0E;</span><img class="mkt-logo mkt-logo-wordmark" src="images/logo-objkt.svg" alt="objkt" onerror="this.style.display='none'"></a>
+        <a href="https://t.co/LQQK6JZcH5" target="_blank" rel="noopener noreferrer" class="mkt-btn"><span class="mkt-arrow">&#x2197;&#xFE0E;</span><img class="mkt-logo" src="images/logo-buildtree.svg" alt="Buildtree" onerror="this.style.display='none'"><span class="mkt-name">Buildtree</span></a>
+      </div>
+    </div>
+  </div>
   </div>
 </section>
 <!-- ── ABOUT ── -->
