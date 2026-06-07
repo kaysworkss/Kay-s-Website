@@ -1034,9 +1034,19 @@
   }
   #shop::before {
     content: '';
-    position: absolute; inset: 0;
-    background: radial-gradient(ellipse at 50% 50%, rgba(196,132,90,0.15) 0%, transparent 70%);
+    position: absolute; inset: -20%;
+    background:
+      radial-gradient(ellipse 40% 50% at 30% 40%, rgba(196,132,90,0.16) 0%, transparent 60%),
+      radial-gradient(ellipse 35% 45% at 70% 65%, rgba(201,153,58,0.10) 0%, transparent 55%);
+    animation: shopGlowDrift 22s ease-in-out infinite alternate;
+    pointer-events: none; z-index: 0;
   }
+  @keyframes shopGlowDrift {
+    0%   { transform: translate(0, 0) scale(1); }
+    50%  { transform: translate(4%, -3%) scale(1.08); }
+    100% { transform: translate(-3%, 4%) scale(1.04); }
+  }
+  #shop > * { position: relative; z-index: 1; }
   #shop .section-label { color: var(--clay); text-align: center; }
   #shop .section-title { color: var(--sand); text-align: center; }
   #shop .section-title em { color: var(--gold); }
@@ -1095,17 +1105,32 @@
     flex-wrap: wrap; margin-bottom: 0; position: relative; z-index: 1;
   }
   .shop-item {
-    background: rgba(232,213,176,0.05);
+    background: linear-gradient(150deg, rgba(232,213,176,0.09) 0%, rgba(232,213,176,0.03) 45%, rgba(74,50,40,0.15) 100%);
     border: 1px solid rgba(196,132,90,0.25);
     padding: 3.5rem 1.5rem; width: 100%; max-width: 340px;
     cursor: none; border-radius: 10px;
-    transition: background 0.3s, border-color 0.3s, transform 0.3s;
+    position: relative; overflow: hidden;
+    transition: background 0.3s, border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+  }
+  .shop-item::before {
+    content: '';
+    position: absolute; top: 0; left: -120%;
+    width: 80%; height: 100%;
+    background: linear-gradient(105deg, transparent 0%, rgba(232,213,176,0.18) 45%, rgba(255,247,230,0.28) 50%, rgba(232,213,176,0.18) 55%, transparent 100%);
+    transform: skewX(-18deg);
+    transition: left 0.6s ease;
+    pointer-events: none; z-index: 2;
+  }
+  .shop-item:hover::before { left: 130%; }
+  .shop-item > * { position: relative; z-index: 1; }
+  .shop-item {
     text-align: center;
   }
   .shop-item:hover {
-    background: rgba(196,132,90,0.1);
+    background: linear-gradient(150deg, rgba(196,132,90,0.18) 0%, rgba(201,153,58,0.08) 50%, rgba(196,132,90,0.06) 100%);
     border-color: var(--clay);
     transform: translateY(-6px);
+    box-shadow: 0 12px 34px -8px rgba(0,0,0,0.45), 0 0 20px -4px rgba(201,153,58,0.25);
   }
   .shop-item-icon { font-size: 4.5rem; margin-bottom: 1.2rem; line-height: 1; }
   .shop-item-name {
@@ -1136,30 +1161,68 @@
     font-family: 'Cinzel', serif; font-size: 0.66rem;
     letter-spacing: 0.16em; text-transform: uppercase;
     color: var(--sand); text-align: center;
-    background: rgba(232,213,176,0.05);
+    background: linear-gradient(150deg, rgba(232,213,176,0.09) 0%, rgba(232,213,176,0.03) 45%, rgba(74,50,40,0.15) 100%);
     border: 1px solid rgba(196,132,90,0.3);
     border-radius: 8px;
     cursor: none;
     padding: 1rem;
     position: relative;
-    transition: background 0.3s, border-color 0.3s, color 0.3s, transform 0.3s;
+    overflow: hidden;
+    transition: background 0.3s, border-color 0.3s, color 0.3s, transform 0.3s, box-shadow 0.3s;
+  }
+  /* Diagonal glint that sweeps across on hover */
+  .mkt-btn::before {
+    content: '';
+    position: absolute; top: 0; left: -120%;
+    width: 80%; height: 100%;
+    background: linear-gradient(105deg, transparent 0%, rgba(232,213,176,0.18) 45%, rgba(255,247,230,0.28) 50%, rgba(232,213,176,0.18) 55%, transparent 100%);
+    transform: skewX(-18deg);
+    transition: left 0.6s ease;
+    pointer-events: none; z-index: 2;
+    animation: mktAutoGlint 9s ease-in-out infinite;
+  }
+  /* Auto glint loop — brief shimmer, long pause; staggered per card below */
+  @keyframes mktAutoGlint {
+    0%   { left: -120%; }
+    14%  { left: 130%; }
+    100% { left: 130%; }
+  }
+  .mkt-col:nth-child(1) .mkt-btn:nth-child(1)::before { animation-delay: 0s; }
+  .mkt-col:nth-child(1) .mkt-btn:nth-child(2)::before { animation-delay: 1.5s; }
+  .mkt-col:nth-child(2) .mkt-btn:nth-child(1)::before { animation-delay: 3s; }
+  .mkt-col:nth-child(2) .mkt-btn:nth-child(2)::before { animation-delay: 4.5s; }
+  .mkt-col:nth-child(3) .mkt-btn:nth-child(1)::before { animation-delay: 6s; }
+  .mkt-col:nth-child(3) .mkt-btn:nth-child(2)::before { animation-delay: 7.5s; }
+  /* Hover overrides the auto loop with an immediate sweep */
+  .mkt-btn:hover::before {
+    animation: none;
+    left: 130%;
+  }
+  /* Gentle breathing float — each column drifts slightly out of sync */
+  .mkt-col { animation: mktFloat 7s ease-in-out infinite; }
+  .mkt-col:nth-child(2) { animation-delay: -2.3s; }
+  .mkt-col:nth-child(3) { animation-delay: -4.6s; }
+  @keyframes mktFloat {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-6px); }
   }
   .mkt-btn:hover {
-    background: rgba(196,132,90,0.12);
+    background: linear-gradient(150deg, rgba(196,132,90,0.18) 0%, rgba(201,153,58,0.08) 50%, rgba(196,132,90,0.06) 100%);
     border-color: var(--clay);
     color: var(--gold);
     transform: translateY(-4px);
+    box-shadow: 0 10px 30px -8px rgba(0,0,0,0.45), 0 0 18px -4px rgba(201,153,58,0.25);
   }
-  .mkt-btn .mkt-name { display: block; line-height: 1.3; }
+  .mkt-btn .mkt-name { display: block; line-height: 1.3; position: relative; z-index: 1; }
   .mkt-btn .mkt-arrow {
     font-size: 0.8rem; opacity: 0.6;
-    position: absolute; top: 0.7rem; right: 0.85rem;
+    position: absolute; top: 0.7rem; right: 0.85rem; z-index: 1;
     font-family: 'Cinzel', 'Times New Roman', serif;
     font-variant-emoji: text;
   }
   .mkt-btn .mkt-logo {
     height: 30px; width: auto; max-width: 80%; flex-shrink: 0;
-    display: block; object-fit: contain;
+    display: block; object-fit: contain; position: relative; z-index: 1;
     /* Logos are monochrome white SVGs; tint toward sand text, shift to gold on hover. */
     filter: brightness(0) saturate(100%) invert(86%) sepia(18%) saturate(420%) hue-rotate(2deg) brightness(95%);
     transition: filter 0.3s, opacity 0.3s;
@@ -1508,6 +1571,7 @@
   .aor-row:nth-child(9) { animation-delay: .40s; }
   @media (prefers-reduced-motion: reduce) {
     .aor-row { opacity: 1; transform: none; animation: none; }
+    #shop::before, .mkt-col, .mkt-btn::before { animation: none; }
   }
   .aor-date {
     width: 98px;
