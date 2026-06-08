@@ -269,6 +269,33 @@ nav.scrolled {
 }
 body.dark .variant-chip.selected { color: var(--sand); }
 
+/* Print option selector on artwork cards */
+.print-type-wrap { margin-bottom: 0.7rem; }
+.print-type-select {
+  width: 100%;
+  font-family: 'Montserrat', sans-serif; font-size: 0.66rem;
+  letter-spacing: 0.04em; font-weight: 500;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 0.5rem 2rem 0.5rem 0.7rem;
+  cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a7060' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  transition: border-color 0.15s, color 0.15s;
+}
+.print-type-select:hover, .print-type-select:focus {
+  border-color: var(--clay); outline: none;
+}
+.print-type-single {
+  font-family: 'Cinzel', serif; font-size: 0.56rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--clay);
+}
+
 .card-footer {
   display: flex; align-items: center; justify-content: space-between;
   gap: 1rem; padding-top: 1rem;
@@ -1607,6 +1634,7 @@ let SHOP_CONFIG = {
 /* ─── Cart state ─── */
 let cart = [];
 let selectedVariants = {};
+let selectedTypes = {};
 
 /* ─── Helpers ─── */
 function fmt(n) { return '₦' + Number(n).toLocaleString('en-NG'); }
@@ -1620,6 +1648,7 @@ function showToast(msg, dur=2800) {
 function printOptionKey(type, size) { return `${type}|${size}`; }
 function labelPrintOption(type, size) { return `${type} · ${size}`; }
 function keySize(key) { return String(key || '').includes('|') ? String(key).split('|').pop() : String(key || ''); }
+function keyType(key) { return String(key || '').includes('|') ? String(key).split('|')[0] : ''; }
 
 function getPrintOptions(p) {
   const variants = Array.isArray(p.variants) ? p.variants : [];
@@ -1660,8 +1689,23 @@ function availablePrintChoices(p) {
   );
 }
 
+function availablePrintOptions(p) {
+  return getPrintOptions(p).filter(o => (o.availableSizes.length ? o.availableSizes : o.sizes).length);
+}
+
+function getActivePrintOption(p) {
+  const options = availablePrintOptions(p);
+  if (!options.length) return null;
+  const selected = selectedTypes[p.id];
+  return options.find(o => o.type === selected) || options[0];
+}
+
+function optionDisplaySizes(option) {
+  if (!option) return [];
+  return option.availableSizes.length ? option.availableSizes : option.sizes;
+}
+
 function getChoices(p) {
-  if (p.category === 'prints') return availablePrintChoices(p);
   return (p.variants || []).map(v => ({ key: v, label: v, size: v }));
 }
 
@@ -1700,6 +1744,8 @@ window.addEventListener('scroll', () => nav.classList.toggle('scrolled', window.
 
 /* ─── Build product cards ─── */
 function buildCard(p) {
+  if (p.category === 'prints') return buildPrintCard(p);
+
   const choices = getChoices(p);
   const defaultChoice = choices[0] || { key: '', label: '' };
   selectedVariants[p.id] = defaultChoice.key;
@@ -1753,6 +1799,113 @@ function buildCard(p) {
   return card;
 }
 
+function buildPrintCard(p) {
+  const options = availablePrintOptions(p);
+  const imgHtml = p.image
+    ? `<img src="${p.image}" alt="${p.name}" loading="lazy"/>`
+    : `<div class="card-img-placeholder">${p.emoji}</div>`;
+  const badgeHtml = p.badge ? `<span class="card-badge">${p.badge}</span>` : '';
+
+  const card = document.createElement('div');
+  card.className = 'product-card';
+  card.dataset.pid = p.id;
+  card.dataset.category = p.category;
+
+  if (!options.length) {
+    card.innerHTML = `
+      <div class="card-img">${imgHtml}${badgeHtml}</div>
+      <div class="card-body">
+        <p class="card-category">${p.category}</p>
+        <h3 class="card-title">${p.name}</h3>
+        <p class="card-desc">${p.desc}</p>
+        <div class="card-footer">
+          <div class="card-price"><span class="price-ngn">Unavailable</span></div>
+          <button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed">Unavailable</button>
+        </div>
+      </div>`;
+    return card;
+  }
+
+  const active = getActivePrintOption(p);
+  selectedTypes[p.id] = active.type;
+  const sizes = optionDisplaySizes(active);
+  const defaultSize = sizes[0] || '';
+  const defaultKey = defaultSize ? printOptionKey(active.type, defaultSize) : '';
+  selectedVariants[p.id] = defaultKey;
+
+  const typeSelectHtml = options.length > 1
+    ? `<select class="print-type-select" data-pid="${p.id}" id="ptype-${p.id}" aria-label="Print option">
+        ${options.map(o => `<option value="${o.type}"${o.type===active.type?' selected':''}>${o.type}</option>`).join('')}
+      </select>`
+    : `<div class="print-type-single" id="ptype-${p.id}">${active.type}</div>`;
+
+  const sizeChipsHtml = sizes.map((size, i) => {
+    const key = printOptionKey(active.type, size);
+    return `<button class="variant-chip${i===0?' selected':''}" data-pid="${p.id}" data-v="${key}">${size}</button>`;
+  }).join('');
+
+  const ngn = productPrice(p, defaultKey, 'ngn');
+  const usd = productPrice(p, defaultKey, 'usd');
+  const stock = stockForChoice(p, defaultKey);
+
+  card.innerHTML = `
+    <div class="card-img">${imgHtml}${badgeHtml}</div>
+    <div class="card-body">
+      <p class="card-category">${p.category}</p>
+      <h3 class="card-title">${p.name}</h3>
+      <p class="card-desc" id="pdesc-${p.id}">${p.desc}</p>
+      <div class="print-type-wrap">${typeSelectHtml}</div>
+      <div class="card-variants" id="variants-${p.id}">${sizeChipsHtml}</div>
+      <div class="card-footer">
+        <div class="card-price">
+          <span class="price-ngn" id="pngn-${p.id}">${fmt(ngn)}</span>
+          <span class="price-usd" id="pusd-${p.id}">${fmtUsd(usd)} USD</span>
+        </div>
+        <button class="add-btn" data-pid="${p.id}" ${!defaultKey || stock===0?'disabled style="opacity:0.4;cursor:not-allowed"':''}>
+          ${!defaultKey ? 'Unavailable' : stock===0 ? 'Sold out' : 'Add to bag'}
+        </button>
+      </div>
+    </div>`;
+  return card;
+}
+
+function refreshPrintOption(pid) {
+  const p = SHOP_CONFIG.products.find(x => x.id === pid);
+  if (!p) return;
+  const active = getActivePrintOption(p);
+  const sizes = optionDisplaySizes(active);
+  const firstSize = sizes[0] || '';
+  const firstKey = active && firstSize ? printOptionKey(active.type, firstSize) : '';
+  selectedVariants[pid] = firstKey;
+
+  const variantsEl = document.getElementById('variants-' + pid);
+  if (variantsEl) {
+    variantsEl.innerHTML = sizes.map((size, i) => {
+      const key = printOptionKey(active.type, size);
+      return `<button class="variant-chip${i===0?' selected':''}" data-pid="${pid}" data-v="${key}">${size}</button>`;
+    }).join('');
+    variantsEl.querySelectorAll('.variant-chip').forEach(btn => wireVariantButton(btn));
+  }
+
+  const priceNgnEl = document.getElementById('pngn-' + pid);
+  const priceUsdEl = document.getElementById('pusd-' + pid);
+  if (priceNgnEl) priceNgnEl.textContent = fmt(productPrice(p, firstKey, 'ngn'));
+  if (priceUsdEl) priceUsdEl.textContent = fmtUsd(productPrice(p, firstKey, 'usd')) + ' USD';
+}
+
+function wireVariantButton(btn) {
+  btn.addEventListener('click', () => {
+    const pid = btn.dataset.pid;
+    const v = btn.dataset.v;
+    selectedVariants[pid] = v;
+    document.querySelectorAll(`.variant-chip[data-pid="${pid}"]`)
+      .forEach(b => b.classList.toggle('selected', b.dataset.v === v));
+    const p = SHOP_CONFIG.products.find(x=>x.id===pid);
+    document.getElementById('pngn-'+pid).textContent = fmt(productPrice(p, v, 'ngn'));
+    document.getElementById('pusd-'+pid).textContent = fmtUsd(productPrice(p, v, 'usd')) + ' USD';
+  });
+}
+
 function renderProducts() {
   const grids = {
     prints: document.getElementById('printsGrid'),
@@ -1766,17 +1919,14 @@ function renderProducts() {
     if (grid) grid.appendChild(buildCard(p));
   });
 
-  // Variant clicks
-  document.querySelectorAll('.variant-chip').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const pid = btn.dataset.pid;
-      const v = btn.dataset.v;
-      selectedVariants[pid] = v;
-      document.querySelectorAll(`.variant-chip[data-pid="${pid}"]`)
-        .forEach(b => b.classList.toggle('selected', b.dataset.v === v));
-      const p = SHOP_CONFIG.products.find(x=>x.id===pid);
-      document.getElementById('pngn-'+pid).textContent = fmt(productPrice(p, v, 'ngn'));
-      document.getElementById('pusd-'+pid).textContent = fmtUsd(productPrice(p, v, 'usd')) + ' USD';
+  // Variant / size chip clicks
+  document.querySelectorAll('.variant-chip').forEach(btn => wireVariantButton(btn));
+
+  // Print option dropdown changes
+  document.querySelectorAll('.print-type-select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      selectedTypes[sel.dataset.pid] = sel.value;
+      refreshPrintOption(sel.dataset.pid);
     });
   });
 
@@ -1814,9 +1964,11 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 
 /* ─── Cart ─── */
 function addToCart(p, variant) {
-  if (!variant) { showToast('Please choose a print option'); return; }
+  if (!variant) { showToast(p.category === 'prints' ? 'Please choose a print size' : 'Please choose an option'); return; }
   const key = p.id + '-' + variant;
-  const choice = getChoices(p).find(c => c.key === variant);
+  const choice = p.category === 'prints'
+    ? availablePrintChoices(p).find(c => c.key === variant)
+    : getChoices(p).find(c => c.key === variant);
   const label = choice?.label || variant;
   const existing = cart.find(c=>c.key===key);
   if (existing) {
