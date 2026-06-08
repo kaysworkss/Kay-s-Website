@@ -221,6 +221,15 @@ nav.scrolled {
 }
 .print-title em { font-style:italic; color:var(--clay); }
 
+.detail-tags { display:flex; gap:0.5rem; margin-bottom:0.9rem; flex-wrap:wrap; }
+.detail-tag {
+  font-family:'Cinzel',serif; font-size:0.5rem;
+  letter-spacing:0.2em; text-transform:uppercase;
+  padding:0.3rem 0.65rem; border-radius:2px; color:#fff;
+}
+.detail-tag-new { background:var(--moss); }
+.detail-tag-best { background:var(--gold); color:#1a1a1a; }
+
 .print-year {
   font-family:'Cinzel',serif; font-size:0.52rem;
   letter-spacing:0.25em; color:var(--text-muted);
@@ -671,6 +680,13 @@ let _product = null;
 let _selectedPrintType = '';
 let _selectedVariant = '';
 
+function detailTags(p) {
+  const tags = [];
+  if (p.is_bestseller) tags.push('<span class="detail-tag detail-tag-best">Best Seller</span>');
+  if (p.is_new) tags.push('<span class="detail-tag detail-tag-new">New</span>');
+  return tags.length ? `<div class="detail-tags">${tags.join('')}</div>` : '';
+}
+
 function renderProduct(p) {
   _product = p;
 
@@ -700,8 +716,11 @@ function renderProduct(p) {
       <span style="color:var(--text)">${p.name}</span>
     </div>`;
 
-  // Build thumbnails (images array or single image)
-  const images = p.images || (p.image_url ? [p.image_url] : []);
+  // Build thumbnails (images array or single image). Guard against an empty
+  // images[] array (JSONB default []), which is truthy and would otherwise
+  // hide a product that only has image_url set.
+  const images = (Array.isArray(p.images) && p.images.length ? p.images
+                 : (p.image_url ? [p.image_url] : []));
   const thumbsHtml = images.length > 1
     ? `<div class="thumb-strip">${images.map((img,i) => `
         <div class="thumb${i===0?' active':''}" data-idx="${i}" onclick="switchImage(${i})">
@@ -714,14 +733,12 @@ function renderProduct(p) {
     : `<div class="hero-img-placeholder">🖼</div>`;
 
   const optionChips = printOptions.map((opt, i) => `
-    <button class="size-chip${i===0?' selected':''}"
-      data-type="${escapeAttr(opt.type)}" onclick="selectPrintType('${escapeJs(opt.type)}')">${opt.type}</button>
+    <button class="size-chip${i===0?' selected':''}" data-type="${escapeAttr(opt.type)}">${opt.type}</button>
   `).join('');
 
   const sizeChips = availSizes.map(size => {
     const key = printOptionKey(_selectedPrintType, size);
-    return `<button class="size-chip${key===_selectedVariant?' selected':''}"
-      data-v="${escapeAttr(key)}" onclick="selectSize('${escapeJs(key)}')">${size}</button>`;
+    return `<button class="size-chip${key===_selectedVariant?' selected':''}" data-v="${escapeAttr(key)}">${size}</button>`;
   }).join('');
 
   // Initial prices
@@ -764,6 +781,7 @@ function renderProduct(p) {
         ${seriesSlug ? `<a href="/shop/series/${seriesSlug}" class="print-series-link">${seriesName}</a>` : ''}
 
         <h1 class="print-title">${p.name}</h1>
+        ${detailTags(p)}
         <p class="print-year">${p.year || '2025'} · Fine art print</p>
 
         ${p.quote ? `
@@ -839,7 +857,8 @@ function renderMerchProduct(p) {
       <span style="color:var(--text)">${p.name}</span>
     </div>`;
 
-  const images = p.images || (p.image_url ? [p.image_url] : []);
+  const images = (Array.isArray(p.images) && p.images.length ? p.images
+                 : (p.image_url ? [p.image_url] : []));
   const thumbsHtml = images.length > 1
     ? `<div class="thumb-strip">${images.map((img,i) => `
         <div class="thumb${i===0?' active':''}" data-idx="${i}" onclick="switchImage(${i})">
@@ -851,8 +870,7 @@ function renderMerchProduct(p) {
     : `<div class="hero-img-placeholder">${p.emoji || '✦'}</div>`;
 
   const variantChips = variants.map((label, i) => `
-    <button class="size-chip${i===0?' selected':''}"
-      data-v="${escapeAttr(label)}" onclick="selectMerchVariant('${escapeJs(label)}')">${label}</button>
+    <button class="size-chip${i===0?' selected':''}" data-v="${escapeAttr(label)}">${label}</button>
   `).join('');
 
   const ngn = printPrice(p, _selectedVariant, 'ngn');
@@ -882,6 +900,7 @@ function renderMerchProduct(p) {
 
       <div class="info-panel">
         <h1 class="print-title">${p.name}</h1>
+        ${detailTags(p)}
         <p class="print-year">${catLabel}</p>
 
         ${p.quote ? `<blockquote class="print-quote">"${p.quote}"<cite>— Kay</cite></blockquote>` : ''}
@@ -1011,7 +1030,7 @@ function selectPrintType(type) {
     .forEach(c => c.classList.toggle('selected', c.dataset.type === type));
   document.querySelector('.size-picker').innerHTML = sizes.map(size => {
     const key = printOptionKey(type, size);
-    return `<button class="size-chip${key===firstKey?' selected':''}" data-v="${escapeAttr(key)}" onclick="selectSize('${escapeJs(key)}')">${size}</button>`;
+    return `<button class="size-chip${key===firstKey?' selected':''}" data-v="${escapeAttr(key)}">${size}</button>`;
   }).join('');
   const addBtn = document.getElementById('addBtn');
   const descEl = document.getElementById('printOptionDesc');
@@ -1028,7 +1047,8 @@ function handleAddToCart() {
 }
 
 function switchImage(idx) {
-  const images = _product.images || (_product.image_url ? [_product.image_url] : []);
+  const images = (Array.isArray(_product.images) && _product.images.length ? _product.images
+                 : (_product.image_url ? [_product.image_url] : []));
   const heroImg = document.getElementById('heroImg');
   if (heroImg && images[idx]) heroImg.src = images[idx];
   document.querySelectorAll('.thumb').forEach(t => t.classList.toggle('active', Number(t.dataset.idx) === idx));
@@ -1098,6 +1118,22 @@ function showError() {
   document.getElementById('loadingSkeleton').style.display = 'none';
   document.getElementById('errorState').style.display = '';
 }
+
+// Delegated chip handling — robust to quotes/× in size keys (no inline onclick).
+document.getElementById('printContent').addEventListener('click', e => {
+  const chip = e.target.closest('.size-chip');
+  if (!chip) return;
+  if (chip.closest('.print-option-picker')) {
+    if (chip.dataset.type !== undefined) selectPrintType(chip.dataset.type);
+  } else if (chip.closest('.size-picker')) {
+    if (chip.dataset.v === undefined) return;
+    if (_product && _product.category && _product.category !== 'prints') {
+      selectMerchVariant(chip.dataset.v);
+    } else {
+      selectSize(chip.dataset.v);
+    }
+  }
+});
 
 load();
 </script>

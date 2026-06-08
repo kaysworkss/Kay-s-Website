@@ -29,6 +29,7 @@ img{display:block;max-width:100%}
   --bark:      #4a3228;
   --ash:       #8a7060;
   --gold:      #c9993a;
+  --moss:      #5f7a4a;
   --parchment: #ede0c8;
   --bg:        var(--linen);
   --bg-alt:    var(--parchment);
@@ -239,6 +240,19 @@ nav.scrolled {
   background: var(--rust); color: #fff;
   padding: 0.3rem 0.6rem; border-radius: 2px;
 }
+.card-badge-stack {
+  position: absolute; top: 12px; left: 12px;
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+  z-index: 2;
+}
+.card-badge-stack .card-tag {
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: #fff; padding: 0.3rem 0.6rem; border-radius: 2px;
+}
+.card-tag-manual { background: var(--rust); }
+.card-tag-new { background: var(--moss); }
+.card-tag-best { background: var(--gold); color: #1a1a1a; }
 .card-body { padding: 1.2rem 1.3rem 1.4rem; }
 .card-category {
   font-family: 'Cinzel', serif; font-size: 0.5rem;
@@ -1894,6 +1908,14 @@ const nav = document.getElementById('nav');
 window.addEventListener('scroll', () => nav.classList.toggle('scrolled', window.scrollY > 40), { passive: true });
 
 /* ─── Build product cards ─── */
+function buildBadgeStack(p) {
+  const tags = [];
+  if (p.badge) tags.push(`<span class="card-tag card-tag-manual">${escapeText(p.badge)}</span>`);
+  if (p.is_bestseller) tags.push(`<span class="card-tag card-tag-best">Best Seller</span>`);
+  if (p.is_new) tags.push(`<span class="card-tag card-tag-new">New</span>`);
+  return tags.length ? `<div class="card-badge-stack">${tags.join('')}</div>` : '';
+}
+
 function buildCard(p) {
   if (p.category === 'prints') return buildPrintCard(p);
 
@@ -1911,7 +1933,7 @@ function buildCard(p) {
     ? `<img src="${p.image}" alt="${p.name}" loading="lazy"/>`
     : `<div class="card-img-placeholder">${p.emoji}</div>`;
 
-  const badgeHtml = p.badge ? `<span class="card-badge">${p.badge}</span>` : '';
+  const badgeHtml = buildBadgeStack(p);
 
   const defaultStock = stockForChoice(p, defaultChoice.key);
   const stockHtml = defaultStock === 0
@@ -1955,7 +1977,7 @@ function buildPrintCard(p) {
   const imgHtml = p.image
     ? `<img src="${p.image}" alt="${p.name}" loading="lazy"/>`
     : `<div class="card-img-placeholder">${p.emoji}</div>`;
-  const badgeHtml = p.badge ? `<span class="card-badge">${p.badge}</span>` : '';
+  const badgeHtml = buildBadgeStack(p);
 
   const card = document.createElement('div');
   card.className = 'product-card';
@@ -4081,6 +4103,9 @@ async function loadShopData() {
           stock_by_variant:   r.stock_by_variant || {},
           active:             r.active !== false,
           sort_order:         r.sort_order || 0,
+          is_new:             r.is_new || false,
+          is_bestseller:      r.is_bestseller || false,
+          order_count:        r.order_count || 0,
         }));
       }
       // If API returned empty array, keep hardcoded defaults
