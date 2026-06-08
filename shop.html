@@ -1163,7 +1163,6 @@ footer a:hover { color:var(--rust); }
         <!-- Payment method tabs -->
         <div class="pay-tabs" id="payTabs">
           <button class="pay-tab active" data-pay="paystack">Paystack</button>
-          <button class="pay-tab" data-pay="flutterwave">Flutterwave</button>
           <button class="pay-tab" data-pay="eth">⬡ ETH</button>
           <button class="pay-tab" data-pay="tezos" style="color:#5ac0f5">XTZ Tezos</button>
         </div>
@@ -1172,12 +1171,6 @@ footer a:hover { color:var(--rust); }
         <div class="pay-panel active" id="panel-paystack">
           <p class="pay-info">Pay securely in <strong>NGN</strong> via Paystack — cards, bank transfer, or USSD. Nigerian accounts supported natively.</p>
           <button class="submit-pay-btn" id="paystackPayBtn">Pay with Paystack</button>
-        </div>
-
-        <!-- Flutterwave panel -->
-        <div class="pay-panel" id="panel-flutterwave">
-          <p class="pay-info">Pay in <strong>NGN</strong> via Flutterwave — cards, mobile money, and bank transfers across Africa.</p>
-          <button class="submit-pay-btn" id="flutterwavePayBtn">Pay with Flutterwave</button>
         </div>
 
         <!-- ETH/Crypto panel -->
@@ -1222,6 +1215,10 @@ footer a:hover { color:var(--rust); }
             </div>
             <button class="submit-pay-btn" id="ethConnectBtn" style="background:#2a2a5e;margin-bottom:0.7rem">Connect ETH Wallet</button>
             <button class="submit-pay-btn" id="ethSendBtn" style="display:none;background:#3d3d8f">Send <span id="ethSendAmt"></span> ETH</button>
+            <div id="ethManualFields" style="display:none;margin-top:0.8rem;padding:0.8rem;border:1px solid rgba(139,156,247,0.18);background:var(--bg-alt)">
+              <input class="form-input" id="ethManualSender" type="text" placeholder="Sending wallet address" style="margin-bottom:0.5rem;font-size:0.78rem"/>
+              <input class="form-input" id="ethManualTx" type="text" placeholder="Transaction hash / ID" style="font-size:0.78rem"/>
+            </div>
             <button class="submit-pay-btn" id="cryptoConfirmBtn" style="display:none;background:transparent;border:1px solid rgba(139,156,247,0.3);color:#8b9cf7;margin-top:0.5rem">I've sent manually — confirm</button>
           </div>
         </div>
@@ -1245,6 +1242,10 @@ footer a:hover { color:var(--rust); }
             </div>
             <button class="submit-pay-btn" id="tezosConnectBtn" style="background:#1a4a6e;margin-bottom:0.7rem">Connect Tezos Wallet</button>
             <button class="submit-pay-btn" id="tezosSendBtn" style="display:none">Send <span id="tezosSendAmt"></span> XTZ</button>
+            <div id="tezosManualFields" style="display:none;margin-top:0.8rem;padding:0.8rem;border:1px solid rgba(90,192,245,0.18);background:var(--bg-alt)">
+              <input class="form-input" id="tezosManualSender" type="text" placeholder="Sending Tezos wallet address" style="margin-bottom:0.5rem;font-size:0.78rem"/>
+              <input class="form-input" id="tezosManualTx" type="text" placeholder="Operation hash" style="font-size:0.78rem"/>
+            </div>
             <button class="submit-pay-btn" id="tezosManualBtn" style="display:none;background:transparent;border:1px solid rgba(90,192,245,0.3);color:#5ac0f5;margin-top:0.5rem">I've sent manually — confirm</button>
           </div>
         </div>
@@ -1414,7 +1415,7 @@ footer a:hover { color:var(--rust); }
         <!-- API keys note -->
         <p class="admin-section-title" style="margin-top:1.4rem">Payment keys (set as env vars)</p>
         <p style="font-size:0.85rem;color:var(--text-muted);line-height:1.6;margin-bottom:1.2rem">
-          Set <code style="color:var(--clay);font-size:0.78rem">PAYSTACK_PUBLIC_KEY</code>, <code style="color:var(--clay);font-size:0.78rem">FLUTTERWAVE_PUBLIC_KEY</code> in your Vercel environment variables. They are injected at runtime by the page — never stored here.
+          Set <code style="color:var(--clay);font-size:0.78rem">PAYSTACK_PUBLIC_KEY</code> in your Vercel environment variables. It is injected at runtime by the page — never stored here.
         </p>
 
         <!-- Products -->
@@ -1545,9 +1546,8 @@ footer a:hover { color:var(--rust); }
   <p>© 2026 Kay's Works · <a href="mailto:oyeniyikayode4@gmail.com">oyeniyikayode4@gmail.com</a></p>
 </footer>
 
-<!-- Paystack & Flutterwave SDKs -->
+<!-- Paystack SDK -->
 <script src="https://js.paystack.co/v1/inline.js" async></script>
-<script src="https://checkout.flutterwave.com/v3.js" async></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.8.0/ethers.umd.min.js" async></script>
 <script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
 
@@ -1661,6 +1661,25 @@ const SHOP_DEFAULT_PRODUCTS = SHOP_CONFIG.products.map(p => JSON.parse(JSON.stri
 
 /* ─── Cart state ─── */
 let cart = [];
+// Shared cart, persisted under the same key used by print-detail.html so the
+// bag stays in sync across the shop grid and individual product pages.
+function saveCart() {
+  try { localStorage.setItem('kaysworks-cart', JSON.stringify(cart)); } catch (_) {}
+}
+function loadCart() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('kaysworks-cart') || '[]');
+    cart = Array.isArray(raw) ? raw : [];
+  } catch (_) { cart = []; }
+}
+// Live sync: when any other tab/page updates the shared cart, reflect it here
+// immediately without a refresh.
+window.addEventListener('storage', (e) => {
+  if (e.key === 'kaysworks-cart') {
+    loadCart();
+    if (typeof updateCartUI === 'function') updateCartUI();
+  }
+});
 let selectedVariants = {};
 let selectedTypes = {};
 
@@ -1700,6 +1719,7 @@ function normalizeProduct(p) {
   p.badge = p.badge || '';
   p.image = p.image || p.image_url || '';
   p.stock_by_variant = p.stock_by_variant || {};
+  p.edition_totals = p.edition_totals || {};
   p.active = p.active !== false;
   return p;
 }
@@ -1824,7 +1844,7 @@ function getPrintOptions(p) {
       const type = String(v.type || v.print_type || v.name || v.label || 'Print').trim();
       const sizes = (v.sizes || v.variants || []).map(String).filter(Boolean);
       const availableSizes = (v.available_sizes || v.available || v.available_variants || sizes).map(String).filter(Boolean);
-      return { type, desc: v.desc || v.description || '', sizes, availableSizes: availableSizes.length ? availableSizes : sizes };
+      return { type, desc: v.desc || v.description || '', limited: v.limited === true, sizes, availableSizes: availableSizes.length ? availableSizes : sizes };
     }).filter(o => o.type && o.sizes.length);
   }
 
@@ -2194,6 +2214,7 @@ function cartKeyFromButton(btn) {
 }
 
 function updateCartUI() {
+  saveCart();
   const badge = document.getElementById('cartBadge');
   const total = cart.reduce((a,c)=>a+c.qty, 0);
   badge.textContent = total;
@@ -2580,96 +2601,136 @@ function validateForm() {
   return true;
 }
 
+function checkoutPayload(customer, method, extra = {}) {
+  return {
+    name:             customer.name,
+    email:            customer.email,
+    phone:            customer.phone || '',
+    address:          customer.address || '',
+    items:            cart.map(c => ({
+      id: c.id,
+      variant: c.variant,
+      variantKey: c.variantKey || c.variant,
+      qty: c.qty,
+    })),
+    delivery_method:  customer.deliveryMethod,
+    delivery_zone:    customer.deliveryZone,
+    payment_method:   method,
+    ...extra,
+  };
+}
+
+async function postShopJson(url, payload) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `${url} failed`);
+  return data;
+}
+
+async function getServerCheckoutQuote(customer, method, extra = {}) {
+  return postShopJson('/api/shop/quote', checkoutPayload(customer, method, extra));
+}
+
+async function initServerPayment(customer, provider) {
+  return postShopJson('/api/shop/payment-init', checkoutPayload(customer, provider, {
+    provider,
+    callback_url: location.href.split('#')[0],
+  }));
+}
+
 function showConfirmation(method, ref) {
   document.getElementById('formScreen').style.display='none';
   const screen = document.getElementById('confirmScreen');
   screen.classList.add('active');
   document.getElementById('confirmMsg').textContent =
     (method === 'eth' || method === 'tezos' || method === 'crypto')
-      ? 'Your payment details have been received. Kay will confirm once the transaction is verified on-chain, usually within 30 minutes.'
+      ? 'Your crypto payment has been verified on-chain. Kay will review and prepare fulfilment.'
       : 'Thank you for your order. Kay will confirm fulfilment within 24 hours — check your inbox for a receipt.';
   document.getElementById('confirmRef').textContent = ref ? 'Reference: ' + ref : '';
   cart = [];
   updateCartUI();
 }
 
-// Paystack
-document.getElementById('paystackPayBtn').addEventListener('click', ()=>{
-  if(!validateForm()) return;
-  const d = getFormData();
-  const key = window.__PAYSTACK_KEY__ || '';
-  if(!key) { showToast('Paystack key not configured'); return; }
-  const handler = PaystackPop.setup({
-    key,
-    email: d.email,
-    amount: grandTotalNgn() * 100,
-    currency: 'NGN',
-    ref: 'KW-' + Date.now(),
-    metadata: { name: d.name, phone: d.phone, address: d.address, cart: JSON.stringify(cart) },
-    callback: (res) => { showConfirmation('paystack', res.reference); notifyOrder(d, res.reference, 'paystack'); },
-    onClose: () => {},
-  });
-  handler.openIframe();
-});
+function getManualCryptoProof(chain) {
+  const senderEl = document.getElementById(chain === 'tezos' ? 'tezosManualSender' : 'ethManualSender');
+  const txEl = document.getElementById(chain === 'tezos' ? 'tezosManualTx' : 'ethManualTx');
+  const sender = senderEl ? senderEl.value.trim() : '';
+  const txHash = txEl ? txEl.value.trim() : '';
+  if (!sender) { showToast('Enter the sending wallet address'); return null; }
+  if (!txHash) { showToast('Enter the transaction hash'); return null; }
+  if (chain === 'eth' && !/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+    showToast('Enter a valid Ethereum transaction hash');
+    return null;
+  }
+  if (chain === 'tezos' && !/^o[1-9A-HJ-NP-Za-km-z]{50}$/.test(txHash)) {
+    showToast('Enter a valid Tezos operation hash');
+    return null;
+  }
+  return { payer_address: sender, payment_ref: txHash };
+}
 
-// Flutterwave
-document.getElementById('flutterwavePayBtn').addEventListener('click', ()=>{
+// Paystack is initialized server-side so the gateway amount cannot be tampered with in the browser.
+document.getElementById('paystackPayBtn').addEventListener('click', async ()=>{
   if(!validateForm()) return;
   const d = getFormData();
-  const key = window.__FLUTTERWAVE_KEY__ || '';
-  if(!key) { showToast('Flutterwave key not configured'); return; }
-  FlutterwaveCheckout({
-    public_key: key,
-    tx_ref: 'KW-FW-' + Date.now(),
-    amount: grandTotalNgn(),
-    currency: 'NGN',
-    customer: { email: d.email, name: d.name, phone_number: d.phone },
-    customizations: { title: "Kay's Works", description: 'Shop order', logo: '' },
-    meta: { address: d.address, cart: JSON.stringify(cart) },
-    callback: (res) => { FlutterwaveCheckout().close && FlutterwaveCheckout().close(); showConfirmation('flutterwave', res.transaction_id); notifyOrder(d, res.transaction_id, 'flutterwave'); },
-    onclose: () => {},
-  });
+  const btn = document.getElementById('paystackPayBtn');
+  btn.disabled = true; btn.textContent = 'Preparing secure checkout…';
+  try {
+    const init = await initServerPayment(d, 'paystack');
+    if (!init.authorization_url) throw new Error('Paystack did not return a checkout URL');
+    sessionStorage.setItem('kwPendingCheckout', JSON.stringify({ customer: d, method: 'paystack', ref: init.reference, quote: init.quote }));
+    location.href = init.authorization_url;
+  } catch (e) {
+    showToast(e.message || 'Could not start Paystack checkout');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Pay with Paystack';
+  }
 });
 
 // ETH manual confirm (shown after rate loads, for wallets without MetaMask)
 document.getElementById('cryptoConfirmBtn').addEventListener('click', () => {
   if (!validateForm()) return;
+  const proof = getManualCryptoProof('eth');
+  if (!proof) return;
   const d = getFormData();
-  const ref = 'KW-ETH-MANUAL-' + Date.now();
-  notifyOrder(d, ref, 'eth');
-  showConfirmation('eth', ref);
+  const ref = proof.payment_ref;
+  getServerCheckoutQuote(d, 'eth', proof)
+    .then(q => notifyOrder(d, ref, 'eth', q.quote).then(() => showConfirmation('eth', ref)))
+    .catch(e => showToast(e.message || 'Could not confirm crypto order'));
 });
 
 // Notify via site-form API (reuse existing backend)
-async function notifyOrder(customer, ref, method) {
+async function notifyOrder(customer, ref, method, checkoutQuote = null) {
+  const quotedSubtotalNgn = checkoutQuote?.subtotal_ngn ?? cartNgnTotal();
+  const quotedSubtotalUsd = checkoutQuote?.subtotal_usd ?? cartUsdTotal();
+  const quotedDeliveryNgn = checkoutQuote?.delivery_fee_ngn ?? customer.deliveryFeeNgn;
+  const quotedDeliveryUsd = checkoutQuote?.delivery_fee_usd ?? customer.deliveryFeeUsd;
+  const quotedTotalNgn = checkoutQuote?.total_ngn ?? grandTotalNgn();
+  const quotedTotalUsd = checkoutQuote?.total_usd ?? grandTotalUsd();
   const deliveryInfo = customer.deliveryMethod === 'pickup'
     ? 'Kaduna pickup (free)'
-    : `Ship to: ${customer.address}, ${customer.country}, Fee: ${fmt(customer.deliveryFeeNgn)} / $${customer.deliveryFeeUsd}${cartHasLargePrint() ? ' (tube)' : ''}`;
+    : `Ship to: ${customer.address}, ${customer.country}, Fee: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}${cartHasLargePrint() ? ' (tube)' : ''}`;
 
   // 1. Record order in Supabase — decrements stock
   try {
-    await fetch('/api/shop/order', {
+    const orderRes = await fetch('/api/shop/order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name:             customer.name,
-        email:            customer.email,
-        phone:            customer.phone || '',
-        address:          customer.address || '',
-        items:            cart.map(c => ({
-          id: c.id, name: c.name, variant: c.variant, qty: c.qty,
-          priceNgn: c.priceNgn, priceUsd: c.priceUsd,
-        })),
-        total_ngn:        grandTotalNgn(),
-        total_usd:        grandTotalUsd(),
-        delivery_fee_ngn: customer.deliveryFeeNgn,
-        delivery_method:  customer.deliveryMethod,
-        delivery_zone:    customer.deliveryZone,
-        payment_method:   method,
-        payment_ref:      ref,
-      }),
+      body: JSON.stringify(checkoutPayload(customer, method, {
+        payment_ref: ref,
+        payer_address: checkoutQuote?.payer_address || '',
+        checkout_quote: checkoutQuote,
+      })),
     });
-  } catch(_) {}
+    if (!orderRes.ok) {
+      const d = await orderRes.json().catch(() => ({}));
+      throw new Error(d.error || 'Order recording failed');
+    }
+  } catch(e) { throw e; }
 
   // 2. Email alert to Kay
   try {
@@ -2681,7 +2742,7 @@ async function notifyOrder(customer, ref, method) {
         name:            customer.name,
         email:           customer.email,
         commission_type: 'shop-order',
-        message: `Shop order — ${method.toUpperCase()} · Ref: ${ref}\n\nDelivery: ${deliveryInfo}\nPhone: ${customer.phone||'—'}\n\nItems:\n${cart.map(c=>`${c.name} (${c.variant}) × ${c.qty} — ${fmt(c.priceNgn*c.qty)}`).join('\n')}\n\nSubtotal: ${fmt(cartNgnTotal())} / $${cartUsdTotal()}\nDelivery: ${fmt(customer.deliveryFeeNgn)} / $${customer.deliveryFeeUsd}\nGrand total: ${fmt(grandTotalNgn())} / $${grandTotalUsd()}`,
+        message: `Shop order — ${method.toUpperCase()} · Ref: ${ref}\n${checkoutQuote?.payer_address ? `Sender wallet: ${checkoutQuote.payer_address}\n` : ''}\nDelivery: ${deliveryInfo}\nPhone: ${customer.phone||'—'}\n\nItems:\n${cart.map(c=>`${c.name} (${c.variant}) × ${c.qty}`).join('\n')}\n\nSubtotal: ${fmt(quotedSubtotalNgn)} / $${quotedSubtotalUsd}\nDelivery: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}\nGrand total: ${fmt(quotedTotalNgn)} / $${quotedTotalUsd}`,
       }),
     });
   } catch(_) {}
@@ -2691,6 +2752,23 @@ document.getElementById('continueShopping').addEventListener('click', ()=>{
   closeCheckout();
 });
 
+async function finalizeReturnedGatewayCheckout() {
+  const params = new URLSearchParams(location.search);
+  const gatewayRef = params.get('reference') || params.get('trxref') || params.get('tx_ref') || params.get('transaction_id');
+  if (!gatewayRef) return;
+  let pending = null;
+  try { pending = JSON.parse(sessionStorage.getItem('kwPendingCheckout') || 'null'); } catch (_) {}
+  if (!pending || !pending.customer || !pending.method || !pending.quote) return;
+  const ref = pending.ref || gatewayRef;
+  try {
+    await notifyOrder(pending.customer, ref, pending.method, pending.quote);
+    sessionStorage.removeItem('kwPendingCheckout');
+    showConfirmation(pending.method, ref);
+    history.replaceState(null, '', location.pathname + location.hash);
+  } catch (e) {
+    showToast('Payment received, but order recording needs review: ' + (e.message || 'unknown error'), 6000);
+  }
+}
 /* ─── Admin ─── */
 const ADMIN_PW = ''; // checked server-side — this is just UX gating
 let adminUnlocked = false;
@@ -2900,9 +2978,13 @@ function renderAdminProducts() {
       const realIdx = SHOP_CONFIG.products.indexOf(p);
       const options = getPrintOptions(p);
       const optionDescHtml = options.map(opt => `
-        <div style="display:grid;grid-template-columns:1fr 2fr;gap:0.45rem;margin-bottom:0.45rem">
+        <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:0.45rem;margin-bottom:0.45rem;align-items:center">
           <input class="form-input" value="${escapeAttr(opt.type)}" disabled style="padding:0.4rem 0.6rem;font-size:0.8rem;background:var(--bg-alt)"/>
           <input class="form-input ap-option-desc" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" value="${escapeAttr(opt.desc)}" placeholder="Brief description for ${escapeAttr(opt.type)}" style="padding:0.4rem 0.6rem;font-size:0.8rem"/>
+          <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.7rem;color:var(--text-muted);white-space:nowrap;font-family:'Montserrat',sans-serif">
+            <input type="checkbox" class="ap-option-limited" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" ${opt.limited ? 'checked' : ''} style="accent-color:var(--rust)"/>
+            Limited edition
+          </label>
         </div>`).join('');
       html += `<div class="admin-product-row" data-idx="${realIdx}" style="grid-template-columns:1fr;gap:0.6rem">
         <button class="admin-del-btn" data-idx="${realIdx}" title="Remove">✕</button>
@@ -2929,19 +3011,27 @@ function renderAdminProducts() {
         <div>${optionDescHtml}</div>
         <label class="form-label" style="margin-top:0.4rem">Available print options, sizes &amp; prices</label>
         <div style="border:1px solid var(--border);border-radius:2px;overflow:hidden" id="size-table-${realIdx}">
-          <div style="display:grid;grid-template-columns:auto 1.2fr 1fr 1fr 1fr auto;gap:0;font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);padding:0.6rem 0.8rem;border-bottom:1px solid var(--border);background:var(--bg-alt)">
+          <div style="display:grid;grid-template-columns:auto 1.2fr 1fr 1fr 1fr 0.9fr auto;gap:0;font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);padding:0.6rem 0.8rem;border-bottom:1px solid var(--border);background:var(--bg-alt)">
             <span style="min-width:20px"></span>
-            <span>Print option</span><span>Size</span><span>NGN price</span><span>USD price</span><span></span>
+            <span>Print option</span><span>Size</span><span>NGN price</span><span>USD price</span><span>Run size</span><span></span>
           </div>
           ${options.flatMap(opt => opt.sizes.map(size => {
             const key = printOptionKey(opt.type, size);
             const isAvail = (opt.availableSizes||[]).includes(size);
-            return `<div class="ap-size-row" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" data-size="${escapeAttr(size)}" data-v="${escapeAttr(key)}" style="display:grid;grid-template-columns:auto 1.2fr 1fr 1fr 1fr auto;gap:0;align-items:center;padding:0.5rem 0.8rem;border-bottom:1px solid var(--border)">
+            const total = (p.edition_totals || {})[key];
+            const remaining = (p.stock_by_variant || {})[key];
+            const remainingHint = (opt.limited && total !== undefined && remaining !== undefined && remaining !== total)
+              ? `<span style="font-size:0.6rem;color:var(--text-muted);display:block;margin-top:0.15rem">${remaining} left</span>` : '';
+            return `<div class="ap-size-row" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" data-size="${escapeAttr(size)}" data-v="${escapeAttr(key)}" style="display:grid;grid-template-columns:auto 1.2fr 1fr 1fr 1fr 0.9fr auto;gap:0;align-items:center;padding:0.5rem 0.8rem;border-bottom:1px solid var(--border)">
               <input type="checkbox" class="ap-size-check" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" data-size="${escapeAttr(size)}" data-v="${escapeAttr(key)}" ${isAvail?'checked':''} style="margin-right:0.7rem;accent-color:var(--rust);width:14px;height:14px"/>
               <span style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--text)">${opt.type}</span>
               <span style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--text)">${size}</span>
               <input class="form-input ap-size-ngn" data-idx="${realIdx}" data-v="${escapeAttr(key)}" value="${productPrice(p, key, 'ngn')||''}" placeholder="NGN" style="padding:0.35rem 0.5rem;font-size:0.78rem;margin:0 0.4rem 0 0"/>
               <input class="form-input ap-size-usd" data-idx="${realIdx}" data-v="${escapeAttr(key)}" value="${productPrice(p, key, 'usd')||''}" placeholder="$" style="padding:0.35rem 0.5rem"/>
+              <div style="padding:0 0.4rem">
+                <input class="form-input ap-size-edition" data-idx="${realIdx}" data-v="${escapeAttr(key)}" type="number" min="0" value="${total ?? ''}" placeholder="—" ${opt.limited ? '' : 'disabled'} title="${opt.limited ? 'Total editions in this run' : 'Mark the option as limited edition to set a run size'}" style="padding:0.35rem 0.5rem;font-size:0.78rem;${opt.limited ? '' : 'opacity:0.4'}"/>
+                ${remainingHint}
+              </div>
               <button class="ap-remove-custom" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" data-size="${escapeAttr(size)}" data-v="${escapeAttr(key)}" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem;transition:color 0.15s" title="Remove">×</button>
             </div>`;
           })).join('')}
@@ -3255,8 +3345,12 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
       if (p.category === 'prints') {
         const nextAvailable = {};
         const descByType = {};
+        const limitedByType = {};
         row.querySelectorAll('.ap-option-desc').forEach(input => {
           descByType[input.dataset.type] = input.value.trim();
+        });
+        row.querySelectorAll('.ap-option-limited').forEach(chk => {
+          limitedByType[chk.dataset.type] = chk.checked;
         });
         row.querySelectorAll('.ap-size-check').forEach(chk => {
           const v = chk.dataset.v;
@@ -3270,10 +3364,40 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
           const usdIn = Array.from(row.querySelectorAll('.ap-size-usd')).find(input => input.dataset.v === v);
           if (ngnIn) p.priceNgn[v] = Number(ngnIn.value) || p.priceNgn[v];
           if (usdIn) p.priceUsd[v] = Number(usdIn.value) || p.priceUsd[v];
+
+          // Limited-edition run sizes (per size). The run-size input is the
+          // ORIGINAL total; remaining lives in stock_by_variant and counts
+          // down from sales. Only seed remaining when starting a new run or
+          // when the admin raises the total.
+          const editionIn = Array.from(row.querySelectorAll('.ap-size-edition')).find(input => input.dataset.v === v);
+          const isLimited = limitedByType[type] === true;
+          p.edition_totals = p.edition_totals || {};
+          p.stock_by_variant = p.stock_by_variant || {};
+          if (isLimited && editionIn && editionIn.value !== '') {
+            const newTotal = Math.max(0, Number(editionIn.value) || 0);
+            const prevTotal = p.edition_totals[v];
+            p.edition_totals[v] = newTotal;
+            const prevRemaining = p.stock_by_variant[v];
+            if (prevTotal === undefined || prevRemaining === undefined) {
+              // New run: remaining starts at the full total.
+              p.stock_by_variant[v] = newTotal;
+            } else if (newTotal > prevTotal) {
+              // Run extended: add the difference to remaining.
+              p.stock_by_variant[v] = prevRemaining + (newTotal - prevTotal);
+            } else if (newTotal < prevTotal) {
+              // Run reduced: don't exceed the new total.
+              p.stock_by_variant[v] = Math.min(prevRemaining, newTotal);
+            }
+            // else unchanged total: leave remaining as-is.
+          } else if (!isLimited) {
+            // No longer limited — clear edition tracking for this size.
+            if (p.edition_totals) delete p.edition_totals[v];
+          }
         });
         p.variants = getPrintOptions(p).map(o => ({
           type: o.type,
           desc: descByType[o.type] ?? o.desc ?? '',
+          limited: limitedByType[o.type] ?? o.limited ?? false,
           sizes: [...o.sizes],
         }));
         p.availableVariants = nextAvailable;
@@ -3507,21 +3631,22 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
   const toAddr = SHOP_CONFIG.ethAddress;
   if (!toAddr)            { showToast('ETH address not configured'); return; }
   if (!_ethConnectedAddr) { showToast('Please connect your wallet first'); return; }
-  const ethAmt = ethEthAmount();
-  if (!ethAmt)            { showToast('ETH rate still loading \u2014 try again in a moment'); return; }
+  const d = getFormData();
 
   const btn = document.getElementById('ethSendBtn');
   btn.disabled = true; btn.textContent = 'Waiting for wallet\u2026';
 
   try {
+    const quoteData = await getServerCheckoutQuote(d, 'eth', { payer_address: _ethConnectedAddr });
+    const ethAmt = quoteData.quote?.crypto_amount;
+    if (!ethAmt) { showToast('ETH quote unavailable \u2014 try again in a moment'); return; }
     const signer = _ethProvider.getSigner();
     const tx = await signer.sendTransaction({
       to:    toAddr,
-      value: ethers.utils.parseEther(ethAmt),
+      value: ethers.utils.parseEther(String(ethAmt)),
     });
     const ref = 'KW-ETH-' + tx.hash;
-    const d = getFormData();
-    notifyOrder(d, ref, 'eth');
+    await notifyOrder(d, ref, 'eth', quoteData.quote);
     showConfirmation('eth', ref);
   } catch (e) {
     const msg = e?.message || String(e);
@@ -3544,9 +3669,7 @@ async function sendErc20(token) {
   const toAddr = SHOP_CONFIG.ethAddress;
   if (!toAddr)            { showToast('ETH address not configured'); return; }
   if (!_ethConnectedAddr) { showToast('Please connect your wallet first'); return; }
-
-  const usd = grandTotalUsd();
-  if (!usd)               { showToast('Cart is empty'); return; }
+  const d = getFormData();
 
   const btnId = token === 'usdc' ? 'ethSendUsdcBtn' : 'ethSendUsdtBtn';
   const btn   = document.getElementById(btnId);
@@ -3554,6 +3677,9 @@ async function sendErc20(token) {
   btn.disabled = true; btn.textContent = 'Waiting for wallet…';
 
   try {
+    const quoteData = await getServerCheckoutQuote(d, token, { payer_address: _ethConnectedAddr });
+    const usd = Number(quoteData.quote?.crypto_amount);
+    if (!usd) { showToast(label + ' quote unavailable'); return; }
     const signer       = _ethProvider.getSigner();
     const contractAddr = ERC20_CONTRACTS[token];
     const contract     = new ethers.Contract(contractAddr, ERC20_ABI, signer);
@@ -3564,8 +3690,7 @@ async function sendErc20(token) {
 
     const tx  = await contract.transfer(toAddr, amount);
     const ref = 'KW-' + label + '-' + tx.hash;
-    const d   = getFormData();
-    notifyOrder(d, ref, token);
+    await notifyOrder(d, ref, token, quoteData.quote);
     showConfirmation(token, ref);
   } catch (e) {
     const msg = e?.message || String(e);
@@ -3643,6 +3768,8 @@ let _xtzPerUsd = null; // set by fetchCryptoRates()
     // Reveal ETH manual confirm button now that rate is known
     const ethManual = document.getElementById('cryptoConfirmBtn');
     if (ethManual) ethManual.style.display = '';
+    const ethManualFields = document.getElementById('ethManualFields');
+    if (ethManualFields) ethManualFields.style.display = '';
   }
   if (xtzPrice) {
     _xtzPerUsd = 1 / xtzPrice;
@@ -3718,10 +3845,14 @@ async function refreshCryptoRates() {
     if (ethPrice) {
       const ethManual = document.getElementById('cryptoConfirmBtn');
       if (ethManual) ethManual.style.display = '';
+      const ethManualFields = document.getElementById('ethManualFields');
+      if (ethManualFields) ethManualFields.style.display = '';
     }
     if (xtzPrice) {
       const xtzManual = document.getElementById('tezosManualBtn');
       if (xtzManual) xtzManual.style.display = '';
+      const xtzManualFields = document.getElementById('tezosManualFields');
+      if (xtzManualFields) xtzManualFields.style.display = '';
     }
 
     const ethPanel = document.getElementById('panel-eth');
@@ -3997,13 +4128,15 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
   if (!_tezosConnectedAddr || !_tezosWalletProvider) {
     showToast('Please connect your wallet first'); return;
   }
-  const xtzAmt = tezosXtzAmount();
-  if (!xtzAmt) { showToast('XTZ rate still loading — try again in a moment'); return; }
+  const d = getFormData();
 
   const btn = document.getElementById('tezosSendBtn');
   btn.disabled = true; btn.textContent = 'Waiting for wallet…';
 
   try {
+    const quoteData = await getServerCheckoutQuote(d, 'tezos', { payer_address: _tezosConnectedAddr });
+    const xtzAmt = quoteData.quote?.crypto_amount;
+    if (!xtzAmt) { showToast('XTZ quote unavailable — try again in a moment'); return; }
     const mutez = String(Math.round(parseFloat(xtzAmt) * 1_000_000));
     const opHash = await _tezosWalletProvider.sendOperations([{
       kind: 'transaction',
@@ -4011,8 +4144,7 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
       destination: toAddr,
     }]);
     const ref = 'KW-XTZ-' + (opHash || Date.now());
-    const d = getFormData();
-    notifyOrder(d, ref, 'tezos');
+    await notifyOrder(d, ref, 'tezos', quoteData.quote);
     showConfirmation('tezos', ref);
   } catch (e) {
     const msg = e?.message || String(e);
@@ -4030,10 +4162,13 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
 // Manual confirm (fallback — user sent from wallet app directly)
 document.getElementById('tezosManualBtn').addEventListener('click', () => {
   if (!validateForm()) return;
+  const proof = getManualCryptoProof('tezos');
+  if (!proof) return;
   const d = getFormData();
-  const ref = 'KW-XTZ-MANUAL-' + Date.now();
-  notifyOrder(d, ref, 'tezos');
-  showConfirmation('tezos', ref);
+  const ref = proof.payment_ref;
+  getServerCheckoutQuote(d, 'tezos', proof)
+    .then(q => notifyOrder(d, ref, 'tezos', q.quote).then(() => showConfirmation('tezos', ref)))
+    .catch(e => showToast(e.message || 'Could not confirm Tezos order'));
 });
 
 // Re-render crypto panels whenever their tab becomes active
@@ -4053,11 +4188,8 @@ document.querySelectorAll('.pay-tab').forEach(t => {
 /* ─── Inject payment keys (set via env on your server or meta tags) ─── */
 // These should be injected server-side as meta tags, e.g.:
 // <meta name="paystack-key" content="pk_live_…"/>
-// <meta name="flutterwave-key" content="FLWPUBK_TEST-…"/>
 const paystackMeta = document.querySelector('meta[name="paystack-key"]');
-const flwMeta = document.querySelector('meta[name="flutterwave-key"]');
 if (paystackMeta) window.__PAYSTACK_KEY__ = paystackMeta.content;
-if (flwMeta) window.__FLUTTERWAVE_KEY__ = flwMeta.content;
 
 /* ─── Load shop data from API ─── */
 async function loadShopData() {
@@ -4101,6 +4233,7 @@ async function loadShopData() {
           clothing_type:      r.clothing_type || '',
           stock:              r.stock ?? null,
           stock_by_variant:   r.stock_by_variant || {},
+          edition_totals:     r.edition_totals || {},
           active:             r.active !== false,
           sort_order:         r.sort_order || 0,
           is_new:             r.is_new || false,
@@ -4172,6 +4305,7 @@ async function apiSaveProduct(p, token) {
     clothing_type:      p.clothing_type || '',
     stock:              p.stock ?? null,
     stock_by_variant:   p.stock_by_variant || {},
+    edition_totals:     p.edition_totals || {},
     sort_order:         p.sort_order || 0,
     active:             p.active !== false,
   };
@@ -4198,7 +4332,10 @@ document.getElementById('adminBar').classList.add('visible');
 
 /* ─── Init ─── */
 document.getElementById('adminBar').classList.add('visible');
+loadCart();
+updateCartUI();
 loadShopData();
+finalizeReturnedGatewayCheckout();
 </script>
 </body>
 </html>
