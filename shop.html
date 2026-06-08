@@ -1697,10 +1697,22 @@ function apparelTypeFor(p) {
 }
 function ensureExampleSections() {
   ['prints','merch','notebooks','stickers'].forEach(cat => {
+    const visibleIds = new Set(
+      SHOP_CONFIG.products
+        .filter(p => (p.category || '') === cat && p.active !== false)
+        .map(p => String(p.id || ''))
+    );
+    const examples = SHOP_DEFAULT_PRODUCTS.filter(p => p.category === cat);
+    if (examples.length) {
+      examples.forEach(example => {
+        if (!visibleIds.has(String(example.id || ''))) {
+          SHOP_CONFIG.products.push(JSON.parse(JSON.stringify(example)));
+        }
+      });
+      return;
+    }
     const hasVisible = SHOP_CONFIG.products.some(p => (p.category || '') === cat && p.active !== false);
-    if (hasVisible) return;
-    const example = SHOP_DEFAULT_PRODUCTS.find(p => p.category === cat) || defaultProduct(cat);
-    SHOP_CONFIG.products.push(JSON.parse(JSON.stringify(example)));
+    if (!hasVisible) SHOP_CONFIG.products.push(defaultProduct(cat));
   });
 }
 function defaultProduct(category) {
