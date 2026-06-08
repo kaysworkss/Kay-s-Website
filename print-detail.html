@@ -299,6 +299,7 @@ nav.scrolled {
   letter-spacing:0.22em; text-transform:uppercase;
   color:var(--gold); margin-bottom:1rem;
 }
+.print-option-picker,
 .size-picker { display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1.2rem; }
 .size-chip {
   font-family:'Montserrat',sans-serif; font-size:0.62rem;
@@ -529,6 +530,55 @@ const slug = location.pathname.replace(/^\/shop\//, '').replace(/\/$/, '');
 function fmt(n)    { return '₦' + Number(n).toLocaleString('en-NG'); }
 function fmtUsd(n) { return '$' + Number(n).toFixed(0); }
 function slugify(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
+function printOptionKey(type, size) { return `${type}|${size}`; }
+function labelPrintOption(type, size) { return `${type} · ${size}`; }
+function escapeJs(s) { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+function getPrintOptions(p) {
+  const variants = Array.isArray(p.variants) ? p.variants : [];
+  const available = p.available_variants || [];
+  const hasNested = variants.some(v => v && typeof v === 'object' && !Array.isArray(v));
+
+  if (hasNested) {
+    return variants.map(v => {
+      const type = String(v.type || v.print_type || v.name || v.label || 'Print').trim();
+      const sizes = (v.sizes || v.variants || []).map(String).filter(Boolean);
+      const availableSizes = (v.available_sizes || v.available || v.available_variants || sizes).map(String).filter(Boolean);
+      return { type, sizes, availableSizes: availableSizes.length ? availableSizes : sizes };
+    }).filter(o => o.type && o.sizes.length);
+  }
+
+  if (available && typeof available === 'object' && !Array.isArray(available)) {
+    return Object.entries(available).map(([type, sizes]) => ({
+      type,
+      sizes: (Array.isArray(sizes) ? sizes : []).map(String).filter(Boolean),
+      availableSizes: (Array.isArray(sizes) ? sizes : []).map(String).filter(Boolean),
+    })).filter(o => o.type && o.sizes.length);
+  }
+
+  const type = String(p.print_type || p.medium || 'Giclee').replace(/\s+print$/i, '').trim() || 'Print';
+  const sizes = variants.map(String).filter(Boolean);
+  const availableSizes = (Array.isArray(available) && available.length ? available : sizes).map(String).filter(Boolean);
+  return sizes.length ? [{ type, sizes, availableSizes }] : [];
+}
+
+function availablePrintChoices(p) {
+  return getPrintOptions(p).flatMap(o =>
+    (o.availableSizes.length ? o.availableSizes : o.sizes).map(size => ({
+      type: o.type,
+      size,
+      key: printOptionKey(o.type, size),
+      label: labelPrintOption(o.type, size),
+    }))
+  );
+}
+
+function printPrice(p, key, currency) {
+  const prices = currency === 'usd' ? (p.prices_usd || {}) : (p.prices_ngn || {});
+  if (prices[key] !== undefined) return prices[key];
+  const size = String(key).split('|').pop();
+  return prices[size] || 0;
+}
 
 /* ─── Theme ─── */
 function initTheme() {
@@ -566,9 +616,9 @@ function getCart() {
 }
 function saveCart(cart) { localStorage.setItem('kaysworks-cart', JSON.stringify(cart)); }
 
-function addToCart(product, variant) {
+function addToCart(product, variantKey, variantLabel) {
   const cart = getCart();
-  const key = product.id + '-' + variant;
+  const key = product.id + '-' + variantKey;
   const existing = cart.find(c => c.key === key);
   if (existing) {
     existing.qty++;
@@ -576,9 +626,10 @@ function addToCart(product, variant) {
     cart.push({
       key, id: product.id,
       name: product.name,
-      variant,
-      priceNgn: product.prices_ngn[variant] || 0,
-      priceUsd: product.prices_usd[variant] || 0,
+      variant: variantLabel || variantKey,
+      variantKey,
+      priceNgn: printPrice(product, variantKey, 'ngn'),
+      priceUsd: printPrice(product, variantKey, 'usd'),
       emoji: product.emoji || '🖼',
       image: product.image_url || '',
       qty: 1,
@@ -606,12 +657,15 @@ function initZoom(wrap) {
 
 /* ─── Render product ─── */
 let _product = null;
+let _selectedPrintType = '';
 let _selectedVariant = '';
 
 function renderProduct(p) {
   _product = p;
-  const availSizes = p.available_variants || p.variants || [];
-  _selectedVariant = availSizes[0] || '';
+  const printOptions = getPrintOptions(p);
+  _selectedPrintType = printOptions[0]?.type || '';
+  const availSizes = printOptions[0]?.availableSizes || [];
+  _selectedVariant = availSizes[0] ? printOptionKey(_selectedPrintType, availSizes[0]) : '';
 
   // Update page meta
   document.title = `${p.name} · Kay's Works`;
@@ -641,15 +695,20 @@ function renderProduct(p) {
     ? `<img id="heroImg" src="${images[0]}" alt="${p.name}"/>`
     : `<div class="hero-img-placeholder">🖼</div>`;
 
-  // Build size chips
-  const sizeChips = availSizes.map(v => `
-    <button class="size-chip${v===_selectedVariant?' selected':''}"
-      data-v="${v}" onclick="selectSize('${v}')">${v}</button>
+  const optionChips = printOptions.map((opt, i) => `
+    <button class="size-chip${i===0?' selected':''}"
+      data-type="${opt.type}" onclick="selectPrintType('${escapeJs(opt.type)}')">${opt.type}</button>
   `).join('');
 
+  const sizeChips = availSizes.map(size => {
+    const key = printOptionKey(_selectedPrintType, size);
+    return `<button class="size-chip${key===_selectedVariant?' selected':''}"
+      data-v="${key}" onclick="selectSize('${escapeJs(key)}')">${size}</button>`;
+  }).join('');
+
   // Initial prices
-  const ngn = p.prices_ngn[_selectedVariant] || 0;
-  const usd = p.prices_usd[_selectedVariant] || 0;
+  const ngn = printPrice(p, _selectedVariant, 'ngn');
+  const usd = printPrice(p, _selectedVariant, 'usd');
 
   // Spec rows
   const specRows = [
@@ -687,7 +746,7 @@ function renderProduct(p) {
         ${seriesSlug ? `<a href="/shop/series/${seriesSlug}" class="print-series-link">${seriesName}</a>` : ''}
 
         <h1 class="print-title">${p.name}</h1>
-        <p class="print-year">${p.year || '2025'} · ${p.print_type ? p.print_type.charAt(0).toUpperCase() + p.print_type.slice(1) : 'Giclée'} Print</p>
+        <p class="print-year">${p.year || '2025'} · Fine art print</p>
 
         ${p.quote ? `
         <blockquote class="print-quote">
@@ -705,13 +764,15 @@ function renderProduct(p) {
         <table class="spec-table">${specRows}</table>
 
         <div class="purchase-block">
+          <p class="purchase-label">Choose your print option</p>
+          <div class="print-option-picker">${optionChips}</div>
           <p class="purchase-label">Choose your size</p>
           <div class="size-picker">${sizeChips}</div>
           <div class="price-row">
             <span class="price-ngn" id="priceNgn">${fmt(ngn)}</span>
             <span class="price-usd" id="priceUsd">${fmtUsd(usd)} USD</span>
           </div>
-          <button class="add-to-cart-btn" id="addBtn" onclick="handleAddToCart()">Add to bag</button>
+          <button class="add-to-cart-btn" id="addBtn" onclick="handleAddToCart()" ${_selectedVariant ? '' : 'disabled'}>${_selectedVariant ? 'Add to bag' : 'Unavailable'}</button>
           <p class="shipping-note">
             Ships from Kaduna via GIG (domestic) or UPS Worldwide Expedited (international).
             ${p.is_large_print ? ' This piece ships rolled in an archival tube.' : ' Ships flat in a rigid board mailer.'}
@@ -769,10 +830,10 @@ function updateMeta(p) {
     image: img,
     description: desc,
     brand: { '@type': 'Brand', name: "Kay's Works" },
-    offers: Object.entries(p.prices_ngn || {}).map(([size, price]) => ({
+    offers: availablePrintChoices(p).map(choice => ({
       '@type': 'Offer',
-      name: size,
-      price: price,
+      name: choice.label,
+      price: printPrice(p, choice.key, 'ngn'),
       priceCurrency: 'NGN',
       availability: 'https://schema.org/InStock',
       url,
@@ -785,16 +846,34 @@ function updateMeta(p) {
 
 function selectSize(v) {
   _selectedVariant = v;
-  document.querySelectorAll('.size-chip').forEach(c => c.classList.toggle('selected', c.dataset.v === v));
-  const ngn = _product.prices_ngn[v] || 0;
-  const usd = _product.prices_usd[v] || 0;
+  document.querySelectorAll('.size-picker .size-chip').forEach(c => c.classList.toggle('selected', c.dataset.v === v));
+  const ngn = printPrice(_product, v, 'ngn');
+  const usd = printPrice(_product, v, 'usd');
   document.getElementById('priceNgn').textContent = fmt(ngn);
   document.getElementById('priceUsd').textContent = fmtUsd(usd) + ' USD';
 }
 
+function selectPrintType(type) {
+  _selectedPrintType = type;
+  const opt = getPrintOptions(_product).find(o => o.type === type);
+  const sizes = opt?.availableSizes || [];
+  const firstKey = sizes[0] ? printOptionKey(type, sizes[0]) : '';
+  document.querySelectorAll('.print-option-picker .size-chip')
+    .forEach(c => c.classList.toggle('selected', c.dataset.type === type));
+  document.querySelector('.size-picker').innerHTML = sizes.map(size => {
+    const key = printOptionKey(type, size);
+    return `<button class="size-chip${key===firstKey?' selected':''}" data-v="${key}" onclick="selectSize('${escapeJs(key)}')">${size}</button>`;
+  }).join('');
+  const addBtn = document.getElementById('addBtn');
+  addBtn.disabled = !firstKey;
+  addBtn.textContent = firstKey ? 'Add to bag' : 'Unavailable';
+  if (firstKey) selectSize(firstKey);
+}
+
 function handleAddToCart() {
   if (!_selectedVariant) { showToast('Please select a size'); return; }
-  addToCart(_product, _selectedVariant);
+  const choice = availablePrintChoices(_product).find(c => c.key === _selectedVariant);
+  addToCart(_product, _selectedVariant, choice?.label || _selectedVariant);
 }
 
 function switchImage(idx) {
@@ -812,8 +891,9 @@ function renderRelated(prints) {
 
   document.getElementById('relatedSection').style.display = '';
   document.getElementById('relatedGrid').innerHTML = filtered.map(p => {
-    const lowestPrice = Math.min(...Object.values(p.prices_ngn || {}).filter(Boolean));
-    const firstAvail  = (p.available_variants || p.variants || [])[0] || '';
+    const choices = availablePrintChoices(p);
+    const lowestPrice = Math.min(...choices.map(c => printPrice(p, c.key, 'ngn')).filter(Boolean));
+    const firstAvail  = choices[0]?.label || '';
     return `
       <a href="/shop/${p.slug || slugify(p.name)}" class="related-card">
         <div class="related-card-img">

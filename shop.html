@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -1119,7 +1119,7 @@ footer a:hover { color:var(--rust); }
           <button class="pay-tab active" data-pay="paystack">Paystack</button>
           <button class="pay-tab" data-pay="flutterwave">Flutterwave</button>
           <button class="pay-tab" data-pay="eth">⬡ ETH</button>
-          <button class="pay-tab" data-pay="tezos" style="color:#5ac0f5">꜀ Tezos</button>
+          <button class="pay-tab" data-pay="tezos" style="color:#5ac0f5">êœ€ Tezos</button>
         </div>
 
         <!-- Paystack panel -->
@@ -1617,6 +1617,68 @@ function showToast(msg, dur=2800) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), dur);
 }
+function printOptionKey(type, size) { return `${type}|${size}`; }
+function labelPrintOption(type, size) { return `${type} · ${size}`; }
+function keySize(key) { return String(key || '').includes('|') ? String(key).split('|').pop() : String(key || ''); }
+
+function getPrintOptions(p) {
+  const variants = Array.isArray(p.variants) ? p.variants : [];
+  const available = p.availableVariants || p.available_variants || [];
+  const hasNested = variants.some(v => v && typeof v === 'object' && !Array.isArray(v));
+
+  if (hasNested) {
+    return variants.map(v => {
+      const type = String(v.type || v.print_type || v.name || v.label || 'Print').trim();
+      const sizes = (v.sizes || v.variants || []).map(String).filter(Boolean);
+      const availableSizes = (v.available_sizes || v.available || v.available_variants || sizes).map(String).filter(Boolean);
+      return { type, sizes, availableSizes: availableSizes.length ? availableSizes : sizes };
+    }).filter(o => o.type && o.sizes.length);
+  }
+
+  if (available && typeof available === 'object' && !Array.isArray(available)) {
+    return Object.entries(available).map(([type, sizes]) => ({
+      type,
+      sizes: (Array.isArray(sizes) ? sizes : []).map(String).filter(Boolean),
+      availableSizes: (Array.isArray(sizes) ? sizes : []).map(String).filter(Boolean),
+    })).filter(o => o.type && o.sizes.length);
+  }
+
+  const type = String(p.print_type || p.printType || p.medium || 'Giclee').replace(/\s+print$/i, '').trim() || 'Print';
+  const sizes = variants.map(String).filter(Boolean);
+  const availableSizes = (Array.isArray(available) && available.length ? available : sizes).map(String).filter(Boolean);
+  return sizes.length ? [{ type, sizes, availableSizes }] : [];
+}
+
+function availablePrintChoices(p) {
+  return getPrintOptions(p).flatMap(o =>
+    (o.availableSizes.length ? o.availableSizes : o.sizes).map(size => ({
+      type: o.type,
+      size,
+      key: printOptionKey(o.type, size),
+      label: labelPrintOption(o.type, size),
+    }))
+  );
+}
+
+function getChoices(p) {
+  if (p.category === 'prints') return availablePrintChoices(p);
+  return (p.variants || []).map(v => ({ key: v, label: v, size: v }));
+}
+
+function productPrice(p, key, currency) {
+  const prices = currency === 'usd' ? (p.priceUsd || p.prices_usd || {}) : (p.priceNgn || p.prices_ngn || {});
+  if (prices[key] !== undefined) return prices[key];
+  return prices[keySize(key)] || 0;
+}
+
+function stockForChoice(p, key) {
+  const sbv = p.stock_by_variant || {};
+  if (sbv[key] !== undefined) return sbv[key];
+  const size = keySize(key);
+  if (sbv[size] !== undefined) return sbv[size];
+  if (p.stock !== null && p.stock !== undefined) return p.stock;
+  return null;
+}
 
 /* ─── Theme ─── */
 function initTheme() {
@@ -1638,18 +1700,14 @@ window.addEventListener('scroll', () => nav.classList.toggle('scrolled', window.
 
 /* ─── Build product cards ─── */
 function buildCard(p) {
-  // For prints, only show the sizes you've marked as available
-  const displayVariants = (p.category === 'prints' && Array.isArray(p.availableVariants) && p.availableVariants.length)
-    ? p.availableVariants
-    : p.variants;
+  const choices = getChoices(p);
+  const defaultChoice = choices[0] || { key: '', label: '' };
+  selectedVariants[p.id] = defaultChoice.key;
+  const ngn = productPrice(p, defaultChoice.key, 'ngn');
+  const usd = productPrice(p, defaultChoice.key, 'usd');
 
-  const defaultVariant = displayVariants[0];
-  selectedVariants[p.id] = defaultVariant;
-  const ngn = p.priceNgn[defaultVariant];
-  const usd = p.priceUsd[defaultVariant];
-
-  const variantHtml = displayVariants.map((v,i) =>
-    `<button class="variant-chip${i===0?' selected':''}" data-pid="${p.id}" data-v="${v}">${v}</button>`
+  const variantHtml = choices.map((choice,i) =>
+    `<button class="variant-chip${i===0?' selected':''}" data-pid="${p.id}" data-v="${choice.key}">${choice.label}</button>`
   ).join('');
 
   const imgHtml = p.image
@@ -1658,14 +1716,7 @@ function buildCard(p) {
 
   const badgeHtml = p.badge ? `<span class="card-badge">${p.badge}</span>` : '';
 
-  // Stock indicator
-  const sbv = p.stock_by_variant || {};
-  function stockForVariant(v) {
-    if (sbv[v] !== undefined) return sbv[v];
-    if (p.stock !== null && p.stock !== undefined) return p.stock;
-    return null; // unlimited
-  }
-  const defaultStock = stockForVariant(defaultVariant);
+  const defaultStock = stockForChoice(p, defaultChoice.key);
   const stockHtml = defaultStock === 0
     ? `<span style="font-family:'Cinzel',serif;font-size:0.46rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--rust);margin-left:0.5rem">Sold out</span>`
     : defaultStock !== null && defaultStock <= 3
@@ -1687,15 +1738,15 @@ function buildCard(p) {
       <p class="card-category">${p.category}</p>
       <h3 class="card-title">${p.name}</h3>
       <p class="card-desc">${p.desc}</p>
-      <div class="card-variants" id="variants-${p.id}">${variantHtml}${sizeGuideLink}</div>
+      <div class="card-variants" id="variants-${p.id}">${variantHtml || '<span class="variant-chip selected">Unavailable</span>'}${sizeGuideLink}</div>
       <div class="card-footer">
         <div class="card-price">
           <span class="price-ngn" id="pngn-${p.id}">${fmt(ngn)}</span>
           <span class="price-usd" id="pusd-${p.id}">${fmtUsd(usd)} USD</span>
           <span id="stock-${p.id}">${stockHtml}</span>
         </div>
-        <button class="add-btn" data-pid="${p.id}" ${defaultStock===0?'disabled style="opacity:0.4;cursor:not-allowed"':''}>
-          ${defaultStock===0?'Sold out':'Add to bag'}
+        <button class="add-btn" data-pid="${p.id}" ${!defaultChoice.key || defaultStock===0?'disabled style="opacity:0.4;cursor:not-allowed"':''}>
+          ${!defaultChoice.key ? 'Unavailable' : defaultStock===0?'Sold out':'Add to bag'}
         </button>
       </div>
     </div>`;
@@ -1724,8 +1775,8 @@ function renderProducts() {
       document.querySelectorAll(`.variant-chip[data-pid="${pid}"]`)
         .forEach(b => b.classList.toggle('selected', b.dataset.v === v));
       const p = SHOP_CONFIG.products.find(x=>x.id===pid);
-      document.getElementById('pngn-'+pid).textContent = fmt(p.priceNgn[v]);
-      document.getElementById('pusd-'+pid).textContent = fmtUsd(p.priceUsd[v]) + ' USD';
+      document.getElementById('pngn-'+pid).textContent = fmt(productPrice(p, v, 'ngn'));
+      document.getElementById('pusd-'+pid).textContent = fmtUsd(productPrice(p, v, 'usd')) + ' USD';
     });
   });
 
@@ -1734,7 +1785,7 @@ function renderProducts() {
     btn.addEventListener('click', () => {
       const pid = btn.dataset.pid;
       const p = SHOP_CONFIG.products.find(x=>x.id===pid);
-      const v = selectedVariants[pid] || p.variants[0];
+      const v = selectedVariants[pid] || getChoices(p)[0]?.key;
       addToCart(p, v);
     });
   });
@@ -1763,15 +1814,18 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 
 /* ─── Cart ─── */
 function addToCart(p, variant) {
+  if (!variant) { showToast('Please choose a print option'); return; }
   const key = p.id + '-' + variant;
+  const choice = getChoices(p).find(c => c.key === variant);
+  const label = choice?.label || variant;
   const existing = cart.find(c=>c.key===key);
   if (existing) {
     existing.qty++;
   } else {
     cart.push({
-      key, id: p.id, name: p.name, variant,
-      priceNgn: p.priceNgn[variant],
-      priceUsd: p.priceUsd[variant],
+      key, id: p.id, name: p.name, variant: label, variantKey: variant,
+      priceNgn: productPrice(p, variant, 'ngn'),
+      priceUsd: productPrice(p, variant, 'usd'),
       emoji: p.emoji, image: p.image, qty: 1,
     });
   }
@@ -2487,14 +2541,14 @@ function renderAdminProducts() {
 
   // ── Print admin section ───────────────────────────────────────────────
   if (prints.length) {
-    html += `<p class="admin-section-title" style="margin-top:0">Print sizes &amp; availability</p>
+    html += `<p class="admin-section-title" style="margin-top:0">Print options, sizes &amp; availability</p>
     <p style="font-size:0.82rem;color:var(--text-muted);line-height:1.6;margin-bottom:1rem">
-      All prints: 100% cotton rag · 300gsm · 10-colour archival pigment ink · min 1-inch white border (INPRNT spec).<br/>
-      Check the sizes you want to offer. Prices are editable per size.
+      One row is one artwork. Add print options inside it, such as Giclee, Canvas Print, and Mini Print, then add sizes and prices under each option.
     </p>`;
 
     prints.forEach((p, pi) => {
       const realIdx = SHOP_CONFIG.products.indexOf(p);
+      const options = getPrintOptions(p);
       html += `<div class="admin-product-row" data-idx="${realIdx}" style="grid-template-columns:1fr;gap:0.6rem">
         <button class="admin-del-btn" data-idx="${realIdx}" title="Remove">✕</button>
         <div class="admin-prod-name">${p.name}</div>
@@ -2516,38 +2570,43 @@ function renderAdminProducts() {
           <label class="form-label">Image URL</label>
           <input class="form-input ap-img" data-idx="${realIdx}" value="${p.image||''}"/>
         </div>
-        <label class="form-label" style="margin-top:0.4rem">Available sizes &amp; prices</label>
+        <label class="form-label" style="margin-top:0.4rem">Available print options, sizes &amp; prices</label>
         <div style="border:1px solid var(--border);border-radius:2px;overflow:hidden" id="size-table-${realIdx}">
-          <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr auto;gap:0;font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);padding:0.6rem 0.8rem;border-bottom:1px solid var(--border);background:var(--bg-alt)">
+          <div style="display:grid;grid-template-columns:auto 1.2fr 1fr 1fr 1fr auto;gap:0;font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);padding:0.6rem 0.8rem;border-bottom:1px solid var(--border);background:var(--bg-alt)">
             <span style="min-width:20px"></span>
-            <span>Size</span><span>NGN price</span><span>USD price</span><span></span>
+            <span>Print option</span><span>Size</span><span>NGN price</span><span>USD price</span><span></span>
           </div>
-          ${p.variants.map(v => {
-            const isAvail = (p.availableVariants||[]).includes(v);
-            const isCustom = !(p._standardVariants||[]).includes(v);
-            return `<div class="ap-size-row" data-idx="${realIdx}" data-v="${v}" style="display:grid;grid-template-columns:auto 1fr 1fr 1fr auto;gap:0;align-items:center;padding:0.5rem 0.8rem;border-bottom:1px solid var(--border)">
-              <input type="checkbox" class="ap-size-check" data-idx="${realIdx}" data-v="${v}" ${isAvail?'checked':''} style="margin-right:0.7rem;accent-color:var(--rust);width:14px;height:14px"/>
-              <span style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--text)">${v}${isCustom?` <span style="font-size:0.55rem;color:var(--gold);font-family:'Cinzel',serif;letter-spacing:0.1em">custom</span>`:''}</span>
-              <input class="form-input ap-size-ngn" data-idx="${realIdx}" data-v="${v}" value="${p.priceNgn[v]||''}" placeholder="₦" style="padding:0.35rem 0.5rem;font-size:0.78rem;margin:0 0.4rem 0 0"/>
-              <input class="form-input ap-size-usd" data-idx="${realIdx}" data-v="${v}" value="${p.priceUsd[v]||''}" placeholder="$" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
-              ${isCustom ? `<button class="ap-remove-custom" data-idx="${realIdx}" data-v="${v}" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem;transition:color 0.15s" title="Remove">✕</button>` : '<span></span>'}
+          ${options.flatMap(opt => opt.sizes.map(size => {
+            const key = printOptionKey(opt.type, size);
+            const isAvail = (opt.availableSizes||[]).includes(size);
+            return `<div class="ap-size-row" data-idx="${realIdx}" data-type="${opt.type}" data-size="${size}" data-v="${key}" style="display:grid;grid-template-columns:auto 1.2fr 1fr 1fr 1fr auto;gap:0;align-items:center;padding:0.5rem 0.8rem;border-bottom:1px solid var(--border)">
+              <input type="checkbox" class="ap-size-check" data-idx="${realIdx}" data-type="${opt.type}" data-size="${size}" data-v="${key}" ${isAvail?'checked':''} style="margin-right:0.7rem;accent-color:var(--rust);width:14px;height:14px"/>
+              <span style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--text)">${opt.type}</span>
+              <span style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--text)">${size}</span>
+              <input class="form-input ap-size-ngn" data-idx="${realIdx}" data-v="${key}" value="${productPrice(p, key, 'ngn')||''}" placeholder="NGN" style="padding:0.35rem 0.5rem;font-size:0.78rem;margin:0 0.4rem 0 0"/>
+              <input class="form-input ap-size-usd" data-idx="${realIdx}" data-v="${key}" value="${productPrice(p, key, 'usd')||''}" placeholder="$" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+              <button class="ap-remove-custom" data-idx="${realIdx}" data-type="${opt.type}" data-size="${size}" data-v="${key}" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem;transition:color 0.15s" title="Remove">×</button>
             </div>`;
-          }).join('')}
+          })).join('')}
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:0.4rem;margin-top:0.6rem;align-items:flex-end">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:0.4rem;margin-top:0.6rem;align-items:flex-end">
           <div>
-            <label class="form-label">Custom size label</label>
-            <input class="form-input ap-custom-size" data-idx="${realIdx}" placeholder='e.g. 16×20"' style="padding:0.35rem 0.6rem;font-size:0.82rem"/>
+            <label class="form-label">Print option</label>
+            <input class="form-input ap-custom-type" data-idx="${realIdx}" placeholder="e.g. Giclee" style="padding:0.35rem 0.6rem;font-size:0.82rem"/>
+          </div>
+          <div>
+            <label class="form-label">Size label</label>
+            <input class="form-input ap-custom-size" data-idx="${realIdx}" placeholder='e.g. 16x20"' style="padding:0.35rem 0.6rem;font-size:0.82rem"/>
           </div>
           <div>
             <label class="form-label">NGN price</label>
-            <input class="form-input ap-custom-ngn" data-idx="${realIdx}" placeholder="₦" type="number" style="padding:0.35rem 0.6rem;font-size:0.82rem"/>
+            <input class="form-input ap-custom-ngn" data-idx="${realIdx}" placeholder="NGN" type="number" style="padding:0.35rem 0.6rem;font-size:0.82rem"/>
           </div>
           <div>
             <label class="form-label">USD price</label>
             <input class="form-input ap-custom-usd" data-idx="${realIdx}" placeholder="$" type="number" style="padding:0.35rem 0.6rem;font-size:0.82rem"/>
           </div>
-          <button class="ap-add-custom-btn admin-save-btn" data-idx="${realIdx}" style="padding:0.5rem 0.9rem;margin:0;white-space:nowrap;font-size:0.52rem">+ Add size</button>
+          <button class="ap-add-custom-btn admin-save-btn" data-idx="${realIdx}" style="padding:0.5rem 0.9rem;margin:0;white-space:nowrap;font-size:0.52rem">+ Add</button>
         </div>
       </div>`;
     });
@@ -2621,21 +2680,31 @@ function renderAdminProducts() {
       const idx     = Number(btn.dataset.idx);
       const p       = SHOP_CONFIG.products[idx];
       const row     = btn.closest('.admin-product-row');
+      const typeEl  = row.querySelector('.ap-custom-type');
       const sizeEl  = row.querySelector('.ap-custom-size');
       const ngnEl   = row.querySelector('.ap-custom-ngn');
       const usdEl   = row.querySelector('.ap-custom-usd');
+      const type    = (typeEl.value.trim() || 'Giclee');
       const label   = sizeEl.value.trim();
+      const key     = printOptionKey(type, label);
       const ngn     = Number(ngnEl.value) || 0;
       const usd     = Number(usdEl.value) || 0;
+      const options = getPrintOptions(p);
       if (!label) { showToast('Enter a size label first'); return; }
-      if (p.variants.includes(label)) { showToast('That size already exists'); return; }
+      if (options.some(o => o.type === type && o.sizes.includes(label))) { showToast('That print option already has this size'); return; }
 
-      // Add to variants, prices and availableVariants
-      p.variants.push(label);
-      p.priceNgn[label] = ngn;
-      p.priceUsd[label] = usd;
-      if (!p.availableVariants) p.availableVariants = [];
-      p.availableVariants.push(label); // custom sizes default to available
+      const nextOptions = options.map(o => ({ type: o.type, sizes: [...o.sizes] }));
+      let opt = nextOptions.find(o => o.type === type);
+      if (!opt) { opt = { type, sizes: [] }; nextOptions.push(opt); }
+      opt.sizes.push(label);
+      p.variants = nextOptions;
+      p.priceNgn[key] = ngn;
+      p.priceUsd[key] = usd;
+      const nextAvailable = {};
+      options.forEach(o => { nextAvailable[o.type] = [...(o.availableSizes || [])]; });
+      if (!nextAvailable[type]) nextAvailable[type] = [];
+      nextAvailable[type].push(label);
+      p.availableVariants = nextAvailable;
 
       // Clear inputs
       sizeEl.value = ''; ngnEl.value = ''; usdEl.value = '';
@@ -2649,12 +2718,21 @@ function renderAdminProducts() {
   el.querySelectorAll('.ap-remove-custom').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = Number(btn.dataset.idx);
-      const v   = btn.dataset.v;
+      const type = btn.dataset.type;
+      const size = btn.dataset.size;
+      const v = btn.dataset.v;
       const p   = SHOP_CONFIG.products[idx];
-      p.variants = p.variants.filter(x => x !== v);
+      const options = getPrintOptions(p)
+        .map(o => ({ type: o.type, sizes: o.sizes.filter(s => !(o.type === type && s === size)) }))
+        .filter(o => o.sizes.length);
+      p.variants = options;
       delete p.priceNgn[v];
       delete p.priceUsd[v];
-      p.availableVariants = (p.availableVariants||[]).filter(x => x !== v);
+      const nextAvailable = {};
+      getPrintOptions({ ...p, variants: options }).forEach(o => {
+        nextAvailable[o.type] = (o.availableSizes || o.sizes).filter(s => !(o.type === type && s === size));
+      });
+      p.availableVariants = nextAvailable;
       renderAdminProducts();
     });
   });
@@ -2662,12 +2740,14 @@ function renderAdminProducts() {
 } // end renderAdminProducts
 
 document.getElementById('addProductBtn').addEventListener('click', ()=>{
+  const key = printOptionKey('Giclee', 'One size');
   SHOP_CONFIG.products.push({
     id: 'prod-'+uid(), category: 'prints', name: 'New Product',
     desc: 'Product description', emoji: '✦',
-    variants: ['One size'],
-    priceNgn: { 'One size': 10000 },
-    priceUsd: { 'One size': 7 },
+    variants: [{ type: 'Giclee', sizes: ['One size'] }],
+    availableVariants: { Giclee: ['One size'] },
+    priceNgn: { [key]: 10000 },
+    priceUsd: { [key]: 7 },
     badge: '', image: '',
   });
   renderAdminProducts();
@@ -2697,16 +2777,21 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
       if (imgEl)   p.image = imgEl.value.trim();
 
       if (p.category === 'prints') {
-        const availArr = [];
+        const nextAvailable = {};
         row.querySelectorAll('.ap-size-check').forEach(chk => {
           const v = chk.dataset.v;
-          if (chk.checked) availArr.push(v);
+          const type = chk.dataset.type || 'Print';
+          const size = chk.dataset.size || v;
+          if (chk.checked) {
+            if (!nextAvailable[type]) nextAvailable[type] = [];
+            nextAvailable[type].push(size);
+          }
           const ngnIn = row.querySelector(`.ap-size-ngn[data-v="${v}"]`);
           const usdIn = row.querySelector(`.ap-size-usd[data-v="${v}"]`);
           if (ngnIn) p.priceNgn[v] = Number(ngnIn.value) || p.priceNgn[v];
           if (usdIn) p.priceUsd[v] = Number(usdIn.value) || p.priceUsd[v];
         });
-        p.availableVariants = availArr;
+        p.availableVariants = nextAvailable;
       } else {
         const catEl      = row.querySelector('.ap-cat');
         const variantsEl = row.querySelector('.ap-variants');
@@ -2724,8 +2809,12 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
       }
     });
 
-    // Save all products to API
-    await Promise.all(SHOP_CONFIG.products.map(p => apiSaveProduct(p, token)));
+    // Save all products to API and replace temporary ids with Supabase UUIDs.
+    await Promise.all(SHOP_CONFIG.products.map(async p => {
+      const saved = await apiSaveProduct(p, token);
+      if (saved?.id && String(p.id).startsWith('prod-')) p.id = saved.id;
+      return saved;
+    }));
 
     // Save config (wallet addresses handled server-side — just upsert)
     await fetch('/api/admin/shop-config', {
@@ -2738,6 +2827,7 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
     });
 
     renderProducts();
+    populatePrintPageSelector();
     showToast('Saved ✦');
     closeAdmin();
   } catch (e) {
@@ -3480,6 +3570,19 @@ async function loadShopData() {
           priceUsd:           r.prices_usd || {},
           badge:              r.badge || '',
           image:              r.image_url || '',
+          images:             r.images || [],
+          slug:               r.slug || '',
+          series_slug:        r.series_slug || '',
+          series_name:        r.series_name || '',
+          series_desc:        r.series_desc || '',
+          series_year:        r.series_year || '',
+          story:              r.story || '',
+          process:            r.process || '',
+          quote:              r.quote || '',
+          year:               r.year || '',
+          medium:             r.medium || '',
+          signed:             r.signed || false,
+          is_large_print:     r.is_large_print || false,
           clothing:           r.clothing || false,
           clothing_type:      r.clothing_type || '',
           stock:              r.stock ?? null,
@@ -3529,6 +3632,23 @@ async function apiSaveProduct(p, token) {
     prices_usd:         p.priceUsd,
     badge:              p.badge,
     image_url:          p.image,
+    images:             p.images || [],
+    slug:               p.slug || '',
+    series_slug:        p.series_slug || '',
+    series_name:        p.series_name || '',
+    series_desc:        p.series_desc || '',
+    series_year:        p.series_year || '',
+    story:              p.story || '',
+    process:            p.process || '',
+    quote:              p.quote || '',
+    year:               p.year || '',
+    medium:             p.medium || '',
+    signed:             p.signed || false,
+    is_large_print:     p.is_large_print || false,
+    clothing:           p.clothing || false,
+    clothing_type:      p.clothing_type || '',
+    stock:              p.stock ?? null,
+    stock_by_variant:   p.stock_by_variant || {},
     sort_order:         p.sort_order || 0,
     active:             p.active !== false,
   };
