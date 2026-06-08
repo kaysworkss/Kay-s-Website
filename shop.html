@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -1924,7 +1924,7 @@ function buildCard(p) {
     <div class="card-img">${imgHtml}${badgeHtml}</div>
     <div class="card-body">
       <p class="card-category">${p.category}</p>
-      <h3 class="card-title">${p.name}</h3>
+      <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
       <p class="card-desc">${p.desc}</p>
       <div class="card-variants" id="variants-${p.id}">${variantHtml || '<span class="variant-chip selected">Unavailable</span>'}${sizeGuideLink}</div>
       <div class="card-footer">
@@ -1958,7 +1958,7 @@ function buildPrintCard(p) {
       <div class="card-img">${imgHtml}${badgeHtml}</div>
       <div class="card-body">
         <p class="card-category">${p.category}</p>
-        <h3 class="card-title">${p.name}</h3>
+        <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
         <p class="card-desc">${p.desc}</p>
         <div class="card-footer">
           <div class="card-price"><span class="price-ngn">Unavailable</span></div>
@@ -1994,7 +1994,7 @@ function buildPrintCard(p) {
     <div class="card-img">${imgHtml}${badgeHtml}</div>
     <div class="card-body">
       <p class="card-category">${p.category}</p>
-      <h3 class="card-title">${p.name}</h3>
+      <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
       <p class="card-desc" id="pdesc-${p.id}">${active.desc || p.desc}</p>
       <div class="print-type-wrap">${typeSelectHtml}</div>
       <div class="card-variants" id="variants-${p.id}">${sizeChipsHtml}</div>
@@ -3016,6 +3016,11 @@ function renderAdminProducts() {
           <label class="form-label">Image URL</label>
           <input class="form-input ap-img" data-idx="${realIdx}" value="${escapeAttr(p.image||'')}"/>
         </div>
+        <div class="form-row" style="margin:0">
+          <label class="form-label">Product page slug</label>
+          <input class="form-input ap-slug" data-idx="${realIdx}" value="${escapeAttr(p.slug||'')}" placeholder="auto-generated from name"/>
+          <p style="font-size:0.72rem;color:var(--text-muted);margin-top:0.3rem">Lives at <span style="color:var(--clay)">/shop/${escapeAttr(p.slug||'…')}</span>. Leave blank to auto-generate from the name.</p>
+        </div>
         ${apparelAdminHtml}
         <label class="form-label">Variants, prices &amp; stock</label>
         <div class="ap-variant-list" data-idx="${realIdx}">
@@ -3050,6 +3055,21 @@ function renderAdminProducts() {
     btn.addEventListener('click', () => {
       SHOP_CONFIG.products.push(defaultProduct(btn.dataset.category || 'merch'));
       renderAdminProducts();
+    });
+  });
+
+  // Auto-slugify merch slug inputs as the user types; pre-fill from the
+  // product name on focus if left blank.
+  el.querySelectorAll('.ap-slug').forEach(input => {
+    const idx = Number(input.dataset.idx);
+    input.addEventListener('input', function () {
+      this.value = slugify(this.value);
+    });
+    input.addEventListener('focus', function () {
+      if (!this.value.trim()) {
+        const prod = SHOP_CONFIG.products[idx];
+        if (prod) this.value = slugify(prod.name || '');
+      }
     });
   });
 
@@ -3218,7 +3238,12 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         const catEl      = row.querySelector('.ap-cat');
         const clothingEl = row.querySelector('.ap-clothing');
         const typeEl     = row.querySelector('.ap-clothing-type');
+        const slugEl     = row.querySelector('.ap-slug');
         if (catEl) p.category = catEl.value;
+        if (slugEl) {
+          const typed = slugEl.value.trim();
+          p.slug = typed ? slugify(typed) : slugify(p.name || '');
+        }
         if (p.category === 'merch') {
           p.clothing = clothingEl ? clothingEl.checked : false;
           p.clothing_type = typeEl ? typeEl.value : '';
@@ -3247,10 +3272,14 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
       }
     });
 
-    // Save all products to API and replace temporary ids with Supabase UUIDs.
+    // Save all products to API and replace temporary/sample ids with real
+    // Supabase UUIDs. Products whose id is not a UUID (new items, or sample
+    // products edited in place) are POSTed as new rows; we then adopt the
+    // returned UUID so the next save PATCHes correctly instead of duplicating.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     await Promise.all(SHOP_CONFIG.products.map(async p => {
       const saved = await apiSaveProduct(p, token);
-      if (saved?.id && String(p.id).startsWith('prod-')) p.id = saved.id;
+      if (saved?.id && !UUID_RE.test(String(p.id))) p.id = saved.id;
       return saved;
     }));
 
@@ -4061,7 +4090,12 @@ async function loadShopData() {
 
 /* ─── Save product via admin API ─── */
 async function apiSaveProduct(p, token) {
-  const isNew = typeof p.id === 'string' && p.id.startsWith('prod-');
+  // A real DB row has a UUID id. Anything else — temp 'prod-…' ids,
+  // hardcoded sample ids like 'print-sample-artwork', or a missing id —
+  // is a new product and must be POSTed, not PATCHed (PATCH casts the id
+  // to uuid server-side and throws on non-UUID strings).
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const isNew = !(typeof p.id === 'string' && UUID_RE.test(p.id));
   const method  = isNew ? 'POST' : 'PATCH';
   const url     = isNew ? '/api/admin/shop-products' : `/api/admin/shop-products/${p.id}`;
   const body = {
@@ -4123,3 +4157,5 @@ loadShopData();
 </script>
 </body>
 </html>
+
+

@@ -647,7 +647,7 @@ function addToCart(product, variantKey, variantLabel) {
     });
   }
   saveCart(cart);
-  showToast(`${product.name} · ${variant} added to bag ✦`);
+  showToast(`${product.name} · ${variantLabel || variantKey} added to bag ✦`);
 }
 
 /* ─── Image zoom on mousemove ─── */
@@ -673,6 +673,13 @@ let _selectedVariant = '';
 
 function renderProduct(p) {
   _product = p;
+
+  // Non-print products use a simpler variant/price selector.
+  if (p.category && p.category !== 'prints') {
+    renderMerchProduct(p);
+    return;
+  }
+
   const printOptions = getPrintOptions(p);
   _selectedPrintType = printOptions[0]?.type || '';
   const availSizes = printOptions[0]?.availableSizes || [];
@@ -802,6 +809,136 @@ function renderProduct(p) {
   if (wrap) initZoom(wrap);
 }
 
+/* ─── Render merch / notebook / sticker product ─── */
+function merchVariants(p) {
+  const v = Array.isArray(p.variants) ? p.variants : [];
+  // Merch variants are plain strings; guard against print-style objects.
+  const labels = v.map(x => (typeof x === 'string' ? x : (x && x.type) || '')).filter(Boolean);
+  return labels.length ? labels : ['One size'];
+}
+
+function merchStock(p, label) {
+  const sbv = p.stock_by_variant || {};
+  if (sbv[label] !== undefined) return Number(sbv[label]);
+  if (p.stock !== undefined && p.stock !== null) return Number(p.stock);
+  return null;
+}
+
+function renderMerchProduct(p) {
+  const variants = merchVariants(p);
+  _selectedVariant = variants[0] || '';
+
+  document.title = `${p.name} · Kay's Works`;
+  updateMeta(p);
+
+  const catLabel = p.category ? p.category.charAt(0).toUpperCase() + p.category.slice(1) : 'Shop';
+  const breadcrumb = `
+    <div class="breadcrumb">
+      <a href="/shop">Shop</a>
+      <span class="breadcrumb-sep">·</span>
+      <span style="color:var(--text)">${p.name}</span>
+    </div>`;
+
+  const images = p.images || (p.image_url ? [p.image_url] : []);
+  const thumbsHtml = images.length > 1
+    ? `<div class="thumb-strip">${images.map((img,i) => `
+        <div class="thumb${i===0?' active':''}" data-idx="${i}" onclick="switchImage(${i})">
+          <img src="${img}" alt="View ${i+1}" loading="lazy"/>
+        </div>`).join('')}</div>`
+    : '';
+  const mainImg = images[0]
+    ? `<img id="heroImg" src="${images[0]}" alt="${p.name}"/>`
+    : `<div class="hero-img-placeholder">${p.emoji || '✦'}</div>`;
+
+  const variantChips = variants.map((label, i) => `
+    <button class="size-chip${i===0?' selected':''}"
+      data-v="${escapeAttr(label)}" onclick="selectMerchVariant('${escapeJs(label)}')">${label}</button>
+  `).join('');
+
+  const ngn = printPrice(p, _selectedVariant, 'ngn');
+  const usd = printPrice(p, _selectedVariant, 'usd');
+  const stock = merchStock(p, _selectedVariant);
+  const soldOut = stock === 0;
+
+  const storyHtml = (p.story || p.desc || p.description || '')
+    .split('\n').filter(Boolean).map(line => `<p>${line}</p>`).join('');
+
+  const specPairs = [
+    ['Type', p.clothing_type || ''],
+    ['Medium', p.medium || ''],
+  ].filter(r => r[1]);
+  const specRows = specPairs.map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+
+  const html = `
+    ${breadcrumb}
+    <div class="print-layout">
+      <div class="image-panel">
+        <div class="hero-img-wrap" id="heroWrap">
+          ${mainImg}
+          <span class="zoom-hint">Hover to zoom</span>
+          ${thumbsHtml}
+        </div>
+      </div>
+
+      <div class="info-panel">
+        <h1 class="print-title">${p.name}</h1>
+        <p class="print-year">${catLabel}</p>
+
+        ${p.quote ? `<blockquote class="print-quote">"${p.quote}"<cite>— Kay</cite></blockquote>` : ''}
+
+        ${storyHtml ? `<div class="section-divider"><span>About</span></div><div class="print-story">${storyHtml}</div>` : ''}
+
+        ${specRows ? `<div class="section-divider"><span>Details</span></div><table class="spec-table">${specRows}</table>` : ''}
+
+        <div class="purchase-block">
+          <p class="purchase-label">Choose an option</p>
+          <div class="size-picker">${variantChips}</div>
+          <div class="price-row">
+            <span class="price-ngn" id="priceNgn">${fmt(ngn)}</span>
+            <span class="price-usd" id="priceUsd">${fmtUsd(usd)} USD</span>
+            <span id="merchStock" style="font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;margin-left:0.6rem;color:${soldOut?'var(--rust)':'var(--gold)'}">${soldOut?'Sold out':(stock!==null&&stock<=3?`Only ${stock} left`:'')}</span>
+          </div>
+          <button class="add-to-cart-btn" id="addBtn" onclick="handleMerchAddToCart()" ${(!_selectedVariant||soldOut)?'disabled':''}>${soldOut?'Sold out':(_selectedVariant?'Add to bag':'Unavailable')}</button>
+          <p class="shipping-note">Ships from Kaduna via GIG (domestic) or UPS Worldwide Expedited (international).</p>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('printContent').innerHTML = html;
+  document.getElementById('loadingSkeleton').style.display = 'none';
+  document.getElementById('printContent').style.display = '';
+
+  const wrap = document.getElementById('heroWrap');
+  if (wrap) initZoom(wrap);
+}
+
+function selectMerchVariant(label) {
+  _selectedVariant = label;
+  document.querySelectorAll('.size-picker .size-chip').forEach(c =>
+    c.classList.toggle('selected', c.dataset.v === label));
+  const ngn = printPrice(_product, label, 'ngn');
+  const usd = printPrice(_product, label, 'usd');
+  document.getElementById('priceNgn').textContent = fmt(ngn);
+  document.getElementById('priceUsd').textContent = fmtUsd(usd) + ' USD';
+  const stock = merchStock(_product, label);
+  const soldOut = stock === 0;
+  const stockEl = document.getElementById('merchStock');
+  if (stockEl) {
+    stockEl.textContent = soldOut ? 'Sold out' : (stock !== null && stock <= 3 ? `Only ${stock} left` : '');
+    stockEl.style.color = soldOut ? 'var(--rust)' : 'var(--gold)';
+  }
+  const btn = document.getElementById('addBtn');
+  if (btn) {
+    btn.disabled = !label || soldOut;
+    btn.textContent = soldOut ? 'Sold out' : (label ? 'Add to bag' : 'Unavailable');
+  }
+}
+
+function handleMerchAddToCart() {
+  if (!_selectedVariant) { showToast('Please choose an option'); return; }
+  addToCart(_product, _selectedVariant, _selectedVariant);
+}
+
 function updateMeta(p) {
   const desc = (p.story || p.description || p.desc || '').replace(/<[^>]*>/g,'').slice(0,160);
   const img  = p.image_url || '';
@@ -905,13 +1042,22 @@ function renderRelated(prints) {
 
   document.getElementById('relatedSection').style.display = '';
   document.getElementById('relatedGrid').innerHTML = filtered.map(p => {
-    const choices = availablePrintChoices(p);
-    const lowestPrice = Math.min(...choices.map(c => printPrice(p, c.key, 'ngn')).filter(Boolean));
-    const firstAvail  = choices[0]?.label || '';
+    let lowestPrice, firstAvail;
+    if (p.category && p.category !== 'prints') {
+      const labels = merchVariants(p);
+      const prices = labels.map(l => printPrice(p, l, 'ngn')).filter(Boolean);
+      lowestPrice = prices.length ? Math.min(...prices) : 0;
+      firstAvail  = labels[0] || '';
+    } else {
+      const choices = availablePrintChoices(p);
+      const prices  = choices.map(c => printPrice(p, c.key, 'ngn')).filter(Boolean);
+      lowestPrice = prices.length ? Math.min(...prices) : 0;
+      firstAvail  = choices[0]?.label || '';
+    }
     return `
       <a href="/shop/${p.slug || slugify(p.name)}" class="related-card">
         <div class="related-card-img">
-          ${p.image_url ? `<img src="${p.image_url}" alt="${p.name}" loading="lazy"/>` : (p.emoji || '=')}
+          ${p.image_url ? `<img src="${p.image_url}" alt="${p.name}" loading="lazy"/>` : (p.emoji || '✦')}
         </div>
         <div class="related-card-body">
           <div class="related-card-title">${p.name}</div>
@@ -940,7 +1086,7 @@ async function load() {
     } else {
       fetch('/api/shop/products')
         .then(r => r.ok ? r.json() : [])
-        .then(all => renderRelated(all.filter(p => p.category === 'prints')))
+        .then(all => renderRelated(all.filter(p => p.category === product.category)))
         .catch(() => {});
     }
   } catch(e) {
