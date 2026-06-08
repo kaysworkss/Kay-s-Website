@@ -1262,7 +1262,6 @@ footer a:hover { color:var(--rust); }
         <button class="unit-btn active" id="unitCm" onclick="setUnit('cm')">CM</button>
         <button class="unit-btn" id="unitIn" onclick="setUnit('in')">Inches</button>
       </div>
-
       <!-- How to measure -->
       <div class="measure-guide">
         <p class="measure-title">How to measure yourself</p>
@@ -1685,6 +1684,17 @@ function normalizeProduct(p) {
   p.active = p.active !== false;
   return p;
 }
+function isApparelProduct(p) {
+  const text = `${p.name || ''} ${p.clothing_type || ''} ${p.print_type || ''}`.toLowerCase();
+  return p.clothing === true || /\b(tee|t-shirt|tshirt|shirt|hoodie|sweatshirt|cap|hat)\b/.test(text);
+}
+function apparelTypeFor(p) {
+  const text = `${p.name || ''} ${p.clothing_type || ''}`.toLowerCase();
+  if (text.includes('hoodie') || text.includes('sweatshirt')) return 'hoodie';
+  if (text.includes('cap') || text.includes('hat')) return 'cap';
+  if (text.includes('tee') || text.includes('t-shirt') || text.includes('tshirt') || text.includes('shirt')) return 'tee';
+  return p.clothing_type || 'tee';
+}
 function ensureExampleSections() {
   ['prints','merch','notebooks','stickers'].forEach(cat => {
     const hasVisible = SHOP_CONFIG.products.some(p => (p.category || '') === cat && p.active !== false);
@@ -1884,9 +1894,9 @@ function buildCard(p) {
     ? `<span style="font-family:'Cinzel',serif;font-size:0.46rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);margin-left:0.5rem">Only ${defaultStock} left</span>`
     : '';
 
-  const isClothing = p.clothing === true || ['tee','hoodie','shirt'].some(k => p.name.toLowerCase().includes(k) || (p.print_type||'').toLowerCase().includes(k));
+  const isClothing = isApparelProduct(p);
   const sizeGuideLink = isClothing
-    ? `<button class="size-guide-link" onclick="openSizeGuide('${p.id}','${p.name.replace(/'/g,"\\'")}','${p.clothing_type||'tee'}')">Size guide</button>`
+    ? `<button class="size-guide-link" onclick="openSizeGuide('${p.id}','${p.name.replace(/'/g,"\\'")}','${apparelTypeFor(p)}')">Size guide</button>`
     : '';
 
   const card = document.createElement('div');
@@ -2214,7 +2224,7 @@ document.getElementById('cartOverlay').addEventListener('click', closeCart);
 /* ─── Size guide engine ─── */
 const SIZE_DATA = {
   tee: {
-    fitNote: "Kay's tees are cut with a relaxed unisex fit. If you prefer a more fitted look, size down. If you're between sizes, size up for comfort. All measurements are of the garment itself — not body measurements.",
+    fitNote: "Kay's tees are cut with a relaxed unisex fit. Use the garment measurements as the final fit check.",
     sizes: [
       { label:'S',  chest:[96,100],  length:[68,70],  shoulder:[43,44],  sleeve:[20,21]  },
       { label:'M',  chest:[100,104], length:[70,72],  shoulder:[45,46],  sleeve:[21,22]  },
@@ -2224,7 +2234,7 @@ const SIZE_DATA = {
     ],
   },
   hoodie: {
-    fitNote: "The hoodies are oversized and drop-shoulder by design — this is intentional. For a classic fit, size down one. For the full streetwear silhouette, go true to size. Measurements are of the garment.",
+    fitNote: "The hoodies are oversized and drop-shoulder by design. Use the garment measurements as the final fit check.",
     sizes: [
       { label:'S',  chest:[104,108], length:[64,66],  shoulder:[52,53],  sleeve:[59,61]  },
       { label:'M',  chest:[112,116], length:[66,68],  shoulder:[55,56],  sleeve:[61,63]  },
@@ -2234,7 +2244,7 @@ const SIZE_DATA = {
     ],
   },
   cap: {
-    fitNote: "Caps use an adjustable back closure. Use the head circumference range as the main fit reference.",
+    fitNote: "Caps use an adjustable back closure. Use head circumference as the main fit reference.",
     sizes: [
       { label:'One size', circumference:[54,60], crown:[16,17], brim:[7,8], closure:'Adjustable' },
       { label:'XL',       circumference:[60,64], crown:[17,18], brim:[7,8], closure:'Adjustable' },
@@ -2914,7 +2924,7 @@ function renderAdminProducts() {
   // ── Other products ────────────────────────────────────────────────────
   html += `<p class="admin-section-title" style="margin-top:1.6rem">Merch, notebooks &amp; stickers</p>
   <p style="font-size:0.82rem;color:var(--text-muted);line-height:1.6;margin-bottom:1rem">
-    Edit each product as its own item. Apparel can use size guides; notebooks, stickers, caps, totes, and other goods can use their own variant labels, prices, and stock.
+    Edit each product as its own item. Apparel merch such as tees, hoodies, and caps can use size guides; notebooks, stickers, totes, and other goods use their own variant labels, prices, and stock.
   </p>
   <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem">
     <button class="admin-save-btn ap-add-product" data-category="merch" style="margin:0;padding:0.55rem 0.8rem">+ Merch</button>
@@ -2931,6 +2941,19 @@ function renderAdminProducts() {
     items.forEach(raw => {
       const p = normalizeProduct(raw);
       const realIdx = SHOP_CONFIG.products.indexOf(raw);
+      const apparelAdminHtml = cat === 'merch' ? `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem">
+          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-muted);font-family:'Montserrat',sans-serif">
+            <input type="checkbox" class="ap-clothing" data-idx="${realIdx}" ${isApparelProduct(p) ? 'checked' : ''} style="accent-color:var(--rust)"/>
+            Apparel size guide
+          </label>
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Apparel type</label>
+            <select class="form-select ap-clothing-type" data-idx="${realIdx}">
+              ${['tee','hoodie','cap','other'].map(t => `<option value="${t}"${apparelTypeFor(p)===t?' selected':''}>${t}</option>`).join('')}
+            </select>
+          </div>
+        </div>` : '';
       const variantRows = (p.variants.length ? p.variants : ['One size']).map(v => `
         <div class="ap-variant-row" data-idx="${realIdx}" style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr auto;gap:0.4rem;align-items:center;margin-bottom:0.4rem">
           <input class="form-input ap-v-label" value="${escapeAttr(v)}" placeholder="Variant" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
@@ -2976,18 +2999,7 @@ function renderAdminProducts() {
           <label class="form-label">Image URL</label>
           <input class="form-input ap-img" data-idx="${realIdx}" value="${escapeAttr(p.image||'')}"/>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem">
-          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-muted);font-family:'Montserrat',sans-serif">
-            <input type="checkbox" class="ap-clothing" data-idx="${realIdx}" ${p.clothing ? 'checked' : ''} style="accent-color:var(--rust)"/>
-            Show apparel size guide
-          </label>
-          <div class="form-row" style="margin:0">
-            <label class="form-label">Apparel type</label>
-            <select class="form-select ap-clothing-type" data-idx="${realIdx}">
-              ${['tee','hoodie','cap','other'].map(t => `<option value="${t}"${(p.clothing_type||'tee')===t?' selected':''}>${t}</option>`).join('')}
-            </select>
-          </div>
-        </div>
+        ${apparelAdminHtml}
         <label class="form-label">Variants, prices &amp; stock</label>
         <div class="ap-variant-list" data-idx="${realIdx}">
           <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr auto;gap:0.4rem;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.35rem">
@@ -3190,8 +3202,13 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         const clothingEl = row.querySelector('.ap-clothing');
         const typeEl     = row.querySelector('.ap-clothing-type');
         if (catEl) p.category = catEl.value;
-        if (clothingEl) p.clothing = clothingEl.checked;
-        if (typeEl) p.clothing_type = typeEl.value;
+        if (p.category === 'merch') {
+          p.clothing = clothingEl ? clothingEl.checked : false;
+          p.clothing_type = typeEl ? typeEl.value : '';
+        } else {
+          p.clothing = false;
+          p.clothing_type = '';
+        }
 
         const variants = [];
         const nextNgn = {};
@@ -4084,3 +4101,5 @@ loadShopData();
 </script>
 </body>
 </html>
+
+
