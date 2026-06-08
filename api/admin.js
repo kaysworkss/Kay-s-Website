@@ -216,7 +216,7 @@ async function handleShopProducts(req, res, supabase) {
         name:               String(body.name || '').slice(0, 200),
         category:           String(body.category || 'prints').slice(0, 40),
         print_type:         String(body.print_type || '').slice(0, 40),
-        description:        String(body.desc || '').slice(0, 1000),
+        description:        String(body.description || body.desc || '').slice(0, 1000),
         emoji:              String(body.emoji || '✦').slice(0, 10),
         variants:           body.variants || [],
         available_variants: body.available_variants || [],
@@ -224,6 +224,23 @@ async function handleShopProducts(req, res, supabase) {
         prices_usd:         body.prices_usd || {},
         badge:              String(body.badge || '').slice(0, 60),
         image_url:          String(body.image_url || '').slice(0, 500),
+        images:             body.images || [],
+        slug:               body.slug ? String(body.slug).slice(0, 200) : null,
+        series_slug:        body.series_slug ? String(body.series_slug).slice(0, 200) : null,
+        series_name:        String(body.series_name || '').slice(0, 200),
+        series_desc:        String(body.series_desc || '').slice(0, 1000),
+        series_year:        String(body.series_year || '').slice(0, 20),
+        story:              String(body.story || ''),
+        process:            String(body.process || ''),
+        quote:              String(body.quote || '').slice(0, 500),
+        year:               String(body.year || '').slice(0, 20),
+        medium:             String(body.medium || '').slice(0, 200),
+        signed:             Boolean(body.signed),
+        is_large_print:     Boolean(body.is_large_print),
+        clothing:           Boolean(body.clothing),
+        clothing_type:      String(body.clothing_type || '').slice(0, 40),
+        stock:              body.stock === undefined || body.stock === null || body.stock === '' ? null : Number(body.stock),
+        stock_by_variant:   body.stock_by_variant || {},
         sort_order:         Number(body.sort_order) || 0,
         active:             body.active !== false,
       })
@@ -240,14 +257,19 @@ async function handleShopProducts(req, res, supabase) {
     const patch = {};
     if (body.name               !== undefined) patch.name               = String(body.name).slice(0, 200);
     if (body.category           !== undefined) patch.category           = String(body.category).slice(0, 40);
+    if (body.print_type         !== undefined) patch.print_type         = String(body.print_type).slice(0, 40);
     if (body.desc               !== undefined) patch.description        = String(body.desc).slice(0, 1000);
     if (body.description        !== undefined) patch.description        = String(body.description).slice(0, 1000);
+    if (body.emoji              !== undefined) patch.emoji              = String(body.emoji).slice(0, 10);
     if (body.variants           !== undefined) patch.variants           = body.variants;
     if (body.available_variants !== undefined) patch.available_variants = body.available_variants;
     if (body.prices_ngn         !== undefined) patch.prices_ngn         = body.prices_ngn;
     if (body.prices_usd         !== undefined) patch.prices_usd         = body.prices_usd;
     if (body.badge              !== undefined) patch.badge              = String(body.badge).slice(0, 60);
     if (body.image_url          !== undefined) patch.image_url          = String(body.image_url).slice(0, 500);
+    if (body.clothing           !== undefined) patch.clothing           = Boolean(body.clothing);
+    if (body.clothing_type      !== undefined) patch.clothing_type      = String(body.clothing_type).slice(0, 40);
+    if (body.stock              !== undefined) patch.stock              = body.stock === null || body.stock === '' ? null : Number(body.stock);
     if (body.sort_order         !== undefined) patch.sort_order         = Number(body.sort_order);
     if (body.active             !== undefined) patch.active             = Boolean(body.active);
     if (body.stock_by_variant   !== undefined) patch.stock_by_variant   = body.stock_by_variant;
