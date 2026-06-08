@@ -789,7 +789,8 @@ async function handleShopProducts(req, res, supabase) {
       .eq('active', true)
       .single();
     if (error) return res.status(error.code === 'PGRST116' ? 404 : 500).json({ error: error.message });
-    return res.status(200).json(data);
+    const [tagged] = await applyProductTags([data], supabase);
+    return res.status(200).json(tagged || data);
   }
 
   if (series) {
@@ -809,7 +810,58 @@ async function handleShopProducts(req, res, supabase) {
     .eq('active', true)
     .order('sort_order', { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json(data || []);
+
+  const tagged = await applyProductTags(data || [], supabase);
+  return res.status(200).json(tagged);
+}
+
+// Compute "new" (added in last 14 days) and "bestseller" (top 3 by total
+// quantity ordered) tags, returned alongside each product.
+async function applyProductTags(products, supabase) {
+  if (!products.length) return products;
+
+  // Tally ordered quantity per product id across all recorded orders.
+  const counts = {};
+  try {
+    const { data: orders } = await supabase
+      .from('shop_orders')
+      .select('items')
+      .limit(5000);
+    (orders || []).forEach(o => {
+      const items = Array.isArray(o.items) ? o.items : [];
+      items.forEach(it => {
+        const id = it && it.id;
+        const qty = Number(it && it.qty) || 0;
+        if (id) counts[id] = (counts[id] || 0) + qty;
+      });
+    });
+  } catch (e) {
+    // If orders can't be read, fall back to no bestseller tags.
+  }
+
+  // Top 3 product ids by quantity (only those with at least one sale).
+  const bestsellerIds = new Set(
+    Object.entries(counts)
+      .filter(([, n]) => n > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([id]) => id)
+  );
+
+  const NEW_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  return products.map(p => {
+    const created = p.created_at ? new Date(p.created_at).getTime() : 0;
+    const isNew = created > 0 && (now - created) <= NEW_WINDOW_MS;
+    const isBestseller = bestsellerIds.has(p.id);
+    return {
+      ...p,
+      is_new: isNew,
+      is_bestseller: isBestseller,
+      order_count: counts[p.id] || 0,
+    };
+  });
 }
 
 // ── POST /api/game?action=shop-order ──────────────────────────────────────────
