@@ -1701,23 +1701,32 @@ function apparelTypeFor(p) {
   return p.clothing_type || 'tee';
 }
 function ensureExampleSections() {
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   ['prints','merch','notebooks','stickers'].forEach(cat => {
-    const visibleIds = new Set(
-      SHOP_CONFIG.products
-        .filter(p => (p.category || '') === cat && p.active !== false)
-        .map(p => String(p.id || ''))
+    // A "real" product is one persisted in the DB (UUID id) or freshly added
+    // by the user (temp 'prod-…' id) — anything that is not a sample.
+    const hasReal = SHOP_CONFIG.products.some(p =>
+      (p.category || '') === cat &&
+      !p._isSample &&
+      (UUID_RE.test(String(p.id || '')) || String(p.id || '').startsWith('prod-'))
     );
+    // Drop any leftover samples for this category before re-deciding.
+    SHOP_CONFIG.products = SHOP_CONFIG.products.filter(p =>
+      !(p._isSample && (p.category || '') === cat));
+    if (hasReal) return; // category has real items — show no samples
+
     const examples = SHOP_DEFAULT_PRODUCTS.filter(p => p.category === cat);
     if (examples.length) {
       examples.forEach(example => {
-        if (!visibleIds.has(String(example.id || ''))) {
-          SHOP_CONFIG.products.push(JSON.parse(JSON.stringify(example)));
-        }
+        const copy = JSON.parse(JSON.stringify(example));
+        copy._isSample = true;
+        SHOP_CONFIG.products.push(copy);
       });
-      return;
+    } else {
+      const copy = defaultProduct(cat);
+      copy._isSample = true;
+      SHOP_CONFIG.products.push(copy);
     }
-    const hasVisible = SHOP_CONFIG.products.some(p => (p.category || '') === cat && p.active !== false);
-    if (!hasVisible) SHOP_CONFIG.products.push(defaultProduct(cat));
   });
 }
 function defaultProduct(category) {
@@ -3042,7 +3051,9 @@ function renderAdminProducts() {
       const idx   = Number(b.dataset.idx);
       const p     = SHOP_CONFIG.products[idx];
       const token = localStorage.getItem('kaysworks-admin-token');
-      if (p && token && !String(p.id).startsWith('prod-')) {
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      // Only real (UUID) products exist in the DB; samples/temp items are local only.
+      if (p && token && !p._isSample && UUID_RE.test(String(p.id))) {
         try { await apiDeleteProduct(p.id, token); } catch(e) { showToast('Delete failed: ' + e.message); return; }
       }
       SHOP_CONFIG.products.splice(idx, 1);
@@ -3196,6 +3207,16 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
       const p   = SHOP_CONFIG.products[idx];
       if (!p) return;
 
+      // If the admin edited a sample's name, treat it as a real product:
+      // drop the sample flag and give it a temp id so it saves as new.
+      if (p._isSample) {
+        const editedName = row.querySelector('.ap-name')?.value.trim();
+        if (editedName && editedName !== p.name) {
+          delete p._isSample;
+          p.id = 'prod-' + uid();
+        }
+      }
+
       const nameEl  = row.querySelector('.ap-name');
       const descEl  = row.querySelector('.ap-desc');
       const badgeEl = row.querySelector('.ap-badge');
@@ -3273,11 +3294,10 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
     });
 
     // Save all products to API and replace temporary/sample ids with real
-    // Supabase UUIDs. Products whose id is not a UUID (new items, or sample
-    // products edited in place) are POSTed as new rows; we then adopt the
-    // returned UUID so the next save PATCHes correctly instead of duplicating.
+    // Supabase UUIDs. Sample/placeholder products (_isSample) are never saved.
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     await Promise.all(SHOP_CONFIG.products.map(async p => {
+      if (p._isSample) return null;
       const saved = await apiSaveProduct(p, token);
       if (saved?.id && !UUID_RE.test(String(p.id))) p.id = saved.id;
       return saved;
