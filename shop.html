@@ -1324,6 +1324,25 @@ footer a:hover { color:var(--rust); }
         </div>
       </div>
 
+      <!-- Cap table -->
+      <div id="sgCapSection" style="display:none">
+        <p class="size-table-label">Cap — adjustable fit</p>
+        <div class="size-table-wrap">
+          <table class="size-table">
+            <thead>
+              <tr>
+                <th>Size</th>
+                <th>Head circumference <span class="sg-unit">(cm)</span></th>
+                <th>Crown height <span class="sg-unit">(cm)</span></th>
+                <th>Brim length <span class="sg-unit">(cm)</span></th>
+                <th>Closure</th>
+              </tr>
+            </thead>
+            <tbody id="sgCapBody"></tbody>
+          </table>
+        </div>
+      </div>
+
       <p class="size-fit-note" id="sgFitNote"></p>
     </div>
   </div>
@@ -1383,7 +1402,7 @@ footer a:hover { color:var(--rust); }
         <!-- Products -->
         <p class="admin-section-title" style="margin-top:1.4rem">Products</p>
         <div id="adminProducts"></div>
-        <button class="admin-add-btn" id="addProductBtn">+ Add product</button>
+        <button class="admin-add-btn" id="addProductBtn">+ Add print artwork</button>
 
         <button class="admin-save-btn" id="saveConfigBtn">Save configuration</button>
 
@@ -1620,6 +1639,8 @@ let SHOP_CONFIG = {
   ],
 };
 
+const SHOP_DEFAULT_PRODUCTS = SHOP_CONFIG.products.map(p => JSON.parse(JSON.stringify(p)));
+
 /* ─── Cart state ─── */
 let cart = [];
 let selectedVariants = {};
@@ -1640,6 +1661,69 @@ function keySize(key) { return String(key || '').includes('|') ? String(key).spl
 function keyType(key) { return String(key || '').includes('|') ? String(key).split('|')[0] : ''; }
 function escapeAttr(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escapeText(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function toVariantList(v) {
+  if (Array.isArray(v)) return v.map(String).filter(Boolean);
+  if (typeof v === 'string') return v.split(',').map(x => x.trim()).filter(Boolean);
+  return [];
+}
+function normalizeProduct(p) {
+  p.category = p.category || 'merch';
+  p.name = p.name || 'Untitled product';
+  p.desc = p.desc || p.description || '';
+  p.emoji = p.emoji || '✦';
+  if (p.category !== 'prints') p.variants = toVariantList(p.variants);
+  else p.variants = Array.isArray(p.variants) ? p.variants : [];
+  p.priceNgn = p.priceNgn || p.prices_ngn || {};
+  p.priceUsd = p.priceUsd || p.prices_usd || {};
+  p.badge = p.badge || '';
+  p.image = p.image || p.image_url || '';
+  p.stock_by_variant = p.stock_by_variant || {};
+  p.active = p.active !== false;
+  return p;
+}
+function ensureExampleSections() {
+  ['prints','merch','notebooks','stickers'].forEach(cat => {
+    const hasVisible = SHOP_CONFIG.products.some(p => (p.category || '') === cat && p.active !== false);
+    if (hasVisible) return;
+    const example = SHOP_DEFAULT_PRODUCTS.find(p => p.category === cat) || defaultProduct(cat);
+    SHOP_CONFIG.products.push(JSON.parse(JSON.stringify(example)));
+  });
+}
+function defaultProduct(category) {
+  const id = 'prod-' + uid();
+  if (category === 'notebooks') {
+    return normalizeProduct({
+      id, category, name: 'Sketch Journal',
+      desc: 'Lay-flat notebook for sketches, notes, and studio planning.',
+      emoji: '📓', variants: ['A5', 'A4'],
+      priceNgn: { A5: 18000, A4: 24000 },
+      priceUsd: { A5: 12, A4: 16 },
+      badge: '', image: '',
+    });
+  }
+  if (category === 'stickers') {
+    return normalizeProduct({
+      id, category, name: 'Studio Sticker Pack',
+      desc: 'Set of die-cut vinyl stickers for laptops, bottles, and sketchbooks.',
+      emoji: '✦', variants: ['Pack of 6'],
+      priceNgn: { 'Pack of 6': 4500 },
+      priceUsd: { 'Pack of 6': 3 },
+      badge: '', image: '',
+    });
+  }
+  return normalizeProduct({
+    id, category: 'merch', name: 'New T-Shirt',
+    desc: 'Heavyweight cotton merch piece with artwork detail.',
+    emoji: '👕', clothing: true, clothing_type: 'tee',
+    variants: ['S', 'M', 'L', 'XL'],
+    priceNgn: { S: 22000, M: 22000, L: 22000, XL: 24000 },
+    priceUsd: { S: 15, M: 15, L: 15, XL: 16 },
+    badge: '', image: '',
+  });
 }
 
 function defaultPrintOptionData() {
@@ -1940,6 +2024,7 @@ function wireVariantButton(btn) {
 }
 
 function renderProducts() {
+  SHOP_CONFIG.products = (SHOP_CONFIG.products || []).filter(p => p && p.active !== false).map(normalizeProduct);
   const grids = {
     prints: document.getElementById('printsGrid'),
     merch: document.getElementById('merchGrid'),
@@ -2148,6 +2233,13 @@ const SIZE_DATA = {
       { label:'XXL',chest:[136,140], length:[72,74],  shoulder:[64,65],  sleeve:[67,69]  },
     ],
   },
+  cap: {
+    fitNote: "Caps use an adjustable back closure. Use the head circumference range as the main fit reference.",
+    sizes: [
+      { label:'One size', circumference:[54,60], crown:[16,17], brim:[7,8], closure:'Adjustable' },
+      { label:'XL',       circumference:[60,64], crown:[17,18], brim:[7,8], closure:'Adjustable' },
+    ],
+  },
 };
 
 let _sgUnit = 'cm';
@@ -2163,8 +2255,20 @@ function formatRange(range, unit) {
 function renderSizeTable(type) {
   const data = SIZE_DATA[type];
   if (!data) return;
-  const tbody = document.getElementById('sg' + (type === 'tee' ? 'Tee' : 'Hoodie') + 'Body');
+  const bodyId = type === 'tee' ? 'sgTeeBody' : type === 'hoodie' ? 'sgHoodieBody' : 'sgCapBody';
+  const tbody = document.getElementById(bodyId);
   if (!tbody) return;
+  if (type === 'cap') {
+    tbody.innerHTML = data.sizes.map(s => `
+      <tr>
+        <td>${s.label}</td>
+        <td>${formatRange(s.circumference, _sgUnit)}</td>
+        <td>${formatRange(s.crown, _sgUnit)}</td>
+        <td>${formatRange(s.brim, _sgUnit)}</td>
+        <td>${s.closure}</td>
+      </tr>`).join('');
+    return;
+  }
   tbody.innerHTML = data.sizes.map(s => `
     <tr>
       <td>${s.label}</td>
@@ -2182,6 +2286,7 @@ function renderAllSizeTables() {
   });
   renderSizeTable('tee');
   renderSizeTable('hoodie');
+  renderSizeTable('cap');
 }
 
 function setUnit(unit) {
@@ -2192,17 +2297,19 @@ function setUnit(unit) {
 }
 
 function openSizeGuide(pid, name, type) {
-  _sgCurrentType = type || 'tee';
+  _sgCurrentType = SIZE_DATA[type] ? type : 'tee';
   document.getElementById('sizeGuideProductName').textContent = name;
 
   // Show/hide correct table section
   const isTee    = _sgCurrentType === 'tee';
   const isHoodie = _sgCurrentType === 'hoodie';
-  document.getElementById('sgTeeSection').style.display    = (isTee || !isHoodie) ? '' : 'none';
+  const isCap    = _sgCurrentType === 'cap';
+  document.getElementById('sgTeeSection').style.display    = isTee ? '' : 'none';
   document.getElementById('sgHoodieSection').style.display = isHoodie ? '' : 'none';
+  document.getElementById('sgCapSection').style.display    = isCap ? '' : 'none';
 
   // Fit note
-  const fitData = SIZE_DATA[_sgCurrentType] || SIZE_DATA['tee'];
+  const fitData = SIZE_DATA[_sgCurrentType] || SIZE_DATA.tee;
   document.getElementById('sgFitNote').textContent = fitData.fitNote;
 
   renderAllSizeTables();
@@ -2805,50 +2912,93 @@ function renderAdminProducts() {
   }
 
   // ── Other products ────────────────────────────────────────────────────
-  if (others.length) {
-    html += `<p class="admin-section-title" style="margin-top:1.6rem">Merch, notebooks &amp; stickers</p>`;
-    others.forEach(p => {
-      const realIdx = SHOP_CONFIG.products.indexOf(p);
-      html += `<div class="admin-product-row" data-idx="${realIdx}">
+  html += `<p class="admin-section-title" style="margin-top:1.6rem">Merch, notebooks &amp; stickers</p>
+  <p style="font-size:0.82rem;color:var(--text-muted);line-height:1.6;margin-bottom:1rem">
+    Edit each product as its own item. Apparel can use size guides; notebooks, stickers, caps, totes, and other goods can use their own variant labels, prices, and stock.
+  </p>
+  <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem">
+    <button class="admin-save-btn ap-add-product" data-category="merch" style="margin:0;padding:0.55rem 0.8rem">+ Merch</button>
+    <button class="admin-save-btn ap-add-product" data-category="notebooks" style="margin:0;padding:0.55rem 0.8rem">+ Notebook</button>
+    <button class="admin-save-btn ap-add-product" data-category="stickers" style="margin:0;padding:0.55rem 0.8rem">+ Sticker</button>
+  </div>`;
+
+  ['merch','notebooks','stickers'].forEach(cat => {
+    const items = others.filter(p => p.category === cat);
+    html += `<p class="admin-section-title" style="margin-top:1rem">${cat === 'merch' ? 'Merch' : cat.charAt(0).toUpperCase() + cat.slice(1)}</p>`;
+    if (!items.length) {
+      html += `<p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.8rem">No ${cat} products yet.</p>`;
+    }
+    items.forEach(raw => {
+      const p = normalizeProduct(raw);
+      const realIdx = SHOP_CONFIG.products.indexOf(raw);
+      const variantRows = (p.variants.length ? p.variants : ['One size']).map(v => `
+        <div class="ap-variant-row" data-idx="${realIdx}" style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr auto;gap:0.4rem;align-items:center;margin-bottom:0.4rem">
+          <input class="form-input ap-v-label" value="${escapeAttr(v)}" placeholder="Variant" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+          <input class="form-input ap-v-ngn" value="${productPrice(p, v, 'ngn') || ''}" placeholder="NGN" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+          <input class="form-input ap-v-usd" value="${productPrice(p, v, 'usd') || ''}" placeholder="USD" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+          <input class="form-input ap-v-stock" value="${p.stock_by_variant?.[v] ?? ''}" placeholder="Stock" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+          <button class="ap-remove-variant" type="button" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem" title="Remove">×</button>
+        </div>`).join('');
+      html += `<div class="admin-product-row" data-idx="${realIdx}" style="grid-template-columns:1fr;gap:0.7rem">
         <button class="admin-del-btn" data-idx="${realIdx}" title="Remove">✕</button>
-        <div style="grid-column:1/-1" class="admin-prod-name">${p.name}</div>
-        <div class="form-row">
-          <label class="form-label">Name</label>
-          <input class="form-input ap-name" data-idx="${realIdx}" value="${p.name}"/>
+        <div class="admin-prod-name">${escapeText(p.name)}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem">
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Name</label>
+            <input class="form-input ap-name" data-idx="${realIdx}" value="${escapeAttr(p.name)}"/>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Category</label>
+            <select class="form-select ap-cat" data-idx="${realIdx}">
+              ${['merch','notebooks','stickers'].map(c=>`<option value="${c}"${p.category===c?' selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
         </div>
-        <div class="form-row">
-          <label class="form-label">Category</label>
-          <select class="form-select ap-cat" data-idx="${realIdx}">
-            ${['prints','merch','notebooks','stickers'].map(c=>`<option${p.category===c?' selected':''}>${c}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-row" style="grid-column:1/-1">
+        <div class="form-row" style="margin:0">
           <label class="form-label">Description</label>
-          <input class="form-input ap-desc" data-idx="${realIdx}" value="${p.desc}"/>
+          <textarea class="form-input ap-desc" data-idx="${realIdx}" rows="2" style="resize:vertical">${escapeText(p.desc)}</textarea>
         </div>
-        <div class="form-row">
-          <label class="form-label">Variants (comma-separated)</label>
-          <input class="form-input ap-variants" data-idx="${realIdx}" value="${p.variants.join(', ')}"/>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.6rem">
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Emoji / icon</label>
+            <input class="form-input ap-emoji" data-idx="${realIdx}" value="${escapeAttr(p.emoji)}"/>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Badge</label>
+            <input class="form-input ap-badge" data-idx="${realIdx}" value="${escapeAttr(p.badge||'')}"/>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Overall stock</label>
+            <input class="form-input ap-stock" data-idx="${realIdx}" value="${p.stock ?? ''}" type="number" placeholder="Optional"/>
+          </div>
         </div>
-        <div class="form-row">
-          <label class="form-label">NGN prices (per variant, comma)</label>
-          <input class="form-input ap-ngn" data-idx="${realIdx}" value="${p.variants.map(v=>p.priceNgn[v]).join(', ')}"/>
+        <div class="form-row" style="margin:0">
+          <label class="form-label">Image URL</label>
+          <input class="form-input ap-img" data-idx="${realIdx}" value="${escapeAttr(p.image||'')}"/>
         </div>
-        <div class="form-row">
-          <label class="form-label">USD prices (per variant, comma)</label>
-          <input class="form-input ap-usd" data-idx="${realIdx}" value="${p.variants.map(v=>p.priceUsd[v]).join(', ')}"/>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem">
+          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-muted);font-family:'Montserrat',sans-serif">
+            <input type="checkbox" class="ap-clothing" data-idx="${realIdx}" ${p.clothing ? 'checked' : ''} style="accent-color:var(--rust)"/>
+            Show apparel size guide
+          </label>
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Apparel type</label>
+            <select class="form-select ap-clothing-type" data-idx="${realIdx}">
+              ${['tee','hoodie','cap','other'].map(t => `<option value="${t}"${(p.clothing_type||'tee')===t?' selected':''}>${t}</option>`).join('')}
+            </select>
+          </div>
         </div>
-        <div class="form-row">
-          <label class="form-label">Badge (optional)</label>
-          <input class="form-input ap-badge" data-idx="${realIdx}" value="${p.badge||''}"/>
+        <label class="form-label">Variants, prices &amp; stock</label>
+        <div class="ap-variant-list" data-idx="${realIdx}">
+          <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr auto;gap:0.4rem;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.35rem">
+            <span>Variant</span><span>NGN</span><span>USD</span><span>Stock</span><span></span>
+          </div>
+          ${variantRows}
         </div>
-        <div class="form-row">
-          <label class="form-label">Image URL (optional)</label>
-          <input class="form-input ap-img" data-idx="${realIdx}" value="${p.image||''}"/>
-        </div>
+        <button class="admin-save-btn ap-add-variant" type="button" data-idx="${realIdx}" style="margin:0;width:max-content;padding:0.5rem 0.8rem">+ Variant</button>
       </div>`;
     });
-  }
+  });
 
   el.innerHTML = html;
 
@@ -2863,6 +3013,44 @@ function renderAdminProducts() {
       }
       SHOP_CONFIG.products.splice(idx, 1);
       renderAdminProducts();
+    });
+  });
+
+  // Add merch / notebook / sticker products
+  el.querySelectorAll('.ap-add-product').forEach(btn => {
+    btn.addEventListener('click', () => {
+      SHOP_CONFIG.products.push(defaultProduct(btn.dataset.category || 'merch'));
+      renderAdminProducts();
+    });
+  });
+
+  // Add and remove variant rows for non-print products
+  el.querySelectorAll('.ap-add-variant').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const row = btn.closest('.admin-product-row');
+      const list = row.querySelector('.ap-variant-list');
+      const variant = document.createElement('div');
+      variant.className = 'ap-variant-row';
+      variant.style.cssText = 'display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr auto;gap:0.4rem;align-items:center;margin-bottom:0.4rem';
+      variant.innerHTML = `
+        <input class="form-input ap-v-label" value="" placeholder="Variant" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+        <input class="form-input ap-v-ngn" value="" placeholder="NGN" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+        <input class="form-input ap-v-usd" value="" placeholder="USD" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+        <input class="form-input ap-v-stock" value="" placeholder="Stock" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+        <button class="ap-remove-variant" type="button" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem" title="Remove">×</button>`;
+      list.appendChild(variant);
+      variant.querySelector('.ap-remove-variant').addEventListener('click', () => variant.remove());
+    });
+  });
+  el.querySelectorAll('.ap-remove-variant').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const row = btn.closest('.ap-variant-row');
+      const list = btn.closest('.ap-variant-list');
+      if (list.querySelectorAll('.ap-variant-row').length <= 1) {
+        showToast('Keep at least one variant');
+        return;
+      }
+      row.remove();
     });
   });
 
@@ -2963,10 +3151,14 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
       const descEl  = row.querySelector('.ap-desc');
       const badgeEl = row.querySelector('.ap-badge');
       const imgEl   = row.querySelector('.ap-img');
+      const emojiEl = row.querySelector('.ap-emoji');
+      const stockEl = row.querySelector('.ap-stock');
       if (nameEl)  p.name  = nameEl.value.trim() || p.name;
       if (descEl)  p.desc  = descEl.value.trim();
       if (badgeEl) p.badge = badgeEl.value.trim();
       if (imgEl)   p.image = imgEl.value.trim();
+      if (emojiEl) p.emoji = emojiEl.value.trim() || '✦';
+      if (stockEl) p.stock = stockEl.value === '' ? null : Number(stockEl.value);
 
       if (p.category === 'prints') {
         const nextAvailable = {};
@@ -2995,18 +3187,29 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         p.availableVariants = nextAvailable;
       } else {
         const catEl      = row.querySelector('.ap-cat');
-        const variantsEl = row.querySelector('.ap-variants');
-        const ngnEl      = row.querySelector('.ap-ngn');
-        const usdEl      = row.querySelector('.ap-usd');
+        const clothingEl = row.querySelector('.ap-clothing');
+        const typeEl     = row.querySelector('.ap-clothing-type');
         if (catEl) p.category = catEl.value;
-        if (variantsEl) {
-          const variants = variantsEl.value.split(',').map(v=>v.trim()).filter(Boolean);
-          const ngnVals  = ngnEl ? ngnEl.value.split(',').map(v=>Number(v.trim())||0) : [];
-          const usdVals  = usdEl ? usdEl.value.split(',').map(v=>Number(v.trim())||0) : [];
-          p.variants = variants;
-          p.priceNgn = {}; p.priceUsd = {};
-          variants.forEach((v,j) => { p.priceNgn[v] = ngnVals[j]||0; p.priceUsd[v] = usdVals[j]||0; });
-        }
+        if (clothingEl) p.clothing = clothingEl.checked;
+        if (typeEl) p.clothing_type = typeEl.value;
+
+        const variants = [];
+        const nextNgn = {};
+        const nextUsd = {};
+        const nextStock = {};
+        row.querySelectorAll('.ap-variant-row').forEach(vrow => {
+          const label = vrow.querySelector('.ap-v-label')?.value.trim();
+          if (!label) return;
+          variants.push(label);
+          nextNgn[label] = Number(vrow.querySelector('.ap-v-ngn')?.value) || 0;
+          nextUsd[label] = Number(vrow.querySelector('.ap-v-usd')?.value) || 0;
+          const stockVal = vrow.querySelector('.ap-v-stock')?.value;
+          if (stockVal !== '') nextStock[label] = Number(stockVal);
+        });
+        p.variants = variants.length ? variants : ['One size'];
+        p.priceNgn = nextNgn;
+        p.priceUsd = nextUsd;
+        p.stock_by_variant = nextStock;
       }
     });
 
@@ -3813,6 +4016,7 @@ async function loadShopData() {
     }
   });
 
+  ensureExampleSections();
   renderProducts();
 }
 
