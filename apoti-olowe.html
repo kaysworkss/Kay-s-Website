@@ -191,10 +191,13 @@
   /* ── HERO ── */
   .ao-hero {
     position: relative; overflow: hidden;
-    padding: 6rem 5rem 4.5rem;
+    padding: 6rem 3.5rem 4.5rem;
     border-bottom: 1px solid var(--divider);
     background: var(--bg); transition: background 0.35s;
   }
+  .ao-hero-inner { max-width: 980px; margin: 0 auto; position: relative; z-index: 1; text-align: center; }
+  .ao-hero-inner .ao-hero-meta { justify-content: center; }
+  .ao-hero-inner .ao-precursor-badge { margin-left: auto; margin-right: auto; }
   .ao-hero::before {
     content: '';
     position: absolute; top: -80px; right: -60px;
@@ -273,7 +276,7 @@
   }
 
   /* ── CONTENT ── */
-  .ao-content { max-width: 1300px; margin: 0 auto; padding: 0 5rem 6rem; }
+  .ao-content { max-width: 1600px; margin: 0 auto; padding: 0 3.5rem 6rem; }
 
   /* ── SECTIONS ── */
   .ao-section { padding: 4rem 0; border-bottom: 1px solid var(--divider); transition: border-color 0.35s; }
@@ -1232,15 +1235,28 @@
 
   /* ── GALLERY ── */
   .gal-intro-text { font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.75rem; transition: color 0.35s; }
-  .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px,100%),1fr)); gap: 1rem; }
-  .gal-item { cursor: none; }
+  /* Masonry via CSS columns — items flow into balanced columns and keep their
+     natural aspect ratios so tall/wide pieces breathe. */
+  .gal-grid {
+    column-count: 5;
+    column-gap: 1rem;
+  }
+  .gal-item {
+    cursor: none;
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 1.4rem;
+    display: inline-block;
+    width: 100%;
+  }
   .gal-img-wrap {
-    position: relative; width: 100%; aspect-ratio: 4/3;
+    position: relative; width: 100%;
     overflow: hidden; border-radius: 4px;
     border: 1px solid var(--divider); background: var(--surface);
     transition: border-color 0.35s;
   }
-  .gal-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.4s ease; }
+  .gal-img-wrap img { width: 100%; height: auto; object-fit: cover; display: block; transition: transform 0.4s ease; }
   .gal-item:hover .gal-img-wrap img { transform: scale(1.04); }
   .gal-overlay {
     position: absolute; inset: 0;
@@ -1260,6 +1276,12 @@
     color: var(--text-muted); letter-spacing: 0.02em; margin-top: 2px;
     transition: color 0.35s;
   }
+
+  /* Masonry responsive column counts */
+  @media (max-width: 1100px) { .gal-grid { column-count: 3; } }
+  @media (max-width: 760px)  { .gal-grid { column-count: 2; } }
+  @media (max-width: 460px)  { .gal-grid { column-count: 2; column-gap: 0.7rem; } .gal-item { margin-bottom: 0.9rem; } }
+
 
   /* ── LIGHTBOX ── */
   .lb-panel {
@@ -1377,7 +1399,10 @@
   }
 
   /* ── THREADS ── */
-  .ao-threads-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(220px,100%),1fr)); gap: 1rem; }
+  .ao-threads-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; }
+  @media (max-width: 1100px) { .ao-threads-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 760px)  { .ao-threads-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px)  { .ao-threads-grid { grid-template-columns: 1fr; } }
   .ao-thread-card {
     background: var(--surface); border: 1px solid var(--divider); border-radius: 4px;
     padding: 1.3rem; transition: background 0.2s, border-color 0.2s; text-decoration: none; display: block;
@@ -1612,6 +1637,7 @@
 
 <!-- ── HERO ── -->
 <header class="ao-hero">
+  <div class="ao-hero-inner">
   <p class="ao-eyebrow">Kaysworks · New Series · 2026</p>
   <h1 class="ao-title">Àpótí <em>Ọlọ́wẹ̀</em></h1>
   <p class="ao-subtitle">A six-chapter serialized art release</p>
@@ -1636,6 +1662,7 @@
   <button type="button" class="ao-puzzle-btn" data-script-open="ch1">
     <span>&#9632;</span> Enter the Story
   </button>
+  </div>
 </header>
 
 <!-- ── CONTENT ── -->
@@ -2624,6 +2651,12 @@ var IMGS = [
   {src:"images/tote bag front2.png",     title:"Totebag design",               sub:"Tote bag sample mockup"},
   {src:"images/merch.jpg",                      title:"Totebag design Motif",         sub:"Tote bag motif design"},
   {src:"images/back.png",               title:"Totebag design",               sub:"Tote bag sample mockup"},
+  {src:"images/ijoko 1.png",            title:"Ìjòkòó I",                      sub:"The Ìjòkòó set"},
+  {src:"images/ijoko 2.png",            title:"Ìjòkòó II",                     sub:"The Ìjòkòó set"},
+  {src:"images/ijoko 3.png",            title:"Ìjòkòó III",                    sub:"The Ìjòkòó set"},
+  {src:"images/ijoko 4.png",            title:"Ìjòkòó IV",                     sub:"The Ìjòkòó set"},
+  {src:"images/ijoko 5.png",            title:"Ìjòkòó V",                      sub:"The Ìjòkòó set"},
+  {src:"images/ijoko 6.png",            title:"Ìjòkòó VI",                     sub:"The Ìjòkòó set"},
 ];
 
 var grid = document.getElementById('galGrid');
