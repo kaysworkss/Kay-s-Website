@@ -301,6 +301,13 @@ nav.scrolled {
 }
 .print-option-picker,
 .size-picker { display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1.2rem; }
+.print-option-desc {
+  font-family:'Montserrat',sans-serif;
+  font-size:0.82rem;
+  line-height:1.7;
+  color:var(--text-muted);
+  margin:-0.55rem 0 1.1rem;
+}
 .size-chip {
   font-family:'Montserrat',sans-serif; font-size:0.62rem;
   letter-spacing:0.06em; font-weight:500;
@@ -533,6 +540,9 @@ function slugify(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/
 function printOptionKey(type, size) { return `${type}|${size}`; }
 function labelPrintOption(type, size) { return `${type} · ${size}`; }
 function escapeJs(s) { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function escapeAttr(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 function getPrintOptions(p) {
   const variants = Array.isArray(p.variants) ? p.variants : [];
@@ -544,13 +554,14 @@ function getPrintOptions(p) {
       const type = String(v.type || v.print_type || v.name || v.label || 'Print').trim();
       const sizes = (v.sizes || v.variants || []).map(String).filter(Boolean);
       const availableSizes = (v.available_sizes || v.available || v.available_variants || sizes).map(String).filter(Boolean);
-      return { type, sizes, availableSizes: availableSizes.length ? availableSizes : sizes };
+      return { type, desc: v.desc || v.description || '', sizes, availableSizes: availableSizes.length ? availableSizes : sizes };
     }).filter(o => o.type && o.sizes.length);
   }
 
   if (available && typeof available === 'object' && !Array.isArray(available)) {
     return Object.entries(available).map(([type, sizes]) => ({
       type,
+      desc: '',
       sizes: (Array.isArray(sizes) ? sizes : []).map(String).filter(Boolean),
       availableSizes: (Array.isArray(sizes) ? sizes : []).map(String).filter(Boolean),
     })).filter(o => o.type && o.sizes.length);
@@ -559,7 +570,7 @@ function getPrintOptions(p) {
   const type = String(p.print_type || p.medium || 'Giclee').replace(/\s+print$/i, '').trim() || 'Print';
   const sizes = variants.map(String).filter(Boolean);
   const availableSizes = (Array.isArray(available) && available.length ? available : sizes).map(String).filter(Boolean);
-  return sizes.length ? [{ type, sizes, availableSizes }] : [];
+  return sizes.length ? [{ type, desc: p.description || p.desc || '', sizes, availableSizes }] : [];
 }
 
 function availablePrintChoices(p) {
@@ -585,12 +596,12 @@ function initTheme() {
   const saved = localStorage.getItem('kaysworks-theme');
   const dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme:dark)').matches;
   document.body.classList.toggle('dark', dark);
-  document.getElementById('themeBtn').textContent = dark ? '☀️' : '🌙';
+  document.getElementById('themeBtn').textContent = dark ? 'Light' : 'Dark';
 }
 document.getElementById('themeBtn').addEventListener('click', () => {
   const isDark = document.body.classList.toggle('dark');
   localStorage.setItem('kaysworks-theme', isDark ? 'dark' : 'light');
-  document.getElementById('themeBtn').textContent = isDark ? '☀️' : '🌙';
+  document.getElementById('themeBtn').textContent = isDark ? 'Light' : 'Dark';
 });
 initTheme();
 
@@ -697,13 +708,13 @@ function renderProduct(p) {
 
   const optionChips = printOptions.map((opt, i) => `
     <button class="size-chip${i===0?' selected':''}"
-      data-type="${opt.type}" onclick="selectPrintType('${escapeJs(opt.type)}')">${opt.type}</button>
+      data-type="${escapeAttr(opt.type)}" onclick="selectPrintType('${escapeJs(opt.type)}')">${opt.type}</button>
   `).join('');
 
   const sizeChips = availSizes.map(size => {
     const key = printOptionKey(_selectedPrintType, size);
     return `<button class="size-chip${key===_selectedVariant?' selected':''}"
-      data-v="${key}" onclick="selectSize('${escapeJs(key)}')">${size}</button>`;
+      data-v="${escapeAttr(key)}" onclick="selectSize('${escapeJs(key)}')">${size}</button>`;
   }).join('');
 
   // Initial prices
@@ -718,7 +729,7 @@ function renderProduct(p) {
     ['Border',     'Minimum 1-inch white border'],
     ['Finish',     'Natural smooth matte'],
     ['Packaging',  p.is_large_print ? 'Rolled in protective archival tube' : 'Flat-packed in rigid board mailer'],
-    ['Signed',     p.signed ? 'Yes — hand signed by Kay' : 'Open edition'],
+    ['Signed',     p.signed ? 'Yes, hand signed by Kay' : 'Open edition'],
   ].filter(r => r[1]).map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
 
   // Story paragraphs
@@ -766,6 +777,7 @@ function renderProduct(p) {
         <div class="purchase-block">
           <p class="purchase-label">Choose your print option</p>
           <div class="print-option-picker">${optionChips}</div>
+          <p class="print-option-desc" id="printOptionDesc">${printOptions[0]?.desc || ''}</p>
           <p class="purchase-label">Choose your size</p>
           <div class="size-picker">${sizeChips}</div>
           <div class="price-row">
@@ -862,9 +874,11 @@ function selectPrintType(type) {
     .forEach(c => c.classList.toggle('selected', c.dataset.type === type));
   document.querySelector('.size-picker').innerHTML = sizes.map(size => {
     const key = printOptionKey(type, size);
-    return `<button class="size-chip${key===firstKey?' selected':''}" data-v="${key}" onclick="selectSize('${escapeJs(key)}')">${size}</button>`;
+    return `<button class="size-chip${key===firstKey?' selected':''}" data-v="${escapeAttr(key)}" onclick="selectSize('${escapeJs(key)}')">${size}</button>`;
   }).join('');
   const addBtn = document.getElementById('addBtn');
+  const descEl = document.getElementById('printOptionDesc');
+  if (descEl) descEl.textContent = opt?.desc || '';
   addBtn.disabled = !firstKey;
   addBtn.textContent = firstKey ? 'Add to bag' : 'Unavailable';
   if (firstKey) selectSize(firstKey);
@@ -897,7 +911,7 @@ function renderRelated(prints) {
     return `
       <a href="/shop/${p.slug || slugify(p.name)}" class="related-card">
         <div class="related-card-img">
-          ${p.image_url ? `<img src="${p.image_url}" alt="${p.name}" loading="lazy"/>` : (p.emoji || '🖼')}
+          ${p.image_url ? `<img src="${p.image_url}" alt="${p.name}" loading="lazy"/>` : (p.emoji || '=')}
         </div>
         <div class="related-card-body">
           <div class="related-card-title">${p.name}</div>

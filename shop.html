@@ -1866,13 +1866,13 @@ function buildPrintCard(p) {
 
   const typeSelectHtml = options.length > 1
     ? `<select class="print-type-select" data-pid="${p.id}" id="ptype-${p.id}" aria-label="Print option">
-        ${options.map(o => `<option value="${o.type}"${o.type===active.type?' selected':''}>${o.type}</option>`).join('')}
+        ${options.map(o => `<option value="${escapeAttr(o.type)}"${o.type===active.type?' selected':''}>${o.type}</option>`).join('')}
       </select>`
     : `<div class="print-type-single" id="ptype-${p.id}">${active.type}</div>`;
 
   const sizeChipsHtml = sizes.map((size, i) => {
     const key = printOptionKey(active.type, size);
-    return `<button class="variant-chip${i===0?' selected':''}" data-pid="${p.id}" data-v="${key}">${size}</button>`;
+    return `<button class="variant-chip${i===0?' selected':''}" data-pid="${p.id}" data-v="${escapeAttr(key)}">${size}</button>`;
   }).join('');
 
   const ngn = productPrice(p, defaultKey, 'ngn');
@@ -1913,7 +1913,7 @@ function refreshPrintOption(pid) {
   if (variantsEl) {
     variantsEl.innerHTML = sizes.map((size, i) => {
       const key = printOptionKey(active.type, size);
-      return `<button class="variant-chip${i===0?' selected':''}" data-pid="${pid}" data-v="${key}">${size}</button>`;
+      return `<button class="variant-chip${i===0?' selected':''}" data-pid="${pid}" data-v="${escapeAttr(key)}">${size}</button>`;
     }).join('');
     variantsEl.querySelectorAll('.variant-chip').forEach(btn => wireVariantButton(btn));
   }
@@ -2771,13 +2771,13 @@ function renderAdminProducts() {
           ${options.flatMap(opt => opt.sizes.map(size => {
             const key = printOptionKey(opt.type, size);
             const isAvail = (opt.availableSizes||[]).includes(size);
-            return `<div class="ap-size-row" data-idx="${realIdx}" data-type="${opt.type}" data-size="${size}" data-v="${key}" style="display:grid;grid-template-columns:auto 1.2fr 1fr 1fr 1fr auto;gap:0;align-items:center;padding:0.5rem 0.8rem;border-bottom:1px solid var(--border)">
-              <input type="checkbox" class="ap-size-check" data-idx="${realIdx}" data-type="${opt.type}" data-size="${size}" data-v="${key}" ${isAvail?'checked':''} style="margin-right:0.7rem;accent-color:var(--rust);width:14px;height:14px"/>
+            return `<div class="ap-size-row" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" data-size="${escapeAttr(size)}" data-v="${escapeAttr(key)}" style="display:grid;grid-template-columns:auto 1.2fr 1fr 1fr 1fr auto;gap:0;align-items:center;padding:0.5rem 0.8rem;border-bottom:1px solid var(--border)">
+              <input type="checkbox" class="ap-size-check" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" data-size="${escapeAttr(size)}" data-v="${escapeAttr(key)}" ${isAvail?'checked':''} style="margin-right:0.7rem;accent-color:var(--rust);width:14px;height:14px"/>
               <span style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--text)">${opt.type}</span>
               <span style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--text)">${size}</span>
-              <input class="form-input ap-size-ngn" data-idx="${realIdx}" data-v="${key}" value="${productPrice(p, key, 'ngn')||''}" placeholder="NGN" style="padding:0.35rem 0.5rem;font-size:0.78rem;margin:0 0.4rem 0 0"/>
-              <input class="form-input ap-size-usd" data-idx="${realIdx}" data-v="${key}" value="${productPrice(p, key, 'usd')||''}" placeholder="$" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
-              <button class="ap-remove-custom" data-idx="${realIdx}" data-type="${opt.type}" data-size="${size}" data-v="${key}" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem;transition:color 0.15s" title="Remove">×</button>
+              <input class="form-input ap-size-ngn" data-idx="${realIdx}" data-v="${escapeAttr(key)}" value="${productPrice(p, key, 'ngn')||''}" placeholder="NGN" style="padding:0.35rem 0.5rem;font-size:0.78rem;margin:0 0.4rem 0 0"/>
+              <input class="form-input ap-size-usd" data-idx="${realIdx}" data-v="${escapeAttr(key)}" value="${productPrice(p, key, 'usd')||''}" placeholder="$" style="padding:0.35rem 0.5rem"/>
+              <button class="ap-remove-custom" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" data-size="${escapeAttr(size)}" data-v="${escapeAttr(key)}" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem;transition:color 0.15s" title="Remove">×</button>
             </div>`;
           })).join('')}
         </div>
@@ -2982,8 +2982,8 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
             if (!nextAvailable[type]) nextAvailable[type] = [];
             nextAvailable[type].push(size);
           }
-          const ngnIn = row.querySelector(`.ap-size-ngn[data-v="${v}"]`);
-          const usdIn = row.querySelector(`.ap-size-usd[data-v="${v}"]`);
+          const ngnIn = Array.from(row.querySelectorAll('.ap-size-ngn')).find(input => input.dataset.v === v);
+          const usdIn = Array.from(row.querySelectorAll('.ap-size-usd')).find(input => input.dataset.v === v);
           if (ngnIn) p.priceNgn[v] = Number(ngnIn.value) || p.priceNgn[v];
           if (usdIn) p.priceUsd[v] = Number(usdIn.value) || p.priceUsd[v];
         });
