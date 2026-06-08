@@ -1169,7 +1169,7 @@ footer a:hover { color:var(--rust); }
 
         <!-- Paystack panel -->
         <div class="pay-panel active" id="panel-paystack">
-          <p class="pay-info">Pay securely in <strong>NGN</strong> via Paystack — cards, bank transfer, or USSD. Nigerian accounts supported natively.</p>
+          <p class="pay-info">Pay securely with <strong>Paystack</strong> — local orders are charged in <strong>NGN</strong>, while international card checkout can be initialized in <strong>USD</strong> when enabled on Kay's Paystack account.</p>
           <button class="submit-pay-btn" id="paystackPayBtn">Pay with Paystack</button>
         </div>
 
@@ -2673,6 +2673,33 @@ function getManualCryptoProof(chain) {
   return { payer_address: sender, payment_ref: txHash };
 }
 
+function revealManualCryptoFields(chain) {
+  const fields = document.getElementById(chain === 'tezos' ? 'tezosManualFields' : 'ethManualFields');
+  const btn = document.getElementById(chain === 'tezos' ? 'tezosManualBtn' : 'cryptoConfirmBtn');
+  if (!fields || !btn) return false;
+  if (fields.style.display === 'none' || !fields.style.display) {
+    fields.style.display = '';
+    btn.textContent = 'Confirm manual payment';
+    const firstInput = fields.querySelector('input');
+    if (firstInput) firstInput.focus();
+    return true;
+  }
+  return false;
+}
+
+function submitManualCrypto(chain) {
+  if (!validateForm()) return;
+  if (revealManualCryptoFields(chain)) return;
+  const proof = getManualCryptoProof(chain);
+  if (!proof) return;
+  const d = getFormData();
+  const method = chain === 'tezos' ? 'tezos' : 'eth';
+  const ref = proof.payment_ref;
+  getServerCheckoutQuote(d, method, proof)
+    .then(q => notifyOrder(d, ref, method, q.quote).then(() => showConfirmation(method, ref)))
+    .catch(e => showToast(e.message || 'Could not confirm crypto order'));
+}
+
 // Paystack is initialized server-side so the gateway amount cannot be tampered with in the browser.
 document.getElementById('paystackPayBtn').addEventListener('click', async ()=>{
   if(!validateForm()) return;
@@ -2693,14 +2720,7 @@ document.getElementById('paystackPayBtn').addEventListener('click', async ()=>{
 
 // ETH manual confirm (shown after rate loads, for wallets without MetaMask)
 document.getElementById('cryptoConfirmBtn').addEventListener('click', () => {
-  if (!validateForm()) return;
-  const proof = getManualCryptoProof('eth');
-  if (!proof) return;
-  const d = getFormData();
-  const ref = proof.payment_ref;
-  getServerCheckoutQuote(d, 'eth', proof)
-    .then(q => notifyOrder(d, ref, 'eth', q.quote).then(() => showConfirmation('eth', ref)))
-    .catch(e => showToast(e.message || 'Could not confirm crypto order'));
+  submitManualCrypto('eth');
 });
 
 // Notify via site-form API (reuse existing backend)
@@ -3768,8 +3788,6 @@ let _xtzPerUsd = null; // set by fetchCryptoRates()
     // Reveal ETH manual confirm button now that rate is known
     const ethManual = document.getElementById('cryptoConfirmBtn');
     if (ethManual) ethManual.style.display = '';
-    const ethManualFields = document.getElementById('ethManualFields');
-    if (ethManualFields) ethManualFields.style.display = '';
   }
   if (xtzPrice) {
     _xtzPerUsd = 1 / xtzPrice;
@@ -3845,14 +3863,10 @@ async function refreshCryptoRates() {
     if (ethPrice) {
       const ethManual = document.getElementById('cryptoConfirmBtn');
       if (ethManual) ethManual.style.display = '';
-      const ethManualFields = document.getElementById('ethManualFields');
-      if (ethManualFields) ethManualFields.style.display = '';
     }
     if (xtzPrice) {
       const xtzManual = document.getElementById('tezosManualBtn');
       if (xtzManual) xtzManual.style.display = '';
-      const xtzManualFields = document.getElementById('tezosManualFields');
-      if (xtzManualFields) xtzManualFields.style.display = '';
     }
 
     const ethPanel = document.getElementById('panel-eth');
@@ -4161,14 +4175,7 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
 
 // Manual confirm (fallback — user sent from wallet app directly)
 document.getElementById('tezosManualBtn').addEventListener('click', () => {
-  if (!validateForm()) return;
-  const proof = getManualCryptoProof('tezos');
-  if (!proof) return;
-  const d = getFormData();
-  const ref = proof.payment_ref;
-  getServerCheckoutQuote(d, 'tezos', proof)
-    .then(q => notifyOrder(d, ref, 'tezos', q.quote).then(() => showConfirmation('tezos', ref)))
-    .catch(e => showToast(e.message || 'Could not confirm Tezos order'));
+  submitManualCrypto('tezos');
 });
 
 // Re-render crypto panels whenever their tab becomes active
