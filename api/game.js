@@ -1,20 +1,21 @@
-/**
+﻿/**
  * /api/game
  *
  * Single consolidated file replacing:
- *   api/challenges.js              → GET  /api/challenges
- *   api/challenge.js               → GET  /api/challenge?id=<uuid>
- *   api/score.js                   → POST /api/score
- *   api/leaderboard/[challengeId]  → GET  /api/leaderboard?id=<uuid>
- *   api/hall-of-fame.js            → GET  /api/hall-of-fame
- *   api/notify-outbid.js           → POST /api/notify-outbid
+ *   api/challenges.js              â†’ GET  /api/challenges
+ *   api/challenge.js               â†’ GET  /api/challenge?id=<uuid>
+ *   api/score.js                   â†’ POST /api/score
+ *   api/leaderboard/[challengeId]  â†’ GET  /api/leaderboard?id=<uuid>
+ *   api/hall-of-fame.js            â†’ GET  /api/hall-of-fame
+ *   api/notify-outbid.js           â†’ POST /api/notify-outbid
  *
  * Routing via ?action= query param.
  */
 
+const crypto = require('crypto');
 const { getSupabase, cors, handleOptions } = require('./_lib');
 
-// ── Difficulty tiers ──────────────────────────────────────────────────────────
+// â”€â”€ Difficulty tiers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DIFF_TIERS = [
   { label: 'Cowrie',   cls: 'demo',   range: [1,    48]   },
   { label: 'Coral',    cls: 'easy',   range: [49,   250]  },
@@ -26,7 +27,7 @@ function tierForCount(n) {
   return DIFF_TIERS.find(t => n >= t.range[0] && n <= t.range[1]) || DIFF_TIERS[1];
 }
 
-// ── GET /api/game?action=challenges ──────────────────────────────────────────
+// â”€â”€ GET /api/game?action=challenges â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Returns all currently active challenges (starts_at <= now <= ends_at)
 async function handleChallenges(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -42,7 +43,7 @@ async function handleChallenges(req, res, supabase) {
 }
 
 
-// ── GET /api/game?action=upcoming ────────────────────────────────────────────
+// â”€â”€ GET /api/game?action=upcoming â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Returns all future challenges (starts_at > now), ordered soonest first
 async function handleUpcoming(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -56,7 +57,7 @@ async function handleUpcoming(req, res, supabase) {
   return res.status(200).json(data || []);
 }
 
-// ── GET /api/game?action=challenge&id=<uuid> ──────────────────────────────────
+// â”€â”€ GET /api/game?action=challenge&id=<uuid> â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleChallenge(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const id = req.query.id;
@@ -70,7 +71,7 @@ async function handleChallenge(req, res, supabase) {
   return res.status(200).json(data);
 }
 
-// ── POST /api/game?action=score ───────────────────────────────────────────────
+// â”€â”€ POST /api/game?action=score â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleScore(req, res, supabase) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -84,7 +85,7 @@ async function handleScore(req, res, supabase) {
   }
   const name = String(player_name).trim();
   if (name.length < 1 || name.length > 28) {
-    return res.status(400).json({ error: 'player_name must be 1–28 characters.' });
+    return res.status(400).json({ error: 'player_name must be 1â€“28 characters.' });
   }
   const wallet = wallet_address && String(wallet_address).trim().length > 0
     ? String(wallet_address).trim().slice(0, 100) : null;
@@ -140,7 +141,7 @@ async function handleScore(req, res, supabase) {
   return res.status(201).json({ id: score.id, rank });
 }
 
-// ── GET /api/game?action=leaderboard&id=<challenge_id> ───────────────────────
+// â”€â”€ GET /api/game?action=leaderboard&id=<challenge_id> â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleLeaderboard(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const id = req.query.id;
@@ -182,7 +183,7 @@ async function handleLeaderboard(req, res, supabase) {
   return res.status(200).json(best);
 }
 
-// ── GET /api/game?action=hall-of-fame ────────────────────────────────────────
+// â”€â”€ GET /api/game?action=hall-of-fame â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleHallOfFame(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const now = new Date().toISOString();
@@ -242,7 +243,7 @@ async function handleHallOfFame(req, res, supabase) {
   return res.status(200).json(results);
 }
 
-// ── POST /api/game?action=notify-outbid ──────────────────────────────────────
+// â”€â”€ POST /api/game?action=notify-outbid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Sends outbid email via Resend. Looks up email from collector_notifications
 // table in Supabase using the outbid wallet address + auction_id.
 async function handleNotifyOutbid(req, res) {
@@ -259,7 +260,7 @@ async function handleNotifyOutbid(req, res) {
   const RESEND_KEY    = process.env.RESEND_API_KEY;
 
   if (!RESEND_KEY || !SUPABASE_ANON) {
-    return res.status(500).json({ error: 'Server misconfigured — missing env vars' });
+    return res.status(500).json({ error: 'Server misconfigured â€” missing env vars' });
   }
 
   // 1. Look up the outbid wallet's email from Supabase
@@ -280,16 +281,16 @@ async function handleNotifyOutbid(req, res) {
   }
 
   // 2. Format display values
-  const shortOutbid = outbid_wallet.slice(0, 6) + '…' + outbid_wallet.slice(-4);
-  const shortBidder = (new_bidder || '').slice(0, 6) + '…' + (new_bidder || '').slice(-4);
-  const title       = art_title || 'an Àpótí Ọlọ́wẹ̀ piece';
+  const shortOutbid = outbid_wallet.slice(0, 6) + 'â€¦' + outbid_wallet.slice(-4);
+  const shortBidder = (new_bidder || '').slice(0, 6) + 'â€¦' + (new_bidder || '').slice(-4);
+  const title       = art_title || 'an Ã€pÃ³tÃ­ á»Œlá»Ìwáº¹Ì€ piece';
   const url         = auction_url || 'https://kaysworks.com/auction';
 
   // 3. Send email via Resend
   const emailBody = {
-    from:    'Àpótí Ọlọ́wẹ̀ Auction <auction@mail.kaysworks.com>',
+    from:    'Ã€pÃ³tÃ­ á»Œlá»Ìwáº¹Ì€ Auction <auction@mail.kaysworks.com>',
     to:      [email],
-    subject: `Ohhh — ${shortBidder} just swept in and took your crown`,
+    subject: `Ohhh â€” ${shortBidder} just swept in and took your crown`,
     html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -303,7 +304,7 @@ async function handleNotifyOutbid(req, res) {
       <table width="560" cellpadding="0" cellspacing="0" style="background:#2a1c14;border:1px solid rgba(196,132,90,0.25);border-radius:6px;overflow:hidden;max-width:560px;width:100%">
         <tr>
           <td style="padding:28px 32px 20px;border-bottom:1px solid rgba(196,132,90,0.18)">
-            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works · Live Auction</p>
+            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works Â· Live Auction</p>
             <h1 style="margin:0;font-family:'Georgia',serif;font-size:26px;font-weight:400;color:#e8d5b0;line-height:1.2">${title}</h1>
           </td>
         </tr>
@@ -313,7 +314,7 @@ async function handleNotifyOutbid(req, res) {
               <tr><td style="padding:18px 20px">
                 <p style="margin:0 0 10px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#c4845a;font-family:'Georgia',serif">You've been outbid</p>
                 <p style="margin:0 0 8px;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">${shortBidder} just dropped <strong style="color:#c4845a">${new_amount}</strong> and took your spot.</p>
-                <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">Are you going to let that stand? The Àpótí doesn't wait for anyone — and neither does this room.</p>
+                <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">Are you going to let that stand? The Ã€pÃ³tÃ­ doesn't wait for anyone â€” and neither does this room.</p>
               </td></tr>
             </table>
           </td>
@@ -342,13 +343,13 @@ async function handleNotifyOutbid(req, res) {
         </tr>
         <tr>
           <td style="padding:4px 32px 32px;text-align:center">
-            <a href="${url}" style="display:inline-block;background:#9e4f2e;color:#f5ede0;text-decoration:none;font-family:'Georgia',serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 32px;border-radius:4px">Bid back — reclaim your lead</a>
+            <a href="${url}" style="display:inline-block;background:#9e4f2e;color:#f5ede0;text-decoration:none;font-family:'Georgia',serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 32px;border-radius:4px">Bid back â€” reclaim your lead</a>
             <p style="margin:18px 0 0;font-size:12px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">This is your moment to respond. The auction is still live.</p>
           </td>
         </tr>
         <tr>
           <td style="padding:16px 32px;border-top:1px solid rgba(196,132,90,0.18);text-align:center">
-            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">© Kay's Works · <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
+            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">Â© Kay's Works Â· <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
           </td>
         </tr>
       </table>
@@ -372,7 +373,7 @@ async function handleNotifyOutbid(req, res) {
   }
 }
 
-// ── Shared helper: look up a bidder's email from collector_notifications ──────
+// â”€â”€ Shared helper: look up a bidder's email from collector_notifications â”€â”€â”€â”€â”€â”€
 async function _lookupBidderEmail(wallet, auction_id) {
   const SUPABASE_URL  = process.env.SUPABASE_URL || 'https://haijshusgcbdexfueunr.supabase.co';
   const SUPABASE_ANON = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -384,7 +385,7 @@ async function _lookupBidderEmail(wallet, auction_id) {
   return Array.isArray(rows) && rows.length > 0 ? rows[0].email : null;
 }
 
-// ── Shared helper: send via Resend ────────────────────────────────────────────
+// â”€â”€ Shared helper: send via Resend â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function _sendEmail(emailBody) {
   const RESEND_KEY = process.env.RESEND_API_KEY;
   if (!RESEND_KEY) throw new Error('Missing RESEND_API_KEY');
@@ -398,7 +399,7 @@ async function _sendEmail(emailBody) {
   return data;
 }
 
-// ── Shared email shell ────────────────────────────────────────────────────────
+// â”€â”€ Shared email shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function _emailShell(title, badgeColor, badgeLabel, headingHtml, bodyRowsHtml, ctaHtml) {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -412,7 +413,7 @@ function _emailShell(title, badgeColor, badgeLabel, headingHtml, bodyRowsHtml, c
       <table width="560" cellpadding="0" cellspacing="0" style="background:#2a1c14;border:1px solid rgba(196,132,90,0.25);border-radius:6px;overflow:hidden;max-width:560px;width:100%">
         <tr>
           <td style="padding:28px 32px 20px;border-bottom:1px solid rgba(196,132,90,0.18)">
-            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works · Live Auction</p>
+            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works Â· Live Auction</p>
             <h1 style="margin:0;font-family:'Georgia',serif;font-size:26px;font-weight:400;color:#e8d5b0;line-height:1.2">${title}</h1>
           </td>
         </tr>
@@ -434,7 +435,7 @@ function _emailShell(title, badgeColor, badgeLabel, headingHtml, bodyRowsHtml, c
         </tr>
         <tr>
           <td style="padding:16px 32px;border-top:1px solid rgba(196,132,90,0.18);text-align:center">
-            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">© Kay's Works · <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
+            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">Â© Kay's Works Â· <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
           </td>
         </tr>
       </table>
@@ -444,7 +445,7 @@ function _emailShell(title, badgeColor, badgeLabel, headingHtml, bodyRowsHtml, c
 </html>`;
 }
 
-// ── POST /api/game?action=notify-bid-confirm ──────────────────────────────────
+// â”€â”€ POST /api/game?action=notify-bid-confirm â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Email sent to the bidder themselves when their bid lands (first bid or retake).
 async function handleNotifyBidConfirm(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -458,17 +459,17 @@ async function handleNotifyBidConfirm(req, res) {
   }
   if (!email) return res.status(200).json({ sent: false, reason: 'No email registered' });
 
-  const title    = art_title   || 'an Àpótí Ọlọ́wẹ̀ piece';
+  const title    = art_title   || 'an Ã€pÃ³tÃ­ á»Œlá»Ìwáº¹Ì€ piece';
   const url      = auction_url || 'https://kaysworks.com/auction';
   const subject  = is_first
-    ? `The first bid is in — and it's YOU. ${amount} on ${title}`
+    ? `The first bid is in â€” and it's YOU. ${amount} on ${title}`
     : `Crown changed. You're back on top at ${amount}`;
   const badgeLabel = is_first ? 'First bid confirmed' : 'Lead reclaimed';
   const heading    = is_first
-    ? `<p style="margin:0 0 8px;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">YASSS. You just made history — first bid ever, <strong style="color:#c4845a">${amount}</strong>.</p>
-       <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">The energy just shifted in this room. That's YOU at the top. Kay is doing a backflip right now. Stay sharp — this won't last without you watching.</p>`
+    ? `<p style="margin:0 0 8px;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">YASSS. You just made history â€” first bid ever, <strong style="color:#c4845a">${amount}</strong>.</p>
+       <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">The energy just shifted in this room. That's YOU at the top. Kay is doing a backflip right now. Stay sharp â€” this won't last without you watching.</p>`
     : `<p style="margin:0 0 8px;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">You're back. <strong style="color:#c4845a">${amount}</strong> and the crown is yours again.</p>
-       <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">Kay sees your ${amount} and approves. You're the one to beat now. Protect that position — the room is watching.</p>`;
+       <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">Kay sees your ${amount} and approves. You're the one to beat now. Protect that position â€” the room is watching.</p>`;
   const bodyRows = `
     <tr>
       <td style="padding:0 32px 20px">
@@ -498,14 +499,14 @@ async function handleNotifyBidConfirm(req, res) {
   const html = _emailShell(title, 'rgba(107,124,92,0.12)', badgeLabel, heading, bodyRows, cta);
 
   try {
-    const data = await _sendEmail({ from: 'Àpótí Ọlọ́wẹ̀ Auction <auction@mail.kaysworks.com>', to: [email], subject, html });
+    const data = await _sendEmail({ from: 'Ã€pÃ³tÃ­ á»Œlá»Ìwáº¹Ì€ Auction <auction@mail.kaysworks.com>', to: [email], subject, html });
     return res.status(200).json({ sent: true, id: data.id });
   } catch (e) {
     return res.status(500).json({ error: 'Email send failed: ' + e.message });
   }
 }
 
-// ── POST /api/game?action=notify-winner ───────────────────────────────────────
+// â”€â”€ POST /api/game?action=notify-winner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Email sent to the winning bidder when the auction settles.
 async function handleNotifyWinner(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -519,12 +520,12 @@ async function handleNotifyWinner(req, res) {
   }
   if (!email) return res.status(200).json({ sent: false, reason: 'No email registered' });
 
-  const title   = art_title   || 'an Àpótí Ọlọ́wẹ̀ piece';
+  const title   = art_title   || 'an Ã€pÃ³tÃ­ á»Œlá»Ìwáº¹Ì€ piece';
   const url     = auction_url || 'https://kaysworks.com/auction';
-  const subject = `SOLD — ${amount}. ${title} is yours. Kay salutes you.`;
+  const subject = `SOLD â€” ${amount}. ${title} is yours. Kay salutes you.`;
 
-  const heading = `<p style="margin:0 0 8px;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">🏆 The gavel falls. <strong style="color:#c9993a">${amount}</strong> — SOLD.</p>
-    <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">You own a piece of the Àpótí Ọlọ́wẹ̀ story now. Kay made this for someone like you. Welcome to the collection.</p>`;
+  const heading = `<p style="margin:0 0 8px;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">ðŸ† The gavel falls. <strong style="color:#c9993a">${amount}</strong> â€” SOLD.</p>
+    <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">You own a piece of the Ã€pÃ³tÃ­ á»Œlá»Ìwáº¹Ì€ story now. Kay made this for someone like you. Welcome to the collection.</p>`;
 
   const bodyRows = `
     <tr>
@@ -556,14 +557,14 @@ async function handleNotifyWinner(req, res) {
   const html = _emailShell(title, 'rgba(201,153,58,0.12)', 'Auction won', heading, bodyRows, cta);
 
   try {
-    const data = await _sendEmail({ from: 'Àpótí Ọlọ́wẹ̀ Auction <auction@mail.kaysworks.com>', to: [email], subject, html });
+    const data = await _sendEmail({ from: 'Ã€pÃ³tÃ­ á»Œlá»Ìwáº¹Ì€ Auction <auction@mail.kaysworks.com>', to: [email], subject, html });
     return res.status(200).json({ sent: true, id: data.id });
   } catch (e) {
     return res.status(500).json({ error: 'Email send failed: ' + e.message });
   }
 }
 
-// ── POST /api/game?action=notify-bid ─────────────────────────────────────────
+// â”€â”€ POST /api/game?action=notify-bid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Sends a bid alert email to the site owner whenever a new bid is placed.
 async function handleNotifyBid(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -576,18 +577,18 @@ async function handleNotifyBid(req, res) {
 
   const RESEND_KEY = process.env.RESEND_API_KEY;
   if (!RESEND_KEY) {
-    return res.status(500).json({ error: 'Server misconfigured — missing RESEND_API_KEY' });
+    return res.status(500).json({ error: 'Server misconfigured â€” missing RESEND_API_KEY' });
   }
 
-  const shortBidder = bidder.slice(0, 6) + '…' + bidder.slice(-4);
-  const title       = art_title  || 'an Àpótí Ọlọ́wẹ̀ piece';
+  const shortBidder = bidder.slice(0, 6) + 'â€¦' + bidder.slice(-4);
+  const title       = art_title  || 'an Ã€pÃ³tÃ­ á»Œlá»Ìwáº¹Ì€ piece';
   const url         = auction_url || 'https://kaysworks.com/auction';
-  const auctionRef  = auction_id  ? ` (${auction_id.slice(0, 8)}…)` : '';
+  const auctionRef  = auction_id  ? ` (${auction_id.slice(0, 8)}â€¦)` : '';
 
   const emailBody = {
-    from:    'Àpótí Ọlọ́wẹ̀ Auction <auction@mail.kaysworks.com>',
+    from:    'Ã€pÃ³tÃ­ á»Œlá»Ìwáº¹Ì€ Auction <auction@mail.kaysworks.com>',
     to:      ['oyeniyikayode4@gmail.com'],
-    subject: `New bid — ${amount} on ${title}`,
+    subject: `New bid â€” ${amount} on ${title}`,
     html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -601,7 +602,7 @@ async function handleNotifyBid(req, res) {
       <table width="560" cellpadding="0" cellspacing="0" style="background:#2a1c14;border:1px solid rgba(196,132,90,0.25);border-radius:6px;overflow:hidden;max-width:560px;width:100%">
         <tr>
           <td style="padding:28px 32px 20px;border-bottom:1px solid rgba(196,132,90,0.18)">
-            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works · Live Auction</p>
+            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works Â· Live Auction</p>
             <h1 style="margin:0;font-family:'Georgia',serif;font-size:26px;font-weight:400;color:#e8d5b0;line-height:1.2">${title}</h1>
           </td>
         </tr>
@@ -645,7 +646,7 @@ async function handleNotifyBid(req, res) {
         </tr>
         <tr>
           <td style="padding:16px 32px;border-top:1px solid rgba(196,132,90,0.18);text-align:center">
-            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">© Kay's Works · <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
+            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">Â© Kay's Works Â· <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
           </td>
         </tr>
       </table>
@@ -772,7 +773,7 @@ async function handleCrosschainClaim(req, res, supabase) {
   return res.status(409).json({ ok: false, claim: data || null, error: 'PAIR_ALREADY_CLAIMED' });
 }
 
-// ── GET /api/game?action=shop-products ────────────────────────────────────────
+// â”€â”€ GET /api/game?action=shop-products â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Optional ?slug=apoti-olowe-study-i for single product
 // Optional ?series=apoti-olowe for all prints in a series
 async function handleShopProducts(req, res, supabase) {
@@ -864,46 +865,505 @@ async function applyProductTags(products, supabase) {
   });
 }
 
-// ── POST /api/game?action=shop-order ──────────────────────────────────────────
+// â”€â”€ POST /api/game?action=shop-order â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Records an order and decrements stock per variant.
 // Called from shop.html after payment confirmation.
-async function handleShopOrder(req, res, supabase) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const body = req.body || {};
-  const items = Array.isArray(body.items) ? body.items : [];
-  if (!items.length) return res.status(400).json({ error: 'No items in order' });
 
-  // 1. Check stock for all items before doing anything
+// Server-authoritative delivery rates â€” MUST mirror DELIVERY_RATES in shop.html.
+// Client-sent fees/totals are never trusted; everything is recomputed here.
+const SERVER_DELIVERY_RATES = {
+  'pickup':   { small: { ngn: 0,    usd: 0  }, large: { ngn: 0,    usd: 0  } },
+  'NG-other': { small: { ngn: 4500, usd: 0  }, large: { ngn: 6500, usd: 0  } },
+  'WA':       { small: { ngn: 0,    usd: 22 }, large: { ngn: 0,    usd: 30 } },
+  'EU':       { small: { ngn: 0,    usd: 35 }, large: { ngn: 0,    usd: 48 } },
+  'NA':       { small: { ngn: 0,    usd: 42 }, large: { ngn: 0,    usd: 58 } },
+  'AO':       { small: { ngn: 0,    usd: 50 }, large: { ngn: 0,    usd: 68 } },
+  'ROW':      { small: { ngn: 0,    usd: 48 }, large: { ngn: 0,    usd: 62 } },
+};
+const SERVER_LARGE_PRINT_VARIANTS = ['12Ã—16"', '12Ã—18"', '18Ã—24"', '24Ã—36"'];
+const NGN_PER_USD = 1600;
+
+// Look up the authoritative price for a variant from a product row.
+function serverVariantPrice(product, variantKey, variant, currency) {
+  const prices = currency === 'usd' ? (product.prices_usd || {}) : (product.prices_ngn || {});
+  if (variantKey && prices[variantKey] !== undefined) return Number(prices[variantKey]) || 0;
+  if (variant && prices[variant] !== undefined) return Number(prices[variant]) || 0;
+  // Fall back to the size segment of a "type|size" key.
+  const size = String(variantKey || variant || '').split('|').pop();
+  if (size && prices[size] !== undefined) return Number(prices[size]) || 0;
+  return 0;
+}
+
+function serverDeliveryFee(zone, hasLarge, currency) {
+  const z = SERVER_DELIVERY_RATES[zone] || SERVER_DELIVERY_RATES['ROW'];
+  const tier = hasLarge ? z.large : z.small;
+  if (currency === 'usd') {
+    if (tier.usd > 0) return tier.usd;
+    return tier.ngn > 0 ? +(tier.ngn / NGN_PER_USD).toFixed(2) : 0;
+  }
+  if (tier.ngn > 0) return tier.ngn;
+  return tier.usd > 0 ? Math.round(tier.usd * NGN_PER_USD) : 0;
+}
+
+async function computeShopCheckout(body, supabase) {
+  const items = Array.isArray(body.items) ? body.items : [];
+  if (!items.length) {
+    const err = new Error('No items in order');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const productCache = {};
   for (const item of items) {
-    if (!item.id || !item.variant || !item.qty) continue;
-    const { data: product, error } = await supabase
+    if (!item.id || productCache[item.id]) continue;
+    const { data: product } = await supabase
       .from('shop_products')
-      .select('stock, stock_by_variant, name')
+      .select('*')
       .eq('id', item.id)
       .single();
-    if (error) continue; // no stock tracking on this product — allow
+    if (product) productCache[item.id] = product;
+  }
 
-    // Per-variant stock check
+  for (const item of items) {
+    if (!item.id || !item.variant || !item.qty) continue;
+    const vkey = item.variantKey || item.variant;
+    const product = productCache[item.id];
+    if (!product) continue;
+
     const stockByVariant = product.stock_by_variant || {};
-    if (stockByVariant[item.variant] !== undefined) {
-      if (stockByVariant[item.variant] < item.qty) {
-        return res.status(409).json({
-          error: `Only ${stockByVariant[item.variant]} left in stock for ${product.name} · ${item.variant}`,
-          product_id: item.id, variant: item.variant,
-        });
-      }
-    } else if (product.stock !== null && product.stock !== undefined) {
-      // Flat stock check
-      if (product.stock < item.qty) {
-        return res.status(409).json({
-          error: `Only ${product.stock} left in stock for ${product.name}`,
-          product_id: item.id,
-        });
-      }
+    const sv = stockByVariant[vkey] !== undefined ? stockByVariant[vkey] : stockByVariant[item.variant];
+    if (sv !== undefined && sv < item.qty) {
+      const err = new Error(`Only ${sv} left in stock for ${product.name} · ${item.variant}`);
+      err.statusCode = 409;
+      err.product_id = item.id;
+      err.variant = item.variant;
+      throw err;
+    }
+    if (sv === undefined && product.stock !== null && product.stock !== undefined && product.stock < item.qty) {
+      const err = new Error(`Only ${product.stock} left in stock for ${product.name}`);
+      err.statusCode = 409;
+      err.product_id = item.id;
+      throw err;
     }
   }
 
-  // 2. Insert order
+  let subtotalNgn = 0, subtotalUsd = 0, hasLarge = false;
+  const trustedItems = [];
+  for (const item of items) {
+    if (!item.id || !item.variant || !item.qty) continue;
+    const product = productCache[item.id];
+    if (!product) {
+      const err = new Error(`Unknown product in order: ${item.id}`);
+      err.statusCode = 400;
+      throw err;
+    }
+    const vkey = item.variantKey || item.variant;
+    const qty = Math.max(1, Number(item.qty) || 1);
+    const priceNgn = serverVariantPrice(product, vkey, item.variant, 'ngn');
+    const priceUsd = serverVariantPrice(product, vkey, item.variant, 'usd');
+    subtotalNgn += priceNgn * qty;
+    subtotalUsd += priceUsd * qty;
+    if (product.category === 'prints' &&
+        (product.is_large_print === true || SERVER_LARGE_PRINT_VARIANTS.includes(item.variant))) {
+      hasLarge = true;
+    }
+    trustedItems.push({
+      id: item.id,
+      name: product.name,
+      variant: item.variant,
+      variantKey: vkey,
+      qty,
+      priceNgn,
+      priceUsd,
+    });
+  }
+
+  const zone = String(body.delivery_zone || 'pickup');
+  const method = String(body.delivery_method || 'pickup');
+  const deliveryNgn = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'ngn') : 0;
+  const deliveryUsd = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'usd') : 0;
+  const totalNgn = subtotalNgn + deliveryNgn;
+  const totalUsd = +(subtotalUsd + deliveryUsd).toFixed(2);
+
+  return {
+    productCache,
+    trustedItems,
+    hasLarge,
+    zone,
+    method,
+    subtotalNgn,
+    subtotalUsd: +subtotalUsd.toFixed(2),
+    deliveryNgn,
+    deliveryUsd,
+    totalNgn,
+    totalUsd,
+  };
+}
+
+function shopQuoteSecret() {
+  return process.env.SHOP_QUOTE_SECRET
+      || process.env.ADMIN_SESSION_SECRET
+      || process.env.SUPABASE_SERVICE_ROLE_KEY
+      || 'dev-shop-quote-secret';
+}
+
+function signShopQuote(payload) {
+  return crypto.createHmac('sha256', shopQuoteSecret()).update(JSON.stringify(payload)).digest('hex');
+}
+
+function makeShopQuote(checkout, extra = {}) {
+  const now = Date.now();
+  const payload = {
+    v: 1,
+    iat: now,
+    exp: now + 15 * 60 * 1000,
+    items: checkout.trustedItems.map(i => ({ id: i.id, variantKey: i.variantKey, qty: i.qty })),
+    delivery_method: checkout.method,
+    delivery_zone: checkout.zone,
+    subtotal_ngn: checkout.subtotalNgn,
+    subtotal_usd: checkout.subtotalUsd,
+    delivery_fee_ngn: checkout.deliveryNgn,
+    delivery_fee_usd: checkout.deliveryUsd,
+    total_ngn: checkout.totalNgn,
+    total_usd: checkout.totalUsd,
+    ...extra,
+  };
+  return { ...payload, sig: signShopQuote(payload) };
+}
+
+function verifyShopQuote(quote, checkout, expected = {}) {
+  if (!quote || typeof quote !== 'object') return false;
+  const { sig, ...payload } = quote;
+  if (!sig || Date.now() > Number(payload.exp || 0)) return false;
+  const expectedSig = signShopQuote(payload);
+  const sigBuf = Buffer.from(String(sig), 'hex');
+  const expectedBuf = Buffer.from(expectedSig, 'hex');
+  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return false;
+  if (Number(payload.total_ngn) !== checkout.totalNgn) return false;
+  if (Number(payload.total_usd) !== checkout.totalUsd) return false;
+  if (String(payload.delivery_method) !== checkout.method) return false;
+  if (String(payload.delivery_zone) !== checkout.zone) return false;
+  const quoteItems = JSON.stringify(payload.items || []);
+  const trustedItems = JSON.stringify(checkout.trustedItems.map(i => ({ id: i.id, variantKey: i.variantKey, qty: i.qty })));
+  if (quoteItems !== trustedItems) return false;
+  for (const [key, value] of Object.entries(expected)) {
+    if (value !== undefined && String(payload[key] || '') !== String(value)) return false;
+  }
+  return true;
+}
+
+function jsonError(res, e) {
+  return res.status(e.statusCode || 500).json({
+    error: e.message || 'Server error',
+    product_id: e.product_id,
+    variant: e.variant,
+  });
+}
+
+async function fetchServerCryptoPrice(asset) {
+  const symbol = asset === 'xtz' ? 'XTZUSDT' : 'ETHUSDT';
+  const coingeckoId = asset === 'xtz' ? 'tezos' : 'ethereum';
+  async function withTimeout(promise, ms) {
+    return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
+  }
+  async function binance() {
+    const r = await withTimeout(fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`), 3500);
+    if (!r.ok) throw new Error('binance rate failed');
+    const d = await r.json();
+    const price = Number(d.price);
+    if (!price || price <= 0) throw new Error('bad binance rate');
+    return price;
+  }
+  async function coingecko() {
+    const r = await withTimeout(fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoId}&vs_currencies=usd`), 3500);
+    if (!r.ok) throw new Error('coingecko rate failed');
+    const d = await r.json();
+    const price = Number(d?.[coingeckoId]?.usd);
+    if (!price || price <= 0) throw new Error('bad coingecko rate');
+    return price;
+  }
+  try {
+    return await Promise.any([binance(), coingecko()]);
+  } catch (_) {
+    return null;
+  }
+}
+
+async function handleShopQuote(req, res, supabase) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const body = req.body || {};
+    const checkout = await computeShopCheckout(body, supabase);
+    const method = String(body.payment_method || '').slice(0, 40);
+    const payerAddress = String(body.payer_address || '').slice(0, 120);
+    const paymentRef = String(body.payment_ref || '').slice(0, 200);
+    const extra = { payment_method: method };
+    if (payerAddress) extra.payer_address = payerAddress;
+    if (paymentRef) extra.payment_ref = paymentRef;
+    if (method === 'eth' || method === 'tezos') {
+      const asset = method === 'tezos' ? 'xtz' : 'eth';
+      const price = await fetchServerCryptoPrice(asset);
+      if (!price) return res.status(503).json({ error: `${asset.toUpperCase()} rate unavailable` });
+      extra.crypto_asset = asset;
+      extra.crypto_usd_price = price;
+      extra.crypto_amount = asset === 'eth'
+        ? +(checkout.totalUsd / price).toFixed(6)
+        : +(checkout.totalUsd / price).toFixed(4);
+    } else if (method === 'usdc' || method === 'usdt') {
+      extra.crypto_asset = method;
+      extra.crypto_amount = +checkout.totalUsd.toFixed(2);
+    }
+    const quote = makeShopQuote(checkout, extra);
+    return res.status(200).json({ ok: true, quote, checkout });
+  } catch (e) {
+    return jsonError(res, e);
+  }
+}
+
+async function handleShopPaymentInit(req, res, supabase) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const body = req.body || {};
+    const provider = String(body.provider || '').toLowerCase();
+    if (!['paystack','flutterwave'].includes(provider)) {
+      return res.status(400).json({ error: 'Unsupported payment provider' });
+    }
+    const checkout = await computeShopCheckout(body, supabase);
+    const reference = `${provider === 'paystack' ? 'KW' : 'KW-FW'}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    const quote = makeShopQuote(checkout, { payment_method: provider, payment_ref: reference });
+    const email = String(body.email || '').slice(0, 320);
+    const name = String(body.name || '').slice(0, 200);
+    const phone = String(body.phone || '').slice(0, 60);
+    const callbackUrl = String(body.callback_url || '').slice(0, 500);
+
+    if (provider === 'paystack') {
+      const secret = process.env.PAYSTACK_SECRET_KEY;
+      if (!secret) return res.status(500).json({ error: 'Paystack secret key not configured' });
+      const r = await fetch('https://api.paystack.co/transaction/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
+        body: JSON.stringify({
+          email,
+          amount: checkout.totalNgn * 100,
+          currency: 'NGN',
+          reference,
+          callback_url: callbackUrl || undefined,
+          metadata: { name, phone, quote },
+        }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || data.status === false) throw new Error(data.message || 'Paystack initialization failed');
+      return res.status(200).json({ ok: true, provider, reference, quote, checkout, ...data.data });
+    }
+
+    const secret = process.env.FLUTTERWAVE_SECRET_KEY;
+    if (!secret) return res.status(500).json({ error: 'Flutterwave secret key not configured' });
+    const r = await fetch('https://api.flutterwave.com/v3/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
+      body: JSON.stringify({
+        tx_ref: reference,
+        amount: checkout.totalNgn,
+        currency: 'NGN',
+        redirect_url: callbackUrl || undefined,
+        customer: { email, name, phonenumber: phone },
+        customizations: { title: "Kay's Works", description: 'Shop order' },
+        meta: { quote },
+      }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || data.status === 'error') throw new Error(data.message || 'Flutterwave initialization failed');
+    return res.status(200).json({ ok: true, provider, reference, quote, checkout, link: data.data?.link });
+  } catch (e) {
+    return jsonError(res, e);
+  }
+}
+
+const ERC20_CONTRACTS = {
+  usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  usdt: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+};
+const ERC20_DECIMALS = { usdc: 6, usdt: 6 };
+const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+
+function normEvmAddress(addr) {
+  return String(addr || '').trim().toLowerCase();
+}
+
+function evmTopicAddress(topic) {
+  const t = String(topic || '').toLowerCase();
+  return t.startsWith('0x') && t.length === 66 ? '0x' + t.slice(26) : '';
+}
+
+function decimalToUnits(value, decimals) {
+  const [whole, frac = ''] = String(value || '0').split('.');
+  const padded = (frac + '0'.repeat(decimals)).slice(0, decimals);
+  return BigInt(whole || '0') * (10n ** BigInt(decimals)) + BigInt(padded || '0');
+}
+
+async function ethRpc(method, params = []) {
+  const rpcUrl = process.env.ETH_RPC_URL || process.env.EVM_RPC_URL;
+  if (!rpcUrl) {
+    const err = new Error('ETH_RPC_URL is required for on-chain crypto verification');
+    err.statusCode = 503;
+    throw err;
+  }
+  const r = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok || data.error) throw new Error(data.error?.message || `Ethereum RPC ${method} failed`);
+  return data.result;
+}
+
+async function getShopPaymentAddresses(supabase) {
+  const { data } = await supabase
+    .from('shop_config')
+    .select('eth_address, tezos_address')
+    .order('id', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return {
+    eth: process.env.SHOP_ETH_ADDRESS || data?.eth_address || '',
+    tezos: process.env.SHOP_TEZOS_ADDRESS || data?.tezos_address || '',
+  };
+}
+
+async function verifyEvmPayment({ method, txHash, payerAddress, quote, payeeAddress }) {
+  if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) throw new Error('Invalid Ethereum transaction hash');
+  const tx = await ethRpc('eth_getTransactionByHash', [txHash]);
+  const receipt = await ethRpc('eth_getTransactionReceipt', [txHash]);
+  if (!tx || !receipt) {
+    const err = new Error('Transaction is not confirmed yet');
+    err.statusCode = 409;
+    throw err;
+  }
+  if (String(receipt.status).toLowerCase() !== '0x1') throw new Error('Transaction failed on-chain');
+  const latestBlockHex = await ethRpc('eth_blockNumber', []);
+  const confirmations = Number(BigInt(latestBlockHex) - BigInt(receipt.blockNumber) + 1n);
+  const minConfirmations = Number(process.env.CRYPTO_MIN_CONFIRMATIONS || 1);
+  if (confirmations < minConfirmations) {
+    const err = new Error(`Waiting for ${minConfirmations} confirmation(s)`);
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const claimedFrom = normEvmAddress(payerAddress);
+  const expectedTo = normEvmAddress(payeeAddress);
+  if (!expectedTo) throw new Error('Shop ETH address is not configured');
+
+  if (method === 'eth') {
+    if (normEvmAddress(tx.from) !== claimedFrom) throw new Error('Transaction sender does not match claimed wallet');
+    if (normEvmAddress(tx.to) !== expectedTo) throw new Error('Transaction was not sent to the shop wallet');
+    const paidWei = BigInt(tx.value || '0x0');
+    const requiredWei = decimalToUnits(quote.crypto_amount, 18);
+    if (paidWei < requiredWei) throw new Error('Transaction amount is below the quoted ETH amount');
+    return { confirmations, received_amount: Number(paidWei) / 1e18 };
+  }
+
+  const contract = normEvmAddress(ERC20_CONTRACTS[method]);
+  const decimals = ERC20_DECIMALS[method];
+  const required = decimalToUnits(quote.crypto_amount, decimals);
+  const matchingLog = (receipt.logs || []).find(log =>
+    normEvmAddress(log.address) === contract &&
+    String(log.topics?.[0] || '').toLowerCase() === ERC20_TRANSFER_TOPIC &&
+    evmTopicAddress(log.topics?.[1]) === claimedFrom &&
+    evmTopicAddress(log.topics?.[2]) === expectedTo &&
+    BigInt(log.data || '0x0') >= required
+  );
+  if (!matchingLog) throw new Error(`${method.toUpperCase()} transfer to the shop wallet was not found for the quoted amount`);
+  return { confirmations, received_amount: Number(BigInt(matchingLog.data || '0x0')) / (10 ** decimals) };
+}
+
+async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress }) {
+  if (!/^o[1-9A-HJ-NP-Za-km-z]{50}$/.test(opHash)) throw new Error('Invalid Tezos operation hash');
+  if (!payeeAddress) throw new Error('Shop Tezos address is not configured');
+  const api = (process.env.TZKT_API_URL || 'https://api.tzkt.io').replace(/\/$/, '');
+  const r = await fetch(`${api}/v1/operations/transactions?hash=${encodeURIComponent(opHash)}`, {
+    headers: { Accept: 'application/json' },
+  });
+  const rows = await r.json().catch(() => []);
+  if (!r.ok) throw new Error('Tezos verification API failed');
+  const requiredMutez = decimalToUnits(quote.crypto_amount, 6);
+  const match = (Array.isArray(rows) ? rows : []).find(tx =>
+    String(tx.status || '').toLowerCase() === 'applied' &&
+    String(tx.sender?.address || tx.sender?.alias || '').toLowerCase() === String(payerAddress).toLowerCase() &&
+    String(tx.target?.address || tx.target?.alias || '').toLowerCase() === String(payeeAddress).toLowerCase() &&
+    BigInt(tx.amount || 0) >= requiredMutez
+  );
+  if (!match) throw new Error('Tezos transaction to the shop wallet was not found for the quoted amount');
+  return { confirmations: match.confirmations || null, received_amount: Number(match.amount || 0) / 1e6 };
+}
+
+async function verifyCryptoPaymentOnChain({ paymentMethod, paymentRef, payerAddress, quote, supabase }) {
+  const addresses = await getShopPaymentAddresses(supabase);
+  if (paymentMethod === 'tezos') {
+    return verifyTezosPayment({
+      opHash: paymentRef,
+      payerAddress,
+      quote,
+      payeeAddress: addresses.tezos,
+    });
+  }
+  return verifyEvmPayment({
+    method: paymentMethod,
+    txHash: paymentRef,
+    payerAddress,
+    quote,
+    payeeAddress: addresses.eth,
+  });
+}
+
+async function handleShopOrder(req, res, supabase) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const body = req.body || {};
+  let checkout;
+  try {
+    checkout = await computeShopCheckout(body, supabase);
+  } catch (e) {
+    return jsonError(res, e);
+  }
+
+  const paymentMethod = String(body.payment_method || '').slice(0, 40);
+  const paymentRef = String(body.payment_ref || '').slice(0, 200);
+  const payerAddress = String(body.payer_address || '').slice(0, 120);
+  const quoteRequired = ['paystack','flutterwave','eth','tezos','usdc','usdt'].includes(paymentMethod);
+  if (quoteRequired && !verifyShopQuote(body.checkout_quote, checkout, {
+    payment_method: paymentMethod,
+    ...(paymentMethod === 'paystack' || paymentMethod === 'flutterwave' ? { payment_ref: paymentRef } : {}),
+    ...(payerAddress ? { payer_address: payerAddress } : {}),
+  })) {
+    return res.status(400).json({ error: 'Invalid or expired server checkout quote' });
+  }
+  const isCryptoPayment = ['eth','tezos','usdc','usdt'].includes(paymentMethod);
+  if (isCryptoPayment) {
+    if (!paymentRef) return res.status(400).json({ error: 'Crypto transaction hash is required' });
+    if (!payerAddress) return res.status(400).json({ error: 'Sending wallet address is required' });
+    const { data: existingOrder, error: existingError } = await supabase
+      .from('shop_orders')
+      .select('id')
+      .eq('payment_ref', paymentRef)
+      .maybeSingle();
+    if (existingError && existingError.code !== 'PGRST116') return res.status(500).json({ error: existingError.message });
+    if (existingOrder) return res.status(409).json({ error: 'This crypto transaction has already been submitted for an order' });
+  }
+  let chainVerification = null;
+  if (isCryptoPayment) {
+    try {
+      chainVerification = await verifyCryptoPaymentOnChain({
+        paymentMethod,
+        paymentRef,
+        payerAddress,
+        quote: body.checkout_quote,
+        supabase,
+      });
+    } catch (e) {
+      return jsonError(res, e);
+    }
+  }
+
   const { data: order, error: orderError } = await supabase
     .from('shop_orders')
     .insert({
@@ -911,23 +1371,22 @@ async function handleShopOrder(req, res, supabase) {
       email:           String(body.email   || '').slice(0, 320),
       phone:           String(body.phone   || '').slice(0, 60),
       address:         String(body.address || '').slice(0, 500),
-      items:           items,
-      total_ngn:       Number(body.total_ngn) || 0,
-      total_usd:       Number(body.total_usd) || 0,
-      delivery_fee_ngn: Number(body.delivery_fee_ngn) || 0,
-      delivery_method:  String(body.delivery_method || '').slice(0, 40),
-      delivery_zone:    String(body.delivery_zone   || '').slice(0, 40),
-      payment_method:  String(body.payment_method || '').slice(0, 40),
-      payment_ref:     String(body.payment_ref    || '').slice(0, 200),
-      status: 'pending',
+      items:           checkout.trustedItems,
+      total_ngn:       checkout.totalNgn,
+      total_usd:       checkout.totalUsd,
+      delivery_fee_ngn: checkout.deliveryNgn,
+      delivery_method:  checkout.method.slice(0, 40),
+      delivery_zone:    checkout.zone.slice(0, 40),
+      payment_method:  paymentMethod,
+      payment_ref:     paymentRef,
+      status: isCryptoPayment ? 'paid' : 'pending',
     })
     .select('id')
     .single();
   if (orderError) return res.status(500).json({ error: orderError.message });
 
-  // 3. Decrement stock
-  for (const item of items) {
-    if (!item.id || !item.variant || !item.qty) continue;
+  for (const item of checkout.trustedItems) {
+    const vkey = item.variantKey || item.variant;
     const { data: product } = await supabase
       .from('shop_products')
       .select('stock, stock_by_variant')
@@ -936,8 +1395,9 @@ async function handleShopOrder(req, res, supabase) {
     if (!product) continue;
 
     const sbv = product.stock_by_variant || {};
-    if (sbv[item.variant] !== undefined) {
-      sbv[item.variant] = Math.max(0, sbv[item.variant] - item.qty);
+    const decKey = sbv[vkey] !== undefined ? vkey : (sbv[item.variant] !== undefined ? item.variant : null);
+    if (decKey !== null) {
+      sbv[decKey] = Math.max(0, sbv[decKey] - item.qty);
       await supabase.from('shop_products').update({ stock_by_variant: sbv }).eq('id', item.id);
     } else if (product.stock !== null && product.stock !== undefined) {
       await supabase.from('shop_products')
@@ -946,10 +1406,16 @@ async function handleShopOrder(req, res, supabase) {
     }
   }
 
-  return res.status(200).json({ ok: true, order_id: order.id });
+  return res.status(200).json({
+    ok: true,
+    order_id: order.id,
+    total_ngn: checkout.totalNgn,
+    total_usd: checkout.totalUsd,
+    delivery_fee_ngn: checkout.deliveryNgn,
+    chain_verification: chainVerification,
+  });
 }
-
-// ── GET /api/game?action=shop-config ──────────────────────────────────────────
+// â”€â”€ GET /api/game?action=shop-config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleShopConfig(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const { data, error } = await supabase
@@ -962,7 +1428,7 @@ async function handleShopConfig(req, res, supabase) {
   return res.status(200).json(data || {});
 }
 
-// ── Main handler ──────────────────────────────────────────────────────────────
+// â”€â”€ Main handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 module.exports = async (req, res) => {
   cors(res);
@@ -973,7 +1439,7 @@ module.exports = async (req, res) => {
   let action = req.query.action || '';
 
   if (!action) {
-    // Map legacy direct paths → actions
+    // Map legacy direct paths â†’ actions
     if (urlPath.includes('/challenges'))     action = 'challenges';
     else if (urlPath.includes('/challenge')) action = 'challenge';
     else if (urlPath.includes('/score'))     action = 'score';
@@ -991,9 +1457,11 @@ module.exports = async (req, res) => {
     else if (urlPath.includes('/notify-bid-confirm')) action = 'notify-bid-confirm';
     else if (urlPath.includes('/notify-winner'))      action = 'notify-winner';
     else if (urlPath.includes('/notify-bid'))          action = 'notify-bid';
-    else if (urlPath.includes('/shop-products'))      action = 'shop-products';
-    else if (urlPath.includes('/shop-config'))        action = 'shop-config';
-    else if (urlPath.includes('/shop-order'))         action = 'shop-order';
+    else if (urlPath.includes('/shop-products') || urlPath.includes('/shop/products')) action = 'shop-products';
+    else if (urlPath.includes('/shop-config') || urlPath.includes('/shop/config')) action = 'shop-config';
+    else if (urlPath.includes('/shop-payment-init') || urlPath.includes('/shop/payment-init')) action = 'shop-payment-init';
+    else if (urlPath.includes('/shop-quote') || urlPath.includes('/shop/quote')) action = 'shop-quote';
+    else if (urlPath.includes('/shop-order') || urlPath.includes('/shop/order')) action = 'shop-order';
   }
 
   const supabase = getSupabase();
@@ -1012,8 +1480,11 @@ module.exports = async (req, res) => {
     case 'notify-bid':         return handleNotifyBid(req, res);
     case 'shop-products':      return handleShopProducts(req, res, supabase);
     case 'shop-config':        return handleShopConfig(req, res, supabase);
+    case 'shop-quote':         return handleShopQuote(req, res, supabase);
+    case 'shop-payment-init':  return handleShopPaymentInit(req, res, supabase);
     case 'shop-order':         return handleShopOrder(req, res, supabase);
     default:
       return res.status(404).json({ error: `Unknown action: ${action}` });
   }
 };
+
