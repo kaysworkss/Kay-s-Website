@@ -317,6 +317,19 @@ nav.scrolled {
   color:var(--text-muted);
   margin:-0.55rem 0 1.1rem;
 }
+.limited-pill {
+  display:inline-block; margin:0 0 0.7rem;
+  font-family:'Cinzel',serif; font-size:0.5rem;
+  letter-spacing:0.18em; text-transform:uppercase;
+  background:var(--gold); color:#1a1a1a;
+  padding:0.3rem 0.65rem; border-radius:2px;
+}
+.editions-left {
+  font-family:'Cinzel',serif; font-size:0.58rem;
+  letter-spacing:0.12em; text-transform:uppercase;
+  color:var(--gold); margin:0.2rem 0 0.9rem;
+}
+.editions-left.sold-out { color:var(--rust); }
 .size-chip {
   font-family:'Montserrat',sans-serif; font-size:0.62rem;
   letter-spacing:0.06em; font-weight:500;
@@ -563,7 +576,7 @@ function getPrintOptions(p) {
       const type = String(v.type || v.print_type || v.name || v.label || 'Print').trim();
       const sizes = (v.sizes || v.variants || []).map(String).filter(Boolean);
       const availableSizes = (v.available_sizes || v.available || v.available_variants || sizes).map(String).filter(Boolean);
-      return { type, desc: v.desc || v.description || '', sizes, availableSizes: availableSizes.length ? availableSizes : sizes };
+      return { type, desc: v.desc || v.description || '', limited: v.limited === true, sizes, availableSizes: availableSizes.length ? availableSizes : sizes };
     }).filter(o => o.type && o.sizes.length);
   }
 
@@ -593,11 +606,46 @@ function availablePrintChoices(p) {
   );
 }
 
+// Normalize image URLs. Bare relative paths like "images/skull.png" resolve
+// differently on /shop vs /shop/[slug]; force a site-root path so they work
+// everywhere. Leaves absolute URLs (http/https/data/protocol-relative) and
+// already-rooted "/…" paths untouched.
+function normalizeImg(u) {
+  const s = String(u || '').trim();
+  if (!s) return '';
+  if (/^(https?:)?\/\//i.test(s) || s.startsWith('data:') || s.startsWith('/')) return s;
+  return '/' + s.replace(/^\.?\/*/, '');
+}
+
 function printPrice(p, key, currency) {
   const prices = currency === 'usd' ? (p.prices_usd || {}) : (p.prices_ngn || {});
   if (prices[key] !== undefined) return prices[key];
   const size = String(key).split('|').pop();
   return prices[size] || 0;
+}
+
+// Limited-edition helpers. A size is "tracked" if it has a run total set.
+function editionTotal(p, key) {
+  const t = (p.edition_totals || {})[key];
+  return t === undefined ? null : Number(t);
+}
+function editionRemaining(p, key) {
+  const sbv = p.stock_by_variant || {};
+  return sbv[key] === undefined ? null : Number(sbv[key]);
+}
+function isLimitedKey(p, key) {
+  // Limited if the option for this key is flagged limited AND a run total exists.
+  const type = String(key).split('|')[0];
+  const opt = getPrintOptions(p).find(o => o.type === type);
+  return !!(opt && opt.limited) && editionTotal(p, key) !== null;
+}
+function editionLabel(p, key) {
+  if (!isLimitedKey(p, key)) return '';
+  const remaining = editionRemaining(p, key);
+  const total = editionTotal(p, key);
+  if (remaining === null || total === null) return '';
+  if (remaining <= 0) return 'Sold out';
+  return `${remaining} of ${total} editions left`;
 }
 
 // Build the specification rows for a given selected print option. The
@@ -608,6 +656,7 @@ function buildSpecRows(p, selectedType) {
   const opt = opts.find(o => o.type === selectedType) || opts[0];
   const rows = [];
   if (opt && opt.type) rows.push(['Print type', opt.type]);
+  if (opt) rows.push(['Edition', opt.limited ? 'Limited edition' : 'Open edition']);
   if (p.medium) rows.push(['Medium', p.medium]);
   rows.push(['Packaging', p.is_large_print ? 'Rolled in protective archival tube' : 'Flat-packed in rigid board mailer']);
   rows.push(['Signed', p.signed ? 'Yes, hand signed by Kay' : 'Open edition']);
@@ -742,6 +791,7 @@ function renderProduct(p) {
   // primary/hero; any images[] entries are additional views appended after it.
   const extra = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
   const images = [...(p.image_url ? [p.image_url] : []), ...extra]
+    .map(normalizeImg)
     .filter((v, i, a) => v && a.indexOf(v) === i);
   const thumbsHtml = images.length > 1
     ? `<div class="thumb-strip">${images.map((img,i) => `
@@ -817,14 +867,21 @@ function renderProduct(p) {
         <div class="purchase-block">
           <p class="purchase-label">Choose your print option</p>
           <div class="print-option-picker">${optionChips}</div>
+          <p class="limited-pill" id="limitedPill" style="display:${printOptions[0]?.limited ? 'inline-block' : 'none'}">Limited edition</p>
           <p class="print-option-desc" id="printOptionDesc">${printOptions[0]?.desc || ''}</p>
           <p class="purchase-label">Choose your size</p>
           <div class="size-picker">${sizeChips}</div>
+          <p class="editions-left" id="editionsLeft" style="display:${editionLabel(p, _selectedVariant) ? 'block' : 'none'}">${editionLabel(p, _selectedVariant)}</p>
           <div class="price-row">
             <span class="price-ngn" id="priceNgn">${fmt(ngn)}</span>
             <span class="price-usd" id="priceUsd">${fmtUsd(usd)} USD</span>
           </div>
-          <button class="add-to-cart-btn" id="addBtn" onclick="handleAddToCart()" ${_selectedVariant ? '' : 'disabled'}>${_selectedVariant ? 'Add to bag' : 'Unavailable'}</button>
+          ${(() => {
+            const soldOut = isLimitedKey(p, _selectedVariant) && (editionRemaining(p, _selectedVariant) ?? 0) <= 0;
+            const disabled = !_selectedVariant || soldOut;
+            const label = soldOut ? 'Sold out' : (_selectedVariant ? 'Add to bag' : 'Unavailable');
+            return `<button class="add-to-cart-btn" id="addBtn" onclick="handleAddToCart()" ${disabled ? 'disabled' : ''}>${label}</button>`;
+          })()}
           <p class="shipping-note">
             Ships from Kaduna via GIG (domestic) or UPS Worldwide Expedited (international).
             ${p.is_large_print ? ' This piece ships rolled in an archival tube.' : ' Ships flat in a rigid board mailer.'}
@@ -874,6 +931,7 @@ function renderMerchProduct(p) {
 
   const extra = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
   const images = [...(p.image_url ? [p.image_url] : []), ...extra]
+    .map(normalizeImg)
     .filter((v, i, a) => v && a.indexOf(v) === i);
   const thumbsHtml = images.length > 1
     ? `<div class="thumb-strip">${images.map((img,i) => `
@@ -976,7 +1034,8 @@ function handleMerchAddToCart() {
 
 function updateMeta(p) {
   const desc = (p.story || p.description || p.desc || '').replace(/<[^>]*>/g,'').slice(0,160);
-  const img  = p.image_url || '';
+  const rawImg = normalizeImg(p.image_url || '');
+  const img  = rawImg && rawImg.startsWith('/') ? `https://www.kaysworks.com${rawImg}` : rawImg;
   const url  = `https://www.kaysworks.com/shop/${p.slug || slugify(p.name)}`;
 
   const set = (sel, attr, val) => { const el = document.querySelector(sel); if(el) el.setAttribute(attr, val); };
@@ -1035,6 +1094,24 @@ function selectSize(v) {
   const usd = printPrice(_product, v, 'usd');
   document.getElementById('priceNgn').textContent = fmt(ngn);
   document.getElementById('priceUsd').textContent = fmtUsd(usd) + ' USD';
+  updateEditionState(v);
+}
+
+// Reflect limited-edition remaining count and sold-out state for a variant key.
+function updateEditionState(v) {
+  const label = editionLabel(_product, v);
+  const el = document.getElementById('editionsLeft');
+  if (el) {
+    el.textContent = label;
+    el.style.display = label ? 'block' : 'none';
+    el.classList.toggle('sold-out', label === 'Sold out');
+  }
+  const soldOut = isLimitedKey(_product, v) && (editionRemaining(_product, v) ?? 0) <= 0;
+  const btn = document.getElementById('addBtn');
+  if (btn) {
+    btn.disabled = !v || soldOut;
+    btn.textContent = soldOut ? 'Sold out' : (v ? 'Add to bag' : 'Unavailable');
+  }
 }
 
 function selectPrintType(type) {
@@ -1051,6 +1128,8 @@ function selectPrintType(type) {
   const addBtn = document.getElementById('addBtn');
   const descEl = document.getElementById('printOptionDesc');
   if (descEl) descEl.textContent = opt?.desc || '';
+  const pill = document.getElementById('limitedPill');
+  if (pill) pill.style.display = opt?.limited ? 'inline-block' : 'none';
   const specTable = document.getElementById('specTable');
   if (specTable) specTable.innerHTML = buildSpecRows(_product, type);
   addBtn.disabled = !firstKey;
@@ -1060,6 +1139,10 @@ function selectPrintType(type) {
 
 function handleAddToCart() {
   if (!_selectedVariant) { showToast('Please select a size'); return; }
+  if (isLimitedKey(_product, _selectedVariant) && (editionRemaining(_product, _selectedVariant) ?? 0) <= 0) {
+    showToast('This edition is sold out');
+    return;
+  }
   const choice = availablePrintChoices(_product).find(c => c.key === _selectedVariant);
   addToCart(_product, _selectedVariant, choice?.label || _selectedVariant);
 }
@@ -1067,6 +1150,7 @@ function handleAddToCart() {
 function switchImage(idx) {
   const extra = Array.isArray(_product.images) ? _product.images.filter(Boolean) : [];
   const images = [...(_product.image_url ? [_product.image_url] : []), ...extra]
+    .map(normalizeImg)
     .filter((v, i, a) => v && a.indexOf(v) === i);
   const heroImg = document.getElementById('heroImg');
   if (heroImg && images[idx]) heroImg.src = images[idx];
@@ -1096,7 +1180,7 @@ function renderRelated(prints) {
     return `
       <a href="/shop/${p.slug || slugify(p.name)}" class="related-card">
         <div class="related-card-img">
-          ${p.image_url ? `<img src="${p.image_url}" alt="${p.name}" loading="lazy"/>` : (p.emoji || '✦')}
+          ${p.image_url ? `<img src="${normalizeImg(p.image_url)}" alt="${p.name}" loading="lazy"/>` : (p.emoji || '✦')}
         </div>
         <div class="related-card-body">
           <div class="related-card-title">${p.name}</div>
