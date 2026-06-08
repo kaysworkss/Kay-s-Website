@@ -1,9 +1,14 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Shop · Kay's Works</title>
+<link rel="icon" href="/images/kaysworkslogo.svg" type="image/svg+xml"/>
+<link rel="alternate icon" href="/favicon.ico" sizes="any"/>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+<link rel="manifest" href="/site.webmanifest"/>
+<meta name="theme-color" content="#f5ede0"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -3250,14 +3255,19 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
     }));
 
     // Save config (wallet addresses handled server-side — just upsert)
-    await fetch('/api/admin/shop-config', {
+    const cfgRes = await fetch('/api/admin/shop-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
       body: JSON.stringify({
         eth_address:   SHOP_CONFIG.ethAddress,
         tezos_address: SHOP_CONFIG.tezosAddress,
+        announcement:  SHOP_CONFIG.announcement || '',
       }),
     });
+    if (!cfgRes.ok) {
+      const d = await cfgRes.json().catch(() => ({}));
+      throw new Error(`Config save failed (${cfgRes.status}): ${d.error || cfgRes.statusText}`);
+    }
 
     renderProducts();
     populatePrintPageSelector();
@@ -4113,5 +4123,3 @@ loadShopData();
 </script>
 </body>
 </html>
-
-
