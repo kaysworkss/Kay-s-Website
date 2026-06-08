@@ -600,6 +600,28 @@ function printPrice(p, key, currency) {
   return prices[size] || 0;
 }
 
+// Build the specification rows for a given selected print option. The
+// option's own description carries the option-specific detail (paper, finish,
+// etc.), so it replaces the old hardcoded Paper/Ink/Border/Finish rows.
+function buildSpecRows(p, selectedType) {
+  const opts = getPrintOptions(p);
+  const opt = opts.find(o => o.type === selectedType) || opts[0];
+  const rows = [];
+  if (opt && opt.type) rows.push(['Print type', opt.type]);
+  if (p.medium) rows.push(['Medium', p.medium]);
+  rows.push(['Packaging', p.is_large_print ? 'Rolled in protective archival tube' : 'Flat-packed in rigid board mailer']);
+  rows.push(['Signed', p.signed ? 'Yes, hand signed by Kay' : 'Open edition']);
+  return rows
+    .filter(r => r[1])
+    .map(([k, v]) => `<tr><td>${k}</td><td>${escapeAttrText(v)}</td></tr>`)
+    .join('');
+}
+
+// Plain text escape for table cell content.
+function escapeAttrText(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 /* ─── Theme ─── */
 function initTheme() {
   const saved = localStorage.getItem('kaysworks-theme');
@@ -716,11 +738,11 @@ function renderProduct(p) {
       <span style="color:var(--text)">${p.name}</span>
     </div>`;
 
-  // Build thumbnails (images array or single image). Guard against an empty
-  // images[] array (JSONB default []), which is truthy and would otherwise
-  // hide a product that only has image_url set.
-  const images = (Array.isArray(p.images) && p.images.length ? p.images
-                 : (p.image_url ? [p.image_url] : []));
+  // Build the gallery: the main product image (image_url) is always the
+  // primary/hero; any images[] entries are additional views appended after it.
+  const extra = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
+  const images = [...(p.image_url ? [p.image_url] : []), ...extra]
+    .filter((v, i, a) => v && a.indexOf(v) === i);
   const thumbsHtml = images.length > 1
     ? `<div class="thumb-strip">${images.map((img,i) => `
         <div class="thumb${i===0?' active':''}" data-idx="${i}" onclick="switchImage(${i})">
@@ -745,16 +767,9 @@ function renderProduct(p) {
   const ngn = printPrice(p, _selectedVariant, 'ngn');
   const usd = printPrice(p, _selectedVariant, 'usd');
 
-  // Spec rows
-  const specRows = [
-    ['Medium',     p.medium      || 'Giclée fine art print'],
-    ['Paper',      '100% cotton rag · 300gsm · acid-free'],
-    ['Ink',        '10-colour archival pigment ink system'],
-    ['Border',     'Minimum 1-inch white border'],
-    ['Finish',     'Natural smooth matte'],
-    ['Packaging',  p.is_large_print ? 'Rolled in protective archival tube' : 'Flat-packed in rigid board mailer'],
-    ['Signed',     p.signed ? 'Yes, hand signed by Kay' : 'Open edition'],
-  ].filter(r => r[1]).map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  // Spec rows — option-specific detail comes from the selected print option's
+  // own description; only genuinely product-level facts are shown statically.
+  const specRowsHtml = buildSpecRows(p, _selectedPrintType);
 
   // Story paragraphs
   const storyHtml = (p.story || 'This piece is part of Kay\'s ongoing exploration of form, light and memory. Each print is made with care and carries a piece of the original work\'s intention.')
@@ -797,7 +812,7 @@ function renderProduct(p) {
         <div class="print-process">${processHtml}</div>
 
         <div class="section-divider"><span>Print specifications</span></div>
-        <table class="spec-table">${specRows}</table>
+        <table class="spec-table" id="specTable">${specRowsHtml}</table>
 
         <div class="purchase-block">
           <p class="purchase-label">Choose your print option</p>
@@ -857,8 +872,9 @@ function renderMerchProduct(p) {
       <span style="color:var(--text)">${p.name}</span>
     </div>`;
 
-  const images = (Array.isArray(p.images) && p.images.length ? p.images
-                 : (p.image_url ? [p.image_url] : []));
+  const extra = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
+  const images = [...(p.image_url ? [p.image_url] : []), ...extra]
+    .filter((v, i, a) => v && a.indexOf(v) === i);
   const thumbsHtml = images.length > 1
     ? `<div class="thumb-strip">${images.map((img,i) => `
         <div class="thumb${i===0?' active':''}" data-idx="${i}" onclick="switchImage(${i})">
@@ -1035,6 +1051,8 @@ function selectPrintType(type) {
   const addBtn = document.getElementById('addBtn');
   const descEl = document.getElementById('printOptionDesc');
   if (descEl) descEl.textContent = opt?.desc || '';
+  const specTable = document.getElementById('specTable');
+  if (specTable) specTable.innerHTML = buildSpecRows(_product, type);
   addBtn.disabled = !firstKey;
   addBtn.textContent = firstKey ? 'Add to bag' : 'Unavailable';
   if (firstKey) selectSize(firstKey);
@@ -1047,8 +1065,9 @@ function handleAddToCart() {
 }
 
 function switchImage(idx) {
-  const images = (Array.isArray(_product.images) && _product.images.length ? _product.images
-                 : (_product.image_url ? [_product.image_url] : []));
+  const extra = Array.isArray(_product.images) ? _product.images.filter(Boolean) : [];
+  const images = [...(_product.image_url ? [_product.image_url] : []), ...extra]
+    .filter((v, i, a) => v && a.indexOf(v) === i);
   const heroImg = document.getElementById('heroImg');
   if (heroImg && images[idx]) heroImg.src = images[idx];
   document.querySelectorAll('.thumb').forEach(t => t.classList.toggle('active', Number(t.dataset.idx) === idx));
