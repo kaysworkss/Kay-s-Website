@@ -241,6 +241,7 @@ async function handleShopProducts(req, res, supabase) {
         clothing_type:      String(body.clothing_type || '').slice(0, 40),
         stock:              body.stock === undefined || body.stock === null || body.stock === '' ? null : Number(body.stock),
         stock_by_variant:   body.stock_by_variant || {},
+        edition_totals:     body.edition_totals || {},
         sort_order:         Number(body.sort_order) || 0,
         active:             body.active !== false,
       })
@@ -273,6 +274,7 @@ async function handleShopProducts(req, res, supabase) {
     if (body.sort_order         !== undefined) patch.sort_order         = Number(body.sort_order);
     if (body.active             !== undefined) patch.active             = Boolean(body.active);
     if (body.stock_by_variant   !== undefined) patch.stock_by_variant   = body.stock_by_variant;
+    if (body.edition_totals     !== undefined) patch.edition_totals      = body.edition_totals;
     // Print page fields
     if (body.slug               !== undefined) patch.slug               = String(body.slug).slice(0, 200);
     if (body.year               !== undefined) patch.year               = String(body.year).slice(0, 10);
