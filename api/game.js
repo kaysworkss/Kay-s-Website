@@ -1,4 +1,4 @@
-﻿/**
+/**
  * /api/game
  *
  * Single consolidated file replacing:
@@ -894,20 +894,7 @@ function serverVariantPrice(product, variantKey, variant, currency) {
   return 0;
 }
 
-function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd, promoEnabled) {
-  // Shipping promo (all shipped orders, every zone), only when enabled by admin:
-  //   subtotal >= $500  -> free shipping
-  //   subtotal >= $250  -> flat $30
-  //   otherwise         -> normal per-zone rate
-  // Keyed off the USD subtotal. MUST mirror the client's deliveryFee* helpers
-  // in shop.html or the signed-quote check fails.
-  if (promoEnabled !== false) {
-    const sub = Number(subtotalUsd) || 0;
-    if (sub >= 500) return 0;
-    if (sub >= 250) {
-      return currency === 'usd' ? 30 : Math.round(30 * NGN_PER_USD);
-    }
-  }
+function serverDeliveryFee(zone, hasLarge, currency) {
   const z = SERVER_DELIVERY_RATES[zone] || SERVER_DELIVERY_RATES['ROW'];
   const tier = hasLarge ? z.large : z.small;
   if (currency === 'usd') {
@@ -916,22 +903,6 @@ function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd, promoEnabled) 
   }
   if (tier.ngn > 0) return tier.ngn;
   return tier.usd > 0 ? Math.round(tier.usd * NGN_PER_USD) : 0;
-}
-
-// Read the shipping-promo on/off flag from shop_config. Defaults to ON (true)
-// when the column or row is absent, matching prior behaviour.
-async function getShipPromoEnabled(supabase) {
-  try {
-    const { data } = await supabase
-      .from('shop_config')
-      .select('ship_promo_enabled')
-      .order('id', { ascending: true })
-      .limit(1)
-      .single();
-    return !data || data.ship_promo_enabled !== false;
-  } catch (_) {
-    return true;
-  }
 }
 
 async function computeShopCheckout(body, supabase) {
@@ -1009,9 +980,8 @@ async function computeShopCheckout(body, supabase) {
 
   const zone = String(body.delivery_zone || 'pickup');
   const method = String(body.delivery_method || 'pickup');
-  const promoEnabled = await getShipPromoEnabled(supabase);
-  const deliveryNgn = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'ngn', subtotalUsd, promoEnabled) : 0;
-  const deliveryUsd = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'usd', subtotalUsd, promoEnabled) : 0;
+  const deliveryNgn = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'ngn') : 0;
+  const deliveryUsd = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'usd') : 0;
   const totalNgn = subtotalNgn + deliveryNgn;
   const totalUsd = +(subtotalUsd + deliveryUsd).toFixed(2);
 
@@ -1683,4 +1653,3 @@ module.exports = async (req, res) => {
       return res.status(404).json({ error: `Unknown action: ${action}` });
   }
 };
-
