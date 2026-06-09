@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -1024,29 +1024,90 @@ footer a:hover { color:var(--rust); }
   100% { transform: translateX(350%); }
 }
 
-/* ── Free-shipping promo banner ── */
-.ship-promo-banner {
-  position: relative; z-index: 90;
-  display: flex; align-items: center; justify-content: center; gap: 0.8rem;
-  padding: 0.55rem 2.6rem 0.55rem 1rem;
-  background: linear-gradient(90deg, var(--rust), var(--clay));
-  color: var(--linen);
-  font-family: 'Cinzel', serif; font-size: 0.52rem;
-  letter-spacing: 0.16em; text-transform: uppercase; text-align: center;
-  line-height: 1.5;
+/* ── Enquiry widget (floating button + modal) ── */
+.enquire-fab {
+  position: fixed; right: 1.2rem; bottom: 1.2rem; z-index: 8000;
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.7rem 1.1rem; border: none; border-radius: 999px;
+  background: var(--rust); color: var(--linen);
+  font-family: 'Cinzel', serif; font-size: 0.55rem;
+  letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer;
+  box-shadow: 0 6px 22px rgba(20,16,12,0.28);
+  transition: transform 0.18s, background 0.2s;
 }
-.ship-promo-banner strong { color: #fff; font-weight: 600; }
-.ship-promo-banner .promo-sep { opacity: 0.55; }
-.ship-promo-close {
-  position: absolute; right: 0.8rem; top: 50%; transform: translateY(-50%);
-  background: none; border: none; color: var(--linen);
-  font-size: 0.8rem; cursor: pointer; opacity: 0.75; transition: opacity 0.15s;
-  line-height: 1;
+.enquire-fab:hover { background: var(--bark); transform: translateY(-2px); }
+.enquire-fab svg { width: 15px; height: 15px; }
+.enquire-overlay {
+  position: fixed; inset: 0; z-index: 8500;
+  background: rgba(14,10,8,0.7);
+  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  opacity: 0; pointer-events: none; transition: opacity 0.25s;
 }
-.ship-promo-close:hover { opacity: 1; }
-@media(max-width:600px) {
-  .ship-promo-banner { font-size: 0.46rem; letter-spacing: 0.1em; }
+.enquire-overlay.show { opacity: 1; pointer-events: all; }
+.enquire-modal {
+  background: var(--bg-card, #fff); border: 1px solid var(--border);
+  border-radius: 4px; width: min(440px, 100%); max-height: 92vh; overflow-y: auto;
+  padding: 1.8rem; transform: translateY(16px); transition: transform 0.25s;
+  box-shadow: 0 18px 60px rgba(20,16,12,0.35);
 }
+.enquire-overlay.show .enquire-modal { transform: translateY(0); }
+.enquire-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.4rem; }
+.enquire-title { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; font-weight: 300; color: var(--text); }
+.enquire-sub { font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1.2rem; }
+.enquire-close { background: none; border: none; font-size: 1rem; color: var(--text-muted); cursor: pointer; }
+.enquire-close:hover { color: var(--rust); }
+.enquire-wa {
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+  width: 100%; padding: 0.85rem; margin-bottom: 1.1rem;
+  background: #25d366; color: #fff; border: none; border-radius: 3px;
+  font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase;
+  cursor: pointer; transition: filter 0.18s;
+}
+.enquire-wa:hover { filter: brightness(0.93); }
+.enquire-wa svg { width: 18px; height: 18px; }
+.enquire-or { display: flex; align-items: center; gap: 0.7rem; margin: 0.4rem 0 1rem; color: var(--text-muted); font-family: 'Cinzel', serif; font-size: 0.46rem; letter-spacing: 0.2em; text-transform: uppercase; }
+.enquire-or::before, .enquire-or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.enquire-field { margin-bottom: 0.9rem; }
+.enquire-field label { display: block; font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.35rem; }
+.enquire-field input, .enquire-field textarea {
+  width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 2px;
+  background: var(--bg-card, #fff); color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+}
+.enquire-field textarea { resize: vertical; min-height: 90px; }
+.enquire-field input:focus, .enquire-field textarea:focus { border-color: var(--clay); outline: none; }
+.enquire-send {
+  width: 100%; padding: 0.85rem; border: none; border-radius: 2px;
+  background: var(--rust); color: var(--linen);
+  font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.18em; text-transform: uppercase;
+  cursor: pointer; transition: background 0.2s;
+}
+.enquire-send:hover { background: var(--bark); }
+.enquire-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.enquire-done { text-align: center; padding: 1.5rem 0.5rem; }
+.enquire-done-icon { font-size: 2.4rem; color: var(--gold); margin-bottom: 0.8rem; }
+@media(max-width:600px){ .enquire-fab { font-size: 0.48rem; padding: 0.65rem 0.95rem; } }
+
+/* ── FAQ section ── */
+.faq-section { max-width: 760px; margin: 4rem auto 2rem; padding: 0 1.4rem; }
+.faq-eyebrow { font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--gold); text-align: center; margin-bottom: 0.5rem; }
+.faq-heading { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 300; color: var(--text); text-align: center; margin-bottom: 2rem; }
+.faq-item { border-bottom: 1px solid var(--border); }
+.faq-q {
+  width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 1.1rem 0; font-family: 'Crimson Pro', serif; font-size: 1.08rem; color: var(--text);
+}
+.faq-q:hover { color: var(--rust); }
+.faq-q .faq-icon { flex-shrink: 0; font-size: 1.1rem; color: var(--clay); transition: transform 0.2s; }
+.faq-item.open .faq-q .faq-icon { transform: rotate(45deg); }
+.faq-a { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+.faq-item.open .faq-a { max-height: 600px; }
+.faq-a-inner { padding: 0 0 1.2rem; font-family: 'Crimson Pro', serif; font-size: 0.98rem; line-height: 1.7; color: var(--text-muted); }
+.faq-a-inner strong { color: var(--text); }
+.faq-a-inner a { color: var(--clay); }
+.faq-a-inner a:hover { color: var(--rust); }
 </style>
 </head>
 <body>
@@ -1068,14 +1129,6 @@ footer a:hover { color:var(--rust); }
     </button>
   </div>
 </nav>
-
-<!-- Free-shipping promo banner -->
-<div class="ship-promo-banner" id="shipPromoBanner">
-  <span><strong>Free shipping</strong> on orders over $500</span>
-  <span class="promo-sep">·</span>
-  <span>flat <strong>$30 shipping</strong> on orders over $250</span>
-  <button class="ship-promo-close" id="shipPromoClose" aria-label="Dismiss">✕</button>
-</div>
 
 <!-- Hero -->
 <section class="shop-hero">
@@ -1116,6 +1169,103 @@ footer a:hover { color:var(--rust); }
   <div class="shop-grid" id="stickersGrid"></div>
 
 </section>
+
+<!-- FAQ -->
+<section class="faq-section" id="faq">
+  <p class="faq-eyebrow">Before you ask</p>
+  <h2 class="faq-heading">Frequently asked</h2>
+
+  <div class="faq-item">
+    <button class="faq-q">How do I track my order?<span class="faq-icon">+</span></button>
+    <div class="faq-a"><div class="faq-a-inner">
+      Once your order ships, you'll receive an email with a tracking number and a link to follow it. <strong>Nigerian orders</strong> ship via GIG Logistics — track at giglogistics.com with your waybill number. <strong>International orders</strong> ship via DHL or UPS — track on the carrier's site (dhl.com or ups.com) with the air waybill number in your email. If you haven't received tracking within 3 business days of ordering, message us and we'll chase it up.
+    </div></div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-q">What payment methods can I use?<span class="faq-icon">+</span></button>
+    <div class="faq-a"><div class="faq-a-inner">
+      We accept <strong>cards</strong> (debit/credit) through Paystack — which handles both <strong>Naira and US dollar</strong> payments — and <strong>cryptocurrency</strong>: ETH and stablecoins (USDC, USDT) on Ethereum, plus XTZ on Tezos. Card payments are processed securely on Paystack's page; crypto payments are confirmed on-chain before your order is finalised. Choose your method at checkout.
+    </div></div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-q">Can I order a custom size?<span class="faq-icon">+</span></button>
+    <div class="faq-a"><div class="faq-a-inner">
+      Often, yes. Many pieces can be printed at a custom size beyond the standard options listed, depending on the source artwork's resolution. Use the <strong>Questions?</strong> button (bottom-right) or message us on WhatsApp with the piece and the size you have in mind, and we'll let you know what's possible and quote you a price.
+    </div></div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-q">How does international shipping work?<span class="faq-icon">+</span></button>
+    <div class="faq-a"><div class="faq-a-inner">
+      International orders ship from Nigeria via <strong>DHL and UPS</strong> — chosen for their global reach and customs handling, typically delivering to most countries within a few business days. Prints ship flat in a rigid mailer; large prints ship rolled in a protective tube. <strong>Duties and import taxes</strong> are set by your country and are the buyer's responsibility — the carrier will contact you if anything is due on arrival. A per-region delivery rate is shown at checkout before you pay.
+    </div></div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-q">Do you deliver within Nigeria?<span class="faq-icon">+</span></button>
+    <div class="faq-a"><div class="faq-a-inner">
+      Yes. Nigerian orders ship via <strong>GIG Logistics</strong> to any state, or you can collect <strong>free in Kaduna</strong> — choose your option at checkout. If you'd prefer pickup at a nearby GIG station rather than your door, note it in the address field.
+    </div></div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-q">How are limited editions numbered?<span class="faq-icon">+</span></button>
+    <div class="faq-a"><div class="faq-a-inner">
+      Limited-edition prints are produced in a fixed run and hand-numbered (e.g. 3 of 30). Once the run sells out, no more are made. The number remaining is shown on the product page, and the bag won't let you add more than are left.
+    </div></div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-q">Still have a question?<span class="faq-icon">+</span></button>
+    <div class="faq-a"><div class="faq-a-inner">
+      Use the <strong>Questions?</strong> button in the bottom-right corner any time — send a message by email or reach us directly on WhatsApp. We reply within 24 hours.
+    </div></div>
+  </div>
+</section>
+
+<!-- Enquiry widget -->
+<button class="enquire-fab" id="enquireFab" aria-label="Ask a question">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+  Questions?
+</button>
+<div class="enquire-overlay" id="enquireOverlay">
+  <div class="enquire-modal" role="dialog" aria-modal="true" aria-label="Ask a question">
+    <div class="enquire-head">
+      <div>
+        <div class="enquire-title" id="enquireTitle">Ask us anything</div>
+        <div class="enquire-sub" id="enquireSub">We reply within 24 hours</div>
+      </div>
+      <button class="enquire-close" id="enquireClose" aria-label="Close">✕</button>
+    </div>
+    <div id="enquireBody">
+      <button class="enquire-wa" id="enquireWa">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Message us on WhatsApp
+      </button>
+      <div class="enquire-or">or send a message</div>
+      <div class="enquire-field">
+        <label>Your name</label>
+        <input type="text" id="enquireName" placeholder="Name"/>
+      </div>
+      <div class="enquire-field">
+        <label>Email</label>
+        <input type="email" id="enquireEmail" placeholder="your@email.com"/>
+      </div>
+      <div class="enquire-field">
+        <label>Message</label>
+        <textarea id="enquireMsg" placeholder="What would you like to know?"></textarea>
+      </div>
+      <button class="enquire-send" id="enquireSend">Send message</button>
+    </div>
+    <div class="enquire-done" id="enquireDone" style="display:none">
+      <div class="enquire-done-icon">✦</div>
+      <p style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--text);margin-bottom:0.5rem">Message sent.</p>
+      <p style="font-family:'Crimson Pro',serif;color:var(--text-muted);line-height:1.6">Thank you — we'll reply by email within 24 hours.</p>
+    </div>
+  </div>
+</div>
 
 <!-- Cart Drawer -->
 <div class="cart-overlay" id="cartOverlay"></div>
@@ -1288,7 +1438,7 @@ footer a:hover { color:var(--rust); }
               <label class="form-label">Postal / ZIP code</label>
               <input class="form-input" id="ckUpsPostal" type="text" placeholder="Postal or ZIP code"/>
             </div>
-            <p style="font-size:0.72rem;color:var(--text-muted);line-height:1.5;margin:-0.4rem 0 1rem">Shipped via UPS Worldwide Expedited. A postal code and reachable phone number are required for customs and delivery.</p>
+            <p style="font-size:0.72rem;color:var(--text-muted);line-height:1.5;margin:-0.4rem 0 1rem">Shipped internationally via DHL or UPS. A postal code and reachable phone number are required for customs and delivery.</p>
           </div>
 
           <!-- Live delivery estimate -->
@@ -1322,7 +1472,7 @@ footer a:hover { color:var(--rust); }
 
         <!-- Paystack panel -->
         <div class="pay-panel active" id="panel-paystack">
-          <p class="pay-info">Pay securely with <strong>Paystack</strong> — local orders are charged in <strong>NGN</strong>, while international card checkout can be initialized in <strong>USD</strong> when enabled on Kay's Paystack account.</p>
+          <p class="pay-info">Pay securely with <strong>Paystack</strong> — local orders are charged in <strong>NGN</strong>, and international card checkout in <strong>USD</strong>.</p>
           <button class="submit-pay-btn" id="paystackPayBtn">Pay with Paystack</button>
         </div>
 
@@ -1564,14 +1714,6 @@ footer a:hover { color:var(--rust); }
           <input class="form-input" id="cfgTezosAddr" type="text" value="tz1WpjkcxaoRtKzV3Ni1T6KFEnpUdkYzELwd" readonly style="opacity:0.6;cursor:default;border-color:rgba(90,192,245,0.3)"/>
         </div>
         <p style="font-size:0.8rem;color:var(--text-muted);line-height:1.6;margin-bottom:1.2rem">To update wallet addresses, edit the <code style="color:var(--clay);font-size:0.75rem">ethAddress</code> and <code style="color:var(--clay);font-size:0.75rem">tezosAddress</code> values in <code style="color:var(--clay);font-size:0.75rem">SHOP_CONFIG</code> directly.</p>
-
-        <!-- Shipping promo toggle -->
-        <p class="admin-section-title" style="margin-top:1.4rem">Free-shipping promo</p>
-        <label style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem;cursor:pointer">
-          <input type="checkbox" id="cfgShipPromo" checked style="accent-color:var(--rust);width:16px;height:16px"/>
-          <span style="font-family:'Crimson Pro',serif;font-size:0.95rem;color:var(--text)">Promo active — free shipping over $500, flat $30 over $250</span>
-        </label>
-        <p style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;margin-bottom:1.2rem">Turn this off to charge normal per-zone shipping on all orders. The banner and the discounted rates switch off together, on this page and on product pages.</p>
 
         <!-- API keys note -->
         <p class="admin-section-title" style="margin-top:1.4rem">Payment keys (set as env vars)</p>
@@ -2695,22 +2837,15 @@ document.getElementById('sizeGuideOverlay').addEventListener('click', e => {
 const DELIVERY_RATES = {
   'pickup':   { label: 'Collect in Kaduna',          small: { ngn: 0,    usd: 0  }, large: { ngn: 0,    usd: 0  } },
   'NG-other': { label: 'Nigeria — GIG Logistics',    small: { ngn: 4500, usd: 0  }, large: { ngn: 6500, usd: 0  } },
-  'WA':       { label: 'West Africa — UPS Expedited',small: { ngn: 0,    usd: 22 }, large: { ngn: 0,    usd: 30 } },
-  'EU':       { label: 'Europe / UK — UPS Expedited',small: { ngn: 0,    usd: 35 }, large: { ngn: 0,    usd: 48 } },
-  'NA':       { label: 'North America — UPS Expedited',small:{ ngn: 0,   usd: 42 }, large: { ngn: 0,    usd: 58 } },
-  'AO':       { label: 'Asia / Oceania — UPS Expedited',small:{ ngn: 0,  usd: 50 }, large: { ngn: 0,    usd: 68 } },
-  'ROW':      { label: 'Rest of world — UPS Expedited',small:{ ngn: 0,   usd: 48 }, large: { ngn: 0,    usd: 62 } },
+  'WA':       { label: 'West Africa — DHL / UPS',small: { ngn: 0,    usd: 22 }, large: { ngn: 0,    usd: 30 } },
+  'EU':       { label: 'Europe / UK — DHL / UPS',small: { ngn: 0,    usd: 35 }, large: { ngn: 0,    usd: 48 } },
+  'NA':       { label: 'North America — DHL / UPS',small:{ ngn: 0,   usd: 42 }, large: { ngn: 0,    usd: 58 } },
+  'AO':       { label: 'Asia / Oceania — DHL / UPS',small:{ ngn: 0,  usd: 50 }, large: { ngn: 0,    usd: 68 } },
+  'ROW':      { label: 'Rest of world — DHL / UPS',small:{ ngn: 0,   usd: 48 }, large: { ngn: 0,    usd: 62 } },
 };
 
 // Large print threshold — tube shipped
 const LARGE_PRINT_VARIANTS = ['12×16"','12×18"','18×24"','24×36"'];
-
-// Shipping promo (all shipped orders, every zone), keyed off the USD subtotal:
-//   >= $500 → free shipping;  >= $250 → flat $30;  else normal zone rate.
-// MUST mirror serverDeliveryFee() in game.js, or the signed-quote check fails.
-const FREE_SHIP_USD = 500;
-const FLAT_SHIP_USD = 250;
-const FLAT_SHIP_FEE_USD = 30;
 
 let _deliveryMethod = 'pickup'; // 'pickup' | 'ship'
 let _deliveryZone   = 'pickup';
@@ -2722,29 +2857,7 @@ function cartHasLargePrint() {
   });
 }
 
-// Which promo tier applies for the current cart: 'free' | 'flat' | null.
-// Returns null when the admin has switched the promo off.
-function shipPromoTier() {
-  if (SHOP_CONFIG.shipPromoEnabled === false) return null;
-  const sub = cartUsdTotal();
-  if (sub >= FREE_SHIP_USD) return 'free';
-  if (sub >= FLAT_SHIP_USD) return 'flat';
-  return null;
-}
-
-// Show/hide the promo banner to match the admin flag.
-function applyPromoVisibility() {
-  const banner = document.getElementById('shipPromoBanner');
-  if (!banner) return;
-  if (SHOP_CONFIG.shipPromoEnabled === false) { banner.style.display = 'none'; return; }
-  try { if (sessionStorage.getItem('kw-promo-dismissed') === '1') return; } catch(_){}
-  banner.style.display = '';
-}
-
 function deliveryFeeNgn() {
-  const tier = shipPromoTier();
-  if (tier === 'free') return 0;
-  if (tier === 'flat') return Math.round(FLAT_SHIP_FEE_USD * 1600);
   const zone = DELIVERY_RATES[_deliveryZone] || DELIVERY_RATES['ROW'];
   const t = cartHasLargePrint() ? zone.large : zone.small;
   if (t.ngn > 0) return t.ngn;
@@ -2752,9 +2865,6 @@ function deliveryFeeNgn() {
 }
 
 function deliveryFeeUsd() {
-  const tier = shipPromoTier();
-  if (tier === 'free') return 0;
-  if (tier === 'flat') return FLAT_SHIP_FEE_USD;
   const zone = DELIVERY_RATES[_deliveryZone] || DELIVERY_RATES['ROW'];
   const t = cartHasLargePrint() ? zone.large : zone.small;
   if (t.usd > 0) return t.usd;
@@ -2763,9 +2873,6 @@ function deliveryFeeUsd() {
 
 function deliveryFeeDisplay() {
   if (_deliveryZone === 'pickup') return 'Free';
-  const tier = shipPromoTier();
-  if (tier === 'free') return '<span style="color:#6b7c5c">Free — order over $500</span>';
-  if (tier === 'flat') return fmt(Math.round(FLAT_SHIP_FEE_USD * 1600)) + ' ($30 — order over $250)';
   const zone = DELIVERY_RATES[_deliveryZone] || DELIVERY_RATES['ROW'];
   const t = cartHasLargePrint() ? zone.large : zone.small;
   if (t.ngn > 0) return fmt(t.ngn);
@@ -2802,12 +2909,8 @@ function updateDeliveryEstimate() {
   el.style.display = '';
   document.getElementById('deliveryZoneLabel').textContent = info.label;
   document.getElementById('deliveryFeeDisplay').innerHTML = deliveryFeeDisplay();
-  const promo = shipPromoTier();
   document.getElementById('deliveryFeeNote').textContent =
-    promo === 'free' ? 'Free shipping applied — order over $500'
-    : promo === 'flat' ? 'Discounted $30 shipping — order over $250'
-    : isLarge ? 'Large print(s) shipped in protective tube'
-    : 'Flat-pack envelope shipping';
+    isLarge ? 'Large print(s) shipped in protective tube' : 'Flat-pack envelope shipping';
 }
 
 // Show the carrier-appropriate address fields: GIG for Nigeria, UPS for
@@ -3200,8 +3303,6 @@ document.getElementById('adminLoginBtn').addEventListener('click', async ()=>{
 
 function loadAdminConfig() {
   // addresses are hardcoded and shown read-only in the admin panel
-  const promoChk = document.getElementById('cfgShipPromo');
-  if (promoChk) promoChk.checked = SHOP_CONFIG.shipPromoEnabled !== false;
   populatePrintPageSelector();
 }
 
@@ -3864,8 +3965,6 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
     }));
 
     // Save config (wallet addresses handled server-side — just upsert)
-    const promoChk = document.getElementById('cfgShipPromo');
-    if (promoChk) SHOP_CONFIG.shipPromoEnabled = promoChk.checked;
     const cfgRes = await fetch('/api/admin/shop-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
@@ -3873,7 +3972,6 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         eth_address:   SHOP_CONFIG.ethAddress,
         tezos_address: SHOP_CONFIG.tezosAddress,
         announcement:  SHOP_CONFIG.announcement || '',
-        ship_promo_enabled: SHOP_CONFIG.shipPromoEnabled !== false,
       }),
     });
     if (!cfgRes.ok) {
@@ -3883,7 +3981,6 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
 
     renderProducts();
     populatePrintPageSelector();
-    applyPromoVisibility();
     if (typeof buildOrderSummary === 'function') buildOrderSummary();
     showToast('Saved ✦');
     closeAdmin();
@@ -4655,8 +4752,6 @@ async function loadShopData() {
       const cfg = await configRes.json();
       if (cfg.eth_address)   SHOP_CONFIG.ethAddress   = cfg.eth_address;
       if (cfg.tezos_address) SHOP_CONFIG.tezosAddress = cfg.tezos_address;
-      SHOP_CONFIG.shipPromoEnabled = cfg.ship_promo_enabled !== false;
-      applyPromoVisibility();
     }
   } catch (e) {
     // API not reachable or tables don't exist yet — use hardcoded defaults
@@ -4741,17 +4836,69 @@ document.getElementById('adminBar').classList.add('visible');
 /* ─── Init ─── */
 document.getElementById('adminBar').classList.add('visible');
 
-// Promo banner — dismissible for the session.
+/* ─── FAQ accordion ─── */
+document.querySelectorAll('.faq-q').forEach(q => {
+  q.addEventListener('click', () => q.closest('.faq-item').classList.toggle('open'));
+});
+
+/* ─── Enquiry widget ─── */
+const KW_WHATSAPP = '2349055372963'; // Kay's WhatsApp (international format, digits only)
+function openEnquire(context) {
+  document.getElementById('enquireBody').style.display = '';
+  document.getElementById('enquireDone').style.display = 'none';
+  document.getElementById('enquireTitle').textContent = context ? 'Ask about this piece' : 'Ask us anything';
+  document.getElementById('enquireOverlay')._context = context || '';
+  document.getElementById('enquireOverlay').classList.add('show');
+}
+function closeEnquire() { document.getElementById('enquireOverlay').classList.remove('show'); }
 (function(){
-  const banner = document.getElementById('shipPromoBanner');
-  const close  = document.getElementById('shipPromoClose');
-  if (!banner) return;
-  try { if (sessionStorage.getItem('kw-promo-dismissed') === '1') banner.style.display = 'none'; } catch(_){}
-  if (close) close.addEventListener('click', () => {
-    banner.style.display = 'none';
-    try { sessionStorage.setItem('kw-promo-dismissed', '1'); } catch(_){}
+  const fab = document.getElementById('enquireFab');
+  const overlay = document.getElementById('enquireOverlay');
+  const close = document.getElementById('enquireClose');
+  if (fab) fab.addEventListener('click', () => openEnquire(''));
+  if (close) close.addEventListener('click', closeEnquire);
+  if (overlay) overlay.addEventListener('click', e => { if (e.target === overlay) closeEnquire(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEnquire(); });
+
+  const wa = document.getElementById('enquireWa');
+  if (wa) wa.addEventListener('click', () => {
+    const ctx = overlay._context;
+    const text = ctx
+      ? `Hi Kay, I have a question about "${ctx}":\n`
+      : 'Hi Kay, I have a question about the shop:\n';
+    window.open('https://wa.me/' + KW_WHATSAPP + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
+  });
+
+  const send = document.getElementById('enquireSend');
+  if (send) send.addEventListener('click', async () => {
+    const name = document.getElementById('enquireName').value.trim();
+    const email = document.getElementById('enquireEmail').value.trim();
+    const msg = document.getElementById('enquireMsg').value.trim();
+    if (!name) { showToast('Please enter your name'); return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Please enter a valid email'); return; }
+    if (msg.length < 4) { showToast('Please enter your question'); return; }
+    send.disabled = true; send.textContent = 'Sending…';
+    const ctx = overlay._context;
+    try {
+      const res = await fetch('/api/site-form', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          form_type: 'commission', name, email,
+          commission_type: 'shop-enquiry',
+          message: (ctx ? `Enquiry about: ${ctx}\n\n` : 'Shop enquiry\n\n') + msg,
+        }),
+      });
+      if (!res.ok) throw new Error('send failed');
+      document.getElementById('enquireBody').style.display = 'none';
+      document.getElementById('enquireDone').style.display = '';
+    } catch (_) {
+      showToast('Could not send — please try WhatsApp instead');
+    } finally {
+      send.disabled = false; send.textContent = 'Send message';
+    }
   });
 })();
+
 loadCart();
 updateCartUI();
 
@@ -4792,5 +4939,3 @@ finalizeReturnedGatewayCheckout();
 </script>
 </body>
 </html>
-
-
