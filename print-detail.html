@@ -1594,9 +1594,19 @@ function initCartLinks() {
   if (cartOverlay) cartOverlay.addEventListener('click', closeCart);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCart(); });
 
-  // Checkout still happens on the shop page, where the full payment flow lives.
+  // Checkout opens in place via the shared module (card/Paystack handled here;
+  // crypto hands off to the shop page). The bag is shared via localStorage.
   const checkoutBtn = document.getElementById('checkoutBtn');
-  if (checkoutBtn) checkoutBtn.addEventListener('click', () => { window.location.href = shopHref(); });
+  if (checkoutBtn) checkoutBtn.addEventListener('click', () => {
+    closeCart();
+    if (window.KWCheckout) {
+      window.KWCheckout.open('paystack');
+    } else {
+      // Module failed to load — fall back to the shop handoff so checkout still works.
+      const base = shopHref();
+      window.location.href = base + (base.includes('#') ? '' : '#checkout');
+    }
+  });
 
   updateCartBadge();
   updateCartUI();
@@ -1623,6 +1633,11 @@ document.getElementById('printContent').addEventListener('click', e => {
 
 initCartLinks();
 load();
+
+// Expose the page's shop-href resolver to the shared checkout module so its
+// crypto handoff resolves correctly on file:// and on the deployed site.
+window.kwShopHref = shopHref;
 </script>
+<script src="/checkout-shared.js"></script>
 </body>
 </html>
