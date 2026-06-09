@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -342,6 +342,19 @@ body.dark .variant-chip.selected { color: var(--sand); }
 .add-btn:hover { background: var(--bark); transform: translateY(-1px); }
 .add-btn:active { transform: translateY(0); }
 
+/* Secondary link under the card actions — quieter than Add to bag */
+.details-link {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-family: 'Cinzel', serif; font-size: 0.46rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--text-muted); background: none; border: none;
+  padding: 0.5rem 0 0; margin-top: 0.1rem;
+  transition: color 0.2s;
+  text-decoration: none;
+}
+.details-link:hover { color: var(--clay); }
+.details-link::after { content: '\2192'; font-size: 0.6rem; }
+
 /* ── Cart Drawer ── */
 .cart-overlay {
   position: fixed; inset: 0; z-index: 200;
@@ -410,6 +423,18 @@ body.dark .variant-chip.selected { color: var(--sand); }
   font-family: 'Montserrat', sans-serif;
   font-size: 0.6rem; color: var(--text-muted);
   letter-spacing: 0.06em; margin: 0.2rem 0 0.5rem;
+}
+.cart-item-soldout {
+  display: block;
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.5rem;
+}
+.cart-item-lowstock {
+  display: block;
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--gold); margin: 0 0 0.5rem;
 }
 .cart-item-qty {
   display: flex; align-items: center; gap: 0.5rem;
@@ -1909,6 +1934,27 @@ function stockForChoice(p, key) {
   return null;
 }
 
+// Total available units for a variant. null === unlimited (open edition / no
+// stock set). 0 === sold out. Limited editions get their cap from
+// stock_by_variant just like everything else.
+function variantStock(p, key) {
+  const s = stockForChoice(p, key);
+  return s === null || s === undefined ? null : Number(s);
+}
+
+// How many of this exact variant are already sitting in the bag.
+function qtyInCart(productId, variantKey) {
+  const it = cart.find(c => c.key === productId + '-' + variantKey);
+  return it ? it.qty : 0;
+}
+
+// Units still addable: cap minus what's already in the bag. null === unlimited.
+function remainingToAdd(p, variantKey) {
+  const cap = variantStock(p, variantKey);
+  if (cap === null) return null;
+  return Math.max(0, cap - qtyInCart(p.id, variantKey));
+}
+
 /* ─── Theme ─── */
 function initTheme() {
   const saved = localStorage.getItem('kaysworks-theme');
@@ -1934,6 +1980,13 @@ function buildBadgeStack(p) {
   if (p.is_bestseller) tags.push(`<span class="card-tag card-tag-best">Best Seller</span>`);
   if (p.is_new) tags.push(`<span class="card-tag card-tag-new">New</span>`);
   return tags.length ? `<div class="card-badge-stack">${tags.join('')}</div>` : '';
+}
+
+// Quiet secondary action that leads to the full product page. Only shown when
+// the product has a slug to link to.
+function detailsLink(p) {
+  if (!p.slug) return '';
+  return `<a class="details-link" href="/shop/${p.slug}">Show product details</a>`;
 }
 
 function buildCard(p) {
@@ -1988,6 +2041,7 @@ function buildCard(p) {
           ${!defaultChoice.key ? 'Unavailable' : defaultStock===0?'Sold out':'Add to bag'}
         </button>
       </div>
+      ${detailsLink(p)}
     </div>`;
   return card;
 }
@@ -2015,6 +2069,7 @@ function buildPrintCard(p) {
           <div class="card-price"><span class="price-ngn">Unavailable</span></div>
           <button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed">Unavailable</button>
         </div>
+        ${detailsLink(p)}
       </div>`;
     return card;
   }
@@ -2058,6 +2113,7 @@ function buildPrintCard(p) {
           ${!defaultKey ? 'Unavailable' : stock===0 ? 'Sold out' : 'Add to bag'}
         </button>
       </div>
+      ${detailsLink(p)}
     </div>`;
   return card;
 }
@@ -2086,6 +2142,7 @@ function refreshPrintOption(pid) {
   if (priceNgnEl) priceNgnEl.textContent = fmt(productPrice(p, firstKey, 'ngn'));
   if (priceUsdEl) priceUsdEl.textContent = fmtUsd(productPrice(p, firstKey, 'usd')) + ' USD';
   if (descEl) descEl.textContent = active?.desc || p.desc || '';
+  syncCardStock(pid, firstKey);
 }
 
 function wireVariantButton(btn) {
@@ -2098,7 +2155,54 @@ function wireVariantButton(btn) {
     const p = SHOP_CONFIG.products.find(x=>x.id===pid);
     document.getElementById('pngn-'+pid).textContent = fmt(productPrice(p, v, 'ngn'));
     document.getElementById('pusd-'+pid).textContent = fmtUsd(productPrice(p, v, 'usd')) + ' USD';
+    syncCardStock(pid, v);
   });
+}
+
+// Reflect remaining stock for the currently-selected variant on a product card:
+// the stock label and the add-to-bag button. Sold-out variants get the full
+// "Sold out" treatment so a shopper landing on that size knows they missed it.
+// `variantKey` is optional; defaults to the card's current selection.
+function syncCardStock(pid, variantKey) {
+  const p = SHOP_CONFIG.products.find(x => x.id === pid);
+  if (!p) return;
+  const v = variantKey || selectedVariants[pid];
+  const card = document.querySelector(`.product-card[data-pid="${pid}"]`);
+  if (!card) return;
+
+  const cap = variantStock(p, v);                 // null = unlimited
+  const left = remainingToAdd(p, v);              // null = unlimited
+  const soldOut = cap !== null && cap <= 0;       // genuinely out of stock
+  const maxedByCart = left !== null && left <= 0; // none left to add right now
+
+  // Stock label (merch cards already have a #stock-<id> span; print cards get one too)
+  let stockEl = document.getElementById('stock-' + pid);
+  if (!stockEl) {
+    const priceWrap = card.querySelector('.card-price');
+    if (priceWrap) {
+      stockEl = document.createElement('span');
+      stockEl.id = 'stock-' + pid;
+      priceWrap.appendChild(stockEl);
+    }
+  }
+  if (stockEl) {
+    if (soldOut) {
+      stockEl.innerHTML = `<span style="font-family:'Cinzel',serif;font-size:0.46rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--rust);margin-left:0.5rem">Sold out</span>`;
+    } else if (cap !== null && cap <= 3) {
+      stockEl.innerHTML = `<span style="font-family:'Cinzel',serif;font-size:0.46rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);margin-left:0.5rem">Only ${cap} left</span>`;
+    } else {
+      stockEl.innerHTML = '';
+    }
+  }
+
+  const btn = card.querySelector('.add-btn');
+  if (btn) {
+    const block = soldOut || maxedByCart;
+    btn.disabled = block;
+    btn.style.opacity = block ? '0.4' : '';
+    btn.style.cursor = block ? 'not-allowed' : '';
+    btn.textContent = soldOut ? 'Sold out' : (maxedByCart ? 'All in your bag' : 'Add to bag');
+  }
 }
 
 function renderProducts() {
@@ -2135,6 +2239,9 @@ function renderProducts() {
       addToCart(p, v);
     });
   });
+
+  // Reflect any stock already consumed by the saved cart on first paint.
+  SHOP_CONFIG.products.forEach(p => syncCardStock(p.id, selectedVariants[p.id]));
 }
 
 /* ─── Filter ─── */
@@ -2167,6 +2274,16 @@ function addToCart(p, variant) {
     : getChoices(p).find(c => c.key === variant);
   const label = choice?.label || variant;
   const existing = cart.find(c=>c.key===key);
+
+  // Stock wall. remainingToAdd already subtracts what's in the bag.
+  const left = remainingToAdd(p, variant);
+  if (left !== null && left <= 0) {
+    const cap = variantStock(p, variant);
+    showToast(cap === 0 ? 'Sold out ✦' : 'That\u2019s all of this edition — sold out ✦');
+    syncCardStock(p.id, variant);
+    return;
+  }
+
   if (existing) {
     existing.qty++;
   } else {
@@ -2179,7 +2296,9 @@ function addToCart(p, variant) {
   }
   updateCartUI();
   openCart();
-  showToast('Added to bag ✦');
+  // If that was the last one, slam the card shut so the next shopper feels it.
+  syncCardStock(p.id, variant);
+  showToast(remainingToAdd(p, variant) === 0 ? 'Added — last one, now sold out ✦' : 'Added to bag ✦');
 }
 
 function refreshCheckoutPricing() {
@@ -2193,9 +2312,21 @@ function refreshCheckoutPricing() {
 function changeCartQty(key, dir) {
   const item = cart.find(c=>c.key===key);
   if (!item) return;
-  item.qty += Number(dir);
+  const step = Number(dir);
+  if (step > 0) {
+    const p = SHOP_CONFIG.products.find(x => x.id === item.id);
+    // remainingToAdd subtracts current cart qty, so >0 means at least one more.
+    const left = p ? remainingToAdd(p, item.variantKey) : null;
+    if (left !== null && left <= 0) {
+      showToast('That\u2019s the whole edition — sold out ✦');
+      syncCardStock(item.id, item.variantKey);
+      return;
+    }
+  }
+  item.qty += step;
   if (item.qty <= 0) cart.splice(cart.indexOf(item), 1);
   updateCartUI();
+  syncCardStock(item.id, item.variantKey);
   if (cart.length) {
     buildOrderSummary();
     refreshCheckoutPricing();
@@ -2233,7 +2364,14 @@ function updateCartUI() {
   }
   footEl.style.display = '';
 
-  itemsEl.innerHTML = cart.map(c=>`
+  itemsEl.innerHTML = cart.map(c=>{
+    const p = SHOP_CONFIG.products.find(x => x.id === c.id);
+    const left = p ? remainingToAdd(p, c.variantKey) : null; // null = unlimited
+    const maxed = left !== null && left <= 0;
+    const note = maxed
+      ? `<span class="cart-item-soldout">Sold out — last ${c.qty} reserved for you</span>`
+      : (left !== null && left <= 3 ? `<span class="cart-item-lowstock">Only ${left} more available</span>` : '');
+    return `
     <div class="cart-item">
       <div class="cart-item-img">
         ${c.image ? `<img src="${c.image}" alt="${c.name}"/>` : c.emoji}
@@ -2241,17 +2379,19 @@ function updateCartUI() {
       <div class="cart-item-info">
         <div class="cart-item-name">${c.name}</div>
         <div class="cart-item-variant">${c.variant}</div>
+        ${note}
         <div class="cart-item-qty">
           <button class="qty-btn" data-key="${cartDomKey(c.key)}" data-dir="-1">−</button>
           <span class="qty-val">${c.qty}</span>
-          <button class="qty-btn" data-key="${cartDomKey(c.key)}" data-dir="1">+</button>
+          <button class="qty-btn" data-key="${cartDomKey(c.key)}" data-dir="1"${maxed ? ' disabled style="opacity:0.35;cursor:not-allowed"' : ''}>+</button>
           <button class="cart-item-remove" data-key="${cartDomKey(c.key)}">Remove</button>
         </div>
       </div>
       <div>
         <div class="cart-item-price">${fmt(c.priceNgn * c.qty)}</div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   const ngnTotal = cartNgnTotal();
   const usdTotal = cartUsdTotal();
@@ -4346,5 +4486,3 @@ finalizeReturnedGatewayCheckout();
 </script>
 </body>
 </html>
-
-
