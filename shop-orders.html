@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Shop Orders ? Kay's Works Admin</title>
+<title>Shop Orders · Kay's Works Admin</title>
 <link rel="icon" type="image/svg+xml" href="/images/kaysworkslogo.svg"/>
 <meta name="robots" content="noindex,nofollow"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -291,7 +291,7 @@ body.dark .toast{background:#2a1c14;}
 <body>
 
 <nav>
-  <span class="nav-logo"><span style="font-weight:600">KAY'S</span>&nbsp;<span style="font-weight:500">WORKS</span> ? Orders</span>
+  <span class="nav-logo"><span style="font-weight:600">KAY'S</span>&nbsp;<span style="font-weight:500">WORKS</span> · Orders</span>
   <div class="nav-right">
     <a href="/shop">Shop</a>
     <a href="/claim-admin">Claim Admin</a>
@@ -323,7 +323,7 @@ body.dark .toast{background:#2a1c14;}
       <div class="stat-card"><div class="stat-label">Shipped</div><div class="stat-value" id="statShipped">?</div></div>
       <div class="stat-card good"><div class="stat-label">Fulfilled</div><div class="stat-value" id="statFulfilled">?</div></div>
       <div class="stat-card"><div class="stat-label">Revenue (NGN)</div><div class="stat-value" id="statRevenue">?</div><div class="stat-sub" id="statRevenueUsd"></div></div>
-      <div class="stat-card alert" id="statLowStockCard"><div class="stat-label">Low stock</div><div class="stat-value" id="statLowStock">?</div><div class="stat-sub">variants ? 3</div></div>
+      <div class="stat-card alert" id="statLowStockCard"><div class="stat-label">Low stock</div><div class="stat-value" id="statLowStock">—</div><div class="stat-sub">variants ≤ 3</div></div>
     </div>
 
     <!-- Orders -->
@@ -354,7 +354,7 @@ body.dark .toast{background:#2a1c14;}
           </tr>
         </thead>
         <tbody id="ordersBody">
-          <tr><td colspan="9" class="empty-state"><div class="empty-icon">?</div><div class="empty-text">No orders yet.</div></td></tr>
+          <tr><td colspan="9" class="empty-state"><div class="empty-icon">⊘</div><div class="empty-text">No orders yet.</div></td></tr>
         </tbody>
       </table>
     </div>
@@ -366,7 +366,7 @@ body.dark .toast{background:#2a1c14;}
         <button class="refresh-btn" id="refreshStockBtn">? Refresh</button>
       </div>
       <div class="stock-grid" id="stockGrid">
-        <div class="empty-state"><div class="empty-icon">?</div><div class="empty-text">Loading products?</div></div>
+        <div class="empty-state"><div class="empty-icon">⊘</div><div class="empty-text">Loading products?</div></div>
       </div>
     </div>
 
@@ -423,10 +423,10 @@ let _products = [];
 let _activeFilter = 'all';
 
 /* --- Helpers --- */
-function fmt(n)    { return '?' + Number(n||0).toLocaleString('en-NG'); }
+function fmt(n)    { return '₦' + Number(n||0).toLocaleString('en-NG'); }
 function fmtUsd(n) { return '$' + Number(n||0).toFixed(0); }
 function formatDate(d) {
-  if (!d) return '?';
+  if (!d) return '—';
   return new Date(d).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
 }
 function formatTime(d) {
@@ -439,7 +439,7 @@ function short(str, n=30) { return String(str||'').length > n ? str.slice(0,n)+'
 document.getElementById('loginBtn').addEventListener('click', async () => {
   const pw = document.getElementById('pwInput').value;
   const btn = document.getElementById('loginBtn');
-  btn.disabled = true; btn.textContent = 'Checking?';
+  btn.disabled = true; btn.textContent = 'Checking…';
   try {
     const res = await fetch('/api/admin/login', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -491,7 +491,7 @@ function renderStats() {
   document.getElementById('statPending').textContent   = pending;
   document.getElementById('statShipped').textContent   = shipped;
   document.getElementById('statFulfilled').textContent = fulfilled;
-  document.getElementById('statRevenue').textContent   = '?' + Math.round(revenueNgn/1000) + 'k';
+  document.getElementById('statRevenue').textContent   = '₦' + Math.round(revenueNgn/1000) + 'k';
   document.getElementById('statRevenueUsd').textContent= fmtUsd(revenueUsd) + ' USD';
   document.getElementById('statPendingCard').className = `stat-card ${pending>0?'alert':'good'}`;
 
@@ -510,17 +510,17 @@ function renderStats() {
 function renderOrders() {
   const tbody = document.getElementById('ordersBody');
   if (!_orders.length) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">?</div><div class="empty-text">No orders${_activeFilter!=='all'?' with this status':''}.</div></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">⊘</div><div class="empty-text">No orders${_activeFilter!=='all'?' with this status':''}.</div></div></td></tr>`;
     return;
   }
   tbody.innerHTML = _orders.map(o => {
     const items = Array.isArray(o.items) ? o.items : [];
-    const itemsSummary = items.slice(0,2).map(i=>`${short(i.name,20)} ? ${i.variant}`).join('<br/>');
+    const itemsSummary = items.slice(0,2).map(i=>`${short(i.name,20)} · ${i.variant}`).join('<br/>');
     const moreItems = items.length > 2 ? `<span style="color:var(--text-muted);font-size:0.78rem">+${items.length-2} more</span>` : '';
     return `<tr>
       <td><div class="order-ref">${short(o.payment_ref||o.id,18)}</div></td>
       <td>
-        <div class="order-customer">${o.customer_name||'?'}</div>
+        <div class="order-customer">${o.customer_name||'—'}</div>
         <div class="order-email">${o.email||''}</div>
       </td>
       <td><div class="order-items-list">${itemsSummary}${moreItems}</div></td>
@@ -528,8 +528,8 @@ function renderOrders() {
         <div class="order-total">${fmt(o.total_ngn)}</div>
         <div class="order-total-usd">${fmtUsd(o.total_usd)}</div>
       </td>
-      <td><span class="pay-badge">${(o.payment_method||'?').toUpperCase()}</span></td>
-      <td style="font-size:0.82rem;color:var(--text-muted)">${o.delivery_method==='pickup'?'Pickup ? Kaduna':(o.delivery_zone||'?')}</td>
+      <td><span class="pay-badge">${(o.payment_method||'—').toUpperCase()}</span></td>
+      <td style="font-size:0.82rem;color:var(--text-muted)">${o.delivery_method==='pickup'?'Pickup · Kaduna':(o.delivery_zone||'—')}</td>
       <td><span class="status-badge status-${o.status||'pending'}">${o.status||'pending'}</span></td>
       <td style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap">
         ${formatDate(o.created_at)}<br/>${formatTime(o.created_at)}
@@ -574,8 +574,8 @@ function openDetail(id) {
         <div>
           <label class="detail-form-label">Carrier</label>
           <select class="detail-select" id="dCarrier">
-            ${['?','GIG Logistics','UPS','DHL','FedEx','Other'].map(c=>
-              `<option value="${c}"${(o.tracking_carrier||'?')===c?' selected':''}>${c}</option>`
+            ${['—','GIG Logistics','UPS','DHL','FedEx','Other'].map(c=>
+              `<option value="${c}"${(o.tracking_carrier||'—')===c?' selected':''}>${c}</option>`
             ).join('')}
           </select>
         </div>
@@ -593,11 +593,11 @@ function openDetail(id) {
 
     <div class="detail-section">
       <div class="detail-section-label">Customer</div>
-      <div class="detail-row"><span class="detail-row-label">Name</span><span class="detail-row-val">${o.customer_name||'?'}</span></div>
-      <div class="detail-row"><span class="detail-row-label">Email</span><span class="detail-row-val"><a href="mailto:${o.email}" style="color:var(--clay)">${o.email||'?'}</a></span></div>
-      <div class="detail-row"><span class="detail-row-label">Phone</span><span class="detail-row-val">${o.phone||'?'}</span></div>
-      <div class="detail-row"><span class="detail-row-label">Address</span><span class="detail-row-val">${o.address||'?'}</span></div>
-      <div class="detail-row"><span class="detail-row-label">Delivery</span><span class="detail-row-val">${o.delivery_method==='pickup'?'Pickup ? Kaduna':(o.delivery_zone||'?')}</span></div>
+      <div class="detail-row"><span class="detail-row-label">Name</span><span class="detail-row-val">${o.customer_name||'—'}</span></div>
+      <div class="detail-row"><span class="detail-row-label">Email</span><span class="detail-row-val"><a href="mailto:${o.email}" style="color:var(--clay)">${o.email||'—'}</a></span></div>
+      <div class="detail-row"><span class="detail-row-label">Phone</span><span class="detail-row-val">${o.phone||'—'}</span></div>
+      <div class="detail-row"><span class="detail-row-label">Address</span><span class="detail-row-val">${o.address||'—'}</span></div>
+      <div class="detail-row"><span class="detail-row-label">Delivery</span><span class="detail-row-val">${o.delivery_method==='pickup'?'Pickup · Kaduna':(o.delivery_zone||'—')}</span></div>
     </div>
 
     <div class="detail-section">
@@ -607,7 +607,7 @@ function openDetail(id) {
           <div class="detail-item">
             <div>
               <div class="detail-item-name">${i.name}</div>
-              <div style="font-size:0.78rem;color:var(--text-muted)">${i.variant} ? ${i.qty}</div>
+              <div style="font-size:0.78rem;color:var(--text-muted)">${i.variant} × ${i.qty}</div>
             </div>
             <div class="detail-item-price">${fmt((i.priceNgn||0)*i.qty)}</div>
           </div>`).join('')}
@@ -616,8 +616,8 @@ function openDetail(id) {
 
     <div class="detail-section">
       <div class="detail-section-label">Payment</div>
-      <div class="detail-row"><span class="detail-row-label">Method</span><span class="detail-row-val">${(o.payment_method||'?').toUpperCase()}</span></div>
-      <div class="detail-row"><span class="detail-row-label">Reference</span><span class="detail-row-val" style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--clay)">${o.payment_ref||'?'}</span></div>
+      <div class="detail-row"><span class="detail-row-label">Method</span><span class="detail-row-val">${(o.payment_method||'—').toUpperCase()}</span></div>
+      <div class="detail-row"><span class="detail-row-label">Reference</span><span class="detail-row-val" style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--clay)">${o.payment_ref||'—'}</span></div>
       <div class="detail-row"><span class="detail-row-label">Subtotal</span><span class="detail-row-val">${fmt(o.total_ngn - (o.delivery_fee_ngn||0))}</span></div>
       <div class="detail-row"><span class="detail-row-label">Delivery fee</span><span class="detail-row-val">${o.delivery_fee_ngn ? fmt(o.delivery_fee_ngn) : 'Free'}</span></div>
       <div class="detail-row" style="font-weight:600"><span class="detail-row-label">Total</span><span class="detail-row-val" style="color:var(--text);font-family:'Cormorant Garamond',serif;font-size:1.1rem">${fmt(o.total_ngn)} / ${fmtUsd(o.total_usd)}</span></div>
@@ -640,12 +640,12 @@ async function saveOrderDetail(id) {
       body: JSON.stringify({
         status,
         tracking_number: tracking,
-        tracking_carrier: carrier === '?' ? '' : carrier,
+        tracking_carrier: carrier === '—' ? '' : carrier,
         admin_note: note,
       }),
     });
     if (!res.ok) { showToast('Save failed'); return; }
-    showToast('Order updated ?');
+    showToast('Order updated ✓');
     closeDetail();
     loadOrders();
   } catch(e) { showToast('Network error'); }
@@ -751,7 +751,7 @@ async function saveVariantStock(pid, variant) {
     p.stock_by_variant = sbv;
     renderStock();
     renderStats();
-    showToast(`Stock updated ? ${variant}: ${qty} ?`);
+    showToast(`Stock updated · ${variant}: ${qty} ✓`);
   } catch(e) { showToast('Network error'); }
 }
 
@@ -772,7 +772,7 @@ async function setVariantStock(pid, variant) {
     p.stock_by_variant = sbv;
     renderStock();
     renderStats();
-    showToast(`Stock set ? ${variant}: ${qty} ?`);
+    showToast(`Stock set · ${variant}: ${qty} ✓`);
   } catch(e) { showToast('Network error'); }
 }
 
