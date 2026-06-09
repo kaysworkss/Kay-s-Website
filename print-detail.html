@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -670,28 +670,6 @@ footer a:hover { color:var(--rust); }
   100% { transform: translateX(350%); }
 }
 
-/* ── Free-shipping promo banner (bottom, decoupled from fixed nav) ── */
-.ship-promo-banner {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 95;
-  display: flex; align-items: center; justify-content: center; gap: 0.7rem;
-  padding: 0.6rem 2.6rem 0.6rem 1rem;
-  background: linear-gradient(90deg, var(--rust), var(--clay));
-  color: var(--linen);
-  font-family: 'Cinzel', serif; font-size: 0.5rem;
-  letter-spacing: 0.16em; text-transform: uppercase; text-align: center; line-height: 1.5;
-  transform: translateY(100%); transition: transform 0.4s ease;
-}
-.ship-promo-banner.show { transform: translateY(0); }
-.ship-promo-banner strong { color: #fff; font-weight: 600; }
-.ship-promo-banner .promo-sep { opacity: 0.55; }
-.ship-promo-close {
-  position: absolute; right: 0.8rem; top: 50%; transform: translateY(-50%);
-  background: none; border: none; color: var(--linen);
-  font-size: 0.8rem; cursor: pointer; opacity: 0.75; line-height: 1;
-}
-.ship-promo-close:hover { opacity: 1; }
-@media(max-width:600px){ .ship-promo-banner { font-size: 0.44rem; letter-spacing: 0.1em; } }
-
 /* ── Share button + modal ── */
 .share-btn {
   display: inline-flex; align-items: center; gap: 0.45rem;
@@ -753,6 +731,71 @@ footer a:hover { color:var(--rust); }
   white-space: nowrap; transition: background 0.18s, color 0.18s;
 }
 .share-copy button:hover { background: var(--clay); color: var(--linen); }
+
+/* ── Enquiry widget (floating button + modal) ── */
+.enquire-fab {
+  position: fixed; right: 1.2rem; bottom: 1.2rem; z-index: 8000;
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.7rem 1.1rem; border: none; border-radius: 999px;
+  background: var(--rust); color: var(--linen);
+  font-family: 'Cinzel', serif; font-size: 0.55rem;
+  letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer;
+  box-shadow: 0 6px 22px rgba(20,16,12,0.28);
+  transition: transform 0.18s, background 0.2s;
+}
+.enquire-fab:hover { background: var(--bark); transform: translateY(-2px); }
+.enquire-fab svg { width: 15px; height: 15px; }
+.enquire-overlay {
+  position: fixed; inset: 0; z-index: 8500;
+  background: rgba(14,10,8,0.7);
+  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  opacity: 0; pointer-events: none; transition: opacity 0.25s;
+}
+.enquire-overlay.show { opacity: 1; pointer-events: all; }
+.enquire-modal {
+  background: var(--bg-card, #fff); border: 1px solid var(--border);
+  border-radius: 4px; width: min(440px, 100%); max-height: 92vh; overflow-y: auto;
+  padding: 1.8rem; transform: translateY(16px); transition: transform 0.25s;
+  box-shadow: 0 18px 60px rgba(20,16,12,0.35);
+}
+.enquire-overlay.show .enquire-modal { transform: translateY(0); }
+.enquire-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.4rem; }
+.enquire-title { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; font-weight: 300; color: var(--text); }
+.enquire-sub { font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1.2rem; }
+.enquire-close { background: none; border: none; font-size: 1rem; color: var(--text-muted); cursor: pointer; }
+.enquire-close:hover { color: var(--rust); }
+.enquire-wa {
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+  width: 100%; padding: 0.85rem; margin-bottom: 1.1rem;
+  background: #25d366; color: #fff; border: none; border-radius: 3px;
+  font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase;
+  cursor: pointer; transition: filter 0.18s;
+}
+.enquire-wa:hover { filter: brightness(0.93); }
+.enquire-wa svg { width: 18px; height: 18px; }
+.enquire-or { display: flex; align-items: center; gap: 0.7rem; margin: 0.4rem 0 1rem; color: var(--text-muted); font-family: 'Cinzel', serif; font-size: 0.46rem; letter-spacing: 0.2em; text-transform: uppercase; }
+.enquire-or::before, .enquire-or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.enquire-field { margin-bottom: 0.9rem; }
+.enquire-field label { display: block; font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.35rem; }
+.enquire-field input, .enquire-field textarea {
+  width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 2px;
+  background: var(--bg-card, #fff); color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+}
+.enquire-field textarea { resize: vertical; min-height: 90px; }
+.enquire-field input:focus, .enquire-field textarea:focus { border-color: var(--clay); outline: none; }
+.enquire-send {
+  width: 100%; padding: 0.85rem; border: none; border-radius: 2px;
+  background: var(--rust); color: var(--linen);
+  font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.18em; text-transform: uppercase;
+  cursor: pointer; transition: background 0.2s;
+}
+.enquire-send:hover { background: var(--bark); }
+.enquire-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.enquire-done { text-align: center; padding: 1.5rem 0.5rem; }
+.enquire-done-icon { font-size: 2.4rem; color: var(--gold); margin-bottom: 0.8rem; }
+@media(max-width:600px){ .enquire-fab { font-size: 0.48rem; padding: 0.65rem 0.95rem; } }
 </style>
 </head>
 <body>
@@ -839,14 +882,6 @@ footer a:hover { color:var(--rust); }
   <div class="checkout-loading-text">Taking you to checkout…</div>
 </div>
 
-<!-- Free-shipping promo banner -->
-<div class="ship-promo-banner" id="shipPromoBanner">
-  <span><strong>Free shipping</strong> over $500</span>
-  <span class="promo-sep">·</span>
-  <span>flat <strong>$30</strong> over $250</span>
-  <button class="ship-promo-close" id="shipPromoClose" aria-label="Dismiss">✕</button>
-</div>
-
 <!-- Share modal -->
 <div class="share-overlay" id="shareOverlay">
   <div class="share-modal" role="dialog" aria-modal="true" aria-label="Share this print">
@@ -871,6 +906,39 @@ footer a:hover { color:var(--rust); }
     <div class="share-copy">
       <input type="text" id="shareUrl" readonly aria-label="Product link"/>
       <button id="shareCopyBtn">Copy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Enquiry widget -->
+<button class="enquire-fab" id="enquireFab" aria-label="Ask a question">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+  Questions?
+</button>
+<div class="enquire-overlay" id="enquireOverlay">
+  <div class="enquire-modal" role="dialog" aria-modal="true" aria-label="Ask a question">
+    <div class="enquire-head">
+      <div>
+        <div class="enquire-title" id="enquireTitle">Ask about this piece</div>
+        <div class="enquire-sub" id="enquireSub">We reply within 24 hours</div>
+      </div>
+      <button class="enquire-close" id="enquireClose" aria-label="Close">✕</button>
+    </div>
+    <div id="enquireBody">
+      <button class="enquire-wa" id="enquireWa">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Message us on WhatsApp
+      </button>
+      <div class="enquire-or">or send a message</div>
+      <div class="enquire-field"><label>Your name</label><input type="text" id="enquireName" placeholder="Name"/></div>
+      <div class="enquire-field"><label>Email</label><input type="email" id="enquireEmail" placeholder="your@email.com"/></div>
+      <div class="enquire-field"><label>Message</label><textarea id="enquireMsg" placeholder="What would you like to know about this piece?"></textarea></div>
+      <button class="enquire-send" id="enquireSend">Send message</button>
+    </div>
+    <div class="enquire-done" id="enquireDone" style="display:none">
+      <div class="enquire-done-icon">✦</div>
+      <p style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--text);margin-bottom:0.5rem">Message sent.</p>
+      <p style="font-family:'Crimson Pro',serif;color:var(--text-muted);line-height:1.6">Thank you — we'll reply by email within 24 hours.</p>
     </div>
   </div>
 </div>
@@ -1397,7 +1465,7 @@ function renderProduct(p) {
             return `<button class="add-to-cart-btn" id="addBtn" onclick="handleAddToCart()" ${disabled ? 'disabled' : ''}>${label}</button>`;
           })()}
           <p class="shipping-note">
-            Ships from Kaduna via GIG (domestic) or UPS Worldwide Expedited (international).
+            Ships from Nigeria via GIG Logistics (domestic) or DHL / UPS (international).
             ${p.is_large_print ? ' This piece ships rolled in an archival tube.' : ' Ships flat in a rigid board mailer.'}
           </p>
         </div>
@@ -1508,7 +1576,7 @@ function renderMerchProduct(p) {
             <span id="merchStock" style="font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;margin-left:0.6rem;color:${soldOut?'var(--rust)':'var(--gold)'}">${soldOut?'Sold out':(stock!==null&&stock<=3?`Only ${stock} left`:'')}</span>
           </div>
           <button class="add-to-cart-btn" id="addBtn" onclick="handleMerchAddToCart()" ${(!_selectedVariant||soldOut)?'disabled':''}>${soldOut?'Sold out':(_selectedVariant?'Add to bag':'Unavailable')}</button>
-          <p class="shipping-note">Ships from Kaduna via GIG (domestic) or UPS Worldwide Expedited (international).</p>
+          <p class="shipping-note">Ships from Nigeria via GIG Logistics (domestic) or DHL / UPS (international).</p>
         </div>
       </div>
     </div>`;
@@ -1804,29 +1872,6 @@ document.getElementById('printContent').addEventListener('click', e => {
 initCartLinks();
 load();
 
-// Promo banner — shows only if the admin promo is active; slides up on load,
-// dismissible for the session.
-(function(){
-  const banner = document.getElementById('shipPromoBanner');
-  const close  = document.getElementById('shipPromoClose');
-  if (!banner) return;
-  if (close) close.addEventListener('click', () => {
-    banner.classList.remove('show');
-    try { sessionStorage.setItem('kw-promo-dismissed', '1'); } catch(_){}
-  });
-  let dismissed = false;
-  try { dismissed = sessionStorage.getItem('kw-promo-dismissed') === '1'; } catch(_){}
-  if (dismissed) return;
-  // Respect the admin on/off flag before showing.
-  fetch('/api/shop/config')
-    .then(r => r.ok ? r.json() : {})
-    .then(cfg => {
-      if (cfg && cfg.ship_promo_enabled === false) return; // promo off — stay hidden
-      setTimeout(() => banner.classList.add('show'), 900);
-    })
-    .catch(() => { setTimeout(() => banner.classList.add('show'), 900); });
-})();
-
 /* ─── Share modal ─── */
 function shareUrl() {
   // Canonical product URL. On the deployed site this is /shop/<slug>; on file://
@@ -1885,7 +1930,62 @@ function closeShare() {
     setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1800);
   });
 })();
+
+/* ─── Enquiry widget ─── */
+const KW_WHATSAPP = '2349055372963'; // Kay's WhatsApp (international format, digits only)
+function openEnquire() {
+  document.getElementById('enquireBody').style.display = '';
+  document.getElementById('enquireDone').style.display = 'none';
+  document.getElementById('enquireOverlay').classList.add('show');
+}
+function closeEnquire() { document.getElementById('enquireOverlay').classList.remove('show'); }
+(function(){
+  const fab = document.getElementById('enquireFab');
+  const overlay = document.getElementById('enquireOverlay');
+  const close = document.getElementById('enquireClose');
+  if (fab) fab.addEventListener('click', openEnquire);
+  if (close) close.addEventListener('click', closeEnquire);
+  if (overlay) overlay.addEventListener('click', e => { if (e.target === overlay) closeEnquire(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEnquire(); });
+
+  const pieceName = () => (_product && _product.name) ? _product.name : '';
+
+  const wa = document.getElementById('enquireWa');
+  if (wa) wa.addEventListener('click', () => {
+    const n = pieceName();
+    const text = n ? `Hi Kay, I have a question about "${n}":\n` : 'Hi Kay, I have a question:\n';
+    window.open('https://wa.me/' + KW_WHATSAPP + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
+  });
+
+  const send = document.getElementById('enquireSend');
+  if (send) send.addEventListener('click', async () => {
+    const name = document.getElementById('enquireName').value.trim();
+    const email = document.getElementById('enquireEmail').value.trim();
+    const msg = document.getElementById('enquireMsg').value.trim();
+    if (!name) { showToast('Please enter your name'); return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Please enter a valid email'); return; }
+    if (msg.length < 4) { showToast('Please enter your question'); return; }
+    send.disabled = true; send.textContent = 'Sending…';
+    const n = pieceName();
+    try {
+      const res = await fetch('/api/site-form', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          form_type: 'commission', name, email,
+          commission_type: 'shop-enquiry',
+          message: (n ? `Enquiry about: ${n}\n\n` : 'Shop enquiry\n\n') + msg,
+        }),
+      });
+      if (!res.ok) throw new Error('send failed');
+      document.getElementById('enquireBody').style.display = 'none';
+      document.getElementById('enquireDone').style.display = '';
+    } catch (_) {
+      showToast('Could not send — please try WhatsApp instead');
+    } finally {
+      send.disabled = false; send.textContent = 'Send message';
+    }
+  });
+})();
 </script>
 </body>
 </html>
-
