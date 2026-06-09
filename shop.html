@@ -4481,7 +4481,27 @@ document.getElementById('adminBar').classList.add('visible');
 document.getElementById('adminBar').classList.add('visible');
 loadCart();
 updateCartUI();
-loadShopData();
+
+// If we arrived from a product (slug) page's checkout, open the checkout modal
+// once products/config have loaded and the shared cart is in place. The slug
+// page sends '#checkout' (generic) or '#checkout-eth' / '#checkout-tezos' when
+// the buyer chose crypto there (handled by the shop's native wallet flow).
+function maybeOpenCheckoutFromHash() {
+  const h = location.hash;
+  if (h !== '#checkout' && h !== '#checkout-eth' && h !== '#checkout-tezos') return;
+  const tab = h === '#checkout-eth' ? 'eth' : h === '#checkout-tezos' ? 'tezos' : 'paystack';
+  // Strip the hash so a refresh doesn't re-trigger it.
+  history.replaceState(null, '', location.pathname + location.search);
+  if (cart && cart.length) {
+    openCheckout(tab);
+  } else {
+    openCart();
+  }
+}
+
+loadShopData()
+  .then(maybeOpenCheckoutFromHash)
+  .catch(maybeOpenCheckoutFromHash);
 finalizeReturnedGatewayCheckout();
 </script>
 </body>
