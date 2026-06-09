@@ -322,7 +322,6 @@ async function handleShopConfig(req, res, supabase) {
       eth_address:    String(body.eth_address   || '').slice(0, 100),
       tezos_address:  String(body.tezos_address || '').slice(0, 100),
       announcement:   String(body.announcement  || '').slice(0, 500),
-      ship_promo_enabled: body.ship_promo_enabled !== false,
       updated_at:     new Date().toISOString(),
     };
     // Upsert — always keep exactly one config row (id = 1)
