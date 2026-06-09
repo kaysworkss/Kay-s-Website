@@ -1,10 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <!-- SEO meta tags injected by JS once product loads -->
-<title>Print Â· Kay's Works</title>
+<title>Print · Kay's Works</title>
 <link rel="icon" type="image/svg+xml" href="/images/kaysworkslogo.svg"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -61,13 +61,13 @@ body {
   min-height: 100vh;
 }
 
-/* â”€â”€ Noise â”€â”€ */
+/* ── Noise ── */
 body::before {
   content:'';pointer-events:none;position:fixed;inset:0;z-index:0;opacity:0.025;
   background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* â”€â”€ Nav â”€â”€ */
+/* ── Nav ── */
 nav {
   position: fixed; top:0; left:0; right:0; z-index:100;
   display:flex; align-items:center; justify-content:space-between;
@@ -113,7 +113,7 @@ nav.scrolled {
 }
 .cart-badge.visible { opacity:1; transform:scale(1); }
 
-/* â”€â”€ Breadcrumb â”€â”€ */
+/* ── Breadcrumb ── */
 .breadcrumb {
   padding: calc(60px + 1.6rem) clamp(1.2rem,4vw,3rem) 0;
   display:flex; align-items:center; gap:0.5rem;
@@ -124,13 +124,13 @@ nav.scrolled {
 .breadcrumb a:hover { color:var(--clay); }
 .breadcrumb-sep { color:var(--border-hover); }
 
-/* â”€â”€ Loading skeleton â”€â”€ */
+/* ── Loading skeleton ── */
 .skeleton { background:var(--bg-alt); border-radius:2px; animation: shimmer 1.6s infinite; }
 @keyframes shimmer {
   0%{opacity:0.6} 50%{opacity:1} 100%{opacity:0.6}
 }
 
-/* â”€â”€ Main layout â”€â”€ */
+/* ── Main layout ── */
 .print-layout {
   display:grid;
   grid-template-columns: 1fr 1fr;
@@ -142,7 +142,7 @@ nav.scrolled {
   .print-layout { grid-template-columns:1fr; }
 }
 
-/* â”€â”€ Image panel â”€â”€ */
+/* ── Image panel ── */
 .image-panel {
   position: sticky; top: 60px;
   height: calc(100vh - 60px);
@@ -202,7 +202,7 @@ nav.scrolled {
 .thumb.active { border-color:var(--clay); }
 .thumb img { width:100%; height:100%; object-fit:cover; }
 
-/* â”€â”€ Info panel â”€â”€ */
+/* ── Info panel ── */
 .info-panel {
   padding: clamp(2rem,5vw,4rem) clamp(1.4rem,4vw,3rem) 5rem;
   max-width: 580px;
@@ -219,7 +219,7 @@ nav.scrolled {
   margin-bottom:1rem; transition:color 0.2s;
 }
 .print-series-link:hover { color:var(--clay); }
-.print-series-link::before { content:'â†'; font-size:0.65rem; }
+.print-series-link::before { content:'←'; font-size:0.65rem; }
 
 .print-title {
   font-family:'Cormorant Garamond',serif;
@@ -386,9 +386,147 @@ body.dark .size-chip.selected { color:var(--sand); }
   font-size:0.82rem; color:var(--text-muted);
   display:flex; align-items:center; gap:0.4rem; line-height:1.5;
 }
-.shipping-note::before { content:'âŠ•'; color:var(--clay); }
+.shipping-note::before { content:'⊕'; color:var(--clay); }
 
-/* â”€â”€ Cart drawer (minimal â€” links to shop.html for full cart) â”€â”€ */
+/* ── Cart drawer (ported from shop) ── */
+.cart-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(20,16,16,0.6);
+  backdrop-filter: blur(4px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+.cart-overlay.open { opacity: 1; pointer-events: all; }
+.cart-drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 201;
+  width: min(420px, 100vw);
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+.cart-drawer.open { transform: translateX(0); }
+.cart-head {
+  padding: 1.4rem 1.6rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.cart-head-title {
+  font-family: 'Cinzel', serif; font-size: 0.65rem;
+  letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold);
+}
+.cart-close {
+  background: none; border: none; font-size: 1.2rem;
+  color: var(--text-muted); line-height: 1;
+  transition: color 0.2s;
+}
+.cart-close:hover { color: var(--rust); }
+.cart-items {
+  flex: 1; overflow-y: auto; padding: 1rem 1.6rem;
+}
+.cart-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 100%; gap: 1rem;
+  color: var(--text-muted);
+}
+.cart-empty-icon { font-size: 2.5rem; opacity: 0.3; }
+.cart-empty-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem; font-style: italic;
+}
+.cart-item {
+  display: flex; gap: 1rem; padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.cart-item-img {
+  width: 64px; height: 64px; border-radius: 2px;
+  background: var(--bg-alt); overflow: hidden; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; color: var(--clay); opacity: 0.5;
+}
+.cart-item-img img { width:100%; height:100%; object-fit:cover; }
+.cart-item-info { flex:1; min-width:0; }
+.cart-item-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1rem; color: var(--text); line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cart-item-variant {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.6rem; color: var(--text-muted);
+  letter-spacing: 0.06em; margin: 0.2rem 0 0.5rem;
+}
+.cart-item-soldout {
+  display: block;
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.5rem;
+}
+.cart-item-lowstock {
+  display: block;
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--gold); margin: 0 0 0.5rem;
+}
+.cart-item-qty {
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.qty-btn {
+  background: var(--bg-alt); border: 1px solid var(--border);
+  width: 22px; height: 22px; border-radius: 2px;
+  font-size: 0.85rem; color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s;
+}
+.qty-btn:hover { border-color: var(--clay); }
+.qty-val {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.72rem; font-weight: 600; color: var(--text);
+  min-width: 16px; text-align: center;
+}
+.cart-item-price {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.05rem; color: var(--text);
+  white-space: nowrap; text-align: right;
+}
+.cart-item-remove {
+  background: none; border: none; font-size: 0.75rem;
+  color: var(--text-muted); margin-top: 0.2rem;
+  transition: color 0.2s; display: block;
+}
+.cart-item-remove:hover { color: var(--rust); }
+
+.cart-foot {
+  padding: 1.4rem 1.6rem;
+  border-top: 1px solid var(--border);
+}
+.cart-totals {
+  display: flex; flex-direction: column; gap: 0.5rem;
+  margin-bottom: 1.4rem;
+}
+.cart-total-row {
+  display: flex; justify-content: space-between;
+  font-size: 0.88rem; color: var(--text-muted);
+}
+.cart-total-row.grand {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.22rem; color: var(--text);
+  padding-top: 0.6rem; border-top: 1px solid var(--border);
+}
+.checkout-btn {
+  width: 100%;
+  font-family: 'Cinzel', serif; font-size: 0.62rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  padding: 1rem;
+  background: var(--rust); color: var(--linen);
+  border: none; border-radius: 2px;
+  transition: background 0.2s;
+  margin-bottom: 0.8rem;
+}
+.checkout-btn:hover { background: var(--bark); }
+
+/* ── Cart drawer (minimal — links to shop.html for full cart) ── */
 .cart-toast {
   position:fixed; bottom:2rem; left:50%;
   transform:translateX(-50%) translateY(20px);
@@ -411,7 +549,7 @@ body.dark .cart-toast { background:#2a1c14; }
 }
 .cart-toast-action:hover { border-color:var(--clay); color:var(--sand); }
 
-/* â”€â”€ Related prints â”€â”€ */
+/* ── Related prints ── */
 .related-section {
   padding: 4rem clamp(1.2rem,4vw,3rem) 5rem;
   border-top:1px solid var(--border);
@@ -460,7 +598,7 @@ body.dark .cart-toast { background:#2a1c14; }
   letter-spacing:0.15em; color:var(--text-muted);
 }
 
-/* â”€â”€ 404 / error state â”€â”€ */
+/* ── 404 / error state ── */
 .error-state {
   display:flex; flex-direction:column; align-items:center;
   justify-content:center; min-height:70vh; text-align:center;
@@ -482,7 +620,7 @@ body.dark .cart-toast { background:#2a1c14; }
 }
 .back-btn:hover { border-color:var(--clay); color:var(--clay); }
 
-/* â”€â”€ Footer â”€â”€ */
+/* ── Footer ── */
 footer {
   text-align:center; padding:2.5rem 2rem;
   border-top:1px solid var(--border);
@@ -508,7 +646,7 @@ footer a:hover { color:var(--rust); }
       <a href="/auction">Auction</a>
       <a href="/shop">Shop</a>
     </div>
-    <button class="theme-btn" id="themeBtn" aria-label="Toggle theme">ðŸŒ™</button>
+    <button class="theme-btn" id="themeBtn" aria-label="Toggle theme">🌙</button>
     <a href="/shop" class="nav-cart-link" id="navCartLink" title="View bag">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
       Bag <span class="cart-badge" id="cartBadge">0</span>
@@ -516,7 +654,7 @@ footer a:hover { color:var(--rust); }
   </div>
 </nav>
 
-<!-- Main content â€” rendered by JS -->
+<!-- Main content — rendered by JS -->
 <div id="app">
   <!-- Loading skeleton -->
   <div id="loadingSkeleton" style="padding:calc(60px + 2rem) clamp(1.2rem,4vw,3rem) 0">
@@ -535,7 +673,7 @@ footer a:hover { color:var(--rust); }
   </div>
   <div id="printContent" style="display:none"></div>
   <div id="errorState" style="display:none" class="error-state">
-    <div class="error-state-icon">âŠ˜</div>
+    <div class="error-state-icon">⊘</div>
     <h2 class="error-state-title">Print not found</h2>
     <p class="error-state-sub">This piece may have sold out or been removed.</p>
     <a href="/shop" class="back-btn">Back to the shop</a>
@@ -548,23 +686,42 @@ footer a:hover { color:var(--rust); }
   <div class="related-grid" id="relatedGrid"></div>
 </div>
 
+<!-- Cart drawer (opens in-page) -->
+<div class="cart-overlay" id="cartOverlay"></div>
+<aside class="cart-drawer" id="cartDrawer">
+  <div class="cart-head">
+    <span class="cart-head-title">Your Bag</span>
+    <button class="cart-close" id="cartClose">✕</button>
+  </div>
+  <div class="cart-items" id="cartItems">
+    <div class="cart-empty">
+      <div class="cart-empty-icon">&#x2715;&#xFE0E;</div>
+      <p class="cart-empty-text">Your bag is empty.</p>
+    </div>
+  </div>
+  <div class="cart-foot" id="cartFoot" style="display:none">
+    <div class="cart-totals" id="cartTotals"></div>
+    <button class="checkout-btn" id="checkoutBtn">Proceed to checkout</button>
+  </div>
+</aside>
+
 <!-- Cart toast -->
 <div class="cart-toast" id="cartToast">
-  <span id="cartToastMsg">Added to bag âœ¦</span>
-  <button class="cart-toast-action" onclick="goToShop()">View bag</button>
-  <button class="cart-toast-action" onclick="hideToast()" style="border-color:transparent;color:var(--text-muted)">âœ•</button>
+  <span id="cartToastMsg">Added to bag ✦</span>
+  <button class="cart-toast-action" onclick="openCart()">View bag</button>
+  <button class="cart-toast-action" onclick="hideToast()" style="border-color:transparent;color:var(--text-muted)">✕</button>
 </div>
 
 <footer>
-  <p>Â© 2026 Kay's Works Â· <a href="mailto:oyeniyikayode4@gmail.com">oyeniyikayode4@gmail.com</a></p>
+  <p>© 2026 Kay's Works · <a href="mailto:oyeniyikayode4@gmail.com">oyeniyikayode4@gmail.com</a></p>
 </footer>
 
 <script>
 'use strict';
 
-/* â”€â”€â”€ Helpers â”€â”€â”€ */
+/* ─── Helpers ─── */
 const slug = location.pathname.replace(/^\/shop\//, '').replace(/\/$/, '');
-function fmt(n)    { return 'â‚¦' + Number(n).toLocaleString('en-NG'); }
+function fmt(n)    { return '₦' + Number(n).toLocaleString('en-NG'); }
 function fmtUsd(n) { return '$' + Number(n).toFixed(0); }
 function shopHref(path = '') {
   if (location.protocol === 'file:') {
@@ -575,7 +732,7 @@ function shopHref(path = '') {
 }
 function slugify(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
 function printOptionKey(type, size) { return `${type}|${size}`; }
-function labelPrintOption(type, size) { return `${type} Â· ${size}`; }
+function labelPrintOption(type, size) { return `${type} · ${size}`; }
 function escapeJs(s) { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 function escapeAttr(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -624,7 +781,7 @@ function availablePrintChoices(p) {
 // Normalize image URLs. Bare relative paths like "images/skull.png" resolve
 // differently on /shop vs /shop/[slug]; force a site-root path so they work
 // everywhere. Leaves absolute URLs (http/https/data/protocol-relative) and
-// already-rooted "/â€¦" paths untouched.
+// already-rooted "/…" paths untouched.
 function normalizeImg(u) {
   const s = String(u || '').trim();
   if (!s) return '';
@@ -686,7 +843,7 @@ function escapeAttrText(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/* â”€â”€â”€ Theme â”€â”€â”€ */
+/* ─── Theme ─── */
 function initTheme() {
   const saved = localStorage.getItem('kaysworks-theme');
   const dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme:dark)').matches;
@@ -700,12 +857,12 @@ document.getElementById('themeBtn').addEventListener('click', () => {
 });
 initTheme();
 
-/* â”€â”€â”€ Nav scroll â”€â”€â”€ */
+/* ─── Nav scroll ─── */
 window.addEventListener('scroll', () => {
   document.getElementById('mainNav').classList.toggle('scrolled', window.scrollY > 40);
 }, { passive:true });
 
-/* â”€â”€â”€ Toast â”€â”€â”€ */
+/* ─── Toast ─── */
 let _toastTimer;
 function showToast(msg) {
   const t = document.getElementById('cartToast');
@@ -716,7 +873,7 @@ function showToast(msg) {
 }
 function hideToast() { document.getElementById('cartToast').classList.remove('show'); }
 
-/* â”€â”€â”€ Cart (shared localStorage key with shop.html) â”€â”€â”€ */
+/* ─── Cart (shared localStorage key with shop.html) ─── */
 function getCart() {
   try { return JSON.parse(localStorage.getItem('kaysworks-cart') || '[]'); } catch { return []; }
 }
@@ -735,7 +892,39 @@ function goToShop() {
   window.location.href = shopHref();
 }
 
+// ── Stock accounting (mirrors shop.html) ───────────────────────────────────
+// Total units available for a variant key. null === unlimited / untracked.
+// For prints this is the limited-edition remaining count; for merch it's the
+// per-variant or overall stock.
+function variantStock(product, variantKey) {
+  if (product && product.category && product.category !== 'prints') {
+    const s = merchStock(product, variantKey);
+    return s === null || s === undefined ? null : Number(s);
+  }
+  // Prints: only limited editions are capped. Open editions are unlimited.
+  if (!isLimitedKey(product, variantKey)) return null;
+  const r = editionRemaining(product, variantKey);
+  return r === null ? null : Number(r);
+}
+function qtyInCart(productId, variantKey) {
+  const it = getCart().find(c => c.key === productId + '-' + variantKey);
+  return it ? it.qty : 0;
+}
+// Units still addable right now: cap minus what's already in the bag.
+function remainingToAdd(product, variantKey) {
+  const cap = variantStock(product, variantKey);
+  if (cap === null) return null;
+  return Math.max(0, cap - qtyInCart(product.id, variantKey));
+}
+
 function addToCart(product, variantKey, variantLabel) {
+  const left = remainingToAdd(product, variantKey);
+  if (left !== null && left <= 0) {
+    const cap = variantStock(product, variantKey);
+    showToast(cap === 0 ? 'Sold out ✦' : 'That\u2019s the whole edition — sold out ✦');
+    return;
+  }
+
   const cart = getCart();
   const key = product.id + '-' + variantKey;
   const existing = cart.find(c => c.key === key);
@@ -749,17 +938,146 @@ function addToCart(product, variantKey, variantLabel) {
       variantKey,
       priceNgn: printPrice(product, variantKey, 'ngn'),
       priceUsd: printPrice(product, variantKey, 'usd'),
-      emoji: product.emoji || 'ðŸ–¼',
+      emoji: product.emoji || '🖼',
       image: product.image_url || '',
       qty: 1,
     });
   }
   saveCart(cart);
   updateCartBadge();
-  showToast(`${product.name} Â· ${variantLabel || variantKey} added to bag âœ¦`);
+  updateCartUI();
+  openCart();
+  // Re-check what's left after this add so we can twist the knife if it's the last.
+  const after = remainingToAdd(product, variantKey);
+  showToast(after === 0
+    ? 'Added — last one, now sold out ✦'
+    : `${product.name} · ${variantLabel || variantKey} added to bag ✦`);
 }
 
-/* â”€â”€â”€ Image zoom on mousemove â”€â”€â”€ */
+/* ─── Cart drawer ─── */
+function openCart() {
+  updateCartUI();
+  document.getElementById('cartDrawer').classList.add('open');
+  document.getElementById('cartOverlay').classList.add('open');
+}
+function closeCart() {
+  document.getElementById('cartDrawer').classList.remove('open');
+  document.getElementById('cartOverlay').classList.remove('open');
+}
+
+function cartDomKey(key) { return encodeURIComponent(key); }
+function cartKeyFromButton(btn) {
+  try { return decodeURIComponent(btn.dataset.key || ''); }
+  catch (_) { return btn.dataset.key || ''; }
+}
+
+// The bag here knows the price/qty for every line, but only knows live stock
+// for the product currently on the page (_product). For other lines we can
+// still cap using whatever stock snapshot was stored, falling back to no cap.
+function lineRemainingToAdd(c) {
+  if (_product && _product.id === c.id) return remainingToAdd(_product, c.variantKey);
+  return null; // unknown stock for off-page items — don't block
+}
+
+function changeCartQty(key, dir) {
+  const cart = getCart();
+  const item = cart.find(c => c.key === key);
+  if (!item) return;
+  const step = Number(dir);
+  if (step > 0) {
+    const left = lineRemainingToAdd(item);
+    if (left !== null && left <= 0) {
+      showToast('That\u2019s the whole edition — sold out ✦');
+      return;
+    }
+  }
+  item.qty += step;
+  if (item.qty <= 0) cart.splice(cart.indexOf(item), 1);
+  saveCart(cart);
+  updateCartBadge();
+  updateCartUI();
+  // Keep the on-page purchase block in sync if we changed the current product.
+  if (_product && item.id === _product.id) refreshPurchaseControl();
+}
+
+function removeFromCart(key) {
+  const cart = getCart().filter(c => c.key !== key);
+  saveCart(cart);
+  updateCartBadge();
+  updateCartUI();
+  refreshPurchaseControl();
+}
+
+// Re-sync whichever purchase control is on the page (print vs merch) so its
+// button/stock state reflects the current cart.
+function refreshPurchaseControl() {
+  if (!_product || !_selectedVariant) return;
+  if (_product.category && _product.category !== 'prints') {
+    selectMerchVariant(_selectedVariant);
+  } else {
+    updateEditionState(_selectedVariant);
+  }
+}
+
+function updateCartUI() {
+  const itemsEl = document.getElementById('cartItems');
+  const footEl = document.getElementById('cartFoot');
+  if (!itemsEl || !footEl) return;
+  const cart = getCart();
+
+  if (!cart.length) {
+    itemsEl.innerHTML = `<div class="cart-empty">
+      <div class="cart-empty-icon">&#x2715;&#xFE0E;</div>
+      <p class="cart-empty-text">Your bag is empty.</p>
+    </div>`;
+    footEl.style.display = 'none';
+    return;
+  }
+  footEl.style.display = '';
+
+  itemsEl.innerHTML = cart.map(c => {
+    const left = lineRemainingToAdd(c); // null = unknown/unlimited
+    const maxed = left !== null && left <= 0;
+    const note = maxed
+      ? `<span class="cart-item-soldout">Sold out — last ${c.qty} reserved for you</span>`
+      : (left !== null && left <= 3 ? `<span class="cart-item-lowstock">Only ${left} more available</span>` : '');
+    return `
+    <div class="cart-item">
+      <div class="cart-item-img">
+        ${c.image ? `<img src="${c.image}" alt="${c.name}"/>` : (c.emoji || '🖼')}
+      </div>
+      <div class="cart-item-info">
+        <div class="cart-item-name">${c.name}</div>
+        <div class="cart-item-variant">${c.variant}</div>
+        ${note}
+        <div class="cart-item-qty">
+          <button class="qty-btn" data-key="${cartDomKey(c.key)}" data-dir="-1">−</button>
+          <span class="qty-val">${c.qty}</span>
+          <button class="qty-btn" data-key="${cartDomKey(c.key)}" data-dir="1"${maxed ? ' disabled style="opacity:0.35;cursor:not-allowed"' : ''}>+</button>
+          <button class="cart-item-remove" data-key="${cartDomKey(c.key)}">Remove</button>
+        </div>
+      </div>
+      <div>
+        <div class="cart-item-price">${fmt(c.priceNgn * c.qty)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const ngnTotal = cart.reduce((a, c) => a + (c.priceNgn || 0) * c.qty, 0);
+  document.getElementById('cartTotals').innerHTML = `
+    <div class="cart-total-row"><span>Subtotal</span><span>${fmt(ngnTotal)}</span></div>
+    <div class="cart-total-row"><span>Delivery</span><span><span style="color:#6b7c5c">TBD at checkout</span></span></div>
+    <div class="cart-total-row grand"><span>Est. Total</span><span>${fmt(ngnTotal)} <span style="font-size:0.75rem;color:var(--text-muted)">+ delivery</span></span></div>`;
+
+  itemsEl.querySelectorAll('.qty-btn').forEach(b => {
+    b.addEventListener('click', () => changeCartQty(cartKeyFromButton(b), b.dataset.dir));
+  });
+  itemsEl.querySelectorAll('.cart-item-remove').forEach(b => {
+    b.addEventListener('click', () => removeFromCart(cartKeyFromButton(b)));
+  });
+}
+
+/* ─── Image zoom on mousemove ─── */
 function initZoom(wrap) {
   const img = wrap.querySelector('img');
   if (!img) return;
@@ -775,7 +1093,7 @@ function initZoom(wrap) {
   });
 }
 
-/* â”€â”€â”€ Render product â”€â”€â”€ */
+/* ─── Render product ─── */
 let _product = null;
 let _selectedPrintType = '';
 let _selectedVariant = '';
@@ -802,7 +1120,7 @@ function renderProduct(p) {
   _selectedVariant = availSizes[0] ? printOptionKey(_selectedPrintType, availSizes[0]) : '';
 
   // Update page meta
-  document.title = `${p.name} Â· Kay's Works`;
+  document.title = `${p.name} · Kay's Works`;
   updateMeta(p);
 
   // Build breadcrumb
@@ -811,8 +1129,8 @@ function renderProduct(p) {
   const breadcrumb = `
     <div class="breadcrumb">
       <a href="/shop">Shop</a>
-      <span class="breadcrumb-sep">Â·</span>
-      ${seriesSlug ? `<a href="/shop/series/${seriesSlug}">${seriesName}</a><span class="breadcrumb-sep">Â·</span>` : ''}
+      <span class="breadcrumb-sep">·</span>
+      ${seriesSlug ? `<a href="/shop/series/${seriesSlug}">${seriesName}</a><span class="breadcrumb-sep">·</span>` : ''}
       <span style="color:var(--text)">${p.name}</span>
     </div>`;
 
@@ -831,7 +1149,7 @@ function renderProduct(p) {
 
   const mainImg = images[0]
     ? `<img id="heroImg" src="${images[0]}" alt="${p.name}"/>`
-    : `<div class="hero-img-placeholder">ðŸ–¼</div>`;
+    : `<div class="hero-img-placeholder">🖼</div>`;
 
   const optionChips = printOptions.map((opt, i) => `
     <button class="size-chip${i===0?' selected':''}" data-type="${escapeAttr(opt.type)}">${opt.type}</button>
@@ -846,7 +1164,7 @@ function renderProduct(p) {
   const ngn = printPrice(p, _selectedVariant, 'ngn');
   const usd = printPrice(p, _selectedVariant, 'usd');
 
-  // Spec rows â€” option-specific detail comes from the selected print option's
+  // Spec rows — option-specific detail comes from the selected print option's
   // own description; only genuinely product-level facts are shown statically.
   const specRowsHtml = buildSpecRows(p, _selectedPrintType);
 
@@ -858,7 +1176,7 @@ function renderProduct(p) {
   // Process notes
   const processHtml = p.process
     ? p.process.split('\n').filter(Boolean).map(l => `<p>${l}</p>`).join('')
-    : '<p>Every print begins as an original digital painting â€” the same file, without compression or resizing, sent directly to the printer. Kay reviews a proof before any edition ships.</p>';
+    : '<p>Every print begins as an original digital painting — the same file, without compression or resizing, sent directly to the printer. Kay reviews a proof before any edition ships.</p>';
 
   const html = `
     ${breadcrumb}
@@ -876,12 +1194,12 @@ function renderProduct(p) {
 
         <h1 class="print-title">${p.name}</h1>
         ${detailTags(p)}
-        <p class="print-year">${p.year || '2025'} Â· Fine art print</p>
+        <p class="print-year">${p.year || '2025'} · Fine art print</p>
 
         ${p.quote ? `
         <blockquote class="print-quote">
           "${p.quote}"
-          <cite>â€” Kay</cite>
+          <cite>— Kay</cite>
         </blockquote>` : ''}
 
         <div class="section-divider"><span>The work</span></div>
@@ -928,7 +1246,7 @@ function renderProduct(p) {
   if (wrap) initZoom(wrap);
 }
 
-/* â”€â”€â”€ Render merch / notebook / sticker product â”€â”€â”€ */
+/* ─── Render merch / notebook / sticker product ─── */
 function merchVariants(p) {
   const v = Array.isArray(p.variants) ? p.variants : [];
   // Merch variants are plain strings; guard against print-style objects.
@@ -947,14 +1265,14 @@ function renderMerchProduct(p) {
   const variants = merchVariants(p);
   _selectedVariant = variants[0] || '';
 
-  document.title = `${p.name} Â· Kay's Works`;
+  document.title = `${p.name} · Kay's Works`;
   updateMeta(p);
 
   const catLabel = p.category ? p.category.charAt(0).toUpperCase() + p.category.slice(1) : 'Shop';
   const breadcrumb = `
     <div class="breadcrumb">
       <a href="/shop">Shop</a>
-      <span class="breadcrumb-sep">Â·</span>
+      <span class="breadcrumb-sep">·</span>
       <span style="color:var(--text)">${p.name}</span>
     </div>`;
 
@@ -970,7 +1288,7 @@ function renderMerchProduct(p) {
     : '';
   const mainImg = images[0]
     ? `<img id="heroImg" src="${images[0]}" alt="${p.name}"/>`
-    : `<div class="hero-img-placeholder">${p.emoji || 'âœ¦'}</div>`;
+    : `<div class="hero-img-placeholder">${p.emoji || '✦'}</div>`;
 
   const variantChips = variants.map((label, i) => `
     <button class="size-chip${i===0?' selected':''}" data-v="${escapeAttr(label)}">${label}</button>
@@ -1006,7 +1324,7 @@ function renderMerchProduct(p) {
         ${detailTags(p)}
         <p class="print-year">${catLabel}</p>
 
-        ${p.quote ? `<blockquote class="print-quote">"${p.quote}"<cite>â€” Kay</cite></blockquote>` : ''}
+        ${p.quote ? `<blockquote class="print-quote">"${p.quote}"<cite>— Kay</cite></blockquote>` : ''}
 
         ${storyHtml ? `<div class="section-divider"><span>About</span></div><div class="print-story">${storyHtml}</div>` : ''}
 
@@ -1044,6 +1362,8 @@ function selectMerchVariant(label) {
   document.getElementById('priceUsd').textContent = fmtUsd(usd) + ' USD';
   const stock = merchStock(_product, label);
   const soldOut = stock === 0;
+  const left = remainingToAdd(_product, label); // cart-aware
+  const maxedByCart = left !== null && left <= 0;
   const stockEl = document.getElementById('merchStock');
   if (stockEl) {
     stockEl.textContent = soldOut ? 'Sold out' : (stock !== null && stock <= 3 ? `Only ${stock} left` : '');
@@ -1051,14 +1371,17 @@ function selectMerchVariant(label) {
   }
   const btn = document.getElementById('addBtn');
   if (btn) {
-    btn.disabled = !label || soldOut;
-    btn.textContent = soldOut ? 'Sold out' : (label ? 'Add to bag' : 'Unavailable');
+    btn.disabled = !label || soldOut || maxedByCart;
+    btn.textContent = soldOut ? 'Sold out'
+      : (maxedByCart ? 'All in your bag'
+        : (label ? 'Add to bag' : 'Unavailable'));
   }
 }
 
 function handleMerchAddToCart() {
   if (!_selectedVariant) { showToast('Please choose an option'); return; }
   addToCart(_product, _selectedVariant, _selectedVariant);
+  selectMerchVariant(_selectedVariant);
 }
 
 function updateMeta(p) {
@@ -1078,15 +1401,15 @@ function updateMeta(p) {
     el.setAttribute('content', content);
   }
 
-  document.title = `${p.name} Â· Kay's Works`;
+  document.title = `${p.name} · Kay's Works`;
   meta('description', desc, true);
-  meta('og:title', `${p.name} Â· Kay's Works`);
+  meta('og:title', `${p.name} · Kay's Works`);
   meta('og:description', desc);
   meta('og:image', img);
   meta('og:url', url);
   meta('og:type', 'product');
   meta('twitter:card', 'summary_large_image');
-  meta('twitter:title', `${p.name} Â· Kay's Works`);
+  meta('twitter:title', `${p.name} · Kay's Works`);
   meta('twitter:image', img);
 
   // Canonical
@@ -1136,10 +1459,15 @@ function updateEditionState(v) {
     el.classList.toggle('sold-out', label === 'Sold out');
   }
   const soldOut = isLimitedKey(_product, v) && (editionRemaining(_product, v) ?? 0) <= 0;
+  // Also lock the button once the buyer already holds the whole edition.
+  const left = remainingToAdd(_product, v);
+  const maxedByCart = left !== null && left <= 0;
   const btn = document.getElementById('addBtn');
   if (btn) {
-    btn.disabled = !v || soldOut;
-    btn.textContent = soldOut ? 'Sold out' : (v ? 'Add to bag' : 'Unavailable');
+    btn.disabled = !v || soldOut || maxedByCart;
+    btn.textContent = soldOut ? 'Sold out'
+      : (maxedByCart ? 'All in your bag'
+        : (v ? 'Add to bag' : 'Unavailable'));
   }
 }
 
@@ -1168,12 +1496,9 @@ function selectPrintType(type) {
 
 function handleAddToCart() {
   if (!_selectedVariant) { showToast('Please select a size'); return; }
-  if (isLimitedKey(_product, _selectedVariant) && (editionRemaining(_product, _selectedVariant) ?? 0) <= 0) {
-    showToast('This edition is sold out');
-    return;
-  }
   const choice = availablePrintChoices(_product).find(c => c.key === _selectedVariant);
   addToCart(_product, _selectedVariant, choice?.label || _selectedVariant);
+  updateEditionState(_selectedVariant);
 }
 
 function switchImage(idx) {
@@ -1186,7 +1511,7 @@ function switchImage(idx) {
   document.querySelectorAll('.thumb').forEach(t => t.classList.toggle('active', Number(t.dataset.idx) === idx));
 }
 
-/* â”€â”€â”€ Render related prints â”€â”€â”€ */
+/* ─── Render related prints ─── */
 function renderRelated(prints) {
   if (!prints || !prints.length) return;
   const filtered = prints.filter(p => p.slug !== slug).slice(0, 4);
@@ -1209,17 +1534,17 @@ function renderRelated(prints) {
     return `
       <a href="/shop/${p.slug || slugify(p.name)}" class="related-card">
         <div class="related-card-img">
-          ${p.image_url ? `<img src="${normalizeImg(p.image_url)}" alt="${p.name}" loading="lazy"/>` : (p.emoji || 'âœ¦')}
+          ${p.image_url ? `<img src="${normalizeImg(p.image_url)}" alt="${p.name}" loading="lazy"/>` : (p.emoji || '✦')}
         </div>
         <div class="related-card-body">
           <div class="related-card-title">${p.name}</div>
-          <div class="related-card-price">From ${fmt(lowestPrice)} Â· ${firstAvail}</div>
+          <div class="related-card-price">From ${fmt(lowestPrice)} · ${firstAvail}</div>
         </div>
       </a>`;
   }).join('');
 }
 
-/* â”€â”€â”€ Load product â”€â”€â”€ */
+/* ─── Load product ─── */
 async function load() {
   if (!slug) { showError(); return; }
   try {
@@ -1252,16 +1577,35 @@ function showError() {
 }
 
 function initCartLinks() {
+  // Footer / breadcrumb "/shop" links still navigate to the shop.
   document.querySelectorAll('a[href="/shop"]').forEach(a => { a.href = shopHref(); });
+
+  // The nav bag now opens the in-page drawer instead of navigating away.
   const navCart = document.getElementById('navCartLink');
-  if (navCart) navCart.href = shopHref();
+  if (navCart) {
+    navCart.href = '#';
+    navCart.addEventListener('click', e => { e.preventDefault(); openCart(); });
+  }
+
+  // Drawer controls
+  const cartClose = document.getElementById('cartClose');
+  const cartOverlay = document.getElementById('cartOverlay');
+  if (cartClose) cartClose.addEventListener('click', closeCart);
+  if (cartOverlay) cartOverlay.addEventListener('click', closeCart);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCart(); });
+
+  // Checkout still happens on the shop page, where the full payment flow lives.
+  const checkoutBtn = document.getElementById('checkoutBtn');
+  if (checkoutBtn) checkoutBtn.addEventListener('click', () => { window.location.href = shopHref(); });
+
   updateCartBadge();
+  updateCartUI();
 }
 window.addEventListener('storage', e => {
-  if (e.key === 'kaysworks-cart') updateCartBadge();
+  if (e.key === 'kaysworks-cart') { updateCartBadge(); updateCartUI(); }
 });
 
-// Delegated chip handling â€” robust to quotes/Ã— in size keys (no inline onclick).
+// Delegated chip handling — robust to quotes/× in size keys (no inline onclick).
 document.getElementById('printContent').addEventListener('click', e => {
   const chip = e.target.closest('.size-chip');
   if (!chip) return;
@@ -1282,4 +1626,3 @@ load();
 </script>
 </body>
 </html>
-
