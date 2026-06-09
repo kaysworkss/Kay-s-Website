@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -1023,6 +1023,30 @@ footer a:hover { color:var(--rust); }
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(350%); }
 }
+
+/* ── Free-shipping promo banner ── */
+.ship-promo-banner {
+  position: relative; z-index: 90;
+  display: flex; align-items: center; justify-content: center; gap: 0.8rem;
+  padding: 0.55rem 2.6rem 0.55rem 1rem;
+  background: linear-gradient(90deg, var(--rust), var(--clay));
+  color: var(--linen);
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.16em; text-transform: uppercase; text-align: center;
+  line-height: 1.5;
+}
+.ship-promo-banner strong { color: #fff; font-weight: 600; }
+.ship-promo-banner .promo-sep { opacity: 0.55; }
+.ship-promo-close {
+  position: absolute; right: 0.8rem; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--linen);
+  font-size: 0.8rem; cursor: pointer; opacity: 0.75; transition: opacity 0.15s;
+  line-height: 1;
+}
+.ship-promo-close:hover { opacity: 1; }
+@media(max-width:600px) {
+  .ship-promo-banner { font-size: 0.46rem; letter-spacing: 0.1em; }
+}
 </style>
 </head>
 <body>
@@ -1044,6 +1068,14 @@ footer a:hover { color:var(--rust); }
     </button>
   </div>
 </nav>
+
+<!-- Free-shipping promo banner -->
+<div class="ship-promo-banner" id="shipPromoBanner">
+  <span><strong>Free shipping</strong> on orders over $500</span>
+  <span class="promo-sep">·</span>
+  <span>flat <strong>$30 shipping</strong> on orders over $250</span>
+  <button class="ship-promo-close" id="shipPromoClose" aria-label="Dismiss">✕</button>
+</div>
 
 <!-- Hero -->
 <section class="shop-hero">
@@ -1151,15 +1183,11 @@ footer a:hover { color:var(--rust); }
 
         <div id="shippingFields" style="display:none">
           <div class="form-row">
-            <label class="form-label">Street address</label>
-            <input class="form-input" id="ckAddress" type="text" placeholder="Street, city, state / region"/>
-          </div>
-          <div class="form-row">
-            <label class="form-label">Country</label>
+            <label class="form-label">Country / region</label>
             <select class="form-select" id="ckCountry">
               <option value="">— Select country —</option>
               <optgroup label="Nigeria">
-                <option value="NG-other">Nigeria (other states)</option>
+                <option value="NG-other">Nigeria</option>
               </optgroup>
               <optgroup label="West Africa">
                 <option value="WA">Ghana</option>
@@ -1205,6 +1233,62 @@ footer a:hover { color:var(--rust); }
                 <option value="ROW">Other country</option>
               </optgroup>
             </select>
+          </div>
+
+          <!-- GIG Logistics fields (Nigeria) -->
+          <div id="gigFields" style="display:none">
+            <div class="form-row">
+              <label class="form-label">State</label>
+              <select class="form-select" id="ckGigState">
+                <option value="">— Select state —</option>
+                <option>Abia</option><option>Adamawa</option><option>Akwa Ibom</option><option>Anambra</option>
+                <option>Bauchi</option><option>Bayelsa</option><option>Benue</option><option>Borno</option>
+                <option>Cross River</option><option>Delta</option><option>Ebonyi</option><option>Edo</option>
+                <option>Ekiti</option><option>Enugu</option><option>FCT - Abuja</option><option>Gombe</option>
+                <option>Imo</option><option>Jigawa</option><option>Kaduna</option><option>Kano</option>
+                <option>Katsina</option><option>Kebbi</option><option>Kogi</option><option>Kwara</option>
+                <option>Lagos</option><option>Nasarawa</option><option>Niger</option><option>Ogun</option>
+                <option>Ondo</option><option>Osun</option><option>Oyo</option><option>Plateau</option>
+                <option>Rivers</option><option>Sokoto</option><option>Taraba</option><option>Yobe</option>
+                <option>Zamfara</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label">City / town</label>
+              <input class="form-input" id="ckGigCity" type="text" placeholder="e.g. Kaduna, Ikeja, Wuse"/>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Street address</label>
+              <input class="form-input" id="ckGigStreet" type="text" placeholder="House number, street, area / landmark"/>
+            </div>
+            <p style="font-size:0.72rem;color:var(--text-muted);line-height:1.5;margin:-0.4rem 0 1rem">Delivered by GIG Logistics. A nearby GIG station can also be used — note it in the street field if you'd prefer station pickup.</p>
+          </div>
+
+          <!-- UPS fields (international) -->
+          <div id="upsFields" style="display:none">
+            <div class="form-row">
+              <label class="form-label">Address line 1</label>
+              <input class="form-input" id="ckUpsLine1" type="text" placeholder="Street address, P.O. box, company name"/>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Address line 2 (optional)</label>
+              <input class="form-input" id="ckUpsLine2" type="text" placeholder="Apartment, suite, unit, building, floor"/>
+            </div>
+            <div class="form-row-2">
+              <div>
+                <label class="form-label">City</label>
+                <input class="form-input" id="ckUpsCity" type="text" placeholder="City"/>
+              </div>
+              <div>
+                <label class="form-label">State / province</label>
+                <input class="form-input" id="ckUpsState" type="text" placeholder="State / region"/>
+              </div>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Postal / ZIP code</label>
+              <input class="form-input" id="ckUpsPostal" type="text" placeholder="Postal or ZIP code"/>
+            </div>
+            <p style="font-size:0.72rem;color:var(--text-muted);line-height:1.5;margin:-0.4rem 0 1rem">Shipped via UPS Worldwide Expedited. A postal code and reachable phone number are required for customs and delivery.</p>
           </div>
 
           <!-- Live delivery estimate -->
@@ -1480,6 +1564,14 @@ footer a:hover { color:var(--rust); }
           <input class="form-input" id="cfgTezosAddr" type="text" value="tz1WpjkcxaoRtKzV3Ni1T6KFEnpUdkYzELwd" readonly style="opacity:0.6;cursor:default;border-color:rgba(90,192,245,0.3)"/>
         </div>
         <p style="font-size:0.8rem;color:var(--text-muted);line-height:1.6;margin-bottom:1.2rem">To update wallet addresses, edit the <code style="color:var(--clay);font-size:0.75rem">ethAddress</code> and <code style="color:var(--clay);font-size:0.75rem">tezosAddress</code> values in <code style="color:var(--clay);font-size:0.75rem">SHOP_CONFIG</code> directly.</p>
+
+        <!-- Shipping promo toggle -->
+        <p class="admin-section-title" style="margin-top:1.4rem">Free-shipping promo</p>
+        <label style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem;cursor:pointer">
+          <input type="checkbox" id="cfgShipPromo" checked style="accent-color:var(--rust);width:16px;height:16px"/>
+          <span style="font-family:'Crimson Pro',serif;font-size:0.95rem;color:var(--text)">Promo active — free shipping over $500, flat $30 over $250</span>
+        </label>
+        <p style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;margin-bottom:1.2rem">Turn this off to charge normal per-zone shipping on all orders. The banner and the discounted rates switch off together, on this page and on product pages.</p>
 
         <!-- API keys note -->
         <p class="admin-section-title" style="margin-top:1.4rem">Payment keys (set as env vars)</p>
@@ -2039,7 +2131,7 @@ function buildBadgeStack(p) {
 // the product has a slug to link to.
 function detailsLink(p) {
   if (!p.slug) return '';
-  return `<a class="details-link" href="/shop/${p.slug}">Show product details</a>`;
+  return `<a class="details-link" href="/shop/${p.slug}" target="_blank" rel="noopener">Show product details</a>`;
 }
 
 function buildCard(p) {
@@ -2613,6 +2705,13 @@ const DELIVERY_RATES = {
 // Large print threshold — tube shipped
 const LARGE_PRINT_VARIANTS = ['12×16"','12×18"','18×24"','24×36"'];
 
+// Shipping promo (all shipped orders, every zone), keyed off the USD subtotal:
+//   >= $500 → free shipping;  >= $250 → flat $30;  else normal zone rate.
+// MUST mirror serverDeliveryFee() in game.js, or the signed-quote check fails.
+const FREE_SHIP_USD = 500;
+const FLAT_SHIP_USD = 250;
+const FLAT_SHIP_FEE_USD = 30;
+
 let _deliveryMethod = 'pickup'; // 'pickup' | 'ship'
 let _deliveryZone   = 'pickup';
 
@@ -2623,28 +2722,54 @@ function cartHasLargePrint() {
   });
 }
 
+// Which promo tier applies for the current cart: 'free' | 'flat' | null.
+// Returns null when the admin has switched the promo off.
+function shipPromoTier() {
+  if (SHOP_CONFIG.shipPromoEnabled === false) return null;
+  const sub = cartUsdTotal();
+  if (sub >= FREE_SHIP_USD) return 'free';
+  if (sub >= FLAT_SHIP_USD) return 'flat';
+  return null;
+}
+
+// Show/hide the promo banner to match the admin flag.
+function applyPromoVisibility() {
+  const banner = document.getElementById('shipPromoBanner');
+  if (!banner) return;
+  if (SHOP_CONFIG.shipPromoEnabled === false) { banner.style.display = 'none'; return; }
+  try { if (sessionStorage.getItem('kw-promo-dismissed') === '1') return; } catch(_){}
+  banner.style.display = '';
+}
+
 function deliveryFeeNgn() {
+  const tier = shipPromoTier();
+  if (tier === 'free') return 0;
+  if (tier === 'flat') return Math.round(FLAT_SHIP_FEE_USD * 1600);
   const zone = DELIVERY_RATES[_deliveryZone] || DELIVERY_RATES['ROW'];
-  const tier = cartHasLargePrint() ? zone.large : zone.small;
-  if (tier.ngn > 0) return tier.ngn;
-  // Convert USD fee to NGN at approx 1600 NGN/USD for display/paystack
-  return tier.usd > 0 ? Math.round(tier.usd * 1600) : 0;
+  const t = cartHasLargePrint() ? zone.large : zone.small;
+  if (t.ngn > 0) return t.ngn;
+  return t.usd > 0 ? Math.round(t.usd * 1600) : 0;
 }
 
 function deliveryFeeUsd() {
+  const tier = shipPromoTier();
+  if (tier === 'free') return 0;
+  if (tier === 'flat') return FLAT_SHIP_FEE_USD;
   const zone = DELIVERY_RATES[_deliveryZone] || DELIVERY_RATES['ROW'];
-  const tier = cartHasLargePrint() ? zone.large : zone.small;
-  if (tier.usd > 0) return tier.usd;
-  // Convert NGN to USD
-  return tier.ngn > 0 ? +(tier.ngn / 1600).toFixed(2) : 0;
+  const t = cartHasLargePrint() ? zone.large : zone.small;
+  if (t.usd > 0) return t.usd;
+  return t.ngn > 0 ? +(t.ngn / 1600).toFixed(2) : 0;
 }
 
 function deliveryFeeDisplay() {
-  const zone = DELIVERY_RATES[_deliveryZone] || DELIVERY_RATES['ROW'];
-  const tier = cartHasLargePrint() ? zone.large : zone.small;
   if (_deliveryZone === 'pickup') return 'Free';
-  if (tier.ngn > 0) return fmt(tier.ngn);
-  return '$' + tier.usd.toFixed(0) + ' USD (~' + fmt(Math.round(tier.usd * 1600)) + ')';
+  const tier = shipPromoTier();
+  if (tier === 'free') return '<span style="color:#6b7c5c">Free — order over $500</span>';
+  if (tier === 'flat') return fmt(Math.round(FLAT_SHIP_FEE_USD * 1600)) + ' ($30 — order over $250)';
+  const zone = DELIVERY_RATES[_deliveryZone] || DELIVERY_RATES['ROW'];
+  const t = cartHasLargePrint() ? zone.large : zone.small;
+  if (t.ngn > 0) return fmt(t.ngn);
+  return '$' + t.usd.toFixed(0) + ' USD (~' + fmt(Math.round(t.usd * 1600)) + ')';
 }
 
 function setDeliveryMethod(method) {
@@ -2660,6 +2785,7 @@ function setDeliveryMethod(method) {
   } else {
     _deliveryZone = document.getElementById('ckCountry').value || '';
   }
+  updateShippingFieldGroups();
   updateDeliveryEstimate();
   buildOrderSummary();
 }
@@ -2675,9 +2801,24 @@ function updateDeliveryEstimate() {
   const isLarge = cartHasLargePrint();
   el.style.display = '';
   document.getElementById('deliveryZoneLabel').textContent = info.label;
-  document.getElementById('deliveryFeeDisplay').textContent = deliveryFeeDisplay();
+  document.getElementById('deliveryFeeDisplay').innerHTML = deliveryFeeDisplay();
+  const promo = shipPromoTier();
   document.getElementById('deliveryFeeNote').textContent =
-    isLarge ? 'Large print(s) shipped in protective tube' : 'Flat-pack envelope shipping';
+    promo === 'free' ? 'Free shipping applied — order over $500'
+    : promo === 'flat' ? 'Discounted $30 shipping — order over $250'
+    : isLarge ? 'Large print(s) shipped in protective tube'
+    : 'Flat-pack envelope shipping';
+}
+
+// Show the carrier-appropriate address fields: GIG for Nigeria, UPS for
+// everything else international. Hidden entirely until a country is chosen.
+function updateShippingFieldGroups() {
+  const gig = document.getElementById('gigFields');
+  const ups = document.getElementById('upsFields');
+  const isNigeria = _deliveryZone === 'NG-other';
+  const isIntl = _deliveryZone && _deliveryZone !== 'pickup' && !isNigeria;
+  if (gig) gig.style.display = (_deliveryMethod === 'ship' && isNigeria) ? '' : 'none';
+  if (ups) ups.style.display = (_deliveryMethod === 'ship' && isIntl)   ? '' : 'none';
 }
 
 // Wire up country selector
@@ -2685,6 +2826,7 @@ document.addEventListener('DOMContentLoaded', () => {});
 // Country change
 document.getElementById('ckCountry') && document.getElementById('ckCountry').addEventListener('change', function() {
   _deliveryZone = this.value || '';
+  updateShippingFieldGroups();
   updateDeliveryEstimate();
   buildOrderSummary();
 });
@@ -2770,15 +2912,34 @@ document.getElementById('checkoutBtn').addEventListener('click', ()=>openCheckou
 
 
 /* ─── Payment handlers ─── */
+function gv(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+// Assemble a single human-readable address string from the carrier-specific
+// fields, plus structured pieces for the order record.
+function buildShippingAddress() {
+  if (_deliveryMethod === 'pickup') return { address: 'Kaduna pickup', parts: {} };
+  if (_deliveryZone === 'NG-other') {
+    const state = gv('ckGigState'), city = gv('ckGigCity'), street = gv('ckGigStreet');
+    const address = [street, city, state].filter(Boolean).join(', ');
+    return { address, parts: { street, city, state } };
+  }
+  // International (UPS)
+  const l1 = gv('ckUpsLine1'), l2 = gv('ckUpsLine2'), city = gv('ckUpsCity'),
+        state = gv('ckUpsState'), postal = gv('ckUpsPostal');
+  const address = [l1, l2, city, state, postal].filter(Boolean).join(', ');
+  return { address, parts: { line1: l1, line2: l2, city, state, postal } };
+}
+
 function getFormData() {
   const countryEl = document.getElementById('ckCountry');
-  const addressEl = document.getElementById('ckAddress');
+  const shipping = buildShippingAddress();
   return {
-    name:           document.getElementById('ckName').value.trim(),
-    email:          document.getElementById('ckEmail').value.trim(),
-    phone:          document.getElementById('ckPhone').value.trim(),
-    address:        _deliveryMethod === 'pickup' ? 'Kaduna pickup' : (addressEl ? addressEl.value.trim() : ''),
-    country:        _deliveryMethod === 'pickup' ? 'Nigeria (Kaduna pickup)' : (countryEl ? countryEl.options[countryEl.selectedIndex]?.text || '' : ''),
+    name:           gv('ckName'),
+    email:          gv('ckEmail'),
+    phone:          gv('ckPhone'),
+    address:        shipping.address,
+    addressParts:   shipping.parts,
+    country:        _deliveryMethod === 'pickup' ? 'Nigeria (Kaduna pickup)' : (countryEl ? (countryEl.options[countryEl.selectedIndex]?.text || '') : ''),
     deliveryMethod: _deliveryMethod,
     deliveryZone:   _deliveryZone,
     deliveryFeeNgn: deliveryFeeNgn(),
@@ -2787,15 +2948,26 @@ function getFormData() {
 }
 function validateForm() {
   const d = getFormData();
-  // Contact details — always required so Kay can reach the buyer.
+  // Contact details — always required so the carrier and Kay can reach the buyer.
   if (!d.name || d.name.length < 2) { showToast('Please enter your full name'); return false; }
   if (!d.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) { showToast('Please enter a valid email address'); return false; }
   const phoneDigits = (d.phone || '').replace(/[^\d]/g, '');
   if (phoneDigits.length < 7) { showToast('Please enter a phone number we can reach you on'); return false; }
-  // Shipping details — required only when the order is being shipped.
+
   if (_deliveryMethod === 'ship') {
     if (!_deliveryZone) { showToast('Please select your country'); return false; }
-    if (!d.address || d.address.trim().length < 6) { showToast('Please enter your full delivery address'); return false; }
+    if (_deliveryZone === 'NG-other') {
+      // GIG Logistics required fields.
+      if (!gv('ckGigState')) { showToast('Please select your state'); return false; }
+      if (!gv('ckGigCity'))  { showToast('Please enter your city or town'); return false; }
+      if (gv('ckGigStreet').length < 4) { showToast('Please enter your full street address'); return false; }
+    } else {
+      // UPS required fields (international).
+      if (gv('ckUpsLine1').length < 4) { showToast('Please enter your street address'); return false; }
+      if (!gv('ckUpsCity'))  { showToast('Please enter your city'); return false; }
+      if (!gv('ckUpsState')) { showToast('Please enter your state or province'); return false; }
+      if (!gv('ckUpsPostal')) { showToast('Please enter your postal / ZIP code'); return false; }
+    }
   }
   return true;
 }
@@ -3028,6 +3200,8 @@ document.getElementById('adminLoginBtn').addEventListener('click', async ()=>{
 
 function loadAdminConfig() {
   // addresses are hardcoded and shown read-only in the admin panel
+  const promoChk = document.getElementById('cfgShipPromo');
+  if (promoChk) promoChk.checked = SHOP_CONFIG.shipPromoEnabled !== false;
   populatePrintPageSelector();
 }
 
@@ -3508,6 +3682,27 @@ function renderAdminProducts() {
     });
   });
 
+  // Toggling "Limited edition" immediately enables/disables the run-size inputs
+  // for that print option's sizes — without this, an admin ticks the box but the
+  // supply field stays greyed out until a save round-trip.
+  el.querySelectorAll('.ap-option-limited').forEach(chk => {
+    chk.addEventListener('change', () => {
+      const row = chk.closest('.admin-product-row');
+      if (!row) return;
+      const type = chk.dataset.type;
+      const on = chk.checked;
+      row.querySelectorAll('.ap-size-edition').forEach(input => {
+        // data-v is "type|size"; match the type segment to this checkbox.
+        const inputType = String(input.dataset.v || '').split('|')[0];
+        if (inputType !== type) return;
+        input.disabled = !on;
+        input.style.opacity = on ? '' : '0.4';
+        input.title = on ? 'Total editions in this run' : 'Mark the option as limited edition to set a run size';
+        if (!on) input.value = '';
+      });
+    });
+  });
+
 } // end renderAdminProducts
 
 document.getElementById('addProductBtn').addEventListener('click', ()=>{
@@ -3669,6 +3864,8 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
     }));
 
     // Save config (wallet addresses handled server-side — just upsert)
+    const promoChk = document.getElementById('cfgShipPromo');
+    if (promoChk) SHOP_CONFIG.shipPromoEnabled = promoChk.checked;
     const cfgRes = await fetch('/api/admin/shop-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
@@ -3676,6 +3873,7 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         eth_address:   SHOP_CONFIG.ethAddress,
         tezos_address: SHOP_CONFIG.tezosAddress,
         announcement:  SHOP_CONFIG.announcement || '',
+        ship_promo_enabled: SHOP_CONFIG.shipPromoEnabled !== false,
       }),
     });
     if (!cfgRes.ok) {
@@ -3685,6 +3883,8 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
 
     renderProducts();
     populatePrintPageSelector();
+    applyPromoVisibility();
+    if (typeof buildOrderSummary === 'function') buildOrderSummary();
     showToast('Saved ✦');
     closeAdmin();
   } catch (e) {
@@ -4455,6 +4655,8 @@ async function loadShopData() {
       const cfg = await configRes.json();
       if (cfg.eth_address)   SHOP_CONFIG.ethAddress   = cfg.eth_address;
       if (cfg.tezos_address) SHOP_CONFIG.tezosAddress = cfg.tezos_address;
+      SHOP_CONFIG.shipPromoEnabled = cfg.ship_promo_enabled !== false;
+      applyPromoVisibility();
     }
   } catch (e) {
     // API not reachable or tables don't exist yet — use hardcoded defaults
@@ -4538,6 +4740,18 @@ document.getElementById('adminBar').classList.add('visible');
 
 /* ─── Init ─── */
 document.getElementById('adminBar').classList.add('visible');
+
+// Promo banner — dismissible for the session.
+(function(){
+  const banner = document.getElementById('shipPromoBanner');
+  const close  = document.getElementById('shipPromoClose');
+  if (!banner) return;
+  try { if (sessionStorage.getItem('kw-promo-dismissed') === '1') banner.style.display = 'none'; } catch(_){}
+  if (close) close.addEventListener('click', () => {
+    banner.style.display = 'none';
+    try { sessionStorage.setItem('kw-promo-dismissed', '1'); } catch(_){}
+  });
+})();
 loadCart();
 updateCartUI();
 
@@ -4578,3 +4792,5 @@ finalizeReturnedGatewayCheckout();
 </script>
 </body>
 </html>
+
+
