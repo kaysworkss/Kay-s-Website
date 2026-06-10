@@ -1298,24 +1298,51 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
   if (!/^o[1-9A-HJ-NP-Za-km-z]{50}$/.test(opHash)) throw new Error('Invalid Tezos operation hash');
   if (!payeeAddress) throw new Error('Shop Tezos address is not configured');
   const api = (process.env.TZKT_API_URL || 'https://api.tzkt.io').replace(/\/$/, '');
-  const r = await fetch(`${api}/v1/operations/transactions?hash.eq=${encodeURIComponent(opHash)}`, {
-    headers: { Accept: 'application/json' },
-  });
-  const rows = await r.json().catch(() => []);
-  if (!r.ok) { const e = new Error('Tezos verification API failed'); e.statusCode = 409; throw e; }
-  const list = (Array.isArray(rows) ? rows : []).filter(tx => !tx.hash || String(tx.hash) === opHash);
+  const accountAddress = account => String(account?.address || account?.alias || account || '').toLowerCase();
+  const normalizeRows = data => {
+    const out = [];
+    const visit = value => {
+      if (!value) return;
+      if (Array.isArray(value)) { value.forEach(visit); return; }
+      if (typeof value !== 'object') return;
+      if (value.type === 'transaction' || value.kind === 'transaction' || value.sender || value.target || value.amount !== undefined) {
+        out.push(value);
+      }
+      for (const key of ['transactions', 'transaction', 'contents', 'operations']) visit(value[key]);
+    };
+    visit(data);
+    return out;
+  };
+  const fetchTzktRows = async path => {
+    const r = await fetch(`${api}${path}`, { headers: { Accept: 'application/json' } });
+    const data = await r.json().catch(() => null);
+    if (!r.ok) return [];
+    return normalizeRows(data);
+  };
+  const queryPaths = [
+    `/v1/operations/${encodeURIComponent(opHash)}`,
+    `/v1/operations/transactions?hash=${encodeURIComponent(opHash)}`,
+    `/v1/operations/transactions?hash.eq=${encodeURIComponent(opHash)}`,
+    `/v1/operations/transactions?hash.in=${encodeURIComponent(opHash)}`,
+  ];
+  let list = [];
+  for (const path of queryPaths) {
+    const rows = await fetchTzktRows(path);
+    const exactRows = rows.filter(tx => !tx.hash || String(tx.hash) === opHash);
+    if (exactRows.length) { list = exactRows; break; }
+    if (!list.length && rows.length && path.includes('/operations/transactions?hash=')) list = rows;
+  }
 
   // If the indexer hasn't seen the operation at all yet, that's a "not confirmed
   // yet" condition → 409 so the client retry loop waits and tries again, rather
   // than a hard failure on a payment that's genuinely on its way.
   if (list.length === 0) {
-    const e = new Error('Transaction is not confirmed yet');
+    const e = new Error(`Transaction is not confirmed yet. TzKT returned no rows for ${opHash}`);
     e.statusCode = 409;
     throw e;
   }
 
   const requiredMutez = decimalToUnits(quote.crypto_amount, 6);
-  const accountAddress = account => String(account?.address || account?.alias || account || '').toLowerCase();
   const rowSummary = rows => rows.slice(0, 4).map(tx => {
     const sender = accountAddress(tx.sender) || 'unknown-sender';
     const target = accountAddress(tx.target) || 'unknown-target';
@@ -1932,30 +1959,3 @@ module.exports = async (req, res) => {
       case 'upcoming':      return handleUpcoming(req, res, supabase);
       case 'challenge':     return handleChallenge(req, res, supabase);
       case 'score':         return handleScore(req, res, supabase);
-      case 'leaderboard':   return handleLeaderboard(req, res, supabase);
-      case 'hall-of-fame':  return handleHallOfFame(req, res, supabase);
-      case 'crosschain-claim': return handleCrosschainClaim(req, res, supabase);
-      case 'notify-outbid':      return handleNotifyOutbid(req, res);
-      case 'notify-bid-confirm': return handleNotifyBidConfirm(req, res);
-      case 'notify-winner':      return handleNotifyWinner(req, res);
-      case 'notify-bid':         return handleNotifyBid(req, res);
-      case 'shop-products':      return handleShopProducts(req, res, supabase);
-      case 'shop-config':        return handleShopConfig(req, res, supabase);
-      case 'shop-quote':         return handleShopQuote(req, res, supabase);
-      case 'shop-payment-init':  return handleShopPaymentInit(req, res, supabase);
-      case 'shop-order-create':  return handleShopOrderCreate(req, res, supabase);
-      case 'shop-order-confirm': return handleShopOrderConfirm(req, res, supabase);
-      case 'shop-order':         return handleShopOrder(req, res, supabase);
-      default:
-        return res.status(404).json({ error: `Unknown action: ${action}` });
-    }
-  } catch (e) {
-    console.error('[api/game] unhandled error:', e);
-    if (!res.headersSent) {
-      return res.status(e.statusCode || 500).json({
-        error: e.message || 'Unhandled server error',
-        stack: process.env.NODE_ENV === 'production' ? undefined : e.stack,
-      });
-    }
-  }
-};
