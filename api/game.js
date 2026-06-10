@@ -773,11 +773,23 @@ async function handleCrosschainClaim(req, res, supabase) {
   return res.status(409).json({ ok: false, claim: data || null, error: 'PAIR_ALREADY_CLAIMED' });
 }
 
-// ── GET /api/game?action=shop-products ────────────────────────────────────────
-// Optional ?slug=apoti-olowe-study-i for single product
-// Optional ?series=apoti-olowe for all prints in a series
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SHOP SECTION (pending-first + price-lock + payment_metadata crypto storage)
+//  Merged into game.js. Uses res-based json helpers below.
+// ═══════════════════════════════════════════════════════════════════════════
+let _shopRes = null;
+function json(status, obj) { _shopRes.status(status).json(obj); return obj; }
+function jsonError(e) {
+  return json(e.statusCode || 500, {
+    error: e.message || 'Server error',
+    product_id: e.product_id,
+    variant: e.variant,
+  });
+}
+// ── PRODUCTS ──────────────────────────────────────────────────────────────────
 async function handleShopProducts(req, res, supabase) {
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
 
   const slug   = req.query.slug   || '';
   const series = req.query.series || '';
@@ -789,9 +801,9 @@ async function handleShopProducts(req, res, supabase) {
       .eq('slug', slug)
       .eq('active', true)
       .single();
-    if (error) return res.status(error.code === 'PGRST116' ? 404 : 500).json({ error: error.message });
+    if (error) return json(error.code === 'PGRST116' ? 404 : 500, { error: error.message });
     const [tagged] = await applyProductTags([data], supabase);
-    return res.status(200).json(tagged || data);
+    return json(200, tagged || data);
   }
 
   if (series) {
@@ -801,8 +813,8 @@ async function handleShopProducts(req, res, supabase) {
       .eq('series_slug', series)
       .eq('active', true)
       .order('sort_order', { ascending: true });
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json(data || []);
+    if (error) return json(500, { error: error.message });
+    return json(200, data || []);
   }
 
   const { data, error } = await supabase
@@ -810,10 +822,10 @@ async function handleShopProducts(req, res, supabase) {
     .select('*')
     .eq('active', true)
     .order('sort_order', { ascending: true });
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return json(500, { error: error.message });
 
   const tagged = await applyProductTags(data || [], supabase);
-  return res.status(200).json(tagged);
+  return json(200, tagged);
 }
 
 // Compute "new" (added in last 14 days) and "bestseller" (top 3 by total
@@ -821,7 +833,6 @@ async function handleShopProducts(req, res, supabase) {
 async function applyProductTags(products, supabase) {
   if (!products.length) return products;
 
-  // Tally ordered quantity per product id across all recorded orders.
   const counts = {};
   try {
     const { data: orders } = await supabase
@@ -840,7 +851,6 @@ async function applyProductTags(products, supabase) {
     // If orders can't be read, fall back to no bestseller tags.
   }
 
-  // Top 3 product ids by quantity (only those with at least one sale).
   const bestsellerIds = new Set(
     Object.entries(counts)
       .filter(([, n]) => n > 0)
@@ -865,12 +875,8 @@ async function applyProductTags(products, supabase) {
   });
 }
 
-// ── POST /api/game?action=shop-order ──────────────────────────────────────────
-// Records an order and decrements stock per variant.
-// Called from shop.html after payment confirmation.
-
+// ── CHECKOUT COMPUTATION (server-authoritative) ───────────────────────────────
 // Server-authoritative delivery rates — MUST mirror DELIVERY_RATES in shop.html.
-// Client-sent fees/totals are never trusted; everything is recomputed here.
 const SERVER_DELIVERY_RATES = {
   'pickup':   { small: { ngn: 0,    usd: 0  }, large: { ngn: 0,    usd: 0  } },
   'NG-other': { small: { ngn: 4500, usd: 0  }, large: { ngn: 6500, usd: 0  } },
@@ -883,12 +889,10 @@ const SERVER_DELIVERY_RATES = {
 const SERVER_LARGE_PRINT_VARIANTS = ['12×16"', '12×18"', '18×24"', '24×36"'];
 const NGN_PER_USD = 1600;
 
-// Look up the authoritative price for a variant from a product row.
 function serverVariantPrice(product, variantKey, variant, currency) {
   const prices = currency === 'usd' ? (product.prices_usd || {}) : (product.prices_ngn || {});
   if (variantKey && prices[variantKey] !== undefined) return Number(prices[variantKey]) || 0;
   if (variant && prices[variant] !== undefined) return Number(prices[variant]) || 0;
-  // Fall back to the size segment of a "type|size" key.
   const size = String(variantKey || variant || '').split('|').pop();
   if (size && prices[size] !== undefined) return Number(prices[size]) || 0;
   return 0;
@@ -1000,6 +1004,7 @@ async function computeShopCheckout(body, supabase) {
   };
 }
 
+// ── QUOTE SIGNING (HMAC) ──────────────────────────────────────────────────────
 function shopQuoteSecret() {
   return process.env.SHOP_QUOTE_SECRET
       || process.env.ADMIN_SESSION_SECRET
@@ -1052,45 +1057,56 @@ function verifyShopQuote(quote, checkout, expected = {}) {
   return true;
 }
 
-function jsonError(res, e) {
-  return res.status(e.statusCode || 500).json({
-    error: e.message || 'Server error',
-    product_id: e.product_id,
-    variant: e.variant,
-  });
-}
+
 
 async function fetchServerCryptoPrice(asset) {
   const symbol = asset === 'xtz' ? 'XTZUSDT' : 'ETHUSDT';
   const coingeckoId = asset === 'xtz' ? 'tezos' : 'ethereum';
+  const coinbasePair = asset === 'xtz' ? 'XTZ-USD' : 'ETH-USD';
+  const TIMEOUT_MS = 7000; // raised from 3500 — Netlify cold starts + slow upstreams
+  const errors = [];
+
   async function withTimeout(promise, ms) {
     return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
   }
   async function binance() {
-    const r = await withTimeout(fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`), 3500);
-    if (!r.ok) throw new Error('binance rate failed');
+    const r = await withTimeout(fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`), TIMEOUT_MS);
+    if (!r.ok) throw new Error(`binance ${r.status}`);
     const d = await r.json();
     const price = Number(d.price);
     if (!price || price <= 0) throw new Error('bad binance rate');
     return price;
   }
   async function coingecko() {
-    const r = await withTimeout(fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoId}&vs_currencies=usd`), 3500);
-    if (!r.ok) throw new Error('coingecko rate failed');
+    const r = await withTimeout(fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoId}&vs_currencies=usd`), TIMEOUT_MS);
+    if (!r.ok) throw new Error(`coingecko ${r.status}`);
     const d = await r.json();
     const price = Number(d?.[coingeckoId]?.usd);
     if (!price || price <= 0) throw new Error('bad coingecko rate');
     return price;
   }
-  try {
-    return await Promise.any([binance(), coingecko()]);
-  } catch (_) {
-    return null;
+  async function coinbase() {
+    const r = await withTimeout(fetch(`https://api.coinbase.com/v2/prices/${coinbasePair}/spot`), TIMEOUT_MS);
+    if (!r.ok) throw new Error(`coinbase ${r.status}`);
+    const d = await r.json();
+    const price = Number(d?.data?.amount);
+    if (!price || price <= 0) throw new Error('bad coinbase rate');
+    return price;
   }
+
+  // Try each source; collect errors so a total failure is diagnosable in logs.
+  const sources = [['binance', binance], ['coingecko', coingecko], ['coinbase', coinbase]];
+  const settled = await Promise.allSettled(sources.map(([, fn]) => fn()));
+  for (let i = 0; i < settled.length; i++) {
+    if (settled[i].status === 'fulfilled' && settled[i].value > 0) return settled[i].value;
+    errors.push(`${sources[i][0]}: ${settled[i].reason?.message || settled[i].reason}`);
+  }
+  console.error(`[shop-quote] all crypto price sources failed for ${asset}:`, errors.join(' | '));
+  return null;
 }
 
 async function handleShopQuote(req, res, supabase) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
   try {
     const body = req.body || {};
     const checkout = await computeShopCheckout(body, supabase);
@@ -1103,7 +1119,7 @@ async function handleShopQuote(req, res, supabase) {
     if (method === 'eth' || method === 'tezos') {
       const asset = method === 'tezos' ? 'xtz' : 'eth';
       const price = await fetchServerCryptoPrice(asset);
-      if (!price) return res.status(503).json({ error: `${asset.toUpperCase()} rate unavailable` });
+      if (!price) return json(503, { error: `${asset.toUpperCase()} rate unavailable (price sources unreachable from server)` });
       extra.crypto_asset = asset;
       extra.crypto_usd_price = price;
       extra.crypto_amount = asset === 'eth'
@@ -1114,19 +1130,19 @@ async function handleShopQuote(req, res, supabase) {
       extra.crypto_amount = +checkout.totalUsd.toFixed(2);
     }
     const quote = makeShopQuote(checkout, extra);
-    return res.status(200).json({ ok: true, quote, checkout });
+    return json(200, { ok: true, quote, checkout });
   } catch (e) {
-    return jsonError(res, e);
+    return jsonError(e);
   }
 }
 
 async function handleShopPaymentInit(req, res, supabase) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
   try {
     const body = req.body || {};
     const provider = String(body.provider || '').toLowerCase();
     if (!['paystack','flutterwave'].includes(provider)) {
-      return res.status(400).json({ error: 'Unsupported payment provider' });
+      return json(400, { error: 'Unsupported payment provider' });
     }
     const checkout = await computeShopCheckout(body, supabase);
     const reference = `${provider === 'paystack' ? 'KW' : 'KW-FW'}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
@@ -1138,7 +1154,7 @@ async function handleShopPaymentInit(req, res, supabase) {
 
     if (provider === 'paystack') {
       const secret = process.env.PAYSTACK_SECRET_KEY;
-      if (!secret) return res.status(500).json({ error: 'Paystack secret key not configured' });
+      if (!secret) return json(500, { error: 'Paystack secret key not configured' });
       const r = await fetch('https://api.paystack.co/transaction/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
@@ -1153,11 +1169,11 @@ async function handleShopPaymentInit(req, res, supabase) {
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok || data.status === false) throw new Error(data.message || 'Paystack initialization failed');
-      return res.status(200).json({ ok: true, provider, reference, quote, checkout, ...data.data });
+      return json(200, { ok: true, provider, reference, quote, checkout, ...data.data });
     }
 
     const secret = process.env.FLUTTERWAVE_SECRET_KEY;
-    if (!secret) return res.status(500).json({ error: 'Flutterwave secret key not configured' });
+    if (!secret) return json(500, { error: 'Flutterwave secret key not configured' });
     const r = await fetch('https://api.flutterwave.com/v3/payments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
@@ -1173,12 +1189,13 @@ async function handleShopPaymentInit(req, res, supabase) {
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok || data.status === 'error') throw new Error(data.message || 'Flutterwave initialization failed');
-    return res.status(200).json({ ok: true, provider, reference, quote, checkout, link: data.data?.link });
+    return json(200, { ok: true, provider, reference, quote, checkout, link: data.data?.link });
   } catch (e) {
-    return jsonError(res, e);
+    return jsonError(e);
   }
 }
 
+// ── ON-CHAIN PAYMENT VERIFICATION ─────────────────────────────────────────────
 const ERC20_CONTRACTS = {
   usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
   usdt: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
@@ -1285,15 +1302,36 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
     headers: { Accept: 'application/json' },
   });
   const rows = await r.json().catch(() => []);
-  if (!r.ok) throw new Error('Tezos verification API failed');
+  if (!r.ok) { const e = new Error('Tezos verification API failed'); e.statusCode = 409; throw e; }
+  const list = Array.isArray(rows) ? rows : [];
+
+  // If the indexer hasn't seen the operation at all yet, that's a "not confirmed
+  // yet" condition → 409 so the client retry loop waits and tries again, rather
+  // than a hard failure on a payment that's genuinely on its way.
+  if (list.length === 0) {
+    const e = new Error('Transaction is not confirmed yet');
+    e.statusCode = 409;
+    throw e;
+  }
+
   const requiredMutez = decimalToUnits(quote.crypto_amount, 6);
-  const match = (Array.isArray(rows) ? rows : []).find(tx =>
+  const match = list.find(tx =>
     String(tx.status || '').toLowerCase() === 'applied' &&
     String(tx.sender?.address || tx.sender?.alias || '').toLowerCase() === String(payerAddress).toLowerCase() &&
     String(tx.target?.address || tx.target?.alias || '').toLowerCase() === String(payeeAddress).toLowerCase() &&
     BigInt(tx.amount || 0) >= requiredMutez
   );
-  if (!match) throw new Error('Tezos transaction to the shop wallet was not found for the quoted amount');
+  if (!match) {
+    // The op exists but isn't yet 'applied' (still in mempool/baking) → retryable.
+    const anyPending = list.some(tx => String(tx.status || '').toLowerCase() !== 'applied');
+    if (anyPending) {
+      const e = new Error('Transaction is not confirmed yet');
+      e.statusCode = 409;
+      throw e;
+    }
+    // Op is applied but sender/target/amount don't match → genuine mismatch (hard fail).
+    throw new Error('Tezos transaction to the shop wallet was not found for the quoted amount');
+  }
   return { confirmations: match.confirmations || null, received_amount: Number(match.amount || 0) / 1e6 };
 }
 
@@ -1316,11 +1354,6 @@ async function verifyCryptoPaymentOnChain({ paymentMethod, paymentRef, payerAddr
   });
 }
 
-// Server-side confirmation that a card payment actually succeeded. The client
-// is never trusted to assert payment: we ask the gateway directly, using the
-// reference we minted at payment-init, and require both a success status and an
-// amount that covers the quoted NGN total. Throws (statusCode 402/502) on any
-// failure so the caller can reject before claiming stock or recording an order.
 async function verifyCardPayment({ provider, reference, expectedTotalNgn }) {
   if (!reference) {
     const e = new Error('Payment reference is required');
@@ -1354,7 +1387,6 @@ async function verifyCardPayment({ provider, reference, expectedTotalNgn }) {
       const e = new Error('Paystack reports this payment was not completed');
       e.statusCode = 402; throw e;
     }
-    // Paystack amounts are in kobo (1 NGN = 100 kobo).
     const paidNgn = Number(tx.amount || 0) / 100;
     if (String(tx.currency || 'NGN') !== 'NGN' || paidNgn + 0.5 < expectedTotalNgn) {
       const e = new Error('Paystack payment amount does not match the order total');
@@ -1368,7 +1400,6 @@ async function verifyCardPayment({ provider, reference, expectedTotalNgn }) {
     if (!secret) { const e = new Error('Flutterwave secret key not configured'); e.statusCode = 500; throw e; }
     let data;
     try {
-      // We hold the tx_ref (minted at init), so verify by reference.
       const r = await withTimeout(fetch(
         `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(reference)}`,
         { headers: { Authorization: `Bearer ${secret}` } }
@@ -1383,7 +1414,7 @@ async function verifyCardPayment({ provider, reference, expectedTotalNgn }) {
       const e = new Error('Flutterwave reports this payment was not completed');
       e.statusCode = 402; throw e;
     }
-    const paidNgn = Number(tx.amount || 0); // Flutterwave reports in major units
+    const paidNgn = Number(tx.amount || 0);
     if (String(tx.currency || 'NGN') !== 'NGN' || paidNgn + 0.5 < expectedTotalNgn) {
       const e = new Error('Flutterwave payment amount does not match the order total');
       e.statusCode = 402; throw e;
@@ -1396,11 +1427,7 @@ async function verifyCardPayment({ provider, reference, expectedTotalNgn }) {
   throw e;
 }
 
-// Atomically claim stock for one item via the decrement_variant_stock RPC.
-// Returns { ok: true } on success, or { ok: false, available } when there
-// isn't enough. Untracked/unlimited stock returns ok:true. A missing RPC or
-// transport error is surfaced as a thrown error so the caller can 500 rather
-// than silently overselling.
+// ── STOCK CLAIM / RELEASE ─────────────────────────────────────────────────────
 async function claimVariantStock(supabase, item) {
   const vkey = item.variantKey || item.variant;
   const { data, error } = await supabase.rpc('decrement_variant_stock', {
@@ -1413,20 +1440,16 @@ async function claimVariantStock(supabase, item) {
     e.statusCode = 500;
     throw e;
   }
-  // The function returns a boolean: true = claimed, false = insufficient.
   return { ok: data === true };
 }
 
-// Best-effort compensating release of stock previously claimed in this request,
-// used to roll back when a later item in the same order fails. Returns nothing;
-// failures here are logged but not thrown (we're already in an error path).
 async function releaseVariantStock(supabase, item) {
   const vkey = item.variantKey || item.variant;
   try {
     const { error } = await supabase.rpc('decrement_variant_stock', {
       p_id: item.id,
       p_variant_key: vkey,
-      p_qty: -item.qty, // negative qty adds the units back
+      p_qty: -item.qty,
     });
     if (error) console.error('[shop-order] stock release failed:', item.id, vkey, error.message);
   } catch (e) {
@@ -1434,14 +1457,272 @@ async function releaseVariantStock(supabase, item) {
   }
 }
 
-async function handleShopOrder(req, res, supabase) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+// ── ORDER REFERENCE ───────────────────────────────────────────────────────────
+function makeOrderRef() {
+  return 'ORD-' + Date.now().toString(36).toUpperCase() + '-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+}
+
+// Pack the crypto lock (asset, exact amount, usd price, and the full signed
+// quote) into a single object stored in the shop_orders.payment_metadata JSONB
+// column — no dedicated crypto columns required.
+function cryptoOrderLockFromQuote(orderRef, paymentMethod, quote) {
+  if (!['eth','tezos','usdc','usdt'].includes(paymentMethod) || !quote || !quote.crypto_amount) return null;
+  return {
+    kind: 'crypto_order_lock',
+    order_hash: orderRef,
+    payment_method: paymentMethod,
+    crypto_asset: quote.crypto_asset || paymentMethod,
+    crypto_amount: quote.crypto_amount,
+    crypto_usd_price: quote.crypto_usd_price || null,
+    quote_iat: quote.iat || null,
+    quote_exp: quote.exp || null,
+    total_usd: quote.total_usd || null,
+    checkout_quote: quote,
+  };
+}
+
+// Read the crypto lock back from a stored order (payment_metadata, with a
+// legacy fallback to admin_note in case an older order stored it there).
+function readCryptoOrderLock(order) {
+  for (const source of [order.payment_metadata, order.admin_note]) {
+    try {
+      const note = typeof source === 'string' ? JSON.parse(source) : source;
+      if (note && note.kind === 'crypto_order_lock') return note;
+    } catch (_) {}
+  }
+  return null;
+}
+
+// ── PENDING-FIRST FLOW ────────────────────────────────────────────────────────
+// Step 1: create a pending order BEFORE payment. Records items, totals, customer,
+// and a generated order_ref. No stock touched, no payment verified yet. The
+// returned order_ref is the durable handle — payment can be confirmed later even
+// if the customer's cart is gone.
+async function handleShopOrderCreate(req, res, supabase) {
+  if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
   const body = req.body || {};
   let checkout;
   try {
     checkout = await computeShopCheckout(body, supabase);
   } catch (e) {
-    return jsonError(res, e);
+    return jsonError(e);
+  }
+
+  const paymentMethod = String(body.payment_method || '').slice(0, 40);
+  const quoteRequired = ['paystack','flutterwave','eth','tezos','usdc','usdt'].includes(paymentMethod);
+  // Verify the signed quote so a pending order can't be created with tampered totals.
+  if (quoteRequired && !verifyShopQuote(body.checkout_quote, checkout, { payment_method: paymentMethod })) {
+    return json(400, { error: 'Invalid or expired server checkout quote' });
+  }
+
+  const orderRef = makeOrderRef();
+  // For crypto orders, store the exact locked amount + full signed quote in
+  // payment_metadata (JSONB) — matches the live schema, no extra columns needed.
+  const cryptoLock = cryptoOrderLockFromQuote(orderRef, paymentMethod, body.checkout_quote);
+  const { data: order, error: orderError } = await supabase
+    .from('shop_orders')
+    .insert({
+      order_ref:       orderRef,
+      customer_name:   String(body.name    || '').slice(0, 200),
+      email:           String(body.email   || '').slice(0, 320),
+      phone:           String(body.phone   || '').slice(0, 60),
+      address:         String(body.address || '').slice(0, 500),
+      items:           checkout.trustedItems,
+      total_ngn:       checkout.totalNgn,
+      total_usd:       checkout.totalUsd,
+      delivery_fee_ngn: checkout.deliveryNgn,
+      delivery_method:  checkout.method.slice(0, 40),
+      delivery_zone:    checkout.zone.slice(0, 40),
+      payment_method:  paymentMethod,
+      payment_metadata: cryptoLock || undefined,
+      status: 'pending',
+    })
+    .select('id, order_ref')
+    .single();
+  if (orderError) return json(500, { error: orderError.message });
+
+  return json(200, {
+    ok: true,
+    order_ref: order.order_ref,
+    order_id: order.id,
+    total_ngn: checkout.totalNgn,
+    total_usd: checkout.totalUsd,
+    crypto_amount: cryptoLock?.crypto_amount ?? null,
+    crypto_asset: cryptoLock?.crypto_asset ?? null,
+  });
+}
+
+// Step 2: confirm payment for an existing pending order. Looks the order up by
+// order_ref (NOT the cart — so this works even if the browser cart is gone),
+// re-derives a checkout from the SAVED items, verifies the payment on-chain or
+// via the card gateway, decrements stock, and flips the order to 'paid'.
+async function handleShopOrderConfirm(req, res, supabase) {
+  if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
+  const body = req.body || {};
+  const orderRef = String(body.order_ref || '').slice(0, 80);
+  if (!orderRef) return json(400, { error: 'order_ref is required' });
+
+  // Load the pending order — this is the source of truth for what was bought.
+  const { data: order, error: loadErr } = await supabase
+    .from('shop_orders')
+    .select('*')
+    .eq('order_ref', orderRef)
+    .maybeSingle();
+  if (loadErr && loadErr.code !== 'PGRST116') return json(500, { error: loadErr.message });
+  if (!order) return json(404, { error: 'Order not found for that reference' });
+  if (order.status === 'paid') {
+    return json(200, { ok: true, already_paid: true, order_id: order.id, order_ref: orderRef });
+  }
+
+  const paymentMethod = String(body.payment_method || order.payment_method || '').slice(0, 40);
+  const paymentRef = String(body.payment_ref || '').slice(0, 200);
+  const payerAddress = String(body.payer_address || '').slice(0, 120);
+  const isCryptoPayment = ['eth','tezos','usdc','usdt'].includes(paymentMethod);
+  const isCardPayment = ['paystack','flutterwave'].includes(paymentMethod);
+
+  if ((isCryptoPayment || isCardPayment) && !paymentRef) {
+    return json(400, { error: 'Payment reference / transaction hash is required' });
+  }
+
+  // Guard against the same payment_ref being used for a different order.
+  if (paymentRef) {
+    const { data: dupe } = await supabase
+      .from('shop_orders')
+      .select('id, order_ref, status')
+      .eq('payment_ref', paymentRef)
+      .maybeSingle();
+    if (dupe && dupe.order_ref !== orderRef) {
+      return json(409, { error: 'This payment has already been recorded for another order' });
+    }
+  }
+
+  // Reconstruct the trusted checkout from the SAVED order items so verification
+  // uses authoritative server data, not anything the client re-sends now.
+  const savedItems = Array.isArray(order.items) ? order.items : [];
+  const checkout = {
+    trustedItems: savedItems,
+    totalNgn: Number(order.total_ngn) || 0,
+    totalUsd: Number(order.total_usd) || 0,
+    deliveryNgn: Number(order.delivery_fee_ngn) || 0,
+    method: order.delivery_method || 'pickup',
+    zone: order.delivery_zone || 'pickup',
+  };
+
+  // Verify payment BEFORE touching stock.
+  let chainVerification = null, cardVerification = null;
+  if (isCryptoPayment) {
+    if (!payerAddress) return json(400, { error: 'Sending wallet address is required' });
+    // Optional order-hash cross-check (the customer may supply it on manual confirm).
+    const bodyOrderHash = String(body.order_hash || body.order_ref || '').slice(0, 80);
+    if (bodyOrderHash && bodyOrderHash !== orderRef) {
+      return json(400, { error: 'Order hash does not match this order' });
+    }
+    // Read the locked crypto details from payment_metadata — the authoritative
+    // amount + signed quote captured when the pending order was created.
+    const cryptoLock = readCryptoOrderLock(order);
+    if (!cryptoLock || !cryptoLock.checkout_quote || !cryptoLock.checkout_quote.crypto_amount) {
+      return json(400, { error: 'Locked crypto amount is missing for this order' });
+    }
+    if (cryptoLock.payment_method && cryptoLock.payment_method !== paymentMethod) {
+      return json(400, { error: 'Payment method does not match the locked order' });
+    }
+    try {
+      chainVerification = await verifyCryptoPaymentOnChain({
+        paymentMethod,
+        paymentRef,
+        payerAddress,
+        quote: cryptoLock.checkout_quote,
+        supabase,
+      });
+      chainVerification = {
+        ...chainVerification,
+        locked_crypto_amount: cryptoLock.crypto_amount,
+        locked_crypto_asset: cryptoLock.crypto_asset,
+        locked_usd_price: cryptoLock.crypto_usd_price,
+        order_hash: orderRef,
+      };
+    } catch (e) {
+      return jsonError(e);
+    }
+  } else if (isCardPayment) {
+    try {
+      cardVerification = await verifyCardPayment({
+        provider: paymentMethod,
+        reference: paymentRef,
+        expectedTotalNgn: checkout.totalNgn,
+      });
+    } catch (e) {
+      return jsonError(e);
+    }
+  }
+
+  // Decrement stock now that payment is confirmed.
+  const claimed = [];
+  for (const item of checkout.trustedItems) {
+    let result;
+    try {
+      result = await claimVariantStock(supabase, item);
+    } catch (e) {
+      for (const c of claimed) await releaseVariantStock(supabase, c);
+      return jsonError(e);
+    }
+    if (!result.ok) {
+      for (const c of claimed) await releaseVariantStock(supabase, c);
+      return json(409, {
+        error: `Sold out: ${item.name} · ${item.variant} is no longer available`,
+        product_id: item.id,
+        variant: item.variant,
+        sold_out: true,
+      });
+    }
+    claimed.push(item);
+  }
+
+  // Flip the order to paid. For crypto, fold the payment details back into the
+  // payment_metadata lock (no dedicated payer_address/crypto_received columns).
+  const { error: updErr } = await supabase
+    .from('shop_orders')
+    .update({
+      status: 'paid',
+      payment_method: paymentMethod,
+      payment_ref: paymentRef,
+      payment_metadata: isCryptoPayment ? {
+        ...(readCryptoOrderLock(order) || {}),
+        payer_address: payerAddress,
+        payment_ref: paymentRef,
+        received_amount: chainVerification?.received_amount,
+        confirmations: chainVerification?.confirmations,
+        paid_at: new Date().toISOString(),
+      } : order.payment_metadata,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('order_ref', orderRef);
+  if (updErr) {
+    for (const c of claimed) await releaseVariantStock(supabase, c);
+    return json(500, { error: updErr.message });
+  }
+
+  return json(200, {
+    ok: true,
+    order_id: order.id,
+    order_ref: orderRef,
+    total_ngn: checkout.totalNgn,
+    total_usd: checkout.totalUsd,
+    delivery_fee_ngn: checkout.deliveryNgn,
+    chain_verification: chainVerification,
+    card_verification: cardVerification,
+  });
+}
+
+// ── ORDER (legacy single-shot — kept for backward compatibility) ──────────────
+async function handleShopOrder(req, res, supabase) {
+  if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
+  const body = req.body || {};
+  let checkout;
+  try {
+    checkout = await computeShopCheckout(body, supabase);
+  } catch (e) {
+    return jsonError(e);
   }
 
   const paymentMethod = String(body.payment_method || '').slice(0, 40);
@@ -1453,19 +1734,19 @@ async function handleShopOrder(req, res, supabase) {
     ...(paymentMethod === 'paystack' || paymentMethod === 'flutterwave' ? { payment_ref: paymentRef } : {}),
     ...(payerAddress ? { payer_address: payerAddress } : {}),
   })) {
-    return res.status(400).json({ error: 'Invalid or expired server checkout quote' });
+    return json(400, { error: 'Invalid or expired server checkout quote' });
   }
   const isCryptoPayment = ['eth','tezos','usdc','usdt'].includes(paymentMethod);
   if (isCryptoPayment) {
-    if (!paymentRef) return res.status(400).json({ error: 'Crypto transaction hash is required' });
-    if (!payerAddress) return res.status(400).json({ error: 'Sending wallet address is required' });
+    if (!paymentRef) return json(400, { error: 'Crypto transaction hash is required' });
+    if (!payerAddress) return json(400, { error: 'Sending wallet address is required' });
     const { data: existingOrder, error: existingError } = await supabase
       .from('shop_orders')
       .select('id')
       .eq('payment_ref', paymentRef)
       .maybeSingle();
-    if (existingError && existingError.code !== 'PGRST116') return res.status(500).json({ error: existingError.message });
-    if (existingOrder) return res.status(409).json({ error: 'This crypto transaction has already been submitted for an order' });
+    if (existingError && existingError.code !== 'PGRST116') return json(500, { error: existingError.message });
+    if (existingOrder) return json(409, { error: 'This crypto transaction has already been submitted for an order' });
   }
   let chainVerification = null;
   if (isCryptoPayment) {
@@ -1478,15 +1759,10 @@ async function handleShopOrder(req, res, supabase) {
         supabase,
       });
     } catch (e) {
-      return jsonError(res, e);
+      return jsonError(e);
     }
   }
 
-  // ── Verify card payments with the gateway BEFORE touching stock ──────────
-  // There are no provider webhooks: this server-side verify is the only proof
-  // that a card payment actually happened. The client is never trusted to
-  // assert it. A failed/abandoned/spoofed payment is rejected here, so no stock
-  // is claimed and no order is recorded for unpaid carts.
   const isCardPayment = ['paystack', 'flutterwave'].includes(paymentMethod);
   let cardVerification = null;
   if (isCardPayment) {
@@ -1497,45 +1773,31 @@ async function handleShopOrder(req, res, supabase) {
         expectedTotalNgn: checkout.totalNgn,
       });
     } catch (e) {
-      return jsonError(res, e);
+      return jsonError(e);
     }
-    // Guard against the same successful charge being submitted twice.
     const { data: dupe, error: dupeErr } = await supabase
       .from('shop_orders')
       .select('id')
       .eq('payment_ref', paymentRef)
       .maybeSingle();
-    if (dupeErr && dupeErr.code !== 'PGRST116') return res.status(500).json({ error: dupeErr.message });
-    if (dupe) return res.status(409).json({ error: 'This payment has already been recorded for an order' });
+    if (dupeErr && dupeErr.code !== 'PGRST116') return json(500, { error: dupeErr.message });
+    if (dupe) return json(409, { error: 'This payment has already been recorded for an order' });
   }
 
-  // Payment is confirmed (or not required) at this point.
   const paymentConfirmed = isCryptoPayment || isCardPayment;
 
-  // ── Claim stock atomically BEFORE recording the order ────────────────────
-  // Each claim is a single check-and-decrement in Postgres (decrement_variant_stock,
-  // which locks the row FOR UPDATE), so two concurrent orders for the last unit
-  // can no longer both succeed. If any line can't be satisfied, we release every
-  // line we already claimed in this request and reject the whole order.
-  //
-  // Note on payment ordering: by the time we reach here the customer has already
-  // paid (card via the gateway redirect, crypto verified on-chain above). So a
-  // 409 here means "paid but sold out" — the caller must refund. This is rare
-  // (only a true race for the final unit triggers it) and is strictly better
-  // than silently overselling a numbered edition.
   const claimed = [];
   for (const item of checkout.trustedItems) {
     let result;
     try {
       result = await claimVariantStock(supabase, item);
     } catch (e) {
-      // RPC/transport failure: roll back and surface as a server error.
       for (const c of claimed) await releaseVariantStock(supabase, c);
-      return jsonError(res, e);
+      return jsonError(e);
     }
     if (!result.ok) {
       for (const c of claimed) await releaseVariantStock(supabase, c);
-      return res.status(409).json({
+      return json(409, {
         error: `Sold out: ${item.name} · ${item.variant} is no longer available`,
         product_id: item.id,
         variant: item.variant,
@@ -1545,7 +1807,6 @@ async function handleShopOrder(req, res, supabase) {
     claimed.push(item);
   }
 
-  // ── Record the order ─────────────────────────────────────────────────────
   const { data: order, error: orderError } = await supabase
     .from('shop_orders')
     .insert({
@@ -1566,12 +1827,11 @@ async function handleShopOrder(req, res, supabase) {
     .select('id')
     .single();
   if (orderError) {
-    // Order didn't record — give the stock back so we don't strand units.
     for (const c of claimed) await releaseVariantStock(supabase, c);
-    return res.status(500).json({ error: orderError.message });
+    return json(500, { error: orderError.message });
   }
 
-  return res.status(200).json({
+  return json(200, {
     ok: true,
     order_id: order.id,
     total_ngn: checkout.totalNgn,
@@ -1581,18 +1841,23 @@ async function handleShopOrder(req, res, supabase) {
     card_verification: cardVerification,
   });
 }
-// ── GET /api/game?action=shop-config ──────────────────────────────────────────
+
+// ── CONFIG ────────────────────────────────────────────────────────────────────
 async function handleShopConfig(req, res, supabase) {
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
   const { data, error } = await supabase
     .from('shop_config')
     .select('*')
     .order('id', { ascending: true })
     .limit(1)
     .single();
-  if (error && error.code !== 'PGRST116') return res.status(500).json({ error: error.message });
-  return res.status(200).json(data || {});
+  if (error && error.code !== 'PGRST116') return json(500, { error: error.message });
+  return json(200, data || {});
 }
+
+// ── Netlify entry point ───────────────────────────────────────────────────────
+
+// ── Vercel entry point ────────────────────────────────────────────────────────
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 
@@ -1627,10 +1892,13 @@ module.exports = async (req, res) => {
     else if (urlPath.includes('/shop-config') || urlPath.includes('/shop/config')) action = 'shop-config';
     else if (urlPath.includes('/shop-payment-init') || urlPath.includes('/shop/payment-init')) action = 'shop-payment-init';
     else if (urlPath.includes('/shop-quote') || urlPath.includes('/shop/quote')) action = 'shop-quote';
+    else if (urlPath.includes('/shop-order-create') || urlPath.includes('/shop/order-create')) action = 'shop-order-create';
+    else if (urlPath.includes('/shop-order-confirm') || urlPath.includes('/shop/order-confirm')) action = 'shop-order-confirm';
     else if (urlPath.includes('/shop-order') || urlPath.includes('/shop/order')) action = 'shop-order';
   }
 
   const supabase = getSupabase();
+  _shopRes = res; // shop handlers use res-based json() helper
 
   switch (action) {
     case 'challenges':    return handleChallenges(req, res, supabase);
@@ -1648,6 +1916,8 @@ module.exports = async (req, res) => {
     case 'shop-config':        return handleShopConfig(req, res, supabase);
     case 'shop-quote':         return handleShopQuote(req, res, supabase);
     case 'shop-payment-init':  return handleShopPaymentInit(req, res, supabase);
+    case 'shop-order-create':  return handleShopOrderCreate(req, res, supabase);
+    case 'shop-order-confirm': return handleShopOrderConfirm(req, res, supabase);
     case 'shop-order':         return handleShopOrder(req, res, supabase);
     default:
       return res.status(404).json({ error: `Unknown action: ${action}` });
