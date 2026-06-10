@@ -623,9 +623,44 @@ function openDetail(id) {
       <div class="detail-row" style="font-weight:600"><span class="detail-row-label">Total</span><span class="detail-row-val" style="color:var(--text);font-family:'Cormorant Garamond',serif;font-size:1.1rem">${fmt(o.total_ngn)} / ${fmtUsd(o.total_usd)}</span></div>
       <div class="detail-row"><span class="detail-row-label">Ordered</span><span class="detail-row-val">${formatDate(o.created_at)} ${formatTime(o.created_at)}</span></div>
       ${o.fulfilled_at ? `<div class="detail-row"><span class="detail-row-label">Fulfilled</span><span class="detail-row-val" style="color:var(--moss)">${formatDate(o.fulfilled_at)} ${formatTime(o.fulfilled_at)}</span></div>` : ''}
-    </div>`;
+    </div>
+    ${renderCryptoDetails(o)}`;
 
   document.getElementById('detailOverlay').classList.add('open');
+}
+
+// Crypto details — reads the lock + payment info stored in payment_metadata.
+// Only shown for crypto orders that carry that metadata.
+function renderCryptoDetails(o) {
+  let meta = o.payment_metadata;
+  if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch { meta = null; } }
+  if (!meta || meta.kind !== 'crypto_order_lock') return '';
+
+  const asset = (meta.crypto_asset || '').toUpperCase();
+  const locked = meta.crypto_amount != null ? `${meta.crypto_amount} ${asset}` : '—';
+  const received = meta.received_amount != null ? `${meta.received_amount} ${asset}` : null;
+  const usdPrice = meta.crypto_usd_price != null ? `$${Number(meta.crypto_usd_price).toLocaleString(undefined,{maximumFractionDigits:6})}` : null;
+  const payer = meta.payer_address || null;
+  const confs = meta.confirmations != null ? String(meta.confirmations) : null;
+  const orderHash = meta.order_hash || o.order_ref || null;
+  const paidAt = meta.paid_at || null;
+
+  const row = (label, val, extraStyle = '') =>
+    `<div class="detail-row"><span class="detail-row-label">${label}</span><span class="detail-row-val" style="${extraStyle}">${val}</span></div>`;
+
+  const monoClay = "font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--clay);word-break:break-all";
+
+  return `
+    <div class="detail-section">
+      <div class="detail-section-label">Crypto payment</div>
+      ${orderHash ? row('Order hash', orderHash, monoClay) : ''}
+      ${row('Locked amount', locked, 'font-weight:600')}
+      ${received ? row('Received', received, 'color:var(--moss)') : ''}
+      ${usdPrice ? row('Rate at lock', usdPrice + ' / ' + (asset||'unit')) : ''}
+      ${payer ? row('From wallet', payer, monoClay) : ''}
+      ${confs ? row('Confirmations', confs) : ''}
+      ${paidAt ? row('Paid', formatDate(paidAt) + ' ' + formatTime(paidAt), 'color:var(--moss)') : ''}
+    </div>`;
 }
 
 async function saveOrderDetail(id) {
