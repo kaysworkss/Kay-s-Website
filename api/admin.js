@@ -187,7 +187,12 @@ async function handleExtendChallenge(req, res, supabase) {
   return res.status(200).json({ ok: true });
 }
 
-// ── GET/POST/PATCH/DELETE /api/admin?action=shop-products ────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SHOP ADMIN SECTION (filters + restock-delete). Uses res-based json helper.
+// ═══════════════════════════════════════════════════════════════════════════
+let _shopAdminRes = null;
+function json(status, obj) { _shopAdminRes.status(status).json(obj); return obj; }
 async function handleShopProducts(req, res, supabase) {
   if (req.method === 'GET') {
     const id = req.query.id;
@@ -197,15 +202,15 @@ async function handleShopProducts(req, res, supabase) {
         .select('*')
         .eq('id', id)
         .single();
-      if (error) return res.status(error.code === 'PGRST116' ? 404 : 500).json({ error: error.message });
-      return res.status(200).json(data);
+      if (error) return json(error.code === 'PGRST116' ? 404 : 500, { error: error.message });
+      return json(200, data);
     }
     const { data, error } = await supabase
       .from('shop_products')
       .select('*')
       .order('sort_order', { ascending: true });
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json(data || []);
+    if (error) return json(500, { error: error.message });
+    return json(200, data || []);
   }
 
   if (req.method === 'POST') {
@@ -247,13 +252,13 @@ async function handleShopProducts(req, res, supabase) {
       })
       .select('id')
       .single();
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(201).json({ ok: true, id: data.id });
+    if (error) return json(500, { error: error.message });
+    return json(201, { ok: true, id: data.id });
   }
 
   if (req.method === 'PATCH') {
     const id = req.query.id;
-    if (!id) return res.status(400).json({ error: 'id required' });
+    if (!id) return json(400, { error: 'id required' });
     const body = req.body || {};
     const patch = {};
     if (body.name               !== undefined) patch.name               = String(body.name).slice(0, 200);
@@ -275,7 +280,6 @@ async function handleShopProducts(req, res, supabase) {
     if (body.active             !== undefined) patch.active             = Boolean(body.active);
     if (body.stock_by_variant   !== undefined) patch.stock_by_variant   = body.stock_by_variant;
     if (body.edition_totals     !== undefined) patch.edition_totals      = body.edition_totals;
-    // Print page fields
     if (body.slug               !== undefined) patch.slug               = String(body.slug).slice(0, 200);
     if (body.year               !== undefined) patch.year               = String(body.year).slice(0, 10);
     if (body.series_slug        !== undefined) patch.series_slug        = String(body.series_slug).slice(0, 200);
@@ -289,22 +293,22 @@ async function handleShopProducts(req, res, supabase) {
     if (body.is_large_print     !== undefined) patch.is_large_print     = Boolean(body.is_large_print);
     if (body.images             !== undefined) patch.images             = body.images;
     const { error } = await supabase.from('shop_products').update(patch).eq('id', id);
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ ok: true });
+    if (error) return json(500, { error: error.message });
+    return json(200, { ok: true });
   }
 
   if (req.method === 'DELETE') {
     const id = req.query.id;
-    if (!id) return res.status(400).json({ error: 'id required' });
+    if (!id) return json(400, { error: 'id required' });
     const { error } = await supabase.from('shop_products').delete().eq('id', id);
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ ok: true });
+    if (error) return json(500, { error: error.message });
+    return json(200, { ok: true });
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return json(405, { error: 'Method not allowed' });
 }
 
-// ── GET/POST /api/admin?action=shop-config ────────────────────────────────────
+// ── shop-config (GET/POST) ────────────────────────────────────────────────────
 async function handleShopConfig(req, res, supabase) {
   if (req.method === 'GET') {
     const { data, error } = await supabase
@@ -312,8 +316,8 @@ async function handleShopConfig(req, res, supabase) {
       .select('*')
       .limit(1)
       .single();
-    if (error && error.code !== 'PGRST116') return res.status(500).json({ error: error.message });
-    return res.status(200).json(data || {});
+    if (error && error.code !== 'PGRST116') return json(500, { error: error.message });
+    return json(200, data || {});
   }
 
   if (req.method === 'POST') {
@@ -324,43 +328,74 @@ async function handleShopConfig(req, res, supabase) {
       announcement:   String(body.announcement  || '').slice(0, 500),
       updated_at:     new Date().toISOString(),
     };
-    // Upsert — always keep exactly one config row (id = 1)
     const { error } = await supabase
       .from('shop_config')
       .upsert({ id: 1, ...patch }, { onConflict: 'id' });
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ ok: true });
+    if (error) return json(500, { error: error.message });
+    return json(200, { ok: true });
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return json(405, { error: 'Method not allowed' });
 }
 
-// ── GET /api/admin?action=shop-orders ─────────────────────────────────────────
+// ── shop-orders (GET) ─────────────────────────────────────────────────────────
 async function handleShopOrders(req, res, supabase) {
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
   const status = req.query.status || 'all';
   let query = supabase
     .from('shop_orders')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(200);
-  if (status !== 'all') query = query.eq('status', status);
+  if (status === 'paid_unshipped') {
+    query = query.in('status', ['paid', 'processing']);
+  } else if (status === 'pending_payment') {
+    query = query.eq('status', 'pending');
+  } else if (status !== 'all') {
+    query = query.eq('status', status);
+  }
   const { data, error } = await query;
-  if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json(data || []);
+  if (error) return json(500, { error: error.message });
+  return json(200, data || []);
 }
 
-// ── PATCH /api/admin?action=shop-order ────────────────────────────────────────
+// ── shop-order (PATCH / DELETE) ───────────────────────────────────────────────
 async function handleShopOrderUpdate(req, res, supabase) {
-  if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
   const id = req.query.id;
-  if (!id) return res.status(400).json({ error: 'id required' });
+  if (!id) return json(400, { error: 'id required' });
+
+  if (req.method === 'DELETE') {
+    const shouldRestock = String(req.query.restock || '') === '1';
+    if (shouldRestock) {
+      const { data: order, error: loadErr } = await supabase
+        .from('shop_orders')
+        .select('items')
+        .eq('id', id)
+        .maybeSingle();
+      if (loadErr && loadErr.code !== 'PGRST116') return json(500, { error: loadErr.message });
+      for (const item of (Array.isArray(order?.items) ? order.items : [])) {
+        const vkey = item.variantKey || item.variant;
+        const qty = Math.max(1, Number(item.qty) || 1);
+        const { error: stockErr } = await supabase.rpc('decrement_variant_stock', {
+          p_id: item.id,
+          p_variant_key: vkey,
+          p_qty: -qty,
+        });
+        if (stockErr) return json(500, { error: `Could not restock ${item.name || item.id}: ${stockErr.message}` });
+      }
+    }
+    const { error } = await supabase.from('shop_orders').delete().eq('id', id);
+    if (error) return json(500, { error: error.message });
+    return json(200, { ok: true, restocked: shouldRestock });
+  }
+
+  if (req.method !== 'PATCH') return json(405, { error: 'Method not allowed' });
   const body = req.body || {};
   const patch = { updated_at: new Date().toISOString() };
 
   if (body.status !== undefined) {
-    if (!['pending', 'processing', 'shipped', 'fulfilled', 'cancelled'].includes(body.status))
-      return res.status(422).json({ error: 'Invalid status' });
+    if (!['pending', 'paid', 'processing', 'shipped', 'fulfilled', 'cancelled'].includes(body.status))
+      return json(422, { error: 'Invalid status' });
     patch.status = body.status;
     if (body.status === 'fulfilled') patch.fulfilled_at = new Date().toISOString();
   }
@@ -369,12 +404,13 @@ async function handleShopOrderUpdate(req, res, supabase) {
   if (body.admin_note !== undefined) patch.admin_note = String(body.admin_note).slice(0, 1000);
 
   const { error } = await supabase.from('shop_orders').update(patch).eq('id', id);
-  if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json({ ok: true });
+  if (error) return json(500, { error: error.message });
+  return json(200, { ok: true });
 }
 
-// ── Main handler ──────────────────────────────────────────────────────────────
+// ── Netlify entry point ───────────────────────────────────────────────────────
 
+// ── Vercel entry point ────────────────────────────────────────────────────────
 module.exports = async (req, res) => {
   cors(res);
   if (handleOptions(req, res)) return;
@@ -388,9 +424,9 @@ module.exports = async (req, res) => {
     if (match) action = match[1];
   }
 
-  // Extract id from path for /admin/challenge/:id
+  // Extract id from path for /admin/<action>/:id (challenge, shop-products, shop-order)
   if (!req.query.id) {
-    const idMatch = urlPath.match(/\/admin\/challenge\/([^/?]+)/);
+    const idMatch = urlPath.match(/\/admin\/[a-z-]+\/([^/?]+)/);
     if (idMatch && idMatch[1] !== 'undefined') req.query.id = idMatch[1];
   }
 
@@ -401,6 +437,7 @@ module.exports = async (req, res) => {
   if (!checkToken(req)) return res.status(401).json({ error: 'Unauthorized' });
 
   const supabase = getSupabase();
+  _shopAdminRes = res; // shop admin handlers use res-based json() helper
 
   switch (action) {
     case 'challenges':   return handleGetChallenges(req, res, supabase);
