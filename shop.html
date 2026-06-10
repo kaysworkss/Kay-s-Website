@@ -3229,6 +3229,15 @@ function revealManualCryptoFields(chain) {
     fields.dataset.revealed = '1';
     fields.style.display = '';
     btn.textContent = 'Confirm manual payment';
+    const lock = window.__activeLock;
+    const refInput = document.getElementById(chain === 'tezos' ? 'tezosManualRef' : 'ethManualRef');
+    const senderInput = document.getElementById(chain === 'tezos' ? 'tezosManualSender' : 'ethManualSender');
+    if (refInput && !refInput.value && lock && lock.method === chain) refInput.value = lock.order_ref || '';
+    if (senderInput && !senderInput.value) {
+      senderInput.value = chain === 'tezos'
+        ? ((_tezosConnectedAddr || lock?.payerAddress || '') || '')
+        : ((_ethConnectedAddr || lock?.payerAddress || '') || '');
+    }
     const firstInput = fields.querySelector('input');
     if (firstInput) firstInput.focus();
     return true;   // first click: just reveal
@@ -3311,7 +3320,7 @@ async function createPendingOrder(customer, method, checkoutQuote) {
 // Confirm payment against an existing pending order by its order_ref. Retries
 // while the chain is still indexing (server returns 409 "not confirmed yet").
 async function confirmPendingOrder(orderRef, opts) {
-  const payload = Object.assign({ order_ref: orderRef }, opts);
+  const payload = Object.assign({ order_ref: orderRef, order_hash: orderRef }, opts);
   // Tezos/ETH indexers (tzkt, RPC) can lag behind a just-broadcast tx, especially
   // under congestion. Retry generously — 9 attempts × ~8s ≈ 75s — before giving
   // up, so a valid payment isn't reported as failed just because indexing is slow.
@@ -3338,9 +3347,12 @@ async function confirmPendingOrder(orderRef, opts) {
         await new Promise(r => setTimeout(r, RETRY_MS));
         continue;
       }
-      throw new Error(data.error || 'Order confirmation failed');
+      const err = new Error(data.error || 'Order confirmation failed');
+      err.nonRetryable = true;
+      throw err;
     } catch (e) {
       lastErr = e;
+      if (e && e.nonRetryable) throw e;
       if (attempt < maxAttempts) { await new Promise(r => setTimeout(r, RETRY_MS)); continue; }
       throw e;
     }
@@ -3392,8 +3404,8 @@ function renderLockUI(method) {
   box.style.display = 'block';
   const amtEl = document.getElementById(ids.amt);
   const refEl = document.getElementById(ids.ref);
-  if (amtEl) amtEl.textContent = (lock.quote?.crypto_amount ?? '—') + ' ' + lockMethodToAsset(method);
-  if (refEl) refEl.textContent = lock.order_ref || '—';
+  if (amtEl) amtEl.textContent = (lock.quote?.crypto_amount ?? '-') + ' ' + lockMethodToAsset(method);
+  if (refEl) refEl.textContent = lock.order_ref || '-';
 }
 
 function updateLockCountdown() {
@@ -3593,9 +3605,9 @@ function loadAdminConfig() {
 /* ─── Print page editor ─── */
 function slugify(s) {
   return s.toLowerCase()
-    .replace(/[àáâãäå]/g,'a').replace(/[èéêë]/g,'e')
-    .replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o')
-    .replace(/[ùúûü]/g,'u').replace(/[ñ]/g,'n')
+    .replace(/[\u00e0\u00e1\u00e2\u00e3\u00e4\u00e5]/g,'a').replace(/[\u00e8\u00e9\u00ea\u00eb]/g,'e')
+    .replace(/[\u00ec\u00ed\u00ee\u00ef]/g,'i').replace(/[\u00f2\u00f3\u00f4\u00f5\u00f6]/g,'o')
+    .replace(/[\u00f9\u00fa\u00fb\u00fc]/g,'u').replace(/[\u00f1]/g,'n')
     .replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
 }
 
@@ -4696,6 +4708,10 @@ function ensureCryptoRateUpdates() {
 ensureCryptoRateUpdates();
 
 function tezosXtzAmount() {
+  const lock = window.__activeLock;
+  if (lock && lock.method === 'tezos' && lock.quote?.crypto_amount) {
+    return Number(lock.quote.crypto_amount).toFixed(4);
+  }
   if (!_xtzPerUsd) return null; // rate not yet available
   return (grandTotalUsd() * _xtzPerUsd).toFixed(4);
 }
@@ -4886,18 +4902,22 @@ async function tezosConnectWallet() {
 /* ── Render the Tezos panel ── */
 function renderTezosPanel() {
   const addr = SHOP_CONFIG.tezosAddress;
-  const xtz  = tezosXtzAmount(); // null until rate loads
+  const lock = window.__activeLock;
+  const lockReady = !!(lock && lock.method === 'tezos' && lock.order_ref && lock.quote?.crypto_amount);
+  const xtz  = lockReady ? Number(lock.quote.crypto_amount).toFixed(4) : null;
 
   const amtBlock  = document.getElementById('tezosAmountBlock');
   const toAddrEl  = document.getElementById('tezosToAddr');
   const xtzAmtEl  = document.getElementById('tezosXtzAmount');
   const sendAmtEl = document.getElementById('tezosSendAmt');
+  const manualBtn = document.getElementById('tezosManualBtn');
 
   if (addr) {
     amtBlock.style.display = '';
     toAddrEl.textContent   = addr;
-    xtzAmtEl.textContent   = xtz !== null ? xtz + ' XTZ' : 'Fetching rate&';
-    if (sendAmtEl) sendAmtEl.textContent = xtz !== null ? xtz + ' XTZ' : '&';
+    xtzAmtEl.textContent   = xtz !== null ? xtz + ' XTZ' : 'Locking server quote...';
+    if (sendAmtEl) sendAmtEl.textContent = xtz !== null ? xtz : '...';
+    if (manualBtn && lockReady) manualBtn.style.display = '';
   } else {
     amtBlock.style.display = 'none';
   }
@@ -4907,7 +4927,7 @@ function renderTezosPanel() {
   if (copyBtn) {
     copyBtn.onclick = () => {
       navigator.clipboard.writeText(addr).then(() => {
-        copyBtn.textContent = 'Copied ✓';
+        copyBtn.textContent = 'Copied';
         setTimeout(() => { copyBtn.textContent = 'Copy address'; }, 2000);
       });
     };
@@ -4918,8 +4938,8 @@ function renderTezosPanel() {
     document.getElementById('tezosWalletInfo').style.display = '';
     document.getElementById('tezosWalletAddr').textContent = tezosShortAddr(_tezosConnectedAddr);
     document.getElementById('tezosConnectBtn').style.display = 'none';
-    // Only show Send button once the rate is known
-    document.getElementById('tezosSendBtn').style.display = (addr && xtz !== null) ? '' : 'none';
+    // Only show Send button once the server lock is ready.
+    document.getElementById('tezosSendBtn').style.display = (addr && lockReady) ? '' : 'none';
   } else {
     document.getElementById('tezosWalletInfo').style.display = 'none';
     document.getElementById('tezosConnectBtn').style.display = '';
@@ -4995,7 +5015,8 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
       console.error('[Tezos] send error:', e);
     }
   } finally {
-    btn.disabled = false; btn.textContent = 'Send ' + tezosXtzAmount() + ' XTZ';
+    const labelAmt = tezosXtzAmount() || '...';
+    btn.disabled = false; btn.textContent = 'Send ' + labelAmt + ' XTZ';
   }
 });
 
