@@ -3228,6 +3228,8 @@ function revealManualCryptoFields(chain) {
   if (fields.dataset.revealed !== '1') {
     fields.dataset.revealed = '1';
     fields.style.display = '';
+    window.__manualCryptoMode = chain;
+    stopLockTimer();
     btn.textContent = 'Confirm manual payment';
     const lock = window.__activeLock;
     const refInput = document.getElementById(chain === 'tezos' ? 'tezosManualRef' : 'ethManualRef');
@@ -3250,25 +3252,22 @@ async function submitManualCrypto(chain) {
   if (revealManualCryptoFields(chain)) return;
   const proof = getManualCryptoProof(chain);
   if (!proof) return;
-  const d = getFormData();
   const method = chain === 'tezos' ? 'tezos' : 'eth';
   const btn = document.getElementById(chain === 'tezos' ? 'tezosManualBtn' : 'cryptoConfirmBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Confirming…'; }
   try {
     // Resolve which order to confirm, in priority order:
-    //  1. an order hash the customer pasted (recovery — works with empty cart)
-    //  2. the active price-lock's order (normal flow)
-    //  3. create a fresh pending order from the current cart (last resort)
+    //  1. an order hash the customer pasted
+    //  2. the active price-lock's order
+    // Manual confirmation must never create another pending order.
     let orderRef = proof.order_ref;
     let quoteForConfirm = window.__activeLock?.quote || null;
     if (!orderRef && window.__activeLock && window.__activeLock.method === method) {
       orderRef = window.__activeLock.order_ref;
     }
     if (!orderRef) {
-      const q = await getServerCheckoutQuote(d, method, proof);
-      const pending = await createPendingOrder(d, method, q.quote);
-      orderRef = pending.order_ref;
-      quoteForConfirm = q.quote;
+      showToast('Enter the existing order hash from the locked payment box');
+      return;
     }
     await confirmPendingOrder(orderRef, {
       payment_method: method,
@@ -3379,6 +3378,7 @@ function clearPendingOrder(orderRef) {
 // The send paths reuse this locked order instead of creating another.
 const LOCK_MS = 5 * 60 * 1000; // 5 minutes
 window.__activeLock = null;    // { method, order_ref, quote, expires, payerAddress }
+window.__manualCryptoMode = null;
 let _lockTimer = null;
 let _lockSeq = 0;              // guards against overlapping re-locks
 
@@ -3411,6 +3411,7 @@ function renderLockUI(method) {
 function updateLockCountdown() {
   const lock = window.__activeLock;
   if (!lock) return;
+  if (window.__manualCryptoMode === lock.method) return;
   const remaining = Math.max(0, lock.expires - Date.now());
   const mm = String(Math.floor(remaining / 60000)).padStart(2, '0');
   const ss = String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0');
@@ -3467,6 +3468,7 @@ function stopLockTimer() {
 // Called when the cart changes — invalidate and re-lock the active crypto panel.
 function relockOnCartChange() {
   const lock = window.__activeLock;
+  if (lock && window.__manualCryptoMode === lock.method) return;
   if (lock && lock.method) refreshLock(lock.method, true);
 }
 
