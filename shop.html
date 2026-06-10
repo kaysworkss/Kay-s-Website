@@ -3164,13 +3164,15 @@ async function postShopJson(url, payload) {
     if (window.__shopLoadDone) window.__shopLoadDone();
     throw new Error(`${url} — network error: ${netErr.message}`);
   }
-  data = await res.json().catch(() => ({}));
-  window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url, status: res.status, body: JSON.stringify(data) });
+  const rawText = await res.text().catch(() => '');
+  try { data = rawText ? JSON.parse(rawText) : {}; } catch (_) { data = { raw: rawText }; }
+  const diagBody = Object.keys(data || {}).length ? JSON.stringify(data) : (rawText || '(empty response body)');
+  window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url, status: res.status, body: diagBody });
   if (window.__shopDiag.length > 8) window.__shopDiag.length = 8;
   if (window.__renderShopDiag) window.__renderShopDiag();
   // ── END DIAGNOSTIC CAPTURE ──
   if (window.__shopLoadDone) window.__shopLoadDone();
-  if (!res.ok) throw new Error(data.error || `${url} failed`);
+  if (!res.ok) throw new Error(data.error || rawText || `${url} failed with HTTP ${res.status}`);
   return data;
 }
 
@@ -3333,10 +3335,13 @@ async function confirmPendingOrder(orderRef, opts) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json().catch(() => ({}));
+      const rawText = await res.text().catch(() => '');
+      let data;
+      try { data = rawText ? JSON.parse(rawText) : {}; } catch (_) { data = { raw: rawText }; }
       // diagnostic capture
       window.__shopDiag = window.__shopDiag || [];
-      window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url: '/api/shop/order-confirm', status: res.status, body: JSON.stringify(data) });
+      const diagBody = Object.keys(data || {}).length ? JSON.stringify(data) : (rawText || '(empty response body)');
+      window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url: '/api/shop/order-confirm', status: res.status, body: diagBody });
       if (window.__shopDiag.length > 8) window.__shopDiag.length = 8;
       if (window.__renderShopDiag) window.__renderShopDiag();
       if (res.ok) return data;
@@ -3346,7 +3351,7 @@ async function confirmPendingOrder(orderRef, opts) {
         await new Promise(r => setTimeout(r, RETRY_MS));
         continue;
       }
-      const err = new Error(data.error || 'Order confirmation failed');
+      const err = new Error(data.error || rawText || `Order confirmation failed with HTTP ${res.status}`);
       err.nonRetryable = true;
       throw err;
     } catch (e) {
