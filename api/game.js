@@ -1315,6 +1315,13 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
   }
 
   const requiredMutez = decimalToUnits(quote.crypto_amount, 6);
+  const accountAddress = account => String(account?.address || account?.alias || account || '').toLowerCase();
+  const rowSummary = rows => rows.slice(0, 4).map(tx => {
+    const sender = accountAddress(tx.sender) || 'unknown-sender';
+    const target = accountAddress(tx.target) || 'unknown-target';
+    const amount = (Number(tx.amount || 0) / 1e6).toFixed(6);
+    return `${String(tx.status || 'unknown')} ${sender} -> ${target} ${amount} XTZ`;
+  }).join('; ');
   const appliedRows = list.filter(tx => String(tx.status || '').toLowerCase() === 'applied');
   if (!appliedRows.length) {
     const e = new Error('Transaction is not confirmed yet');
@@ -1325,18 +1332,19 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
   const expectedSender = String(payerAddress || '').toLowerCase();
   const expectedTarget = String(payeeAddress || '').toLowerCase();
   const targetRows = appliedRows.filter(tx =>
-    String(tx.target?.address || '').toLowerCase() === expectedTarget
+    accountAddress(tx.target) === expectedTarget
   );
   if (!targetRows.length) {
-    throw new Error(`Tezos operation was not sent to the configured shop wallet (${payeeAddress})`);
+    const seenTargets = [...new Set(appliedRows.map(tx => accountAddress(tx.target)).filter(Boolean))].join(', ') || 'none';
+    throw new Error(`Tezos operation target mismatch. Expected ${payeeAddress}; TzKT returned target(s): ${seenTargets}. Rows: ${rowSummary(appliedRows)}`);
   }
 
   const senderRows = targetRows.filter(tx =>
-    String(tx.sender?.address || '').toLowerCase() === expectedSender
+    accountAddress(tx.sender) === expectedSender
   );
   if (!senderRows.length) {
-    const actualSender = targetRows[0]?.sender?.address || 'unknown';
-    throw new Error(`Sending wallet mismatch. Operation sender is ${actualSender}, but confirmation used ${payerAddress}`);
+    const actualSenders = [...new Set(targetRows.map(tx => accountAddress(tx.sender)).filter(Boolean))].join(', ') || 'unknown';
+    throw new Error(`Sending wallet mismatch. Operation sender(s): ${actualSenders}; confirmation used ${payerAddress}`);
   }
 
   const match = senderRows.find(tx => BigInt(tx.amount || 0) >= requiredMutez);
