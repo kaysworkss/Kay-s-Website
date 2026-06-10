@@ -1298,12 +1298,12 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
   if (!/^o[1-9A-HJ-NP-Za-km-z]{50}$/.test(opHash)) throw new Error('Invalid Tezos operation hash');
   if (!payeeAddress) throw new Error('Shop Tezos address is not configured');
   const api = (process.env.TZKT_API_URL || 'https://api.tzkt.io').replace(/\/$/, '');
-  const r = await fetch(`${api}/v1/operations/transactions?hash=${encodeURIComponent(opHash)}`, {
+  const r = await fetch(`${api}/v1/operations/transactions?hash.eq=${encodeURIComponent(opHash)}`, {
     headers: { Accept: 'application/json' },
   });
   const rows = await r.json().catch(() => []);
   if (!r.ok) { const e = new Error('Tezos verification API failed'); e.statusCode = 409; throw e; }
-  const list = Array.isArray(rows) ? rows : [];
+  const list = (Array.isArray(rows) ? rows : []).filter(tx => !tx.hash || String(tx.hash) === opHash);
 
   // If the indexer hasn't seen the operation at all yet, that's a "not confirmed
   // yet" condition → 409 so the client retry loop waits and tries again, rather
@@ -1335,8 +1335,9 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
     accountAddress(tx.target) === expectedTarget
   );
   if (!targetRows.length) {
-    const seenTargets = [...new Set(appliedRows.map(tx => accountAddress(tx.target)).filter(Boolean))].join(', ') || 'none';
-    throw new Error(`Tezos operation target mismatch. Expected ${payeeAddress}; TzKT returned target(s): ${seenTargets}. Rows: ${rowSummary(appliedRows)}`);
+    const seenTargets = [...new Set(appliedRows.map(tx => accountAddress(tx.target)).filter(Boolean))].slice(0, 6).join(', ') || 'none';
+    const seenSenders = [...new Set(appliedRows.map(tx => accountAddress(tx.sender)).filter(Boolean))].slice(0, 6).join(', ') || 'none';
+    throw new Error(`Tezos operation hash does not match this shop payment. Expected target ${payeeAddress}; TzKT saw sender(s) ${seenSenders}; target(s) ${seenTargets}. First rows: ${rowSummary(appliedRows)}`);
   }
 
   const senderRows = targetRows.filter(tx =>
@@ -1584,7 +1585,7 @@ async function handleShopOrderCreate(req, res, supabase) {
 async function handleShopOrderConfirm(req, res, supabase) {
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
   const body = req.body || {};
-  const orderRef = String(body.order_ref || '').slice(0, 80);
+  const orderRef = String(body.order_ref || '').trim().slice(0, 80);
   if (!orderRef) return json(400, { error: 'order_ref is required' });
 
   // Load the pending order — this is the source of truth for what was bought.
@@ -1600,8 +1601,8 @@ async function handleShopOrderConfirm(req, res, supabase) {
   }
 
   const paymentMethod = String(body.payment_method || order.payment_method || '').slice(0, 40);
-  const paymentRef = String(body.payment_ref || '').slice(0, 200);
-  const payerAddress = String(body.payer_address || '').slice(0, 120);
+  const paymentRef = String(body.payment_ref || '').trim().slice(0, 200);
+  const payerAddress = String(body.payer_address || '').trim().slice(0, 120);
   const isCryptoPayment = ['eth','tezos','usdc','usdt'].includes(paymentMethod);
   const isCardPayment = ['paystack','flutterwave'].includes(paymentMethod);
 
@@ -1638,7 +1639,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
   if (isCryptoPayment) {
     if (!payerAddress) return json(400, { error: 'Sending wallet address is required' });
     // Optional order-hash cross-check (the customer may supply it on manual confirm).
-    const bodyOrderHash = String(body.order_hash || body.order_ref || '').slice(0, 80);
+    const bodyOrderHash = String(body.order_hash || body.order_ref || '').trim().slice(0, 80);
     if (bodyOrderHash && bodyOrderHash !== orderRef) {
       return json(400, { error: 'Order hash does not match this order' });
     }
@@ -1947,4 +1948,3 @@ module.exports = async (req, res) => {
     default:
       return res.status(404).json({ error: `Unknown action: ${action}` });
   }
-};
