@@ -1888,63 +1888,74 @@ async function handleShopConfig(req, res, supabase) {
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 module.exports = async (req, res) => {
-  cors(res);
-  if (handleOptions(req, res)) return;
+  try {
+    cors(res);
+    if (handleOptions(req, res)) return;
 
-  // Derive action from query string or URL path
-  const urlPath = req.url || '';
-  let action = req.query.action || '';
+    // Derive action from query string or URL path
+    const urlPath = req.url || '';
+    let action = req.query.action || '';
 
-  if (!action) {
-    // Map legacy direct paths → actions
-    if (urlPath.includes('/challenges'))     action = 'challenges';
-    else if (urlPath.includes('/challenge')) action = 'challenge';
-    else if (urlPath.includes('/score'))     action = 'score';
-    else if (urlPath.includes('/leaderboard')) {
-      action = 'leaderboard';
-      // Extract challenge id from path e.g. /api/leaderboard/abc-123
-      if (!req.query.id) {
-        const m = urlPath.match(/\/leaderboard\/([^/?]+)/);
-        if (m) req.query.id = m[1];
+    if (!action) {
+      // Map legacy direct paths -> actions
+      if (urlPath.includes('/challenges'))     action = 'challenges';
+      else if (urlPath.includes('/challenge')) action = 'challenge';
+      else if (urlPath.includes('/score'))     action = 'score';
+      else if (urlPath.includes('/leaderboard')) {
+        action = 'leaderboard';
+        // Extract challenge id from path e.g. /api/leaderboard/abc-123
+        if (!req.query.id) {
+          const m = urlPath.match(/\/leaderboard\/([^/?]+)/);
+          if (m) req.query.id = m[1];
+        }
       }
+      else if (urlPath.includes('/hall-of-fame'))   action = 'hall-of-fame';
+      else if (urlPath.includes('/crosschain-claim')) action = 'crosschain-claim';
+      else if (urlPath.includes('/notify-outbid'))      action = 'notify-outbid';
+      else if (urlPath.includes('/notify-bid-confirm')) action = 'notify-bid-confirm';
+      else if (urlPath.includes('/notify-winner'))      action = 'notify-winner';
+      else if (urlPath.includes('/notify-bid'))          action = 'notify-bid';
+      else if (urlPath.includes('/shop-products') || urlPath.includes('/shop/products')) action = 'shop-products';
+      else if (urlPath.includes('/shop-config') || urlPath.includes('/shop/config')) action = 'shop-config';
+      else if (urlPath.includes('/shop-payment-init') || urlPath.includes('/shop/payment-init')) action = 'shop-payment-init';
+      else if (urlPath.includes('/shop-quote') || urlPath.includes('/shop/quote')) action = 'shop-quote';
+      else if (urlPath.includes('/shop-order-create') || urlPath.includes('/shop/order-create')) action = 'shop-order-create';
+      else if (urlPath.includes('/shop-order-confirm') || urlPath.includes('/shop/order-confirm')) action = 'shop-order-confirm';
+      else if (urlPath.includes('/shop-order') || urlPath.includes('/shop/order')) action = 'shop-order';
     }
-    else if (urlPath.includes('/hall-of-fame'))   action = 'hall-of-fame';
-    else if (urlPath.includes('/crosschain-claim')) action = 'crosschain-claim';
-    else if (urlPath.includes('/notify-outbid'))      action = 'notify-outbid';
-    else if (urlPath.includes('/notify-bid-confirm')) action = 'notify-bid-confirm';
-    else if (urlPath.includes('/notify-winner'))      action = 'notify-winner';
-    else if (urlPath.includes('/notify-bid'))          action = 'notify-bid';
-    else if (urlPath.includes('/shop-products') || urlPath.includes('/shop/products')) action = 'shop-products';
-    else if (urlPath.includes('/shop-config') || urlPath.includes('/shop/config')) action = 'shop-config';
-    else if (urlPath.includes('/shop-payment-init') || urlPath.includes('/shop/payment-init')) action = 'shop-payment-init';
-    else if (urlPath.includes('/shop-quote') || urlPath.includes('/shop/quote')) action = 'shop-quote';
-    else if (urlPath.includes('/shop-order-create') || urlPath.includes('/shop/order-create')) action = 'shop-order-create';
-    else if (urlPath.includes('/shop-order-confirm') || urlPath.includes('/shop/order-confirm')) action = 'shop-order-confirm';
-    else if (urlPath.includes('/shop-order') || urlPath.includes('/shop/order')) action = 'shop-order';
-  }
 
-  const supabase = getSupabase();
-  _shopRes = res; // shop handlers use res-based json() helper
+    const supabase = getSupabase();
+    _shopRes = res; // shop handlers use res-based json() helper
 
-  switch (action) {
-    case 'challenges':    return handleChallenges(req, res, supabase);
-    case 'upcoming':      return handleUpcoming(req, res, supabase);
-    case 'challenge':     return handleChallenge(req, res, supabase);
-    case 'score':         return handleScore(req, res, supabase);
-    case 'leaderboard':   return handleLeaderboard(req, res, supabase);
-    case 'hall-of-fame':  return handleHallOfFame(req, res, supabase);
-    case 'crosschain-claim': return handleCrosschainClaim(req, res, supabase);
-    case 'notify-outbid':      return handleNotifyOutbid(req, res);
-    case 'notify-bid-confirm': return handleNotifyBidConfirm(req, res);
-    case 'notify-winner':      return handleNotifyWinner(req, res);
-    case 'notify-bid':         return handleNotifyBid(req, res);
-    case 'shop-products':      return handleShopProducts(req, res, supabase);
-    case 'shop-config':        return handleShopConfig(req, res, supabase);
-    case 'shop-quote':         return handleShopQuote(req, res, supabase);
-    case 'shop-payment-init':  return handleShopPaymentInit(req, res, supabase);
-    case 'shop-order-create':  return handleShopOrderCreate(req, res, supabase);
-    case 'shop-order-confirm': return handleShopOrderConfirm(req, res, supabase);
-    case 'shop-order':         return handleShopOrder(req, res, supabase);
-    default:
-      return res.status(404).json({ error: `Unknown action: ${action}` });
+    switch (action) {
+      case 'challenges':    return handleChallenges(req, res, supabase);
+      case 'upcoming':      return handleUpcoming(req, res, supabase);
+      case 'challenge':     return handleChallenge(req, res, supabase);
+      case 'score':         return handleScore(req, res, supabase);
+      case 'leaderboard':   return handleLeaderboard(req, res, supabase);
+      case 'hall-of-fame':  return handleHallOfFame(req, res, supabase);
+      case 'crosschain-claim': return handleCrosschainClaim(req, res, supabase);
+      case 'notify-outbid':      return handleNotifyOutbid(req, res);
+      case 'notify-bid-confirm': return handleNotifyBidConfirm(req, res);
+      case 'notify-winner':      return handleNotifyWinner(req, res);
+      case 'notify-bid':         return handleNotifyBid(req, res);
+      case 'shop-products':      return handleShopProducts(req, res, supabase);
+      case 'shop-config':        return handleShopConfig(req, res, supabase);
+      case 'shop-quote':         return handleShopQuote(req, res, supabase);
+      case 'shop-payment-init':  return handleShopPaymentInit(req, res, supabase);
+      case 'shop-order-create':  return handleShopOrderCreate(req, res, supabase);
+      case 'shop-order-confirm': return handleShopOrderConfirm(req, res, supabase);
+      case 'shop-order':         return handleShopOrder(req, res, supabase);
+      default:
+        return res.status(404).json({ error: `Unknown action: ${action}` });
+    }
+  } catch (e) {
+    console.error('[api/game] unhandled error:', e);
+    if (!res.headersSent) {
+      return res.status(e.statusCode || 500).json({
+        error: e.message || 'Unhandled server error',
+        stack: process.env.NODE_ENV === 'production' ? undefined : e.stack,
+      });
+    }
   }
+};
