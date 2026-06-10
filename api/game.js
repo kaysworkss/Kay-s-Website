@@ -1315,22 +1315,39 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
   }
 
   const requiredMutez = decimalToUnits(quote.crypto_amount, 6);
-  const match = list.find(tx =>
-    String(tx.status || '').toLowerCase() === 'applied' &&
-    String(tx.sender?.address || tx.sender?.alias || '').toLowerCase() === String(payerAddress).toLowerCase() &&
-    String(tx.target?.address || tx.target?.alias || '').toLowerCase() === String(payeeAddress).toLowerCase() &&
-    BigInt(tx.amount || 0) >= requiredMutez
+  const appliedRows = list.filter(tx => String(tx.status || '').toLowerCase() === 'applied');
+  if (!appliedRows.length) {
+    const e = new Error('Transaction is not confirmed yet');
+    e.statusCode = 409;
+    throw e;
+  }
+
+  const expectedSender = String(payerAddress || '').toLowerCase();
+  const expectedTarget = String(payeeAddress || '').toLowerCase();
+  const targetRows = appliedRows.filter(tx =>
+    String(tx.target?.address || '').toLowerCase() === expectedTarget
   );
+  if (!targetRows.length) {
+    throw new Error(`Tezos operation was not sent to the configured shop wallet (${payeeAddress})`);
+  }
+
+  const senderRows = targetRows.filter(tx =>
+    String(tx.sender?.address || '').toLowerCase() === expectedSender
+  );
+  if (!senderRows.length) {
+    const actualSender = targetRows[0]?.sender?.address || 'unknown';
+    throw new Error(`Sending wallet mismatch. Operation sender is ${actualSender}, but confirmation used ${payerAddress}`);
+  }
+
+  const match = senderRows.find(tx => BigInt(tx.amount || 0) >= requiredMutez);
   if (!match) {
-    // The op exists but isn't yet 'applied' (still in mempool/baking) → retryable.
-    const anyPending = list.some(tx => String(tx.status || '').toLowerCase() !== 'applied');
-    if (anyPending) {
-      const e = new Error('Transaction is not confirmed yet');
-      e.statusCode = 409;
-      throw e;
-    }
-    // Op is applied but sender/target/amount don't match → genuine mismatch (hard fail).
-    throw new Error('Tezos transaction to the shop wallet was not found for the quoted amount');
+    const paidMutez = senderRows.reduce((max, tx) => {
+      const amount = BigInt(tx.amount || 0);
+      return amount > max ? amount : max;
+    }, 0n);
+    const paidXtz = (Number(paidMutez) / 1e6).toFixed(6);
+    const requiredXtz = (Number(requiredMutez) / 1e6).toFixed(6);
+    throw new Error(`Tezos amount is below the locked quote. Paid ${paidXtz} XTZ, required ${requiredXtz} XTZ`);
   }
   return { confirmations: match.confirmations || null, received_amount: Number(match.amount || 0) / 1e6 };
 }
