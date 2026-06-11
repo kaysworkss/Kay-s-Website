@@ -2604,6 +2604,12 @@ function _ccSetWaitingState(claimRow) {
   const activeChain = claimRow.active_chain;
   const activeName  = activeChain === "eth" ? "Ethereum" : "Tezos";
   const resetAt     = claimRow.reset_at ? new Date(claimRow.reset_at).getTime() : 0;
+  document.getElementById("countdown-section").style.display = "none";
+  document.getElementById("stats-grid").style.display = "none";
+  document.getElementById("bid-form").style.display = "none";
+  document.getElementById("history-section").style.display = "none";
+  document.getElementById("buynow-section").style.display = "none";
+  _closeOfferPanel();
 
   // Both cards go into waiting mode — neither is clickable while claim is pending
   const ethChoice = document.getElementById("cc-eth-choice");
@@ -2973,6 +2979,15 @@ function _ccClaimStatus(row) {
   const status = String(row?.status || "").trim().toLowerCase().replace(/_/g, "-");
   if (status === "waiting" || status === "claiming" || status === "pending") return "waiting-bid";
   return status;
+}
+
+function _ccShouldHoldBidPanel(slot = _activeCfg()) {
+  if (!_ccPairKey) return false;
+  if (!_ccClaimRow) return true;
+  const status = _ccClaimStatus(_ccClaimRow);
+  if (status === "waiting-bid" && !_ccIsActiveBrowser) return true;
+  if (status === "live") return _ccClaimRow.active_chain !== _slotChain(slot);
+  return false;
 }
 
 // Called when a paired piece goes live — claims the chain in Supabase.
@@ -4983,7 +4998,7 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
   if (!contract || runToken !== _switchToken) return;
   // Cross-chain chooser is active — no chain chosen yet. Update internal state
   // only; do not touch any bid-panel DOM elements (chooser owns the panel now).
-  const _ccChooserActive = !!_ccPairKey && !_ccClaimRow;
+  const _ccChooserActive = _ccShouldHoldBidPanel(_activeCfg());
   try {
     const s = await contract.auctionState();
     if (runToken !== _switchToken) return;
@@ -5342,7 +5357,7 @@ async function refreshTezosState(runToken = _switchToken) {
   const slot = _activeCfg();
   if (_slotChain(slot) !== "tezos" || !slot.tezosContractAddr || runToken !== _switchToken) return;
   // Cross-chain chooser is active — update internal state only, don't touch bid-panel DOM
-  const _ccChooserActive = !!_ccPairKey && !_ccClaimRow;
+  const _ccChooserActive = _ccShouldHoldBidPanel(slot);
   try {
     if (!window.taquito?.TezosToolkit) throw new Error("Taquito did not load.");
     const auction = _normalizeTezosAuction(await _readTezosAuction(slot));
@@ -7497,18 +7512,3 @@ function simReset() {
 <div class="wc-modal-overlay" id="wc-modal-overlay">
   <div class="wc-modal">
     <p class="wc-modal-title" id="wc-modal-title">Connect Ethereum Wallet</p>
-    <div id="wc-modal-body"></div>
-  </div>
-</div>
-<!-- Cross-chain refresh prompt — shown to passive collector when a bid lands on the other chain -->
-<div class="cc-refresh-overlay" id="cc-refresh-overlay">
-  <div class="cc-refresh-card">
-    <div class="cc-refresh-icon">⚡</div>
-    <p class="cc-refresh-title">Auction is live</p>
-    <p class="cc-refresh-body" id="cc-refresh-body">A bid has been placed and the auction is now running.</p>
-    <p class="cc-refresh-sub">Refresh the page to see the live auction and place your own bid.</p>
-    <button class="cc-refresh-btn" onclick="location.reload()">Refresh now</button>
-  </div>
-</div>
-</body>
-</html>
