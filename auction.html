@@ -5290,18 +5290,23 @@ async function submitPrivateOffer() {
         message,
       }),
     });
-    const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || "Submission failed");
+    const raw = await res.text();
+    let data = {};
+    try { data = raw ? JSON.parse(raw) : {}; }
+    catch { data = { error: raw || "Server returned an unreadable response." }; }
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || data.message || `Submission failed (${res.status})`);
+    }
     setHint("Offer sent — the artist will be in touch.", "ok");
     btn.textContent = "Sent ✓";
     // Clear fields
     ["offer-name","offer-email","offer-wallet","offer-amount","offer-message"]
-      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
-  } catch (err) {
-    setHint("Something went wrong — please try again.", "err");
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });  } catch (err) {
+    console.error("submitPrivateOffer:", err);
+    const detail = err?.message ? ` ${err.message}` : "";
+    setHint(`Private offer submission failed.${detail}`, "err");
     btn.disabled    = false;
     btn.textContent = "Send offer";
-    console.error("submitPrivateOffer:", err);
   }
 }
 
