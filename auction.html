@@ -3562,8 +3562,8 @@ function _setupCrossChainForSlot(slot) {
 }
 
 async function _ccPopulateChooserPrices(pairKey) {
-  const ethIdx = _findPairedSlotIndex(pairKey, "eth");
-  const tezIdx = _findPairedSlotIndex(pairKey, "tezos");
+  const ethIdx  = _findPairedSlotIndex(pairKey, "eth");
+  const tezIdx  = _findPairedSlotIndex(pairKey, "tezos");
   const ethSlot = ethIdx >= 0 ? _auctions[ethIdx] : null;
   const tezSlot = tezIdx >= 0 ? _auctions[tezIdx] : null;
   const ethPriceEl  = document.getElementById("cc-eth-price");
@@ -3572,21 +3572,42 @@ async function _ccPopulateChooserPrices(pairKey) {
   const xtzPriceEl  = document.getElementById("cc-xtz-price");
   const xtzSubEl    = document.getElementById("cc-xtz-price-sub");
   const xtzStatusEl = document.getElementById("cc-xtz-status");
+  const hardCap     = window._ccUsdHardCap || null;
+
+  // ── ETH card ──────────────────────────────────────────────────────────────
   if (ethSlot?.contractAddr && provider && ethers.isAddress(ethSlot.contractAddr)) {
     try {
       let c = _contractCache[ethSlot.contractAddr];
       if (!c) { c = new ethers.Contract(ethSlot.contractAddr, AUCTION_ABI, provider); _contractCache[ethSlot.contractAddr] = c; }
-      const s = await c.auctionState();
-      const noBids = s[5] === ethers.ZeroAddress;
-      const displayWei = s[1] && !noBids ? s[6] : s[7];
-      window._ccEthReserveWei = s[7]; // reserve in wei — used as USD cap anchor
-      if (ethPriceEl) ethPriceEl.textContent = ethers.formatEther(displayWei) + " ETH";
-      // Sub-label: hard cap USD if set, otherwise derive from this ETH amount
-      const _ethCardUsd = _usdAnchor(displayWei);
-      if (ethSubEl) ethSubEl.textContent = _ethCardUsd ? `≈ ${_fmtUsd(_ethCardUsd)}` : (noBids ? "≈ minimum bid" : "≈ current bid");
+      const s        = await c.auctionState();
+      const noBids   = s[5] === ethers.ZeroAddress;
+      window._ccEthReserveWei = s[7]; // reserve in wei
+      const ethUsdNow = _ethUsd();
+      if (hardCap && ethUsdNow) {
+        // Hard cap set — back-calculate ETH from the fixed USD value
+        const ethFromCap = (hardCap / ethUsdNow).toFixed(4).replace(/\.?0+$/, "");
+        if (ethPriceEl) ethPriceEl.textContent = ethFromCap + " ETH";
+        if (ethSubEl)   ethSubEl.textContent   = "\u2248 " + _fmtUsd(hardCap);
+      } else {
+        // No hard cap — show on-chain price, derive USD sub-label
+        const displayWei = s[1] && !noBids ? s[6] : s[7];
+        if (ethPriceEl) ethPriceEl.textContent = ethers.formatEther(displayWei) + " ETH";
+        const derivedUsd = _usdFromEthWei(displayWei);
+        if (ethSubEl) ethSubEl.textContent = derivedUsd
+          ? "\u2248 " + _fmtUsd(derivedUsd)
+          : (noBids ? "\u2248 minimum bid" : "\u2248 current bid");
+      }
       if (ethStatusEl) ethStatusEl.style.display = "";
     } catch(_) {}
+  } else if (hardCap && _ethUsd()) {
+    // No ETH contract but hard cap is set — still show cap-derived ETH
+    const ethFromCap = (hardCap / _ethUsd()).toFixed(4).replace(/\.?0+$/, "");
+    if (ethPriceEl) ethPriceEl.textContent = ethFromCap + " ETH";
+    if (ethSubEl)   ethSubEl.textContent   = "\u2248 " + _fmtUsd(hardCap);
+    if (ethStatusEl) ethStatusEl.style.display = "";
   }
+
+  // ── XTZ card ──────────────────────────────────────────────────────────────
   if (tezSlot?.tezosContractAddr) {
     try {
       const aucRaw  = await _tzktFetchAuction(tezSlot);
@@ -3594,32 +3615,31 @@ async function _ccPopulateChooserPrices(pairKey) {
       if (auction) {
         const noBids = !auction.highestBidder;
         const mutez  = noBids ? auction.minNextBidMutez : auction.highestBidMutez;
-        const xtz    = (mutez / 1_000_000).toFixed(6).replace(/\.?0+$/, "");
-
-        // --- USD hard cap → XTZ floor ----------------------------------------
         const rate   = _xtzRate();
         const ethRsv = window._ccEthReserveWei ?? null;
 
-        if (noBids && rate && ethRsv) {
+        if (noBids && rate && (hardCap || ethRsv)) {
+          // Derive XTZ from USD anchor (hard cap preferred, ETH reserve fallback)
           const ethEquivXtz = _xtzEthEquivFloor(auction.minNextBidMutez, ethRsv);
           const displayXtz  = ethEquivXtz && ethEquivXtz > 0
             ? Math.ceil(ethEquivXtz).toLocaleString()
             : Math.ceil(mutez / 1_000_000).toLocaleString();
           if (xtzPriceEl) xtzPriceEl.textContent = displayXtz + " XTZ";
-          // Mirror the same USD figure shown on the ETH card
-          const usdCap = _usdAnchor(ethRsv);
-          if (xtzSubEl) xtzSubEl.textContent = usdCap ? `≈ ${_fmtUsd(usdCap)}` : "≈ minimum bid";
+          const usdLabel = hardCap || _usdFromEthWei(ethRsv);
+          if (xtzSubEl) xtzSubEl.textContent = usdLabel
+            ? "\u2248 " + _fmtUsd(usdLabel)
+            : "\u2248 minimum bid";
         } else {
+          // Bids exist — show current XTZ amount with live USD value
           const displayXtz = noBids
             ? Math.ceil(mutez / 1_000_000).toLocaleString()
             : (mutez / 1_000_000).toFixed(6).replace(/\.?0+$/, "");
           if (xtzPriceEl) xtzPriceEl.textContent = displayXtz + " XTZ";
-          // For live bids show the current XTZ bid's USD value
           const bidUsd = _xtzUsd() ? (mutez / 1_000_000) * _xtzUsd() : null;
-          if (xtzSubEl) xtzSubEl.textContent = bidUsd ? `≈ ${_fmtUsd(bidUsd)}` : (noBids ? "≈ minimum bid" : "≈ current bid");
+          if (xtzSubEl) xtzSubEl.textContent = bidUsd
+            ? "\u2248 " + _fmtUsd(bidUsd)
+            : (noBids ? "\u2248 minimum bid" : "\u2248 current bid");
         }
-        // ----------------------------------------------------------------------
-
         if (xtzStatusEl) xtzStatusEl.style.display = "";
       }
     } catch(_) {}
@@ -4543,8 +4563,17 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
       document.getElementById("stats-grid").style.display = "grid";
       document.getElementById("stat-bid").textContent     = noBids ? "—" : ethers.formatEther(highestBid) + " ETH";
       document.getElementById("stat-bidder").textContent  = noBids ? "No bids yet" : shortAddr(highestBidder);
-      document.getElementById("stat-min").textContent     = ethers.formatEther(mnb) + " ETH";
-      document.getElementById("stat-min-sub").textContent = noBids ? "Reserve price" : "Min increment";
+      // stat-min: show hard cap equivalent when set and no bids yet
+      const _ethStatHardCap = window._ccUsdHardCap || null;
+      const _ethStatUsdNow  = _ethUsd();
+      const _ethStatMin     = (_ethStatHardCap && _ethStatUsdNow && noBids)
+        ? (_ethStatHardCap / _ethStatUsdNow).toFixed(4).replace(/\.?0+$/, "") + " ETH"
+        : ethers.formatEther(mnb) + " ETH";
+      const _ethStatSub     = (_ethStatHardCap && _ethStatUsdNow && noBids)
+        ? "\u2248 " + _fmtUsd(_ethStatHardCap)
+        : (noBids ? "Reserve price" : "Min increment");
+      document.getElementById("stat-min").textContent     = _ethStatMin;
+      document.getElementById("stat-min-sub").textContent = _ethStatSub;
     }
 
     // Bid form
@@ -4601,9 +4630,18 @@ function updateBidHint() {
     return;
   }
   const min = ethers.formatEther(minNextBid);
-  document.getElementById("bid-hint").textContent = `Minimum bid: ${min} ETH`;
-  if (!bidInput.value) bidInput.value = min;
-  bidInput.step = "0.001";
+  // Hard cap: if set and no bids yet, pre-fill with cap-equivalent ETH
+  const _ethHardCap = window._ccUsdHardCap || null;
+  const _ethUsdNow  = _ethUsd();
+  const _ethCapMin  = (_ethHardCap && _ethUsdNow) ? _ethHardCap / _ethUsdNow : null;
+  // Use whichever is higher: hard cap or on-chain minimum
+  const _ethFloor   = _ethCapMin
+    ? Math.max(_ethCapMin, parseFloat(min)).toFixed(4).replace(/\.?0+$/, "")
+    : min;
+  const _ethUsdHint = _ethHardCap ? ` · ≈ ${_fmtUsd(_ethHardCap)}` : "";
+  document.getElementById("bid-hint").textContent = `Minimum bid: ${_ethFloor} ETH${_ethUsdHint}`;
+  if (!bidInput.value) bidInput.value = _ethFloor;
+  bidInput.step = "0.0001";
   if (currLabel) currLabel.textContent = "ETH";
   const btn = document.getElementById("bid-btn");
   if (btn && btn.textContent !== "Place bid") btn.textContent = "Place bid";
@@ -4620,9 +4658,13 @@ function onBidInput() {
     const ethRsv     = window._ccEthReserveWei ?? null;
     const equivFloor = _xtzEthEquivFloor(minNextBidMutez, ethRsv);
     const floor      = (equivFloor && equivFloor > rawMinXtz) ? equivFloor : rawMinXtz;
-    min = Math.ceil(floor); // match the rounded value shown in the input
+    min = Math.ceil(floor);
   } else {
-    min = parseFloat(ethers.formatEther(minNextBid));
+    const _ethHardCap = window._ccUsdHardCap || null;
+    const _ethUsdNow  = _ethUsd();
+    const _ethCapMin  = (_ethHardCap && _ethUsdNow) ? _ethHardCap / _ethUsdNow : null;
+    const onChainMin  = parseFloat(ethers.formatEther(minNextBid));
+    min = _ethCapMin ? Math.max(_ethCapMin, onChainMin) : onChainMin;
   }
 
   const ok = document.getElementById("eligibility").classList.contains("yes");
