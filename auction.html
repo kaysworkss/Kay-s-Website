@@ -3594,28 +3594,27 @@ async function _ccPopulateChooserPrices(pairKey) {
         const xtz    = (mutez / 1_000_000).toFixed(6).replace(/\.?0+$/, "");
 
         // --- ETH-equivalent overlay -------------------------------------------
-        // When there are no bids yet, show the ETH-equivalent floor so collectors
-        // understand the true reserve value and don't lowball the Tezos auction.
         const rate   = _xtzRate();
-        const ethRsv = window._ccEthReserveWei ?? null; // set above from ETH slot
+        const ethRsv = window._ccEthReserveWei ?? null;
 
         if (noBids && rate && ethRsv) {
           const ethEquivXtz = _xtzEthEquivFloor(auction.minNextBidMutez, ethRsv);
           if (ethEquivXtz && ethEquivXtz > 0) {
-            const displayXtz = ethEquivXtz.toFixed(6).replace(/\.?0+$/, "");
+            const displayXtz = Math.ceil(ethEquivXtz).toLocaleString();
             if (xtzPriceEl) xtzPriceEl.textContent = displayXtz + " XTZ";
-            if (xtzSubEl) {
-              const rateLabel = _xtzRateLabel();
-              xtzSubEl.textContent = `≈ ETH reserve · ${rateLabel}`;
-            }
+            if (xtzSubEl)   xtzSubEl.textContent   = "≈ minimum bid";
           } else {
-            if (xtzPriceEl) xtzPriceEl.textContent = xtz + " XTZ";
-            if (xtzSubEl)   xtzSubEl.textContent   = "≈ reserve price";
+            const displayXtz = Math.ceil(mutez / 1_000_000).toLocaleString();
+            if (xtzPriceEl) xtzPriceEl.textContent = displayXtz + " XTZ";
+            if (xtzSubEl)   xtzSubEl.textContent   = "≈ minimum bid";
           }
         } else {
           // Bids exist — show the current XTZ high bid
-          if (xtzPriceEl) xtzPriceEl.textContent = xtz + " XTZ";
-          if (xtzSubEl)   xtzSubEl.textContent   = noBids ? "≈ reserve price" : "≈ current bid";
+          const displayXtz = noBids
+            ? Math.ceil(mutez / 1_000_000).toLocaleString()
+            : (mutez / 1_000_000).toFixed(6).replace(/\.?0+$/, "");
+          if (xtzPriceEl) xtzPriceEl.textContent = displayXtz + " XTZ";
+          if (xtzSubEl)   xtzSubEl.textContent   = noBids ? "≈ minimum bid" : "≈ current bid";
         }
         // ----------------------------------------------------------------------
 
@@ -4583,25 +4582,16 @@ function updateBidHint() {
   const currLabel = document.getElementById("bid-currency-label");
   const bidInput  = document.getElementById("bid-input");
   if (_slotChain(_activeCfg()) === "tezos") {
-    const rawMinXtz = minNextBidMutez / 1_000_000;
-
-    // ETH-equivalent floor — uses the rate locked when the chooser opened
+    const rawMinXtz  = minNextBidMutez / 1_000_000;
     const ethRsv     = window._ccEthReserveWei ?? null;
     const equivFloor = _xtzEthEquivFloor(minNextBidMutez, ethRsv);
     const floor      = (equivFloor && equivFloor > rawMinXtz) ? equivFloor : rawMinXtz;
-    const min        = floor.toFixed(6).replace(/\.?0+$/, "");
+    // Round up to whole XTZ — clean, no trailing decimals
+    const minRounded = Math.ceil(floor);
 
-    // Hint with conversion context
-    const rate = _xtzRate();
-    let hintText = `Minimum bid: ${min} XTZ`;
-    if (rate && ethRsv && equivFloor && equivFloor > rawMinXtz) {
-      const ethVal = (floor / rate).toFixed(4).replace(/\.?0+$/, "");
-      hintText += ` · ≈ ${ethVal} ETH · ${_xtzRateLabel()}`;
-    }
-    document.getElementById("bid-hint").textContent = hintText;
-
-    if (!bidInput.value) bidInput.value = min;
-    bidInput.step = "0.000001";
+    document.getElementById("bid-hint").textContent = `Minimum bid: ${minRounded.toLocaleString()} XTZ`;
+    if (!bidInput.value) bidInput.value = minRounded;
+    bidInput.step = "1";
     if (currLabel) currLabel.textContent = "XTZ";
     const btn = document.getElementById("bid-btn");
     if (btn) btn.textContent = "Place XTZ bid";
@@ -4627,7 +4617,8 @@ function onBidInput() {
     const rawMinXtz  = minNextBidMutez / 1_000_000;
     const ethRsv     = window._ccEthReserveWei ?? null;
     const equivFloor = _xtzEthEquivFloor(minNextBidMutez, ethRsv);
-    min = (equivFloor && equivFloor > rawMinXtz) ? equivFloor : rawMinXtz;
+    const floor      = (equivFloor && equivFloor > rawMinXtz) ? equivFloor : rawMinXtz;
+    min = Math.ceil(floor); // match the rounded value shown in the input
   } else {
     min = parseFloat(ethers.formatEther(minNextBid));
   }
