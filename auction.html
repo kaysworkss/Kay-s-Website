@@ -4439,46 +4439,56 @@ let _wcProvider = null;
 function connectWallet() { _wcOpenModal(); }
 
 function _wcOpenModal() {
-  const overlay = document.getElementById("wc-modal-overlay");
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  const overlay  = document.getElementById("wc-modal-overlay");
+  const body     = document.getElementById("wc-modal-body");
+  const title    = document.getElementById("wc-modal-title");
+  if (title) title.textContent = "Connect Ethereum Wallet";
+  if (body) {
+    if (isMobile) {
+      body.innerHTML = `
+        <div class="wc-wallet-list">
+          <button class="wc-wallet-btn" onclick="_wcConnectWC('metamask')">
+            <span class="wc-wallet-icon-ph">&#x1F98A;</span>
+            <span class="wc-wallet-name">MetaMask</span>
+            <span class="wc-wallet-tag">Open in app</span>
+          </button>
+          <button class="wc-wallet-btn" onclick="_wcConnectWC('rainbow')">
+            <span class="wc-wallet-icon-ph">&#x1F308;</span>
+            <span class="wc-wallet-name">Rainbow</span>
+            <span class="wc-wallet-tag">Open in app</span>
+          </button>
+          <button class="wc-wallet-btn" onclick="_wcConnectWC('coinbase')">
+            <span class="wc-wallet-icon-ph">&#x1F535;</span>
+            <span class="wc-wallet-name">Coinbase Wallet</span>
+            <span class="wc-wallet-tag">Open in app</span>
+          </button>
+        </div>
+        <button class="wc-cancel-btn" onclick="_wcCloseModal()">Cancel</button>`;
+    } else {
+      body.innerHTML = window.ethereum ? `
+        <div class="wc-wallet-list">
+          <button class="wc-wallet-btn" onclick="_wcConnectInjected()">
+            <span class="wc-wallet-icon-ph">&#x1F98A;</span>
+            <span class="wc-wallet-name">Browser wallet</span>
+            <span class="wc-wallet-tag">MetaMask / Rabby</span>
+          </button>
+        </div>
+        <button class="wc-cancel-btn" onclick="_wcCloseModal()">Cancel</button>` : `
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);text-align:center;padding:12px 0 20px;line-height:1.6">
+          No wallet detected. Install
+          <a href="https://metamask.io" target="_blank" style="color:var(--gold)">MetaMask</a>
+          or another browser wallet, then refresh.
+        </p>
+        <button class="wc-cancel-btn" onclick="_wcCloseModal()">Close</button>`;
+    }
+  }
   if (overlay) overlay.classList.add("show");
-  const injBtn = document.querySelector(".wc-wallet-btn[onclick='_wcConnectInjected()']");
-  if (injBtn) injBtn.style.display = window.ethereum ? "flex" : "none";
 }
 
 function _wcCloseModal() {
   const overlay = document.getElementById("wc-modal-overlay");
   if (overlay) overlay.classList.remove("show");
-  const body = document.getElementById("wc-modal-body");
-  if (body) body.innerHTML = `
-    <div class="wc-wallet-list">
-      <button class="wc-wallet-btn" onclick="_wcConnectInjected()" style="${window.ethereum ? '' : 'display:none'}">
-        <span class="wc-wallet-icon-ph">&#x1F98A;</span>
-        <span class="wc-wallet-name">Browser wallet</span>
-        <span class="wc-wallet-tag">Injected</span>
-      </button>
-      <button class="wc-wallet-btn" onclick="_wcConnectWC('metamask')">
-        <span class="wc-wallet-icon-ph">&#x1F98A;</span>
-        <span class="wc-wallet-name">MetaMask</span>
-        <span class="wc-wallet-tag">Mobile / QR</span>
-      </button>
-      <button class="wc-wallet-btn" onclick="_wcConnectWC('rainbow')">
-        <span class="wc-wallet-icon-ph">&#x1F308;</span>
-        <span class="wc-wallet-name">Rainbow</span>
-        <span class="wc-wallet-tag">Mobile / QR</span>
-      </button>
-      <button class="wc-wallet-btn" onclick="_wcConnectWC('coinbase')">
-        <span class="wc-wallet-icon-ph">&#x1F535;</span>
-        <span class="wc-wallet-name">Coinbase Wallet</span>
-        <span class="wc-wallet-tag">Mobile / QR</span>
-      </button>
-      <button class="wc-wallet-btn" onclick="_wcConnectWC()">
-        <span class="wc-wallet-icon-ph">&#x2B21;</span>
-        <span class="wc-wallet-name">WalletConnect</span>
-        <span class="wc-wallet-tag">All wallets</span>
-      </button>
-    </div>
-    <button class="wc-cancel-btn" onclick="_wcCloseModal()">Cancel</button>`;
-  document.getElementById("wc-modal-title").textContent = "Connect Ethereum Wallet";
 }
 
 async function _wcConnectInjected() {
@@ -7363,40 +7373,11 @@ function simReset() {
   simLog('sys', 'Simulation ready — choose a chain to begin.');
 }
 </script>
-<!-- ETH WalletConnect wallet picker modal -->
+<!-- ETH WalletConnect wallet picker modal — content built dynamically by _wcOpenModal -->
 <div class="wc-modal-overlay" id="wc-modal-overlay">
   <div class="wc-modal">
     <p class="wc-modal-title" id="wc-modal-title">Connect Ethereum Wallet</p>
-    <div id="wc-modal-body">
-      <div class="wc-wallet-list">
-        <button class="wc-wallet-btn" onclick="_wcConnectInjected()">
-          <span class="wc-wallet-icon-ph">&#x1F98A;</span>
-          <span class="wc-wallet-name">Browser wallet</span>
-          <span class="wc-wallet-tag">Injected</span>
-        </button>
-        <button class="wc-wallet-btn" onclick="_wcConnectWC('metamask')">
-          <span class="wc-wallet-icon-ph">&#x1F98A;</span>
-          <span class="wc-wallet-name">MetaMask</span>
-          <span class="wc-wallet-tag">Mobile / QR</span>
-        </button>
-        <button class="wc-wallet-btn" onclick="_wcConnectWC('rainbow')">
-          <span class="wc-wallet-icon-ph">&#x1F308;</span>
-          <span class="wc-wallet-name">Rainbow</span>
-          <span class="wc-wallet-tag">Mobile / QR</span>
-        </button>
-        <button class="wc-wallet-btn" onclick="_wcConnectWC('coinbase')">
-          <span class="wc-wallet-icon-ph">&#x1F535;</span>
-          <span class="wc-wallet-name">Coinbase Wallet</span>
-          <span class="wc-wallet-tag">Mobile / QR</span>
-        </button>
-        <button class="wc-wallet-btn" onclick="_wcConnectWC()">
-          <span class="wc-wallet-icon-ph">&#x2B21;</span>
-          <span class="wc-wallet-name">WalletConnect</span>
-          <span class="wc-wallet-tag">All wallets</span>
-        </button>
-      </div>
-      <button class="wc-cancel-btn" onclick="_wcCloseModal()">Cancel</button>
-    </div>
+    <div id="wc-modal-body"></div>
   </div>
 </div>
 </body>
