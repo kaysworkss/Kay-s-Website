@@ -1188,6 +1188,13 @@ body {
   font-family: 'Crimson Pro', serif; font-size: 0.82rem;
   color: var(--text-muted); margin-bottom: 14px; font-style: italic;
 }
+.bid-legal-notice {
+  font-family: 'Crimson Pro', serif; font-size: 0.72rem;
+  color: var(--text-muted); opacity: 0.55; line-height: 1.55;
+  margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid rgba(196,132,90,0.1);
+  font-style: italic; text-align: left;
+}
 
 /* Bid button — matches site btn-mint style */
 @keyframes pulseBid {
@@ -1415,6 +1422,91 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   box-shadow: 0 4px 22px rgba(201,153,58,0.45);
 }
 .btn-buynow:disabled { opacity: .35; cursor: not-allowed; animation: none; }
+
+/* ── Private offer panel ── */
+.btn-offer-toggle {
+  width: 100%;
+  font-family: 'Cinzel', serif; font-size: 0.7rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid rgba(196,132,90,0.25); border-radius: 4px;
+  padding: 0.75rem 2rem; cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.btn-offer-toggle:hover { color: var(--gold); border-color: rgba(196,132,90,0.55); }
+.btn-offer-toggle.open  { color: var(--gold); border-color: rgba(196,132,90,0.45); }
+
+.offer-panel {
+  max-height: 0; overflow: hidden;
+  transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.28s ease;
+  opacity: 0;
+}
+.offer-panel.open { max-height: 600px; opacity: 1; }
+
+.offer-intro {
+  font-family: 'Crimson Pro', serif; font-size: 0.85rem;
+  color: var(--text-muted); font-style: italic; line-height: 1.55;
+  margin: 14px 0 16px;
+}
+.offer-field { margin-bottom: 12px; }
+.offer-label {
+  display: block;
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 5px;
+}
+.offer-optional {
+  font-family: 'Crimson Pro', serif; font-style: italic;
+  font-size: 0.75rem; letter-spacing: 0; text-transform: none;
+  opacity: 0.6;
+}
+.offer-input {
+  width: 100%; box-sizing: border-box;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(196,132,90,0.2); border-radius: 4px;
+  color: var(--linen); font-family: 'Crimson Pro', serif; font-size: 0.9rem;
+  padding: 8px 10px; outline: none;
+  transition: border-color 0.18s;
+}
+.offer-input:focus { border-color: rgba(196,132,90,0.55); }
+.offer-input::placeholder { color: rgba(196,132,90,0.3); }
+.offer-amount-row { display: flex; gap: 8px; }
+.offer-amount-inp { flex: 1; }
+.offer-currency {
+  width: 72px; flex-shrink: 0;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(196,132,90,0.2); border-radius: 4px;
+  color: var(--linen); font-family: 'Cinzel', serif; font-size: 0.65rem;
+  letter-spacing: 0.1em; padding: 8px 6px; outline: none; cursor: pointer;
+}
+.offer-currency option { background: #2a1c14; }
+.offer-textarea { min-height: 72px; resize: vertical; }
+.offer-hint {
+  font-family: 'Crimson Pro', serif; font-size: 0.8rem;
+  font-style: italic; min-height: 1.2em; margin-bottom: 10px;
+}
+.offer-hint.err  { color: #d4816a; }
+.offer-hint.ok   { color: var(--moss); }
+.btn-offer-submit {
+  flex: 1;
+  font-family: 'Cinzel', serif; font-size: 0.65rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  background: var(--rust); color: var(--linen);
+  border: none; border-radius: 4px; padding: 0.7rem 1rem;
+  cursor: pointer; transition: filter 0.2s;
+}
+.btn-offer-submit:hover:not(:disabled) { filter: brightness(1.2); }
+.btn-offer-submit:disabled { opacity: .4; cursor: not-allowed; }
+.btn-offer-close {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  background: transparent; color: var(--text-muted);
+  border: 1px solid rgba(196,132,90,0.18); border-radius: 4px;
+  padding: 0.7rem 0.9rem; cursor: pointer;
+  transition: color 0.18s, border-color 0.18s;
+}
+.btn-offer-close:hover { color: var(--linen); border-color: rgba(196,132,90,0.4); }
 
 .spin {
   width: 13px; height: 13px;
@@ -2024,6 +2116,13 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             <button class="cc-cancel-claim-btn" id="cc-cancel-claim-btn-bid" onclick="_ccCancelClaim()" style="margin-top:6px">
               ← Back to chain selection
             </button>
+            <p class="bid-legal-notice">
+              Bids are final and cannot be reversed — blockchain transactions are irreversible.
+              Token amounts shown are calculated from live exchange rates and may differ slightly at the moment your transaction confirms.
+              The 1/1 original transfers on-chain to the winning address only after the auction settles.
+              For cross-chain auctions, only one chain will complete — the other closes permanently once a bid is placed.
+              By placing a bid you confirm you understand these terms.
+            </p>
           </div>
 
           <!-- Buy now section -->
@@ -2038,6 +2137,55 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             </button>
             <div style="font-family:'Crimson Pro',serif;font-size:0.78rem;color:var(--text-muted);font-style:italic;margin-top:8px;text-align:center">
               Claim instantly · Available until the first bid is placed
+            </div>
+          </div>
+
+          <!-- Private offer section -->
+          <div id="offer-section" style="display:none;margin-bottom:24px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+              <div style="flex:1;height:1px;background:var(--divider)"></div>
+              <span style="font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted)">or</span>
+              <div style="flex:1;height:1px;background:var(--divider)"></div>
+            </div>
+            <button class="btn-offer-toggle" id="offer-toggle-btn" onclick="toggleOfferPanel()">
+              Make a private offer
+            </button>
+            <div class="offer-panel" id="offer-panel">
+              <p class="offer-intro">
+                Prefer to negotiate directly? Submit an offer below — the artist will review it and reach out. This option closes the moment a bid is placed.
+              </p>
+              <div class="offer-field">
+                <label class="offer-label">Your name</label>
+                <input class="offer-input" id="offer-name" type="text" placeholder="Full name" />
+              </div>
+              <div class="offer-field">
+                <label class="offer-label">Email</label>
+                <input class="offer-input" id="offer-email" type="email" placeholder="your@email.com" />
+              </div>
+              <div class="offer-field">
+                <label class="offer-label">Wallet address <span class="offer-optional">(optional)</span></label>
+                <input class="offer-input" id="offer-wallet" type="text" placeholder="0x… or tz1…" />
+              </div>
+              <div class="offer-field">
+                <label class="offer-label">Offer amount</label>
+                <div class="offer-amount-row">
+                  <input class="offer-input offer-amount-inp" id="offer-amount" type="number" min="0" step="any" placeholder="0.00" />
+                  <select class="offer-currency" id="offer-currency">
+                    <option value="USD">USD</option>
+                    <option value="ETH">ETH</option>
+                    <option value="XTZ">XTZ</option>
+                  </select>
+                </div>
+              </div>
+              <div class="offer-field">
+                <label class="offer-label">Message <span class="offer-optional">(optional)</span></label>
+                <textarea class="offer-input offer-textarea" id="offer-message" placeholder="Any context, conditions, or questions…"></textarea>
+              </div>
+              <div class="offer-hint" id="offer-hint"></div>
+              <div style="display:flex;gap:8px;margin-top:4px">
+                <button class="btn-offer-submit" id="offer-submit-btn" onclick="submitPrivateOffer()">Send offer</button>
+                <button class="btn-offer-close" onclick="toggleOfferPanel()">Cancel</button>
+              </div>
             </div>
           </div>
 
@@ -2417,6 +2565,7 @@ function _ccShowChooser() {
   document.getElementById("bid-form").style.display          = "none";
   document.getElementById("history-section").style.display   = "none";
   document.getElementById("buynow-section").style.display    = "none";
+  _closeOfferPanel(); document.getElementById("offer-section").style.display = "none";
   document.getElementById("status-line").textContent         = "";
 }
 
@@ -3691,6 +3840,7 @@ async function _switchAuction(idx) {
   document.getElementById("bid-form").style.display            = "none";
   document.getElementById("history-section").style.display     = "none";
   document.getElementById("buynow-section").style.display      = "none";
+  _closeOfferPanel(); document.getElementById("offer-section").style.display = "none";
   document.getElementById("settled-banner").classList.remove("show");
   document.getElementById("eligibility").className              = "eligibility";
   document.getElementById("stat-bid").textContent              = "—";
@@ -3848,6 +3998,7 @@ async function _switchAuction(idx) {
   activeContract.on("BuyNowExecuted",  (buyer, price) => {
     if (switchToken !== _switchToken) return;
     document.getElementById("buynow-section").style.display = "none";
+    _closeOfferPanel(); document.getElementById("offer-section").style.display = "none";
     const isMine = signerAddress && buyer.toLowerCase() === signerAddress.toLowerCase();
     if (!isMine) notify("info", "Sold via Buy Now", `${shortAddr(buyer)} purchased at ${ethers.formatEther(price)} ETH.`);
     showSettled(buyer, price);
@@ -4606,6 +4757,13 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
       buyNowSection.style.display = "none";
     }
 
+    // Private offer — only while no bids have been placed
+    const offerSection = document.getElementById("offer-section");
+    if (offerSection) {
+      offerSection.style.display = (noBids && deposited && !settled) ? "block" : "none";
+      if (!noBids) _closeOfferPanel(); // collapse quietly when a bid lands
+    }
+
   } catch(e) { console.error("refreshState:", e); }
 }
 
@@ -4902,6 +5060,12 @@ async function refreshTezosState(runToken = _switchToken) {
       : "Min increment";
     document.getElementById("bid-form").style.display = acceptingBids ? "block" : "none";
     document.getElementById("history-section").style.display = "block";
+    // Private offer — only while no bids have been placed on Tezos
+    const _tezOfferSection = document.getElementById("offer-section");
+    if (_tezOfferSection) {
+      _tezOfferSection.style.display = (noBids && !auction.settled) ? "block" : "none";
+      if (!noBids) _closeOfferPanel();
+    }
     document.getElementById("history-list").innerHTML = noBids ? "" : `
       <div class="history-item leader">
         <div>
@@ -5042,6 +5206,91 @@ async function checkTezosEligibility(runToken = _switchToken) {
 }
 
 // ─── Bid ─────────────────────────────────────────────────────────────────────
+
+// ── Private offer panel ──────────────────────────────────────────────────────
+
+function toggleOfferPanel() {
+  const panel  = document.getElementById("offer-panel");
+  const toggle = document.getElementById("offer-toggle-btn");
+  if (!panel) return;
+  const opening = !panel.classList.contains("open");
+  panel.classList.toggle("open", opening);
+  if (toggle) toggle.classList.toggle("open", opening);
+  if (opening) {
+    // Clear any previous state
+    document.getElementById("offer-hint").textContent = "";
+    document.getElementById("offer-hint").className = "offer-hint";
+    document.getElementById("offer-submit-btn").disabled = false;
+    document.getElementById("offer-submit-btn").textContent = "Send offer";
+  }
+}
+
+function _closeOfferPanel() {
+  const panel  = document.getElementById("offer-panel");
+  const toggle = document.getElementById("offer-toggle-btn");
+  if (panel)  panel.classList.remove("open");
+  if (toggle) toggle.classList.remove("open");
+}
+
+async function submitPrivateOffer() {
+  const name    = (document.getElementById("offer-name")?.value   || "").trim();
+  const email   = (document.getElementById("offer-email")?.value  || "").trim();
+  const wallet  = (document.getElementById("offer-wallet")?.value || "").trim();
+  const amount  = (document.getElementById("offer-amount")?.value || "").trim();
+  const currency= document.getElementById("offer-currency")?.value || "USD";
+  const message = (document.getElementById("offer-message")?.value|| "").trim();
+  const hintEl  = document.getElementById("offer-hint");
+  const btn     = document.getElementById("offer-submit-btn");
+
+  const setHint = (msg, cls) => {
+    hintEl.textContent = msg;
+    hintEl.className   = "offer-hint " + (cls || "");
+  };
+
+  if (!name)   return setHint("Please enter your name.", "err");
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+               return setHint("Please enter a valid email address.", "err");
+  if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0)
+               return setHint("Please enter a valid offer amount.", "err");
+
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  setHint("", "");
+
+  // Attach the artwork title and chain context so the email makes sense
+  const artTitle = _activeCfg()?.artTitle || "";
+  const chain    = _slotChain(_activeCfg()) === "tezos" ? "Tezos" : "Ethereum";
+
+  try {
+    const res = await fetch("/api/site-form", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        form_type:      "private-offer",
+        name,
+        email,
+        wallet_address: wallet,
+        offer_amount:   amount,
+        offer_currency: currency,
+        artwork:        artTitle,
+        chain,
+        message,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "Submission failed");
+    setHint("Offer sent — the artist will be in touch.", "ok");
+    btn.textContent = "Sent ✓";
+    // Clear fields
+    ["offer-name","offer-email","offer-wallet","offer-amount","offer-message"]
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  } catch (err) {
+    setHint("Something went wrong — please try again.", "err");
+    btn.disabled    = false;
+    btn.textContent = "Send offer";
+    console.error("submitPrivateOffer:", err);
+  }
+}
 
 async function placeBid() {
   if (_slotChain(_activeCfg()) === "tezos") return placeTezosBid();
@@ -6341,7 +6590,7 @@ function _renderPresenceCounts(total, eligible) {
       <button class="cc-sim-close" onclick="closeCcSim()">×</button>
     </div>
     <div class="cc-sim-body">
-      <div class="cc-sim-guide" id="sim-guide">Choose a chain below to start the auction — watch what happens to the other one.</div>
+      <div class="cc-sim-guide" id="sim-guide">This is a 1/1 artwork available on two chains simultaneously. Choose a chain to start the auction — the moment a bid is placed, the other chain closes permanently. Only one collector can win.</div>
       <div id="sim-cc-banner" class="cc-banner" style="margin-bottom:10px;display:none"></div>
       <div class="cc-sim-bar-wrap" id="sim-bar-wrap"><div class="cc-sim-bar" id="sim-bar"></div></div>
       <div class="cc-sim-chooser" id="sim-chooser">
@@ -6552,9 +6801,10 @@ function simChooseChain(chain) {
 
   const chainName = chain === 'eth' ? 'Ethereum ⟠' : 'Tezos ꜩ';
   const otherName = chain === 'eth' ? 'Tezos' : 'Ethereum';
-  simSetBanner('cc-waiting', `<span class="cc-banner-dot"></span><span><strong id="sim-nobid-txt">${simFmt(SIM.NO_BID_SEC)}</strong> to place a bid — or both chains unlock and reset automatically.</span>`);
-  simSetGuide('You have 60 seconds to bid on ' + chainName + '. Place a bid or hit "Auto bid" — or wait and watch both chains reset.');
-  simLog('sys', chainName + ' claimed — 60s no-bid window started. ' + otherName + ' locked.');
+  simSetBanner('cc-waiting', `<span class="cc-banner-dot"></span><span><strong id="sim-nobid-txt">${simFmt(SIM.NO_BID_SEC)}</strong> to place the first bid — if time runs out, both chains unlock and reset.</span>`);
+  simSetGuide('You\'ve claimed ' + chainName + '. You have 60 seconds to place the opening bid. If no bid lands in time, both chains reset and either collector can try again.');
+  simLog('sys', chainName + ' claimed — 60-second opening window started.');
+  simLog('warn', otherName + ' is now locked and cannot accept bids until this window expires or resets.');
 }
 
 // ── No-bid bar ────────────────────────────────────────────────────────────────
@@ -6574,7 +6824,7 @@ function simStartNoBidBar() {
     const rem = Math.max(0, SIM.NO_BID_SEC - (Date.now() / 1000 - SIM.noBidStart));
     const el = document.getElementById('sim-nobid-txt');
     if (el) el.textContent = simFmt(rem);
-    simSetBanner('cc-waiting', `<span class="cc-banner-dot"></span><span><strong>${simFmt(rem)}</strong> to place a bid — or both chains unlock and reset automatically.</span>`);
+    simSetBanner('cc-waiting', `<span class="cc-banner-dot"></span><span><strong>${simFmt(rem)}</strong> remaining — place a bid to lock in this chain, or both chains reset.</span>`);
     if (rem <= 0) { clearInterval(SIM.noBidRef); simAutoCancel(); }
   }, 500);
 }
@@ -6601,11 +6851,12 @@ function simAutoCancel() {
   document.getElementById('sim-xtz-btn').disabled = false;
   document.getElementById('sim-bid-area').classList.remove('show');
   document.getElementById('sim-settle-btn').disabled = true;
-  simSetBanner('cc-reset', `<span class="cc-banner-dot" style="animation:none;opacity:.5"></span><span>No bid placed — <strong>both chains unlocked</strong>. Choose a chain to try again.</span>`);
+  simSetBanner('cc-reset', `<span class="cc-banner-dot" style="animation:none;opacity:.5"></span><span>No bid placed — <strong>both chains are unlocked again</strong>. Choose either chain to start over.</span>`);
   const rn = document.getElementById('sim-reset-notice');
-  if (rn) { rn.textContent = 'No bid was placed in time — both chains are unlocked. Choose either chain to start again.'; rn.classList.add('show'); }
-  simSetGuide('The 60-second window expired. Both chains are open again — choose one to restart.');
-  simLog('warn', 'No bids placed — auction cancelled. Both chains unlocked.');
+  if (rn) { rn.textContent = 'The 60-second window expired with no bids. Both chains are open again — either collector can now choose their preferred chain.'; rn.classList.add('show'); }
+  simSetGuide('Time expired. No bid was placed so neither chain was locked. Both are open — choose a chain to try again.');
+  simLog('warn', '60-second window expired — no bid placed.');
+  simLog('sys', 'Both chains unlocked and reset. Either collector can start the auction.');
 }
 
 // ── Bid ───────────────────────────────────────────────────────────────────────
@@ -6629,10 +6880,11 @@ function _simBid(amount, bidder) {
     simStopBar();
     SIM.phase = 'live';
     const chain = SIM.chain, otherName = chain === 'eth' ? 'Tezos' : 'Ethereum';
-    simSetBanner('cc-live', `<span class="cc-banner-dot"></span><span>Auction live on ${chain === 'eth' ? 'Ethereum' : 'Tezos'} — ${otherName} is locked.</span>`);
+    simSetBanner('cc-live', `<span class="cc-banner-dot"></span><span>First bid placed on ${chain === 'eth' ? 'Ethereum' : 'Tezos'} — <strong>${otherName} is now permanently closed.</strong></span>`);
     simSetCardStatus(SIM.chain, 'live', 'Live');
-    simSetGuide('Bid placed — the auction is live. Keep bidding or hit "End auction" to settle.');
-    simLog(chain, 'First bid placed — 60s window cancelled. ' + otherName + ' permanently locked.');
+    simSetGuide('The auction is live on ' + (chain === 'eth' ? 'Ethereum' : 'Tezos') + '. ' + otherName + ' has closed permanently — bids there are no longer possible. The 1/1 will only exist on this chain.');
+    simLog(chain, 'First bid placed — auction is now live on ' + (chain === 'eth' ? 'Ethereum' : 'Tezos') + '.');
+    simLog('warn', otherName + ' listing is now permanently closed. No bids can be placed there.');
     document.getElementById('sim-settle-btn').disabled = false;
     // Auction countdown
     const aucStart = Date.now() / 1000;
@@ -6665,16 +6917,16 @@ function simSettle() {
   SIM.phase = 'settled';
   const chainName  = SIM.chain === 'eth' ? 'Ethereum' : 'Tezos';
   const otherName  = SIM.chain === 'eth' ? 'Tezos' : 'Ethereum';
-  simSetBanner('cc-settled', `<span class="cc-banner-dot" style="animation:none;opacity:.5"></span><span>Auction settled on ${chainName} — ${otherName} listing permanently closed.</span>`);
+  simSetBanner('cc-settled', `<span class="cc-banner-dot" style="animation:none;opacity:.5"></span><span>Sold on ${chainName} — the ${otherName} listing is permanently closed.</span>`);
   simSetCardStatus(SIM.chain, 'won', 'Sold');
   document.getElementById('sim-bid-area').classList.remove('show');
   document.getElementById('sim-settle-btn').disabled = true;
   const oc = document.getElementById('sim-outcome'); if (oc) oc.classList.add('show');
   const ob = document.getElementById('sim-outcome-body');
-  if (ob) ob.innerHTML = `<strong>${SIM.leader}</strong> wins on <strong>${chainName}</strong> — ${simFA(SIM.bid)} &nbsp;·&nbsp; ${simFU(SIM.bid)}<br><br>The 1/1 original transfers to ${SIM.leader} on ${chainName}. The <strong>${otherName}</strong> listing is permanently closed.`;
-  simSetGuide('Auction complete. Hit ↺ Reset to run the simulation again.');
-  simLog('ok', 'Settled — ' + SIM.leader + ' wins with ' + simFA(SIM.bid) + ' (' + simFU(SIM.bid) + ')');
-  simLog('sys', otherName + ' listing permanently closed.');
+  if (ob) ob.innerHTML = `<strong>${SIM.leader}</strong> wins on <strong>${chainName}</strong> — ${simFA(SIM.bid)} &nbsp;·&nbsp; ${simFU(SIM.bid)}<br><br>The 1/1 original transfers on-chain to ${SIM.leader} on ${chainName}. The <strong>${otherName}</strong> listing is permanently closed — it will never reopen.`;
+  simSetGuide('Auction complete. The 1/1 has a single owner on ' + chainName + '. The ' + otherName + ' listing is gone for good. Hit ↺ Reset to run the simulation again.');
+  simLog('ok', 'Settled — ' + SIM.leader + ' wins with ' + simFA(SIM.bid) + ' (' + simFU(SIM.bid) + ').');
+  simLog('sys', otherName + ' listing permanently closed. The work exists on one chain only.');
 }
 
 // ── Reset ─────────────────────────────────────────────────────────────────────
