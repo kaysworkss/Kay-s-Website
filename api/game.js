@@ -1656,7 +1656,7 @@ async function sendShopSellerNotification({ order, orderRef, checkout, paymentMe
     <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
       ${itemsHtml}
     </table>
-    <p style="margin:18px 0 0;text-align:right"><strong>Total: ${shopMoney(checkout.totalNgn, checkout.totalUsd)}</strong></p>
+            <p style="margin:22px 0 30px;text-align:right"><span style="display:inline-block;border:1px solid #cdbb9f;background:#f5ede0;padding:13px 24px;font-size:16px"><strong>Total: ${shopMoney(checkout.totalNgn, checkout.totalUsd)}</strong></span></p>
   </div>
 </body></html>`;
 
@@ -1686,6 +1686,128 @@ async function sendShopSellerNotification({ order, orderRef, checkout, paymentMe
 }
 
 // ── ORDER REFERENCE ───────────────────────────────────────────────────────────
+async function sendShopCustomerReceipt({ order, orderRef, checkout, paymentMethod, paymentRef }) {
+  const to = String(order.email || '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    const e = new Error('Customer email is missing or invalid');
+    e.statusCode = 400;
+    throw e;
+  }
+  const from = process.env.SHOP_ORDER_FROM_EMAIL ||
+    process.env.FORM_ALERT_FROM_EMAIL ||
+    "Kay's Works Queue <auction@mail.kaysworks.com>";
+  const customerName = order.customer_name || 'there';
+  const shopUrl = process.env.SHOP_URL || 'https://www.kaysworks.com/shop';
+  const logoUrl = process.env.SHOP_LOGO_URL || 'https://www.kaysworks.com/images/kaysworkslogo.svg';
+  const delivery = checkout.method === 'pickup'
+    ? 'Kaduna pickup. Kay will contact you with pickup details.'
+    : `Ship to: ${order.address || 'the address on your order'}.`;
+  const deliveryFeeLabel = Number(checkout.deliveryNgn || 0) > 0
+    ? `Delivery fee: NGN ${Number(checkout.deliveryNgn || 0).toLocaleString('en-NG')}`
+    : 'Delivery fee: Free';
+  const itemsHtml = checkout.trustedItems.map(item => `
+    <tr>
+      <td colspan="3" style="padding:0 0 10px">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5ede0;border-radius:10px">
+          <tr>
+            <td style="padding:16px 18px;font-size:15px;color:#2d211b"><strong>${shopEscapeHtml(item.name)}</strong><br><span style="color:#8a7060;font-size:13px">${shopEscapeHtml(item.variant)}</span></td>
+            <td width="58" align="center" style="padding:16px 10px;font-size:14px;color:#2d211b">${Number(item.qty || 1)}</td>
+            <td width="165" align="right" style="padding:16px 18px;font-size:14px;color:#2d211b">${shopMoney(item.priceNgn * item.qty, item.priceUsd * item.qty)}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>`).join('');
+  const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#f5ede0;font-family:Georgia,serif;color:#2d211b">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5ede0;padding:28px 12px">
+    <tr><td align="center">
+      <table width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#ede0c8;border-collapse:separate;border-spacing:0;border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(74,50,40,0.16)">
+        <tr>
+          <td align="center" style="background:#4a3228;background-image:radial-gradient(circle at 50% 0%,rgba(196,132,90,0.3),transparent 36%),linear-gradient(145deg,#4a3228 0%,#2d1d16 100%);padding:36px 36px 42px;color:#e8d5b0;border-radius:0 0 18px 18px;text-align:center">
+            <p style="margin:0 0 24px;font-family:Arial,sans-serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#f5ede0">Order confirmation</p>
+            <img src="${shopEscapeHtml(logoUrl)}" alt="Kay's Works" width="132" style="display:block;width:132px;max-width:46%;height:auto;margin:0 auto 24px">
+            <div style="width:58px;height:58px;background:rgba(245,237,224,0.12);border-radius:50%;text-align:center;line-height:58px;font-family:Arial,sans-serif;font-size:30px;color:#f5ede0;margin:0 auto 22px">&#10003;</div>
+            <h1 style="margin:0 0 14px;font-size:34px;font-weight:400;line-height:1.12;color:#f5ede0">Thanks for your purchase</h1>
+            <p style="margin:0 auto;line-height:1.7;color:#e8d5b0;font-size:16px;max-width:500px">Hi ${shopEscapeHtml(customerName)}, welcome to the Kay's Works collector circle. Your payment is confirmed, and your order is now being prepared with care.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 36px;background:#ede0c8">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5ede0;border-radius:12px;margin:0 0 18px">
+              <tr>
+                <td style="padding:16px 18px">
+                  <p style="margin:0 0 6px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#9e4f2e"><strong>Order No:</strong> ${shopEscapeHtml(orderRef)}</p>
+                  <p style="margin:0;font-size:13px;color:#5c463a"><strong>Payment:</strong> ${shopEscapeHtml(String(paymentMethod || '').toUpperCase())}${paymentRef ? ` &middot; ${shopEscapeHtml(paymentRef)}` : ''}</p>
+                </td>
+              </tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+              <tr>
+                <th align="left" style="padding:0 18px 9px;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#8a7060">Item</th>
+                <th align="center" style="padding:0 10px 9px;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#8a7060">Qty</th>
+                <th align="right" style="padding:0 18px 9px;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#8a7060">Price</th>
+              </tr>
+              ${itemsHtml}
+            </table>
+            <p style="margin:12px 0 8px;text-align:right"><span style="display:inline-block;background:#f5ede0;border-radius:10px;padding:11px 18px;font-size:13px;color:#5c463a">${shopEscapeHtml(deliveryFeeLabel)}</span></p>
+            <p style="margin:0 0 30px;text-align:right"><span style="display:inline-block;background:#f5ede0;border-radius:10px;padding:14px 24px;font-size:16px"><strong>Total: ${shopMoney(checkout.totalNgn, checkout.totalUsd)}</strong></span></p>
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td width="50%" valign="top" style="padding:18px;background:#f5ede0;border-radius:12px">
+                  <h2 style="margin:0 0 8px;font-size:16px">Payment method</h2>
+                  <p style="margin:0;color:#5c463a;line-height:1.5">${shopEscapeHtml(String(paymentMethod || '').toUpperCase())}<br>${paymentRef ? shopEscapeHtml(paymentRef) : 'Payment confirmed'}</p>
+                </td>
+                <td width="16"></td>
+                <td width="50%" valign="top" style="padding:18px;background:#f5ede0;border-radius:12px">
+                  <h2 style="margin:0 0 8px;font-size:16px">Delivery details</h2>
+                  <p style="margin:0;color:#5c463a;line-height:1.5">${shopEscapeHtml(delivery)}</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#4a3228;padding:30px 36px;text-align:center;color:#e8d5b0">
+            <h2 style="margin:0 0 16px;font-size:24px;font-weight:400;color:#f5ede0">Come back anytime</h2>
+            <a href="${shopEscapeHtml(shopUrl)}" style="display:inline-block;background:linear-gradient(90deg,#c9993a,#f3c85f);color:#2d211b;text-decoration:none;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;padding:14px 30px;border-radius:999px">Continue shopping</a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 36px;color:#5c463a;line-height:1.6;font-size:14px;background:#ede0c8">
+            <p style="margin:0 0 14px">Thank you again for your order. If you have any questions, reply to this email and we will help.</p>
+            <p style="margin:0">Warmly,<br>Kay's Works</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+  const text = [
+    `Hi ${customerName}, your order has been received and your payment is confirmed.`,
+    "Thank you for collecting from Kay's Works. Kay will review the details, prepare your pieces with care, and follow up with fulfilment updates.",
+    '',
+    `Order: ${orderRef}`,
+    `Payment: ${String(paymentMethod || '').toUpperCase()}`,
+    paymentRef ? `Reference: ${paymentRef}` : '',
+    `Delivery: ${delivery}`,
+    deliveryFeeLabel,
+    '',
+    'Items:',
+    ...checkout.trustedItems.map(item => `- ${item.name} (${item.variant}) x ${item.qty}`),
+    '',
+    `Total: ${shopMoney(checkout.totalNgn, checkout.totalUsd)}`,
+    `Continue shopping: ${shopUrl}`,
+  ].filter(line => line !== '').join('\n');
+
+  return _sendEmail({
+    from,
+    to: [to],
+    subject: `Your Kay's Works order ${orderRef}`,
+    html,
+    text,
+  });
+}
+
 function makeOrderRef() {
   return 'ORD-' + Date.now().toString(36).toUpperCase() + '-' + crypto.randomBytes(3).toString('hex').toUpperCase();
 }
@@ -1828,7 +1950,28 @@ async function handleShopOrderConfirm(req, res, supabase) {
       sellerNotification = { sent: false, error: notifyErr.message || String(notifyErr) };
       console.error('[shop-order] seller notification failed:', orderRef, sellerNotification.error);
     }
-    return json(200, { ok: true, already_paid: true, order_id: order.id, order_ref: orderRef, seller_notification: sellerNotification });
+    let customerNotification = { sent: false };
+    try {
+      const emailResult = await sendShopCustomerReceipt({
+        order,
+        orderRef,
+        checkout: paidCheckout,
+        paymentMethod,
+        paymentRef,
+      });
+      customerNotification = { sent: true, id: emailResult?.id || null };
+    } catch (notifyErr) {
+      customerNotification = { sent: false, error: notifyErr.message || String(notifyErr) };
+      console.error('[shop-order] customer receipt failed:', orderRef, customerNotification.error);
+    }
+    return json(200, {
+      ok: true,
+      already_paid: true,
+      order_id: order.id,
+      order_ref: orderRef,
+      seller_notification: sellerNotification,
+      customer_notification: customerNotification,
+    });
   }
 
   const isCryptoPayment = ['eth','tezos','usdc','usdt'].includes(paymentMethod);
@@ -1973,6 +2116,20 @@ async function handleShopOrderConfirm(req, res, supabase) {
     sellerNotification = { sent: false, error: notifyErr.message || String(notifyErr) };
     console.error('[shop-order] seller notification failed:', orderRef, sellerNotification.error);
   }
+  let customerNotification = { sent: false };
+  try {
+    const emailResult = await sendShopCustomerReceipt({
+      order,
+      orderRef,
+      checkout,
+      paymentMethod,
+      paymentRef,
+    });
+    customerNotification = { sent: true, id: emailResult?.id || null };
+  } catch (notifyErr) {
+    customerNotification = { sent: false, error: notifyErr.message || String(notifyErr) };
+    console.error('[shop-order] customer receipt failed:', orderRef, customerNotification.error);
+  }
 
   return json(200, {
     ok: true,
@@ -1984,6 +2141,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
     chain_verification: chainVerification,
     card_verification: cardVerification,
     seller_notification: sellerNotification,
+    customer_notification: customerNotification,
   });
 }
 
