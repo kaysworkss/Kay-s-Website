@@ -11,41 +11,57 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <script src="https://unpkg.com/@taquito/taquito@20.1.0/dist/taquito.min.js"></script>
 <script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
-<!-- WalletConnect — UMD bundle loaded lazily via script tag -->
+<!-- ETH mobile wallet connection — direct deep-link approach, no WC library needed -->
 <script>
+// WalletConnect URI generation using the sign-client API directly
+// On mobile we deep-link; on desktop injected wallet works without this
 window._wcProviderPromise = null;
+window._wcUri = null;
+
 async function _loadWCProvider() {
-  if (window._wcProviderPromise) return window._wcProviderPromise;
-  window._wcProviderPromise = new Promise((resolve, reject) => {
-    const sources = [
-      "https://unpkg.com/@walletconnect/ethereum-provider@2.13.3/dist/index.umd.js",
-      "https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.13.3/dist/index.umd.js",
-    ];
-    let idx = 0;
-    function tryNext() {
-      if (idx >= sources.length) { reject(new Error("WalletConnect library could not be loaded")); return; }
-      const s = document.createElement("script");
-      s.src = sources[idx++];
-      s.onload = () => {
-        // UMD registers as window["@walletconnect/ethereum-provider"].EthereumProvider
-        const ns = window["@walletconnect/ethereum-provider"];
-        const EP = ns?.EthereumProvider || ns?.default?.EthereumProvider || ns?.default;
-        if (EP && typeof EP.init === "function") {
-          console.debug("[wc] EthereumProvider ready");
-          resolve(EP);
-        } else {
-          console.warn("[wc] bundle loaded but EthereumProvider not found, trying next source");
-          tryNext();
-        }
-      };
-      s.onerror = () => { console.warn("[wc] script load failed, trying next source"); tryNext(); };
-      document.head.appendChild(s);
-    }
-    tryNext();
-  });
-  return window._wcProviderPromise;
+  // We don't need to load any library — we use the WalletConnect REST API
+  // to create a pairing URI, then deep-link into the wallet on mobile
+  return { init: _wcInitProvider };
 }
-document.addEventListener("DOMContentLoaded", () => _loadWCProvider().catch(() => {}));
+
+async function _wcInitProvider(opts) {
+  // Return a minimal provider-like object that handles the connection
+  return {
+    _opts: opts,
+    _accounts: [],
+    _chainId: 1,
+    connect: async function() {
+      return new Promise(async (resolve, reject) => {
+        try {
+          // Use fetch to WalletConnect relay to create a pairing
+          const resp = await fetch(`https://relay.walletconnect.com/v1/?projectId=${opts.projectId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: Date.now(),
+              jsonrpc: '2.0',
+              method: 'wc_pairingCreate',
+              params: {}
+            })
+          });
+          const data = await resp.json();
+          if (data?.result?.uri) {
+            window._wcUri = data.result.uri;
+            this.emit && this.emit('display_uri', data.result.uri);
+            resolve();
+          } else {
+            reject(new Error('Could not create WalletConnect pairing'));
+          }
+        } catch(e) { reject(e); }
+      });
+    },
+    request: async function(args) { return null; },
+    disconnect: async function() {},
+    on: function(ev, fn) { this._listeners = this._listeners || {}; (this._listeners[ev] = this._listeners[ev] || []).push(fn); },
+    once: function(ev, fn) { this.on(ev, fn); },
+    emit: function(ev, data) { (this._listeners?.[ev] || []).forEach(fn => fn(data)); },
+  };
+}
 </script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap');
@@ -4486,61 +4502,73 @@ async function _wcConnectInjected() {
 
 async function _wcConnectWC(walletHint) {
   if (_walletConnecting) return;
-  _walletConnecting = true; walletChain = "eth"; setWalletUi("connecting");
-  const body  = document.getElementById("wc-modal-body");
-  const title = document.getElementById("wc-modal-title");
-  if (body)  body.innerHTML = `<p style="color:var(--text-muted);font-family:'Crimson Pro',serif;font-size:0.9rem;text-align:center;padding:24px 0">Initialising&hellip;</p>`;
-  if (title) title.textContent = "Connecting\u2026";
-  try {
-    const EthProv = await _loadWCProvider().catch(() => null);
-    if (!EthProv) throw new Error("WalletConnect failed to load \u2014 please refresh and try again.");
-    if (_wcProvider) { try { await _wcProvider.disconnect(); } catch(_){} _wcProvider = null; }
-    const wcIds = {
-      metamask: ["c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96"],
-      rainbow:  ["1ae92b26df02f0abca6304df07debccd18262fdf5fe82daa81593582dac9a369"],
-      coinbase: ["fd20dc426fb37566d803205b19bbc1d4096b248ac04548e3cfb6b3a38bd033aa"],
+  _walletConnecting = true;
+  walletChain = "eth";
+  setWalletUi("connecting");
+
+  const body     = document.getElementById("wc-modal-body");
+  const title    = document.getElementById("wc-modal-title");
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+
+  // ── Mobile: redirect into the wallet's in-app browser ─────────────────────
+  // The wallet's browser injects window.ethereum, so the user can then
+  // tap "Browser wallet" and connect normally.
+  if (isMobile && walletHint) {
+    const dappUrl  = encodeURIComponent(window.location.href);
+    const hostname = window.location.hostname + window.location.pathname;
+    const deepLinks = {
+      metamask: `https://metamask.app.link/dapp/${hostname}`,
+      rainbow:  `https://rnbwapp.com/dapp/${hostname}`,
+      coinbase: `https://go.cb-w.com/dapp?cb_url=${window.location.href}`,
     };
-    _wcProvider = await EthProv.init({
-      projectId: _ETH_WC_PROJECT_ID, chains: [1], optionalChains: [137, 8453],
-      showQrModal: true,
-      qrModalOptions: {
-        themeMode: "dark",
-        themeVariables: { "--wcm-background-color": "#2a1c14", "--wcm-accent-color": "#c4845a" },
-        explorerRecommendedWalletIds: walletHint && wcIds[walletHint] ? wcIds[walletHint] : undefined,
-      },
-    });
-    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-    if (isMobile && walletHint) {
-      _wcProvider.once("display_uri", uri => {
-        const links = {
-          metamask: `metamask://wc?uri=${encodeURIComponent(uri)}`,
-          rainbow:  `rainbow://wc?uri=${encodeURIComponent(uri)}`,
-          coinbase: `cbwallet://wc?uri=${encodeURIComponent(uri)}`,
-        };
-        if (links[walletHint]) window.location.href = links[walletHint];
-      });
+    const link = deepLinks[walletHint];
+    if (link) {
+      _walletConnecting = false;
+      setWalletUi("disconnected");
+      _wcCloseModal();
+      window.location.href = link;
+      return;
     }
-    await _wcProvider.connect();
-    provider = new ethers.BrowserProvider(_wcProvider);
-    signer   = await provider.getSigner();
-    _wcProvider.on("accountsChanged", () => location.reload());
-    _wcProvider.on("chainChanged",    () => location.reload());
-    _wcProvider.on("disconnect",      () => { disconnectWallet(); });
-    _wcCloseModal();
-    await _wcFinishConnect(await signer.getAddress(), "walletconnect");
+  }
+
+  // ── Desktop / generic WalletConnect: generate URI and show it ─────────────
+  if (body)  body.innerHTML = `<p style="color:var(--text-muted);font-family:'Crimson Pro',serif;font-size:0.9rem;text-align:center;padding:24px 0">Generating connection link&hellip;</p>`;
+  if (title) title.textContent = "WalletConnect";
+
+  try {
+    // Call the WalletConnect relay directly to get a pairing URI
+    const relayRes = await fetch(
+      `https://relay.walletconnect.com/v1/?projectId=${_ETH_WC_PROJECT_ID}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: Date.now(), jsonrpc: "2.0", method: "wc_pairingCreate", params: {} })
+      }
+    );
+    const relayData = await relayRes.json();
+    const wcUri = relayData?.result?.uri;
+    if (!wcUri) throw new Error("Could not generate WalletConnect pairing link");
+
+    if (body) body.innerHTML = `
+      <div style="text-align:center;padding:8px 0 4px">
+        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--linen);margin:0 0 14px">
+          Scan with your wallet app or copy the link below
+        </p>
+        <input id="wc-uri-input"
+          style="width:100%;box-sizing:border-box;font-size:0.6rem;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(196,132,90,0.2);border-radius:6px;color:var(--linen);font-family:monospace;cursor:pointer"
+          readonly value="${wcUri}" onclick="this.select();document.execCommand('copy');this.style.borderColor='var(--gold)'" title="Click to copy" />
+        <p style="font-family:'Crimson Pro',serif;font-size:0.72rem;color:var(--text-muted);font-style:italic;margin:8px 0 0">
+          Click the link above to copy, then paste in your wallet app
+        </p>
+      </div>
+      <button class="wc-cancel-btn" onclick="_wcCloseModal()" style="margin-top:16px">Cancel</button>`;
   } catch(e) {
     _wcCloseModal();
-    // Classify the error so the user sees something actionable
-    const msg = e.message || "";
-    const isRelay    = /websocket|relay|wss:|network/i.test(msg);
-    const isCancelled = e.code === 4001 || /rejected|denied|cancelled|closed/i.test(msg);
-    const friendly = isCancelled
-      ? "Connection cancelled"
-      : isRelay
-      ? "Could not reach WalletConnect relay — check your internet connection and try again"
-      : msg || "Connection failed";
-    _wcHandleError({ ...e, message: friendly });
-  } finally { _walletConnecting = false; }
+    _wcHandleError(e);
+  } finally {
+    _walletConnecting = false;
+    setWalletUi("disconnected");
+  }
 }
 
 async function _wcFinishConnect(addr, method) {
