@@ -11,24 +11,41 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <script src="https://unpkg.com/@taquito/taquito@20.1.0/dist/taquito.min.js"></script>
 <script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
-<!-- WalletConnect ethereum provider — loaded lazily via ESM on first use -->
+<!-- WalletConnect — UMD bundle loaded lazily via script tag -->
 <script>
-// Pre-load the WalletConnect provider in the background so it's ready when needed.
-// Using esm.sh which correctly bundles CJS packages for browser ESM consumption.
 window._wcProviderPromise = null;
 async function _loadWCProvider() {
   if (window._wcProviderPromise) return window._wcProviderPromise;
-  window._wcProviderPromise = import("https://esm.sh/@walletconnect/ethereum-provider@2.17.0")
-    .then(mod => {
-      const EthProv = mod?.EthereumProvider || mod?.default?.EthereumProvider || mod?.default;
-      if (!EthProv) throw new Error("WalletConnect EthereumProvider not found in module exports");
-      window.EthereumProvider = EthProv;
-      console.debug("[wc] EthereumProvider loaded");
-      return EthProv;
-    });
+  window._wcProviderPromise = new Promise((resolve, reject) => {
+    const sources = [
+      "https://unpkg.com/@walletconnect/ethereum-provider@2.13.3/dist/index.umd.js",
+      "https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.13.3/dist/index.umd.js",
+    ];
+    let idx = 0;
+    function tryNext() {
+      if (idx >= sources.length) { reject(new Error("WalletConnect library could not be loaded")); return; }
+      const s = document.createElement("script");
+      s.src = sources[idx++];
+      s.onload = () => {
+        // UMD bundle exposes window.EthereumProvider — the class is nested
+        const EP = window?.EthereumProvider?.EthereumProvider
+                || window?.EthereumProvider
+                || window?.WalletConnectEthereumProvider?.EthereumProvider;
+        if (EP && typeof EP.init === "function") {
+          console.debug("[wc] EthereumProvider ready");
+          resolve(EP);
+        } else {
+          console.warn("[wc] bundle loaded but EthereumProvider not found, trying next source");
+          tryNext();
+        }
+      };
+      s.onerror = () => { console.warn("[wc] script load failed, trying next source"); tryNext(); };
+      document.head.appendChild(s);
+    }
+    tryNext();
+  });
   return window._wcProviderPromise;
 }
-// Kick off the load immediately so it's ready before the user taps Connect
 document.addEventListener("DOMContentLoaded", () => _loadWCProvider().catch(() => {}));
 </script>
 <style>
