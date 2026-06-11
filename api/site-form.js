@@ -69,6 +69,26 @@ function buildRow(payload) {
     return { bot: true };
   }
 
+  if (formType === 'private-offer' || formType === 'offer') {
+    const row = {
+      form_type:      'private-offer',
+      status:         'pending',
+      name:           clean(payload.name, 180),
+      email:          clean(payload.email, 320),
+      offer_amount:   clean(payload.offer_amount, 40),
+      offer_currency: clean(payload.offer_currency || 'USD', 10),
+      artwork:        clean(payload.artwork, 200),
+      chain:          clean(payload.chain, 40),
+      wallet_address: clean(payload.wallet_address, 180),
+      message:        clean(payload.message, 2000),
+      payload,
+    };
+    if (!row.name || !isEmail(row.email) || !row.offer_amount) {
+      return { error: 'Please complete all required offer fields.' };
+    }
+    return row;
+  }
+
   if (formType === 'matching-token' || formType === 'claim') {
     const row = {
       form_type: 'matching-token',
@@ -105,7 +125,143 @@ function buildRow(payload) {
 }
 
 function alertLabel(formType) {
-  return formType === 'matching-token' ? 'matching token request' : 'commission request';
+  if (formType === 'matching-token') return 'matching token request';
+  if (formType === 'private-offer')  return 'private offer';
+  return 'commission request';
+}
+
+async function sendOfferConfirmation(row, id) {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) throw new Error('RESEND_API_KEY missing');
+
+  const name     = row.name           || 'Collector';
+  const artwork  = row.artwork        || 'the piece';
+  const amount   = row.offer_amount && row.offer_currency
+    ? `${row.offer_amount} ${row.offer_currency}`
+    : null;
+  const subject  = `Your offer on "${artwork}" — received`;
+
+  const amountRow = amount ? `
+        <tr>
+          <td style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
+            <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Your offer</span>
+          </td>
+          <td align="right" style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
+            <span style="font-size:16px;color:#e8d5b0;font-weight:600;font-family:'Georgia',serif">${amount}</span>
+          </td>
+        </tr>` : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+</head>
+<body style="margin:0;padding:0;background:#1e1510;font-family:'Georgia',serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#1e1510;padding:40px 0">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#2a1c14;border:1px solid rgba(196,132,90,0.25);border-radius:6px;overflow:hidden;max-width:560px;width:100%">
+
+        <!-- Header -->
+        <tr>
+          <td style="padding:28px 32px 20px;border-bottom:1px solid rgba(196,132,90,0.18)">
+            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works · Private Offer</p>
+            <h1 style="margin:0;font-family:'Georgia',serif;font-size:26px;font-weight:400;color:#e8d5b0;line-height:1.2">${artwork}</h1>
+          </td>
+        </tr>
+
+        <!-- Badge -->
+        <tr>
+          <td style="padding:24px 32px">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(196,132,90,0.08);border:1px solid rgba(196,132,90,0.3);border-radius:4px">
+              <tr><td style="padding:18px 20px">
+                <p style="margin:0 0 8px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#c4845a;font-family:'Georgia',serif">Offer received</p>
+                <p style="margin:0 0 8px;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">Thank you, ${name}.</p>
+                <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">Your interest in this work means a great deal. Kay has been notified and will review your offer personally — expect a response within a few days.</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Detail rows -->
+        <tr>
+          <td style="padding:0 32px 20px">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              ${amountRow}
+              <tr>
+                <td style="padding:10px 0${amount ? ';border-bottom:1px solid rgba(196,132,90,0.12)' : ''}">
+                  <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Piece</span>
+                </td>
+                <td align="right" style="padding:10px 0${amount ? ';border-bottom:1px solid rgba(196,132,90,0.12)' : ''}">
+                  <span style="font-size:13px;color:#c4845a;font-style:italic;font-family:'Georgia',serif">${artwork}</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0">
+                  <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Reference</span>
+                </td>
+                <td align="right" style="padding:10px 0">
+                  <span style="font-size:11px;color:#4a3228;font-family:'Georgia',serif">${id || '—'}</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- CTA -->
+        <tr>
+          <td style="padding:4px 32px 32px;text-align:center">
+            <a href="https://kaysworks.com/auction" style="display:inline-block;background:#9e4f2e;color:#f5ede0;text-decoration:none;font-family:'Georgia',serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 32px;border-radius:4px">View the auction</a>
+            <p style="margin:18px 0 0;font-size:12px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">In the meantime the auction remains open — you are always welcome to place a bid.</p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:16px 32px;border-top:1px solid rgba(196,132,90,0.18);text-align:center">
+            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">© Kay's Works · <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const text = [
+    `Thank you, ${name}.`,
+    '',
+    `Your offer on "${artwork}" has been received.`,
+    amount ? `Offer: ${amount}` : '',
+    `Reference: ${id || '—'}`,
+    '',
+    `Kay has been notified and will review your offer personally — expect a response within a few days.`,
+    '',
+    `In the meantime the auction remains open — you are welcome to place a bid.`,
+    `https://kaysworks.com/auction`,
+  ].filter(l => l !== undefined).join('\n');
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: ALERT_FROM_EMAIL,
+      to:   [row.email],
+      subject,
+      text,
+      html,
+    }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || `Resend confirmation failed with ${response.status}`);
+  }
+  return response.json().catch(() => ({}));
 }
 
 async function sendMinimalAlert(row, id) {
@@ -183,7 +339,18 @@ async function handleCreate(req, res) {
     console.error('Queue alert failed:', error.message);
     alert = { sent: false, error: error.message };
   }
-  return res.status(200).json({ ok: true, id, alert });
+  // Client-facing confirmation email for private offers
+  let confirmation = { sent: false };
+  if (row.form_type === 'private-offer') {
+    try {
+      const confData = await sendOfferConfirmation(row, id);
+      confirmation = { sent: true, id: confData && confData.id };
+    } catch (error) {
+      console.error('Offer confirmation email failed:', error.message);
+      confirmation = { sent: false, error: error.message };
+    }
+  }
+  return res.status(200).json({ ok: true, id, alert, confirmation });
 }
 
 async function handleList(req, res) {
