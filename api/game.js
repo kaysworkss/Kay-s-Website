@@ -1299,43 +1299,57 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
   if (!payeeAddress) throw new Error('Shop Tezos address is not configured');
   const api = (process.env.TZKT_API_URL || 'https://api.tzkt.io').replace(/\/$/, '');
   const accountAddress = account => String(account?.address || account?.alias || account || '').toLowerCase();
-  const normalizeRows = data => {
+  const operationRows = data => {
     const out = [];
     const visit = value => {
       if (!value) return;
       if (Array.isArray(value)) { value.forEach(visit); return; }
       if (typeof value !== 'object') return;
-      if (value.type === 'transaction' || value.kind === 'transaction' || value.sender || value.target || value.amount !== undefined) {
+      if (value.hash === opHash || value.type || value.kind || value.status) {
         out.push(value);
       }
       for (const key of ['transactions', 'transaction', 'contents', 'operations']) visit(value[key]);
     };
     visit(data);
-    return out;
+    return out.filter(row => !row.hash || String(row.hash) === opHash);
   };
-  const fetchTzktRows = async path => {
-    const r = await fetch(`${api}${path}`, { headers: { Accept: 'application/json' } });
-    const data = await r.json().catch(() => null);
-    if (!r.ok) return [];
-    return normalizeRows(data);
-  };
-  const queryPaths = [
-    `/v1/operations/${encodeURIComponent(opHash)}`,
-    `/v1/operations/transactions?hash=${encodeURIComponent(opHash)}`,
-    `/v1/operations/transactions?hash.eq=${encodeURIComponent(opHash)}`,
-    `/v1/operations/transactions?hash.in=${encodeURIComponent(opHash)}`,
-  ];
+  const transactionRows = rows => rows.filter(row =>
+    String(row.type || row.kind || '').toLowerCase() === 'transaction' ||
+    row.sender ||
+    row.target ||
+    row.amount !== undefined
+  );
   let list = [];
-  for (const path of queryPaths) {
-    const rows = await fetchTzktRows(path);
-    const exactRows = rows.filter(tx => !tx.hash || String(tx.hash) === opHash);
-    if (exactRows.length) { list = exactRows; break; }
-    if (!list.length && rows.length && path.includes('/operations/transactions?hash=')) list = rows;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4500);
+  try {
+    const r = await fetch(`${api}/v1/operations/${encodeURIComponent(opHash)}`, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    if (r.status === 404) {
+      const e = new Error('Transaction is not confirmed yet');
+      e.statusCode = 409;
+      throw e;
+    }
+    const data = await r.json().catch(() => null);
+    if (!r.ok) {
+      const e = new Error(`Could not reach TzKT operation lookup: HTTP ${r.status}`);
+      e.statusCode = 502;
+      throw e;
+    }
+    list = operationRows(data);
+  } catch (err) {
+    if (err.statusCode) throw err;
+    const e = new Error(`Could not reach TzKT operation lookup: ${err.message || err}`);
+    e.statusCode = 502;
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
 
-  // If the indexer hasn't seen the operation at all yet, that's a "not confirmed
-  // yet" condition → 409 so the client retry loop waits and tries again, rather
-  // than a hard failure on a payment that's genuinely on its way.
+  // If the indexer has not seen the operation yet, return 409 so the browser's
+  // retry loop waits and tries again instead of failing a payment in flight.
   if (list.length === 0) {
     const e = new Error(`Transaction is not confirmed yet. TzKT returned no rows for ${opHash}`);
     e.statusCode = 409;
@@ -1349,7 +1363,16 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
     const amount = (Number(tx.amount || 0) / 1e6).toFixed(6);
     return `${String(tx.status || 'unknown')} ${sender} -> ${target} ${amount} XTZ`;
   }).join('; ');
-  const appliedRows = list.filter(tx => String(tx.status || '').toLowerCase() === 'applied');
+  const statuses = list.map(row => String(row.status || '').toLowerCase()).filter(Boolean);
+  const failedStatus = statuses.find(status => ['failed', 'backtracked', 'skipped'].includes(status));
+  if (failedStatus) {
+    const withErrors = list.find(row => Array.isArray(row.errors) && row.errors.length);
+    const reason = withErrors?.errors?.[0]?.with?.string ||
+      withErrors?.errors?.[0]?.id?.split('.').pop()?.replace(/_/g, ' ') ||
+      `Operation ${failedStatus}`;
+    throw new Error(`Tezos operation failed on-chain: ${reason}`);
+  }
+  const appliedRows = transactionRows(list).filter(tx => String(tx.status || '').toLowerCase() === 'applied');
   if (!appliedRows.length) {
     const e = new Error('Transaction is not confirmed yet');
     e.statusCode = 409;
@@ -1959,3 +1982,31 @@ module.exports = async (req, res) => {
       case 'upcoming':      return handleUpcoming(req, res, supabase);
       case 'challenge':     return handleChallenge(req, res, supabase);
       case 'score':         return handleScore(req, res, supabase);
+      case 'leaderboard':   return handleLeaderboard(req, res, supabase);
+      case 'hall-of-fame':  return handleHallOfFame(req, res, supabase);
+      case 'crosschain-claim': return handleCrosschainClaim(req, res, supabase);
+      case 'notify-outbid':      return handleNotifyOutbid(req, res);
+      case 'notify-bid-confirm': return handleNotifyBidConfirm(req, res);
+      case 'notify-winner':      return handleNotifyWinner(req, res);
+      case 'notify-bid':         return handleNotifyBid(req, res);
+      case 'shop-products':      return handleShopProducts(req, res, supabase);
+      case 'shop-config':        return handleShopConfig(req, res, supabase);
+      case 'shop-quote':         return handleShopQuote(req, res, supabase);
+      case 'shop-payment-init':  return handleShopPaymentInit(req, res, supabase);
+      case 'shop-order-create':  return handleShopOrderCreate(req, res, supabase);
+      case 'shop-order-confirm': return handleShopOrderConfirm(req, res, supabase);
+      case 'shop-order':         return handleShopOrder(req, res, supabase);
+      default:
+        return res.status(404).json({ error: `Unknown action: ${action}` });
+    }
+  } catch (e) {
+    console.error('[api/game] unhandled error:', e);
+    if (!res.headersSent) {
+      return res.status(e.statusCode || 500).json({
+        error: e.message || 'Unhandled server error',
+        stack: process.env.NODE_ENV === 'production' ? undefined : e.stack,
+      });
+    }
+  }
+};
+
