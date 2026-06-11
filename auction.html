@@ -27,10 +27,9 @@ async function _loadWCProvider() {
       const s = document.createElement("script");
       s.src = sources[idx++];
       s.onload = () => {
-        // UMD bundle exposes window.EthereumProvider — the class is nested
-        const EP = window?.EthereumProvider?.EthereumProvider
-                || window?.EthereumProvider
-                || window?.WalletConnectEthereumProvider?.EthereumProvider;
+        // UMD registers as window["@walletconnect/ethereum-provider"].EthereumProvider
+        const ns = window["@walletconnect/ethereum-provider"];
+        const EP = ns?.EthereumProvider || ns?.default?.EthereumProvider || ns?.default;
         if (EP && typeof EP.init === "function") {
           console.debug("[wc] EthereumProvider ready");
           resolve(EP);
