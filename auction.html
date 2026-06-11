@@ -2745,7 +2745,7 @@ async function _ccChooseChain(chain) {
   _ccStartPolling(_ccPairKey);
 
   // If claim succeeded (our chain is now active), show the bid UI
-  if (_ccClaimRow && _ccClaimRow.active_chain === chain) {
+  if (_ccIsActiveBrowser && _ccClaimRow && _ccClaimRow.active_chain === chain) {
     if (targetIdx >= 0 && targetIdx !== _activeIdx) {
       const savedClaim = _ccClaimRow;
       await _switchAuction(targetIdx);
@@ -2772,9 +2772,17 @@ async function _ccChooseChain(chain) {
       "Bidding window open",
       `You have 60 seconds to place the first bid on ${chain === "tezos" ? "Tezos" : "Ethereum"} before both chains unlock again.`
     );
-  } else if (_ccClaimRow && _ccClaimRow.active_chain !== chain) {
+  } else if (_ccClaimRow) {
     // Another browser already claimed the other chain — show locked state
-    _ccUpdateChooserLock(_ccClaimRow.active_chain);
+    _ccSetWaitingState(_ccClaimRow);
+    if (!window._ccClaimNoticeShown) {
+      window._ccClaimNoticeShown = true;
+      notify(
+        "info",
+        "Chain being claimed",
+        `Another collector is starting the auction on ${_ccClaimRow.active_chain === "eth" ? "Ethereum" : "Tezos"}. Both chains are paused until they bid or the window expires.`
+      );
+    }
     if (ethBtn) ethBtn.disabled = false;
     if (xtzBtn) xtzBtn.disabled = false;
   } else {
@@ -2954,23 +2962,33 @@ async function _ccFetch(method, body) {
     const opts = { method, headers: { "Content-Type": "application/json" } };
     if (body) opts.body = JSON.stringify(body);
     const res  = await fetch(CC_API + (method === "GET" && body?.pair_key ? "?pair_key=" + encodeURIComponent(body.pair_key) : ""), opts);
-    return res.ok ? res.json() : null;
+    const data = await res.json().catch(() => null);
+    if (res.ok) return data;
+    if (data?.claim) return data;
+    return null;
   } catch(_) { return null; }
+}
+
+function _ccClaimStatus(row) {
+  const status = String(row?.status || "").trim().toLowerCase().replace(/_/g, "-");
+  if (status === "waiting" || status === "claiming" || status === "pending") return "waiting-bid";
+  return status;
 }
 
 // Called when a paired piece goes live — claims the chain in Supabase.
 // No-bid timeout is 60 seconds; server enforces the window (min 15s, max 3600s).
 async function _ccRegisterClaim(pairKey, activeChain, auctionKey, timeoutSec = 60) {
-  _ccIsActiveBrowser = true; // this browser is the one making the claim
+  _ccIsActiveBrowser = false;
   const data = await _ccFetch("POST", {
     pair_key: pairKey,
     active_chain: activeChain,
     active_auction_key: auctionKey,
     no_bid_timeout_sec: timeoutSec,
   });
-  if (data?.ok) {
+  if (data?.claim) {
     _ccClaimRow = data.claim;
     _ccPairKey = pairKey;
+    _ccIsActiveBrowser = data.claimed === true;
     _renderCcBanner();
   }
 }
@@ -2981,7 +2999,7 @@ async function _ccSignalBid(pairKey) {
   if (_ccBidSignalled) return;
   _ccBidSignalled = true;
   const data = await _ccFetch("POST", { pair_key: pairKey, action: "bid" });
-  if (data?.ok) {
+  if (data?.claim) {
     _ccClaimRow = data.claim;
     _ccStopNoBidCountdown(); // first bid placed — cancel the no-bid window
     _renderCcBanner();
@@ -2991,7 +3009,7 @@ async function _ccSignalBid(pairKey) {
 // Called after AuctionSettled fires — marks the pair permanently closed.
 async function _ccSignalSettle(pairKey) {
   const data = await _ccFetch("POST", { pair_key: pairKey, action: "settle" });
-  if (data?.ok) { _ccClaimRow = data.claim; _renderCcBanner(); }
+  if (data?.claim) { _ccClaimRow = data.claim; _renderCcBanner(); }
 }
 
 // Poll the server for the current claim state.
@@ -3006,17 +3024,18 @@ async function _ccPoll(pairKey) {
   }
   _ccClaimRow = data.claim;
   _renderCcBanner();
+  const claimStatus = _ccClaimStatus(_ccClaimRow);
 
   // React to claim state
-  if (_ccClaimRow?.status === "waiting-bid" || _ccClaimRow?.status === "live") {
+  if (claimStatus === "waiting-bid" || claimStatus === "live") {
     const activeChain = _ccClaimRow.active_chain;
 
     if (_ccIsActiveBrowser) {
       // ── This browser made the claim — it's the active collector ───────────
       _ccClearWaitingState();
       _ccHideChooser();
-      if (_ccClaimRow.status === "waiting-bid") _ccStartNoBidCountdown();
-      if (_ccClaimRow.status === "live") {
+      if (claimStatus === "waiting-bid") _ccStartNoBidCountdown();
+      if (claimStatus === "live") {
         _ccFireNotification("Auction is live!", "A bid was placed. The auction is now running.");
       }
     } else {
@@ -3024,7 +3043,7 @@ async function _ccPoll(pairKey) {
       const chooser = document.getElementById("cc-chooser");
       if (chooser && !chooser.classList.contains("show")) chooser.classList.add("show");
 
-      if (_ccClaimRow.status === "waiting-bid") {
+      if (claimStatus === "waiting-bid") {
         _ccSetWaitingState(_ccClaimRow);
         if (!window._ccClaimNoticeShown) {
           const activeName = activeChain === "eth" ? "Ethereum" : "Tezos";
@@ -3035,7 +3054,7 @@ async function _ccPoll(pairKey) {
             `Another collector is starting the auction on ${activeName}. Both chains are paused until they bid or the window expires.`
           );
         }
-      } else if (_ccClaimRow.status === "live") {
+      } else if (claimStatus === "live") {
         _ccClearWaitingState();
         const activeName    = activeChain === "eth" ? "Ethereum" : "Tezos";
         const activeSlotIdx = _findPairedSlotIndex(_ccPairKey, activeChain);
@@ -3056,7 +3075,7 @@ async function _ccPoll(pairKey) {
   }
 
   // Keep the waiting-bid banner countdown ticking on the passive chain
-  if (_ccClaimRow?.status === "waiting-bid") {
+  if (claimStatus === "waiting-bid") {
     clearTimeout(_ccBannerTickRef);
     _ccBannerTickRef = setTimeout(() => _renderCcBanner(), 1000);
   } else {
@@ -3064,7 +3083,7 @@ async function _ccPoll(pairKey) {
   }
 
   // Stop polling once settled — state is permanent
-  if (_ccClaimRow?.status === "settled") {
+  if (claimStatus === "settled") {
     _ccClearWaitingState();
     _ccStopPolling();
   }
