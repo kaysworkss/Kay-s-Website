@@ -4843,8 +4843,15 @@ async function refreshTezosState(runToken = _switchToken) {
     document.getElementById("stats-grid").style.display = "grid";
     document.getElementById("stat-bid").textContent = noBids ? "—" : `${(auction.highestBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "")} XTZ`;
     document.getElementById("stat-bidder").textContent = noBids ? "No bids yet" : shortAddr(auction.highestBidder);
-    document.getElementById("stat-min").textContent = `${(auction.minNextBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "")} XTZ`;
-    document.getElementById("stat-min-sub").textContent = noBids ? "Reserve price" : "Min increment";
+    // Show ETH-equivalent floor (rounded up) when no bids, otherwise raw on-chain min
+    const _statEthRsv     = window._ccEthReserveWei ?? null;
+    const _statEquivFloor = noBids ? _xtzEthEquivFloor(auction.minNextBidMutez, _statEthRsv) : null;
+    const _statRawXtz     = auction.minNextBidMutez / 1_000_000;
+    const _statMin        = (_statEquivFloor && _statEquivFloor > _statRawXtz)
+      ? Math.ceil(_statEquivFloor).toLocaleString() + " XTZ"
+      : `${(auction.minNextBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "")} XTZ`;
+    document.getElementById("stat-min").textContent = _statMin;
+    document.getElementById("stat-min-sub").textContent = noBids ? "Minimum bid" : "Min increment";
     document.getElementById("bid-form").style.display = acceptingBids ? "block" : "none";
     document.getElementById("history-section").style.display = "block";
     document.getElementById("history-list").innerHTML = noBids ? "" : `
