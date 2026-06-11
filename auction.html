@@ -11,7 +11,26 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <script src="https://unpkg.com/@taquito/taquito@20.1.0/dist/taquito.min.js"></script>
 <script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.17.0/dist/index.umd.js"></script>
+<!-- WalletConnect ethereum provider — loaded lazily via ESM on first use -->
+<script>
+// Pre-load the WalletConnect provider in the background so it's ready when needed.
+// Using esm.sh which correctly bundles CJS packages for browser ESM consumption.
+window._wcProviderPromise = null;
+async function _loadWCProvider() {
+  if (window._wcProviderPromise) return window._wcProviderPromise;
+  window._wcProviderPromise = import("https://esm.sh/@walletconnect/ethereum-provider@2.17.0")
+    .then(mod => {
+      const EthProv = mod?.EthereumProvider || mod?.default?.EthereumProvider || mod?.default;
+      if (!EthProv) throw new Error("WalletConnect EthereumProvider not found in module exports");
+      window.EthereumProvider = EthProv;
+      console.debug("[wc] EthereumProvider loaded");
+      return EthProv;
+    });
+  return window._wcProviderPromise;
+}
+// Kick off the load immediately so it's ready before the user taps Connect
+document.addEventListener("DOMContentLoaded", () => _loadWCProvider().catch(() => {}));
+</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap');
 
@@ -343,6 +362,14 @@ body {
   display: none; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;
 }
 .cc-chooser.show { display: grid; }
+#cc-offer-anchor { grid-column: 1 / -1; }
+#cc-chooser > #offer-section {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: 100%;
+  max-width: 360px;
+  margin: 6px auto 0 !important;
+}
 .cc-choice {
   background: var(--bg-alt); border: 1px solid var(--divider);
   border-radius: var(--r); overflow: hidden; cursor: pointer;
@@ -1188,13 +1215,6 @@ body {
 .bid-hint {
   font-family: 'Crimson Pro', serif; font-size: 0.82rem;
   color: var(--text-muted); margin-bottom: 14px; font-style: italic;
-}
-.bid-legal-notice {
-  font-family: 'Crimson Pro', serif; font-size: 0.72rem;
-  color: var(--text-muted); opacity: 0.55; line-height: 1.55;
-  margin-top: 14px; padding-top: 12px;
-  border-top: 1px solid rgba(196,132,90,0.1);
-  font-style: italic; text-align: left;
 }
 
 /* Bid button — matches site btn-mint style */
@@ -2095,6 +2115,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
                 <button class="cc-choice-btn xtz" onclick="_ccChooseChain('tezos')">Start the Bid on Tezos</button>
               </div>
             </div>
+            <div id="cc-offer-anchor"></div>
           </div>
           <div class="cc-nobid-bar-wrap" id="cc-nobid-bar-wrap">
             <div class="cc-nobid-bar" id="cc-nobid-bar"></div>
@@ -2160,13 +2181,6 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             <button class="cc-cancel-claim-btn" id="cc-cancel-claim-btn-bid" onclick="_ccCancelClaim()" style="margin-top:6px">
               ← Back to chain selection
             </button>
-            <p class="bid-legal-notice">
-              Bids are final and cannot be reversed — blockchain transactions are irreversible.
-              Token amounts shown are calculated from live exchange rates and may differ slightly at the moment your transaction confirms.
-              The 1/1 original transfers on-chain to the winning address only after the auction settles.
-              For cross-chain auctions, only one chain will complete — the other closes permanently once a bid is placed.
-              By placing a bid you confirm you understand these terms.
-            </p>
           </div>
 
           <!-- Buy now section -->
@@ -2185,6 +2199,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           </div>
 
           <!-- Private offer section -->
+          <div id="offer-bid-panel-anchor"></div>
           <div id="offer-section" style="display:none;margin-bottom:24px">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
               <div style="flex:1;height:1px;background:var(--divider)"></div>
@@ -2598,6 +2613,7 @@ function _ccFireNotification(title, body) {
 function _ccShowChooser() {
   // Freeze the XTZ/ETH rate for the duration the chooser is open
   lockXtzRate();
+  _placeOfferSection("chooser");
   // Show the two-chain chooser, hide bid form and countdown until chosen
   const chooser = document.getElementById("cc-chooser");
   if (chooser) chooser.classList.add("show");
@@ -2609,7 +2625,8 @@ function _ccShowChooser() {
   document.getElementById("bid-form").style.display          = "none";
   document.getElementById("history-section").style.display   = "none";
   document.getElementById("buynow-section").style.display    = "none";
-  _closeOfferPanel(); document.getElementById("offer-section").style.display = "none";
+  _closeOfferPanel();
+  document.getElementById("offer-section").style.display     = "block";
   document.getElementById("status-line").textContent         = "";
 }
 
@@ -2658,6 +2675,10 @@ async function _ccChooseChain(chain) {
       _renderCcBanner();
     }
     _ccHideChooser();
+    _placeOfferSection("bid");
+    _closeOfferPanel();
+    const offerSection = document.getElementById("offer-section");
+    if (offerSection) offerSection.style.display = "none";
     _ccStartNoBidCountdown();
     // Immediately populate the bid panel — don't wait for the 15s poll timer
     const _refreshChain = _slotChain(_activeCfg());
@@ -4454,10 +4475,8 @@ async function _wcConnectWC(walletHint) {
   if (body)  body.innerHTML = `<p style="color:var(--text-muted);font-family:'Crimson Pro',serif;font-size:0.9rem;text-align:center;padding:24px 0">Initialising&hellip;</p>`;
   if (title) title.textContent = "Connecting\u2026";
   try {
-    const EthProv = window.EthereumProvider
-      || window?.WalletConnectEthereumProvider?.EthereumProvider
-      || window?.["@walletconnect/ethereum-provider"]?.EthereumProvider;
-    if (!EthProv) throw new Error("WalletConnect not loaded \u2014 please refresh.");
+    const EthProv = await _loadWCProvider().catch(() => null);
+    if (!EthProv) throw new Error("WalletConnect failed to load \u2014 please refresh and try again.");
     if (_wcProvider) { try { await _wcProvider.disconnect(); } catch(_){} _wcProvider = null; }
     const wcIds = {
       metamask: ["c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96"],
@@ -4890,8 +4909,9 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     // Private offer — only while no bids have been placed
     const offerSection = document.getElementById("offer-section");
     if (offerSection) {
-      offerSection.style.display = (noBids && deposited && !settled) ? "block" : "none";
-      if (!noBids) _closeOfferPanel(); // collapse quietly when a bid lands
+      _placeOfferSection(_isCrossChainOfferContext() ? "chooser" : "bid");
+      offerSection.style.display = (!_isCrossChainOfferContext() && noBids && deposited && !settled) ? "block" : "none";
+      if (!noBids) _closeOfferPanel();
     }
 
   } catch(e) { console.error("refreshState:", e); }
@@ -5193,7 +5213,8 @@ async function refreshTezosState(runToken = _switchToken) {
     // Private offer — only while no bids have been placed on Tezos
     const _tezOfferSection = document.getElementById("offer-section");
     if (_tezOfferSection) {
-      _tezOfferSection.style.display = (noBids && !auction.settled) ? "block" : "none";
+      _placeOfferSection(_isCrossChainOfferContext() ? "chooser" : "bid");
+      _tezOfferSection.style.display = (!_isCrossChainOfferContext() && noBids && !auction.settled) ? "block" : "none";
       if (!noBids) _closeOfferPanel();
     }
     document.getElementById("history-list").innerHTML = noBids ? "" : `
@@ -5338,6 +5359,16 @@ async function checkTezosEligibility(runToken = _switchToken) {
 // ─── Bid ─────────────────────────────────────────────────────────────────────
 
 // ── Private offer panel ──────────────────────────────────────────────────────
+
+function _placeOfferSection(target) {
+  const offer  = document.getElementById("offer-section");
+  const anchor = document.getElementById(target === "chooser" ? "cc-offer-anchor" : "offer-bid-panel-anchor");
+  if (offer && anchor && offer.previousElementSibling !== anchor) anchor.after(offer);
+}
+
+function _isCrossChainOfferContext() {
+  return !!(_activeCfg()?.crossChainPairKey || _ccPairKey);
+}
 
 function toggleOfferPanel() {
   const panel  = document.getElementById("offer-panel");
