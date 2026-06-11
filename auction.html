@@ -4400,7 +4400,9 @@ function setWalletUi(state, addr) {
 // ── ETH Wallet Connection — injected + WalletConnect v2 ──────────────────────
 // Desktop: prefers window.ethereum (MetaMask, Rabby…) via picker modal
 // Mobile:  no injected provider → WalletConnect deep-link / QR code
-const _ETH_WC_PROJECT_ID = "f9a3c36a9a9b8d60f77e64a5a4b8ef7c";
+// ⚠️  Replace with your own key from https://cloud.walletconnect.com
+//     The Beacon community key below works for Tezos but is rate-limited for ETH.
+const _ETH_WC_PROJECT_ID = process?.env?.WC_PROJECT_ID || "YOUR_WALLETCONNECT_PROJECT_ID";
 let _wcProvider = null;
 
 function connectWallet() { _wcOpenModal(); }
@@ -4511,8 +4513,19 @@ async function _wcConnectWC(walletHint) {
     _wcProvider.on("disconnect",      () => { disconnectWallet(); });
     _wcCloseModal();
     await _wcFinishConnect(await signer.getAddress(), "walletconnect");
-  } catch(e) { _wcCloseModal(); _wcHandleError(e); }
-  finally    { _walletConnecting = false; }
+  } catch(e) {
+    _wcCloseModal();
+    // Classify the error so the user sees something actionable
+    const msg = e.message || "";
+    const isRelay    = /websocket|relay|wss:|network/i.test(msg);
+    const isCancelled = e.code === 4001 || /rejected|denied|cancelled|closed/i.test(msg);
+    const friendly = isCancelled
+      ? "Connection cancelled"
+      : isRelay
+      ? "Could not reach WalletConnect relay — check your internet connection and try again"
+      : msg || "Connection failed";
+    _wcHandleError({ ...e, message: friendly });
+  } finally { _walletConnecting = false; }
 }
 
 async function _wcFinishConnect(addr, method) {
