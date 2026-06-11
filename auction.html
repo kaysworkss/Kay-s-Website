@@ -2103,9 +2103,9 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           <div class="cc-chooser" id="cc-chooser">
             <div class="cc-choice" id="cc-eth-choice">
               <div class="cc-lock-overlay">
-                <div class="cc-lock-icon">✕</div>
-                <div class="cc-lock-lbl">Locked</div>
-                <div class="cc-lock-sub" id="cc-eth-lock-sub">Auction on Tezos</div>
+                <div class="cc-lock-icon">⏳</div>
+                <div class="cc-lock-lbl">Chain being claimed</div>
+                <div class="cc-lock-sub" id="cc-eth-lock-sub">A collector is starting the Tezos auction — this chain is paused for 60 seconds</div>
               </div>
               <div class="cc-wait-overlay" id="cc-eth-wait-overlay">
                 <div class="cc-wait-spinner"></div>
@@ -2126,9 +2126,9 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             </div>
             <div class="cc-choice" id="cc-xtz-choice">
               <div class="cc-lock-overlay">
-                <div class="cc-lock-icon">✕</div>
-                <div class="cc-lock-lbl">Locked</div>
-                <div class="cc-lock-sub" id="cc-xtz-lock-sub">Auction on Ethereum</div>
+                <div class="cc-lock-icon">⏳</div>
+                <div class="cc-lock-lbl">Chain being claimed</div>
+                <div class="cc-lock-sub" id="cc-xtz-lock-sub">A collector is starting the Ethereum auction — this chain is paused for 60 seconds</div>
               </div>
               <div class="cc-wait-overlay" id="cc-xtz-wait-overlay">
                 <div class="cc-wait-spinner"></div>
@@ -2562,7 +2562,8 @@ function _isEthAuctionSlot(slot) {
 // A notify-me button lets the collector get a browser notification when
 // the auction goes live (if bid placed) or resets (if timer expires).
 
-let _ccWaitTickRef = null;
+let _ccWaitTickRef    = null;
+let _ccBannerTickRef  = null;
 
 function _ccSetWaitingState(claimRow) {
   const activeChain = claimRow.active_chain;
@@ -2608,7 +2609,9 @@ function _ccSetWaitingState(claimRow) {
 
 function _ccClearWaitingState() {
   clearInterval(_ccWaitTickRef);
-  _ccWaitTickRef = null;
+  _ccWaitTickRef   = null;
+  clearTimeout(_ccBannerTickRef);
+  _ccBannerTickRef = null;
   const ethChoice = document.getElementById("cc-eth-choice");
   const xtzChoice = document.getElementById("cc-xtz-choice");
   if (ethChoice) ethChoice.classList.remove("waiting");
@@ -2960,7 +2963,7 @@ async function _ccPoll(pairKey) {
   // React to claim state — handle all cases for browsers that didn't initiate the claim
   if (_ccClaimRow?.status === "waiting-bid" || _ccClaimRow?.status === "live") {
     const activeChain = _ccClaimRow.active_chain;
-    const slot = _activeCfg();
+    const slot      = _activeCfg();
     const thisChain = (slot?.chain || "eth") === "tezos" ? "tezos" : "eth";
 
     if (activeChain === thisChain) {
@@ -2969,20 +2972,39 @@ async function _ccPoll(pairKey) {
       _ccHideChooser();
       if (_ccClaimRow.status === "waiting-bid") _ccStartNoBidCountdown();
       if (_ccClaimRow.status === "live") {
-        // Bid was placed while this browser was waiting — fire notification
         _ccFireNotification("Auction is live!", "A bid was placed. The auction is now running.");
       }
     } else {
-      // This browser is on the passive chain — show waiting state with countdown
+      // This browser is on the passive/locked chain
       if (_ccClaimRow.status === "waiting-bid") {
+        // Show chooser with waiting overlays so the passive collector can see the countdown
+        const chooser = document.getElementById("cc-chooser");
+        if (chooser && !chooser.classList.contains("show")) {
+          // Only show chooser if it's not already visible — don't disrupt the active collector
+          chooser.classList.add("show");
+        }
         _ccSetWaitingState(_ccClaimRow);
       } else if (_ccClaimRow.status === "live") {
-        // Bid placed by someone on the other chain — lock this chain out
+        // Bid placed on the other chain — lock this chain out permanently
         _ccClearWaitingState();
         _ccUpdateChooserLock(activeChain);
-        _ccFireNotification("Auction is live on another chain", "The auction started on " + (activeChain === "eth" ? "Ethereum" : "Tezos") + ". This chain is now locked.");
+        // Hide the chooser — replace it with just the banner
+        const chooser = document.getElementById("cc-chooser");
+        if (chooser) chooser.classList.remove("show");
+        _ccFireNotification(
+          "Auction is live on another chain",
+          "The auction started on " + (activeChain === "eth" ? "Ethereum" : "Tezos") + ". This chain is now permanently locked."
+        );
       }
     }
+  }
+
+  // Keep the waiting-bid banner countdown ticking on the passive chain
+  if (_ccClaimRow?.status === "waiting-bid") {
+    clearTimeout(_ccBannerTickRef);
+    _ccBannerTickRef = setTimeout(() => _renderCcBanner(), 1000);
+  } else {
+    clearTimeout(_ccBannerTickRef);
   }
 
   // Stop polling once settled — state is permanent
@@ -3041,37 +3063,43 @@ function _renderCcBanner() {
   if (!_ccClaimRow) { el.style.display = "none"; return; }
 
   const { status, active_chain, reset_at } = _ccClaimRow;
-  const slot       = _activeCfg();
-  const thisChain  = (slot?.chain || "eth") === "tezos" ? "tezos" : "eth";
-  const otherChain = active_chain === "eth" ? "Tezos" : "Ethereum";
-  const sameChain  = active_chain === thisChain;
+  const slot      = _activeCfg();
+  const thisChain = (slot?.chain || "eth") === "tezos" ? "tezos" : "eth";
+  const sameChain = active_chain === thisChain;
+  const activeName  = active_chain === "eth" ? "Ethereum" : "Tezos";
+  const passiveName = active_chain === "eth" ? "Tezos" : "Ethereum";
 
   el.style.display = "flex";
 
   if (status === "settled") {
     el.className = "cc-banner cc-settled";
-    el.innerHTML = `<span class="cc-banner-dot"></span><span>Auction settled — the ${otherChain} listing is permanently closed.</span>`;
+    el.innerHTML = sameChain
+      ? `<span class="cc-banner-dot"></span><span>Auction settled on this chain — ${passiveName} listing is permanently closed.</span>`
+      : `<span class="cc-banner-dot"></span><span>Auction settled on ${activeName} — this listing is permanently closed.</span>`;
     return;
   }
 
   if (status === "waiting-bid") {
-    // No bid yet — show the no-bid countdown
-    const resetMs  = reset_at ? new Date(reset_at).getTime() - Date.now() : 0;
-    const remSec   = Math.max(0, Math.floor(resetMs / 1000));
-    const mm       = String(Math.floor(remSec / 60)).padStart(2, "0");
-    const ss       = String(remSec % 60).padStart(2, "0");
-    el.className   = "cc-banner cc-waiting";
-    el.innerHTML   = `<span class="cc-banner-dot"></span><span><strong>${mm}:${ss}</strong> to place a bid — or both chains unlock and reset automatically.</span>`;
+    const resetMs = reset_at ? new Date(reset_at).getTime() - Date.now() : 0;
+    const remSec  = Math.max(0, Math.floor(resetMs / 1000));
+    const mm = String(Math.floor(remSec / 60)).padStart(2, "0");
+    const ss = String(remSec % 60).padStart(2, "0");
+    el.className  = "cc-banner cc-waiting";
+    el.innerHTML  = sameChain
+      ? `<span class="cc-banner-dot"></span><span><strong>${mm}:${ss}</strong> to place the opening bid — or both chains unlock and reset.</span>`
+      : `<span class="cc-banner-dot"></span><span>A collector claimed ${activeName} — <strong>${mm}:${ss}</strong> left to open the auction. This chain is paused until they bid or the window expires.</span>`;
     return;
   }
 
   if (status === "live") {
     if (sameChain) {
       el.className = "cc-banner cc-live";
-      el.innerHTML = `<span class="cc-banner-dot"></span><span>Auction live on this chain — ${otherChain} is locked.</span>`;
+      el.innerHTML = `<span class="cc-banner-dot"></span><span>Auction live on this chain — ${passiveName} is permanently locked.</span>`;
     } else {
       el.className = "cc-banner cc-locked";
-      el.innerHTML = `<span class="cc-banner-dot cc-dot-locked"></span><span>Auction is running on ${active_chain === "eth" ? "Ethereum" : "Tezos"} — this chain is locked out.</span>`;
+      el.innerHTML = `<span class="cc-banner-dot cc-dot-locked"></span><span>The auction is running on ${activeName} — this chain is permanently locked out.</span>`;
+      // Also ensure the chooser cards are locked in case chooser is visible
+      _ccUpdateChooserLock(active_chain);
     }
   }
 }
