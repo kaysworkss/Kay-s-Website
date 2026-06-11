@@ -99,6 +99,9 @@ function sanitisePiece(p) {
       : "mainnet",
     tezosRpcUrl: String(p.tezosRpcUrl || "").slice(0, 500),
     crossChainPairKey: String(p.crossChainPairKey || "").slice(0, 100),
+    usdHardCap:        p.usdHardCap != null && isFinite(parseFloat(p.usdHardCap)) && parseFloat(p.usdHardCap) > 0
+      ? parseFloat(p.usdHardCap)
+      : null,
     artTitle:     String(p.artTitle     || "").slice(0, 200),
     artArtist:    String(p.artArtist    || "").slice(0, 200),
     // Long-form HTML (rich text from the admin editor). 50k chars allows for
@@ -134,6 +137,7 @@ const DEFAULT_CONFIG = {
   tezosNetwork:     "mainnet",
   tezosRpcUrl:      "",
   crossChainPairKey:"",
+  usdHardCap:       null,
   artTitle:         "",
   artArtist:        "",
   artAbout:         "",
@@ -192,6 +196,9 @@ module.exports = async function handler(req, res) {
         : "mainnet",
       tezosRpcUrl:      String(body.tezosRpcUrl       || "").slice(0, 500),
       crossChainPairKey:String(body.crossChainPairKey || "").slice(0, 100),
+      usdHardCap:       body.usdHardCap != null && isFinite(parseFloat(body.usdHardCap)) && parseFloat(body.usdHardCap) > 0
+        ? parseFloat(body.usdHardCap)
+        : null,
       artTitle:         String(body.artTitle         || "").slice(0, 200),
       artArtist:        String(body.artArtist        || "").slice(0, 200),
       artAbout:         String(body.artAbout         || "").slice(0, 50000),
