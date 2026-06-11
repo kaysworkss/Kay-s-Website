@@ -2511,6 +2511,7 @@ let _ccPairKey       = null;   // pair key for the active paired piece, or null
 let _ccClaimRow      = null;   // current claim row from server, or null
 let _ccPollTimer     = null;   // interval for polling claim state
 let _ccBidSignalled  = false;  // true once we've sent the "bid" action for this slot
+let _ccIsActiveBrowser = false; // true if this browser initiated the current claim
 const CC_API         = "/api/crosschain-claim";
 const CC_POLL_MS     = 8000;   // poll every 8 seconds
 
@@ -2601,6 +2602,7 @@ let _ccBannerTickRef  = null;
 
 function _ccSetWaitingState(claimRow) {
   const activeChain = claimRow.active_chain;
+  const activeName  = activeChain === "eth" ? "Ethereum" : "Tezos";
   const resetAt     = claimRow.reset_at ? new Date(claimRow.reset_at).getTime() : 0;
 
   // Both cards go into waiting mode — neither is clickable while claim is pending
@@ -2609,13 +2611,21 @@ function _ccSetWaitingState(claimRow) {
   if (ethChoice) ethChoice.classList.add("waiting");
   if (xtzChoice) xtzChoice.classList.add("waiting");
 
-  // Show the draining no-bid bar (gold = waiting, not started by this browser)
+  // Update the wait overlay text to say which chain was chosen and how long to wait
+  const remMs    = Math.max(0, resetAt - Date.now());
+  const remSec   = Math.ceil(remMs / 1000);
+  const mm = String(Math.floor(remSec / 60)).padStart(2, "0");
+  const ss = String(remSec % 60).padStart(2, "0");
+  const subText  = `Another collector is starting the auction on ${activeName}. Both chains are paused — ${mm}:${ss} left or until they place a bid.`;
+  document.querySelectorAll(".cc-wait-lbl").forEach(el => el.textContent = "A choice is being made");
+  document.querySelectorAll(".cc-wait-sub").forEach(el => el.textContent = subText);
+
+  // Show the draining no-bid bar
   const barWrap = document.getElementById("cc-nobid-bar-wrap");
   const bar     = document.getElementById("cc-nobid-bar");
   if (barWrap) barWrap.classList.add("show");
   if (bar) {
     bar.classList.remove("live");
-    const remMs = Math.max(0, resetAt - Date.now());
     bar.style.transition = "none"; bar.style.width = "100%";
     bar.getBoundingClientRect();
     bar.style.transition = `width ${remMs}ms linear`;
@@ -2626,17 +2636,18 @@ function _ccSetWaitingState(claimRow) {
   const notifyBtn = document.getElementById("cc-notify-btn");
   if (notifyBtn) notifyBtn.classList.add("show");
 
-  // Tick the wait timers every second on both overlays
+  // Tick the wait timers every second
   clearInterval(_ccWaitTickRef);
   _ccWaitTickRef = setInterval(() => {
     const rem = Math.max(0, Math.floor((resetAt - Date.now()) / 1000));
     const mm  = String(Math.floor(rem / 60)).padStart(2, "0");
     const ss  = String(rem % 60).padStart(2, "0");
-    const label = `${mm}:${ss} remaining`;
+    const updated = `Another collector is starting the auction on ${activeName}. Both chains are paused — ${mm}:${ss} left or until they place a bid.`;
+    document.querySelectorAll(".cc-wait-sub").forEach(el => el.textContent = updated);
     const ethTimer = document.getElementById("cc-eth-wait-timer");
     const xtzTimer = document.getElementById("cc-xtz-wait-timer");
-    if (ethTimer) ethTimer.textContent = label;
-    if (xtzTimer) xtzTimer.textContent = label;
+    if (ethTimer) ethTimer.textContent = `${mm}:${ss} remaining`;
+    if (xtzTimer) xtzTimer.textContent = `${mm}:${ss} remaining`;
     if (rem === 0) clearInterval(_ccWaitTickRef);
   }, 1000);
 }
@@ -2949,6 +2960,7 @@ async function _ccFetch(method, body) {
 // Called when a paired piece goes live — claims the chain in Supabase.
 // No-bid timeout is 60 seconds; server enforces the window (min 15s, max 3600s).
 async function _ccRegisterClaim(pairKey, activeChain, auctionKey, timeoutSec = 60) {
+  _ccIsActiveBrowser = true; // this browser is the one making the claim
   const data = await _ccFetch("POST", {
     pair_key: pairKey,
     active_chain: activeChain,
@@ -2994,14 +3006,12 @@ async function _ccPoll(pairKey) {
   _ccClaimRow = data.claim;
   _renderCcBanner();
 
-  // React to claim state — handle all cases for browsers that didn't initiate the claim
+  // React to claim state
   if (_ccClaimRow?.status === "waiting-bid" || _ccClaimRow?.status === "live") {
     const activeChain = _ccClaimRow.active_chain;
-    const slot      = _activeCfg();
-    const thisChain = (slot?.chain || "eth") === "tezos" ? "tezos" : "eth";
 
-    if (activeChain === thisChain) {
-      // This browser is on the active chain — hide chooser, show bid UI
+    if (_ccIsActiveBrowser) {
+      // ── This browser made the claim — it's the active collector ───────────
       _ccClearWaitingState();
       _ccHideChooser();
       if (_ccClaimRow.status === "waiting-bid") _ccStartNoBidCountdown();
@@ -3009,16 +3019,13 @@ async function _ccPoll(pairKey) {
         _ccFireNotification("Auction is live!", "A bid was placed. The auction is now running.");
       }
     } else {
-      // This browser is on the passive/locked chain — keep the chooser visible
-      // so both cards are visible with the appropriate overlay state
+      // ── Passive collector — show why they're locked out ────────────────────
       const chooser = document.getElementById("cc-chooser");
       if (chooser && !chooser.classList.contains("show")) chooser.classList.add("show");
 
       if (_ccClaimRow.status === "waiting-bid") {
-        // Both cards grey out with spinner and countdown
         _ccSetWaitingState(_ccClaimRow);
       } else if (_ccClaimRow.status === "live") {
-        // Bid placed on the other chain — show refresh prompt to passive collector
         _ccClearWaitingState();
         const activeName    = activeChain === "eth" ? "Ethereum" : "Tezos";
         const activeSlotIdx = _findPairedSlotIndex(_ccPairKey, activeChain);
@@ -3026,13 +3033,9 @@ async function _ccPoll(pairKey) {
         if (refreshBody) refreshBody.textContent = `A bid has been placed on ${activeName}. The auction is now live — refresh to join it and place your own bid.`;
         const refreshOverlay = document.getElementById("cc-refresh-overlay");
         if (refreshOverlay) refreshOverlay.classList.add("show");
-        // Switch to the active chain slot on reload so they land on the live auction
         if (activeSlotIdx >= 0) {
-          const activeSlug = _auctions[activeSlotIdx]?.artTitle || "";
-          // Store which slot to activate so after reload we switch to it
           try { sessionStorage.setItem("cc_redirect_slot", String(activeSlotIdx)); } catch(_) {}
         }
-        // Auto-reload after 5 seconds if they don't tap the button
         setTimeout(() => location.reload(), 5000);
         _ccFireNotification(
           "Auction is live — refresh now",
@@ -3073,7 +3076,8 @@ function _ccReset() {
   _ccClearWaitingState();
   _ccPairKey      = null;
   _ccClaimRow     = null;
-  _ccBidSignalled = false;
+  _ccBidSignalled    = false;
+  _ccIsActiveBrowser = false;
   _ccNoBidCountdownRef = null;
   window._ccNotifyRequested = false;
   _renderCcBanner();
