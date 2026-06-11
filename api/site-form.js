@@ -27,6 +27,13 @@ function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 }
 
+function emailList(value) {
+  return String(value || '')
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean);
+}
+
 function isAuthorised(req) {
   const pw = process.env.ADMIN_PASSWORD;
   if (!pw) {
@@ -322,6 +329,8 @@ async function sendOfferConfirmation(row, id) {
     body: JSON.stringify({
       from: ALERT_FROM_EMAIL,
       to:   [row.email],
+      bcc:  emailList(ALERT_TO_EMAIL),
+      reply_to: ALERT_TO_EMAIL,
       subject,
       text,
       html,
@@ -345,8 +354,16 @@ async function sendMinimalAlert(row, id) {
     `A new ${label} has been recorded in the Kay's Works admin queue.`,
     '',
     `Submission ID: ${id || 'saved'}`,
+    `Collector: ${row.name || row.collector_name || '—'}`,
+    `Email: ${row.email || '—'}`,
+    row.form_type === 'private-offer' ? `Offer: ${row.offer_amount || '—'} ${row.offer_currency || ''}`.trim() : '',
+    row.form_type === 'private-offer' ? `Artwork: ${row.artwork || '—'}` : '',
+    row.form_type === 'private-offer' ? `Chain: ${row.chain || '—'}` : '',
+    row.wallet_address ? `Wallet: ${row.wallet_address}` : '',
+    row.message ? `Message: ${row.message}` : '',
+    '',
     `Open the admin queue: ${ADMIN_URL}`,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
 
   const html = `<!DOCTYPE html>
@@ -376,7 +393,8 @@ async function sendMinimalAlert(row, id) {
     },
     body: JSON.stringify({
       from: ALERT_FROM_EMAIL,
-      to: [ALERT_TO_EMAIL],
+      to: emailList(ALERT_TO_EMAIL),
+      reply_to: row.email || undefined,
       subject,
       text,
       html,
