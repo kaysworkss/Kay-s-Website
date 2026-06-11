@@ -11,6 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <script src="https://unpkg.com/@taquito/taquito@20.1.0/dist/taquito.min.js"></script>
 <script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.17.0/dist/index.umd.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap');
 
@@ -342,14 +343,6 @@ body {
   display: none; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;
 }
 .cc-chooser.show { display: grid; }
-#cc-offer-anchor { grid-column: 1 / -1; }
-#cc-chooser > #offer-section {
-  grid-column: 1 / -1;
-  justify-self: center;
-  width: 100%;
-  max-width: 360px;
-  margin: 6px auto 0 !important;
-}
 .cc-choice {
   background: var(--bg-alt); border: 1px solid var(--divider);
   border-radius: var(--r); overflow: hidden; cursor: pointer;
@@ -1196,6 +1189,13 @@ body {
   font-family: 'Crimson Pro', serif; font-size: 0.82rem;
   color: var(--text-muted); margin-bottom: 14px; font-style: italic;
 }
+.bid-legal-notice {
+  font-family: 'Crimson Pro', serif; font-size: 0.72rem;
+  color: var(--text-muted); opacity: 0.55; line-height: 1.55;
+  margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid rgba(196,132,90,0.1);
+  font-style: italic; text-align: left;
+}
 
 /* Bid button — matches site btn-mint style */
 @keyframes pulseBid {
@@ -1276,6 +1276,49 @@ body {
 }
 
 hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
+
+/* ── ETH WalletConnect picker modal ── */
+.wc-modal-overlay {
+  display:none;position:fixed;inset:0;z-index:9000;
+  background:rgba(10,6,3,0.78);backdrop-filter:blur(4px);
+  align-items:center;justify-content:center;
+}
+.wc-modal-overlay.show{display:flex;}
+.wc-modal{
+  background:#2a1c14;border:1px solid rgba(196,132,90,0.3);
+  border-radius:16px;padding:28px 24px;width:340px;max-width:94vw;
+  box-shadow:0 24px 60px rgba(0,0,0,0.6);
+}
+.wc-modal-title{
+  font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.2em;
+  text-transform:uppercase;color:var(--text-muted);text-align:center;margin-bottom:20px;
+}
+.wc-wallet-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+.wc-wallet-btn{
+  display:flex;align-items:center;gap:14px;
+  background:rgba(255,255,255,0.04);border:1px solid rgba(196,132,90,0.15);
+  border-radius:10px;padding:13px 16px;cursor:pointer;
+  transition:background 0.18s,border-color 0.18s;width:100%;
+  color:var(--linen);font-family:'Crimson Pro',serif;font-size:1rem;
+}
+.wc-wallet-btn:hover{background:rgba(196,132,90,0.1);border-color:rgba(196,132,90,0.4);}
+.wc-wallet-icon-ph{
+  width:36px;height:36px;border-radius:8px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.3rem;background:rgba(196,132,90,0.1);
+}
+.wc-wallet-name{flex:1;text-align:left;}
+.wc-wallet-tag{
+  font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--text-muted);font-family:'Cinzel',serif;
+}
+.wc-cancel-btn{
+  width:100%;text-align:center;font-family:'Cinzel',serif;font-size:0.6rem;
+  letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);
+  background:transparent;border:none;cursor:pointer;padding:8px;
+  transition:color 0.18s;
+}
+.wc-cancel-btn:hover{color:var(--linen);}
 
 /* Notification */
 .notif {
@@ -2052,7 +2095,6 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
                 <button class="cc-choice-btn xtz" onclick="_ccChooseChain('tezos')">Start the Bid on Tezos</button>
               </div>
             </div>
-            <div id="cc-offer-anchor"></div>
           </div>
           <div class="cc-nobid-bar-wrap" id="cc-nobid-bar-wrap">
             <div class="cc-nobid-bar" id="cc-nobid-bar"></div>
@@ -2118,6 +2160,13 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             <button class="cc-cancel-claim-btn" id="cc-cancel-claim-btn-bid" onclick="_ccCancelClaim()" style="margin-top:6px">
               ← Back to chain selection
             </button>
+            <p class="bid-legal-notice">
+              Bids are final and cannot be reversed — blockchain transactions are irreversible.
+              Token amounts shown are calculated from live exchange rates and may differ slightly at the moment your transaction confirms.
+              The 1/1 original transfers on-chain to the winning address only after the auction settles.
+              For cross-chain auctions, only one chain will complete — the other closes permanently once a bid is placed.
+              By placing a bid you confirm you understand these terms.
+            </p>
           </div>
 
           <!-- Buy now section -->
@@ -2136,7 +2185,6 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           </div>
 
           <!-- Private offer section -->
-          <div id="offer-bid-panel-anchor"></div>
           <div id="offer-section" style="display:none;margin-bottom:24px">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
               <div style="flex:1;height:1px;background:var(--divider)"></div>
@@ -2550,7 +2598,6 @@ function _ccFireNotification(title, body) {
 function _ccShowChooser() {
   // Freeze the XTZ/ETH rate for the duration the chooser is open
   lockXtzRate();
-  _placeOfferSection("chooser");
   // Show the two-chain chooser, hide bid form and countdown until chosen
   const chooser = document.getElementById("cc-chooser");
   if (chooser) chooser.classList.add("show");
@@ -2562,7 +2609,7 @@ function _ccShowChooser() {
   document.getElementById("bid-form").style.display          = "none";
   document.getElementById("history-section").style.display   = "none";
   document.getElementById("buynow-section").style.display    = "none";
-  _closeOfferPanel(); document.getElementById("offer-section").style.display = "block";
+  _closeOfferPanel(); document.getElementById("offer-section").style.display = "none";
   document.getElementById("status-line").textContent         = "";
 }
 
@@ -2611,10 +2658,6 @@ async function _ccChooseChain(chain) {
       _renderCcBanner();
     }
     _ccHideChooser();
-    _placeOfferSection("bid");
-    _closeOfferPanel();
-    const offerSection = document.getElementById("offer-section");
-    if (offerSection) offerSection.style.display = "none";
     _ccStartNoBidCountdown();
     // Immediately populate the bid panel — don't wait for the 15s poll timer
     const _refreshChain = _slotChain(_activeCfg());
@@ -4333,65 +4376,151 @@ function setWalletUi(state, addr) {
   if (connectTezosBtn) connectTezosBtn.textContent = "Connect Tezos";
 }
 
-async function connectWallet() {
+// ── ETH Wallet Connection — injected + WalletConnect v2 ──────────────────────
+// Desktop: prefers window.ethereum (MetaMask, Rabby…) via picker modal
+// Mobile:  no injected provider → WalletConnect deep-link / QR code
+const _ETH_WC_PROJECT_ID = "f9a3c36a9a9b8d60f77e64a5a4b8ef7c";
+let _wcProvider = null;
+
+function connectWallet() { _wcOpenModal(); }
+
+function _wcOpenModal() {
+  const overlay = document.getElementById("wc-modal-overlay");
+  if (overlay) overlay.classList.add("show");
+  const injBtn = document.querySelector(".wc-wallet-btn[onclick='_wcConnectInjected()']");
+  if (injBtn) injBtn.style.display = window.ethereum ? "flex" : "none";
+}
+
+function _wcCloseModal() {
+  const overlay = document.getElementById("wc-modal-overlay");
+  if (overlay) overlay.classList.remove("show");
+  const body = document.getElementById("wc-modal-body");
+  if (body) body.innerHTML = `
+    <div class="wc-wallet-list">
+      <button class="wc-wallet-btn" onclick="_wcConnectInjected()" style="${window.ethereum ? '' : 'display:none'}">
+        <span class="wc-wallet-icon-ph">&#x1F98A;</span>
+        <span class="wc-wallet-name">Browser wallet</span>
+        <span class="wc-wallet-tag">Injected</span>
+      </button>
+      <button class="wc-wallet-btn" onclick="_wcConnectWC('metamask')">
+        <span class="wc-wallet-icon-ph">&#x1F98A;</span>
+        <span class="wc-wallet-name">MetaMask</span>
+        <span class="wc-wallet-tag">Mobile / QR</span>
+      </button>
+      <button class="wc-wallet-btn" onclick="_wcConnectWC('rainbow')">
+        <span class="wc-wallet-icon-ph">&#x1F308;</span>
+        <span class="wc-wallet-name">Rainbow</span>
+        <span class="wc-wallet-tag">Mobile / QR</span>
+      </button>
+      <button class="wc-wallet-btn" onclick="_wcConnectWC('coinbase')">
+        <span class="wc-wallet-icon-ph">&#x1F535;</span>
+        <span class="wc-wallet-name">Coinbase Wallet</span>
+        <span class="wc-wallet-tag">Mobile / QR</span>
+      </button>
+      <button class="wc-wallet-btn" onclick="_wcConnectWC()">
+        <span class="wc-wallet-icon-ph">&#x2B21;</span>
+        <span class="wc-wallet-name">WalletConnect</span>
+        <span class="wc-wallet-tag">All wallets</span>
+      </button>
+    </div>
+    <button class="wc-cancel-btn" onclick="_wcCloseModal()">Cancel</button>`;
+  document.getElementById("wc-modal-title").textContent = "Connect Ethereum Wallet";
+}
+
+async function _wcConnectInjected() {
+  _wcCloseModal();
   if (_walletConnecting) return;
-  _walletConnecting = true;
-  walletChain = "eth";
-  setWalletUi("connecting");
-
+  _walletConnecting = true; walletChain = "eth"; setWalletUi("connecting");
   try {
-    if (!window.ethereum) throw new Error("MetaMask not found — open via http://localhost");
+    if (!window.ethereum) throw new Error("No browser wallet found. Use WalletConnect instead.");
     await window.ethereum.request({ method: "eth_requestAccounts" });
-
     provider = new ethers.BrowserProvider(window.ethereum);
     signer   = await provider.getSigner();
-    const addr = await signer.getAddress();
-
-    // Signature challenge — forces active approval on every connect
-    const ts  = Date.now();
-    const msg = `Gated Auction — wallet verification\n\nAddress: ${addr}\nTimestamp: ${ts}\n\nThis signature proves wallet ownership. It does not cost gas or authorise any transaction.`;
-    setWalletUi("signing");
-    const sig = await signer.signMessage(msg);
-    const rec = ethers.verifyMessage(msg, sig);
-    if (rec.toLowerCase() !== addr.toLowerCase()) throw new Error("Signature mismatch");
-
-    signerAddress = addr;
-    tezosAddress = null;
-    sessionStorage.removeItem("wallet_disconnected");
-
-    setWalletUi("connected", addr);
-
+    await _wcFinishConnect(await signer.getAddress(), "injected");
     if (!_walletEventsBound && window.ethereum?.on) {
       window.ethereum.on("accountsChanged", () => location.reload());
-      window.ethereum.on("chainChanged", () => location.reload());
+      window.ethereum.on("chainChanged",    () => location.reload());
       _walletEventsBound = true;
     }
+  } catch(e) { _wcHandleError(e); }
+  finally    { _walletConnecting = false; }
+}
 
-    if (auctionContract) {
-      // Reconnect all cached contracts with signer
-      Object.keys(_contractCache).forEach(addr => {
-        _contractCache[addr] = _contractCache[addr].connect(signer);
+async function _wcConnectWC(walletHint) {
+  if (_walletConnecting) return;
+  _walletConnecting = true; walletChain = "eth"; setWalletUi("connecting");
+  const body  = document.getElementById("wc-modal-body");
+  const title = document.getElementById("wc-modal-title");
+  if (body)  body.innerHTML = `<p style="color:var(--text-muted);font-family:'Crimson Pro',serif;font-size:0.9rem;text-align:center;padding:24px 0">Initialising&hellip;</p>`;
+  if (title) title.textContent = "Connecting\u2026";
+  try {
+    const EthProv = window.EthereumProvider
+      || window?.WalletConnectEthereumProvider?.EthereumProvider
+      || window?.["@walletconnect/ethereum-provider"]?.EthereumProvider;
+    if (!EthProv) throw new Error("WalletConnect not loaded \u2014 please refresh.");
+    if (_wcProvider) { try { await _wcProvider.disconnect(); } catch(_){} _wcProvider = null; }
+    const wcIds = {
+      metamask: ["c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96"],
+      rainbow:  ["1ae92b26df02f0abca6304df07debccd18262fdf5fe82daa81593582dac9a369"],
+      coinbase: ["fd20dc426fb37566d803205b19bbc1d4096b248ac04548e3cfb6b3a38bd033aa"],
+    };
+    _wcProvider = await EthProv.init({
+      projectId: _ETH_WC_PROJECT_ID, chains: [1], optionalChains: [137, 8453],
+      showQrModal: true,
+      qrModalOptions: {
+        themeMode: "dark",
+        themeVariables: { "--wcm-background-color": "#2a1c14", "--wcm-accent-color": "#c4845a" },
+        explorerRecommendedWalletIds: walletHint && wcIds[walletHint] ? wcIds[walletHint] : undefined,
+      },
+    });
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    if (isMobile && walletHint) {
+      _wcProvider.once("display_uri", uri => {
+        const links = {
+          metamask: `metamask://wc?uri=${encodeURIComponent(uri)}`,
+          rainbow:  `rainbow://wc?uri=${encodeURIComponent(uri)}`,
+          coinbase: `cbwallet://wc?uri=${encodeURIComponent(uri)}`,
+        };
+        if (links[walletHint]) window.location.href = links[walletHint];
       });
-      auctionContract = auctionContract.connect(signer);
-      // Run post-connect steps independently — a failure in one must not block the others
-      const ok = await checkEligibility().catch(e => {
-        console.warn("checkEligibility:", e);
-        return false;
-      });
-      ok ? onRoomEligibilityGranted() : onRoomEligibilityRevoked();
-      _loadMyProfile().catch(e => console.warn("_loadMyProfile:", e));
     }
+    await _wcProvider.connect();
+    provider = new ethers.BrowserProvider(_wcProvider);
+    signer   = await provider.getSigner();
+    _wcProvider.on("accountsChanged", () => location.reload());
+    _wcProvider.on("chainChanged",    () => location.reload());
+    _wcProvider.on("disconnect",      () => { disconnectWallet(); });
+    _wcCloseModal();
+    await _wcFinishConnect(await signer.getAddress(), "walletconnect");
+  } catch(e) { _wcCloseModal(); _wcHandleError(e); }
+  finally    { _walletConnecting = false; }
+}
 
-  } catch(e) {
-    signer = null;
-    signerAddress = null;
-    setWalletUi("failed");
-    const msg = (e.code === 4001 || e.message?.includes("rejected") || e.message?.includes("denied"))
-      ? "Signature rejected — required to verify wallet" : e.message;
-    notify("err", "Connection failed", msg);
-  } finally {
-    _walletConnecting = false;
+async function _wcFinishConnect(addr, method) {
+  setWalletUi("signing");
+  const ts  = Date.now();
+  const msg = `Gated Auction \u2014 wallet verification\n\nAddress: ${addr}\nTimestamp: ${ts}\n\nThis signature proves wallet ownership. It does not cost gas or authorise any transaction.`;
+  const sig = await signer.signMessage(msg);
+  const rec = ethers.verifyMessage(msg, sig);
+  if (rec.toLowerCase() !== addr.toLowerCase()) throw new Error("Signature mismatch");
+  signerAddress = addr; tezosAddress = null;
+  sessionStorage.removeItem("wallet_disconnected");
+  setWalletUi("connected", addr);
+  console.debug(`[eth] connected via ${method}:`, addr);
+  if (auctionContract) {
+    Object.keys(_contractCache).forEach(a => { _contractCache[a] = _contractCache[a].connect(signer); });
+    auctionContract = auctionContract.connect(signer);
+    const ok = await checkEligibility().catch(e => { console.warn("checkEligibility:", e); return false; });
+    ok ? onRoomEligibilityGranted() : onRoomEligibilityRevoked();
+    _loadMyProfile().catch(e => console.warn("_loadMyProfile:", e));
   }
+}
+
+function _wcHandleError(e) {
+  signer = null; signerAddress = null; setWalletUi("failed");
+  const msg = (e.code === 4001 || /rejected|denied|cancelled/i.test(e.message || ""))
+    ? "Connection cancelled" : e.message || "Connection failed";
+  notify("err", "Connection failed", msg);
 }
 
 function _tezosRpcForSlot(slot = _activeCfg()) {
@@ -4761,8 +4890,7 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     // Private offer — only while no bids have been placed
     const offerSection = document.getElementById("offer-section");
     if (offerSection) {
-      _placeOfferSection(_isCrossChainOfferContext() ? "chooser" : "bid");
-      offerSection.style.display = (!_isCrossChainOfferContext() && noBids && deposited && !settled) ? "block" : "none";
+      offerSection.style.display = (noBids && deposited && !settled) ? "block" : "none";
       if (!noBids) _closeOfferPanel(); // collapse quietly when a bid lands
     }
 
@@ -5065,8 +5193,7 @@ async function refreshTezosState(runToken = _switchToken) {
     // Private offer — only while no bids have been placed on Tezos
     const _tezOfferSection = document.getElementById("offer-section");
     if (_tezOfferSection) {
-      _placeOfferSection(_isCrossChainOfferContext() ? "chooser" : "bid");
-      _tezOfferSection.style.display = (!_isCrossChainOfferContext() && noBids && !auction.settled) ? "block" : "none";
+      _tezOfferSection.style.display = (noBids && !auction.settled) ? "block" : "none";
       if (!noBids) _closeOfferPanel();
     }
     document.getElementById("history-list").innerHTML = noBids ? "" : `
@@ -5212,16 +5339,6 @@ async function checkTezosEligibility(runToken = _switchToken) {
 
 // ── Private offer panel ──────────────────────────────────────────────────────
 
-function _placeOfferSection(target) {
-  const offer = document.getElementById("offer-section");
-  const anchor = document.getElementById(target === "chooser" ? "cc-offer-anchor" : "offer-bid-panel-anchor");
-  if (offer && anchor && offer.previousElementSibling !== anchor) anchor.after(offer);
-}
-
-function _isCrossChainOfferContext() {
-  return !!(_activeCfg()?.crossChainPairKey || _ccPairKey);
-}
-
 function toggleOfferPanel() {
   const panel  = document.getElementById("offer-panel");
   const toggle = document.getElementById("offer-toggle-btn");
@@ -5290,23 +5407,18 @@ async function submitPrivateOffer() {
         message,
       }),
     });
-    const raw = await res.text();
-    let data = {};
-    try { data = raw ? JSON.parse(raw) : {}; }
-    catch { data = { error: raw || "Server returned an unreadable response." }; }
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || data.message || `Submission failed (${res.status})`);
-    }
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "Submission failed");
     setHint("Offer sent — the artist will be in touch.", "ok");
     btn.textContent = "Sent ✓";
     // Clear fields
     ["offer-name","offer-email","offer-wallet","offer-amount","offer-message"]
-      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });  } catch (err) {
-    console.error("submitPrivateOffer:", err);
-    const detail = err?.message ? ` ${err.message}` : "";
-    setHint(`Private offer submission failed.${detail}`, "err");
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  } catch (err) {
+    setHint("Something went wrong — please try again.", "err");
     btn.disabled    = false;
     btn.textContent = "Send offer";
+    console.error("submitPrivateOffer:", err);
   }
 }
 
@@ -7164,5 +7276,41 @@ function simReset() {
   simLog('sys', 'Simulation ready — choose a chain to begin.');
 }
 </script>
+<!-- ETH WalletConnect wallet picker modal -->
+<div class="wc-modal-overlay" id="wc-modal-overlay">
+  <div class="wc-modal">
+    <p class="wc-modal-title" id="wc-modal-title">Connect Ethereum Wallet</p>
+    <div id="wc-modal-body">
+      <div class="wc-wallet-list">
+        <button class="wc-wallet-btn" onclick="_wcConnectInjected()">
+          <span class="wc-wallet-icon-ph">&#x1F98A;</span>
+          <span class="wc-wallet-name">Browser wallet</span>
+          <span class="wc-wallet-tag">Injected</span>
+        </button>
+        <button class="wc-wallet-btn" onclick="_wcConnectWC('metamask')">
+          <span class="wc-wallet-icon-ph">&#x1F98A;</span>
+          <span class="wc-wallet-name">MetaMask</span>
+          <span class="wc-wallet-tag">Mobile / QR</span>
+        </button>
+        <button class="wc-wallet-btn" onclick="_wcConnectWC('rainbow')">
+          <span class="wc-wallet-icon-ph">&#x1F308;</span>
+          <span class="wc-wallet-name">Rainbow</span>
+          <span class="wc-wallet-tag">Mobile / QR</span>
+        </button>
+        <button class="wc-wallet-btn" onclick="_wcConnectWC('coinbase')">
+          <span class="wc-wallet-icon-ph">&#x1F535;</span>
+          <span class="wc-wallet-name">Coinbase Wallet</span>
+          <span class="wc-wallet-tag">Mobile / QR</span>
+        </button>
+        <button class="wc-wallet-btn" onclick="_wcConnectWC()">
+          <span class="wc-wallet-icon-ph">&#x2B21;</span>
+          <span class="wc-wallet-name">WalletConnect</span>
+          <span class="wc-wallet-tag">All wallets</span>
+        </button>
+      </div>
+      <button class="wc-cancel-btn" onclick="_wcCloseModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
