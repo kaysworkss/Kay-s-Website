@@ -3164,15 +3164,13 @@ async function postShopJson(url, payload) {
     if (window.__shopLoadDone) window.__shopLoadDone();
     throw new Error(`${url} — network error: ${netErr.message}`);
   }
-  const rawText = await res.text().catch(() => '');
-  try { data = rawText ? JSON.parse(rawText) : {}; } catch (_) { data = { raw: rawText }; }
-  const diagBody = Object.keys(data || {}).length ? JSON.stringify(data) : (rawText || '(empty response body)');
-  window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url, status: res.status, body: diagBody });
+  data = await res.json().catch(() => ({}));
+  window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url, status: res.status, body: JSON.stringify(data) });
   if (window.__shopDiag.length > 8) window.__shopDiag.length = 8;
   if (window.__renderShopDiag) window.__renderShopDiag();
   // ── END DIAGNOSTIC CAPTURE ──
   if (window.__shopLoadDone) window.__shopLoadDone();
-  if (!res.ok) throw new Error(data.error || rawText || `${url} failed with HTTP ${res.status}`);
+  if (!res.ok) throw new Error(data.error || `${url} failed`);
   return data;
 }
 
@@ -3256,7 +3254,7 @@ async function submitManualCrypto(chain) {
   if (!proof) return;
   const method = chain === 'tezos' ? 'tezos' : 'eth';
   const btn = document.getElementById(chain === 'tezos' ? 'tezosManualBtn' : 'cryptoConfirmBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Confirming…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Confirming...'; }
   try {
     // Resolve which order to confirm, in priority order:
     //  1. an order hash the customer pasted
@@ -3292,7 +3290,7 @@ document.getElementById('paystackPayBtn').addEventListener('click', async ()=>{
   if(!validateForm()) return;
   const d = getFormData();
   const btn = document.getElementById('paystackPayBtn');
-  btn.disabled = true; btn.textContent = 'Preparing secure checkout…';
+  btn.disabled = true; btn.textContent = 'Preparing secure checkout...';
   try {
     const init = await initServerPayment(d, 'paystack');
     if (!init.authorization_url) throw new Error('Paystack did not return a checkout URL');
@@ -3322,11 +3320,10 @@ async function createPendingOrder(customer, method, checkoutQuote) {
 // while the chain is still indexing (server returns 409 "not confirmed yet").
 async function confirmPendingOrder(orderRef, opts) {
   const payload = Object.assign({ order_ref: orderRef, order_hash: orderRef }, opts);
-  // Tezos/ETH indexers (tzkt, RPC) can lag behind a just-broadcast tx, especially
-  // under congestion. Retry generously — 9 attempts × ~8s ≈ 75s — before giving
-  // up, so a valid payment isn't reported as failed just because indexing is slow.
-  const maxAttempts = 9;
-  const RETRY_MS = 8000;
+  // Tezos/ETH indexers can lag behind a just-broadcast tx. Keep each server call
+  // short, but let the browser retry for about three minutes before giving up.
+  const maxAttempts = 36;
+  const RETRY_MS = 5000;
   let lastErr = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -3347,7 +3344,7 @@ async function confirmPendingOrder(orderRef, opts) {
       if (res.ok) return data;
       if (res.status === 409 && /confirm|not confirmed|waiting|found/i.test(data.error || '') && attempt < maxAttempts) {
         lastErr = new Error(data.error || 'Awaiting on-chain confirmation');
-        if (typeof showToast === 'function' && attempt === 1) showToast('Payment sent — confirming on-chain, please wait…');
+        if (typeof showToast === 'function' && attempt === 1) showToast('Payment sent - confirming on-chain, please wait...');
         await new Promise(r => setTimeout(r, RETRY_MS));
         continue;
       }
@@ -3383,7 +3380,6 @@ function clearPendingOrder(orderRef) {
 // The send paths reuse this locked order instead of creating another.
 const LOCK_MS = 5 * 60 * 1000; // 5 minutes
 window.__activeLock = null;    // { method, order_ref, quote, expires, payerAddress }
-window.__manualCryptoMode = null;
 let _lockTimer = null;
 let _lockSeq = 0;              // guards against overlapping re-locks
 
@@ -3409,8 +3405,8 @@ function renderLockUI(method) {
   box.style.display = 'block';
   const amtEl = document.getElementById(ids.amt);
   const refEl = document.getElementById(ids.ref);
-  if (amtEl) amtEl.textContent = (lock.quote?.crypto_amount ?? '-') + ' ' + lockMethodToAsset(method);
-  if (refEl) refEl.textContent = lock.order_ref || '-';
+  if (amtEl) amtEl.textContent = (lock.quote?.crypto_amount ?? '—') + ' ' + lockMethodToAsset(method);
+  if (refEl) refEl.textContent = lock.order_ref || '—';
 }
 
 function updateLockCountdown() {
@@ -3612,9 +3608,9 @@ function loadAdminConfig() {
 /* ─── Print page editor ─── */
 function slugify(s) {
   return s.toLowerCase()
-    .replace(/[\u00e0\u00e1\u00e2\u00e3\u00e4\u00e5]/g,'a').replace(/[\u00e8\u00e9\u00ea\u00eb]/g,'e')
-    .replace(/[\u00ec\u00ed\u00ee\u00ef]/g,'i').replace(/[\u00f2\u00f3\u00f4\u00f5\u00f6]/g,'o')
-    .replace(/[\u00f9\u00fa\u00fb\u00fc]/g,'u').replace(/[\u00f1]/g,'n')
+    .replace(/[àáâãäå]/g,'a').replace(/[èéêë]/g,'e')
+    .replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o')
+    .replace(/[ùúûü]/g,'u').replace(/[ñ]/g,'n')
     .replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
 }
 
@@ -4715,10 +4711,6 @@ function ensureCryptoRateUpdates() {
 ensureCryptoRateUpdates();
 
 function tezosXtzAmount() {
-  const lock = window.__activeLock;
-  if (lock && lock.method === 'tezos' && lock.quote?.crypto_amount) {
-    return Number(lock.quote.crypto_amount).toFixed(4);
-  }
   if (!_xtzPerUsd) return null; // rate not yet available
   return (grandTotalUsd() * _xtzPerUsd).toFixed(4);
 }
@@ -4909,22 +4901,21 @@ async function tezosConnectWallet() {
 /* ── Render the Tezos panel ── */
 function renderTezosPanel() {
   const addr = SHOP_CONFIG.tezosAddress;
-  const lock = window.__activeLock;
-  const lockReady = !!(lock && lock.method === 'tezos' && lock.order_ref && lock.quote?.crypto_amount);
-  const xtz  = lockReady ? Number(lock.quote.crypto_amount).toFixed(4) : null;
+  const lockedQuote = window.__activeLock?.method === 'tezos'
+    ? window.__activeLock.quote?.crypto_amount
+    : null;
+  const xtz  = lockedQuote || tezosXtzAmount(); // prefer the server-locked quote
 
   const amtBlock  = document.getElementById('tezosAmountBlock');
   const toAddrEl  = document.getElementById('tezosToAddr');
   const xtzAmtEl  = document.getElementById('tezosXtzAmount');
   const sendAmtEl = document.getElementById('tezosSendAmt');
-  const manualBtn = document.getElementById('tezosManualBtn');
 
   if (addr) {
     amtBlock.style.display = '';
     toAddrEl.textContent   = addr;
-    xtzAmtEl.textContent   = xtz !== null ? xtz + ' XTZ' : 'Locking server quote...';
-    if (sendAmtEl) sendAmtEl.textContent = xtz !== null ? xtz : '...';
-    if (manualBtn && lockReady) manualBtn.style.display = '';
+    xtzAmtEl.textContent   = xtz !== null ? xtz + ' XTZ' : 'Fetching rate...';
+    if (sendAmtEl) sendAmtEl.textContent = xtz !== null ? xtz + ' XTZ' : '...';
   } else {
     amtBlock.style.display = 'none';
   }
@@ -4934,7 +4925,7 @@ function renderTezosPanel() {
   if (copyBtn) {
     copyBtn.onclick = () => {
       navigator.clipboard.writeText(addr).then(() => {
-        copyBtn.textContent = 'Copied';
+        copyBtn.textContent = 'Copied ✓';
         setTimeout(() => { copyBtn.textContent = 'Copy address'; }, 2000);
       });
     };
@@ -4945,8 +4936,8 @@ function renderTezosPanel() {
     document.getElementById('tezosWalletInfo').style.display = '';
     document.getElementById('tezosWalletAddr').textContent = tezosShortAddr(_tezosConnectedAddr);
     document.getElementById('tezosConnectBtn').style.display = 'none';
-    // Only show Send button once the server lock is ready.
-    document.getElementById('tezosSendBtn').style.display = (addr && lockReady) ? '' : 'none';
+    // Only show Send button once the rate is known
+    document.getElementById('tezosSendBtn').style.display = (addr && xtz !== null) ? '' : 'none';
   } else {
     document.getElementById('tezosWalletInfo').style.display = 'none';
     document.getElementById('tezosConnectBtn').style.display = '';
@@ -5022,8 +5013,7 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
       console.error('[Tezos] send error:', e);
     }
   } finally {
-    const labelAmt = tezosXtzAmount() || '...';
-    btn.disabled = false; btn.textContent = 'Send ' + labelAmt + ' XTZ';
+    btn.disabled = false; btn.textContent = 'Send ' + tezosXtzAmount() + ' XTZ';
   }
 });
 
