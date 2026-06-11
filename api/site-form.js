@@ -130,6 +130,77 @@ function alertLabel(formType) {
   return 'commission request';
 }
 
+function isSchemaMismatch(error) {
+  const msg = String(error && error.message || '').toLowerCase();
+  return msg.includes('schema cache') ||
+    msg.includes('could not find') ||
+    msg.includes('column') ||
+    msg.includes('pgrst204');
+}
+
+function offerSummary(row) {
+  const lines = [
+    row.artwork ? `Artwork: ${row.artwork}` : '',
+    row.chain ? `Chain: ${row.chain}` : '',
+    row.offer_amount ? `Offer: ${row.offer_amount} ${row.offer_currency || ''}`.trim() : '',
+    row.wallet_address ? `Wallet: ${row.wallet_address}` : '',
+    row.message ? '' : '',
+    row.message || '',
+  ].filter(Boolean);
+  return lines.join('\n').slice(0, 4000);
+}
+
+function compactRow(row) {
+  if (row.form_type === 'private-offer') {
+    return {
+      form_type: 'private-offer',
+      status: row.status || 'pending',
+      name: row.name,
+      email: row.email,
+      commission_type: 'private-offer',
+      message: offerSummary(row),
+      payload: row.payload || row,
+    };
+  }
+  return row;
+}
+
+function minimalRow(row) {
+  if (row.form_type === 'private-offer') {
+    return {
+      form_type: 'private-offer',
+      status: row.status || 'pending',
+      name: row.name,
+      email: row.email,
+      message: offerSummary(row),
+    };
+  }
+  return row;
+}
+
+async function insertSubmission(row) {
+  const attempts = [row];
+  if (row.form_type === 'private-offer') {
+    attempts.push(compactRow(row), minimalRow(row));
+  }
+
+  let lastError;
+  for (const candidate of attempts) {
+    try {
+      return await supabaseFetch(TABLE, {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify(candidate),
+      });
+    } catch (error) {
+      lastError = error;
+      if (row.form_type !== 'private-offer' || !isSchemaMismatch(error)) throw error;
+      console.warn('Private offer insert shape failed, retrying with compact schema:', error.message);
+    }
+  }
+  throw lastError;
+}
+
 async function sendOfferConfirmation(row, id) {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) throw new Error('RESEND_API_KEY missing');
@@ -325,11 +396,7 @@ async function handleCreate(req, res) {
   if (row.bot) return res.status(200).json({ ok: true });
   if (row.error) return res.status(422).json({ error: row.error });
 
-  const inserted = await supabaseFetch(TABLE, {
-    method: 'POST',
-    headers: { Prefer: 'return=representation' },
-    body: JSON.stringify(row),
-  });
+  const inserted = await insertSubmission(row);
   const id = inserted && inserted[0] && inserted[0].id;
   let alert = { sent: false };
   try {
