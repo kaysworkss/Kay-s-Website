@@ -248,130 +248,201 @@ async function handleHallOfFame(req, res, supabase) {
 // table in Supabase using the outbid wallet address + auction_id.
 async function handleNotifyOutbid(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
   const { outbid_wallet, new_bidder, new_amount, auction_id, art_title, auction_url } = req.body || {};
-
-  if (!outbid_wallet || !new_amount) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-
-  const SUPABASE_URL  = process.env.SUPABASE_URL || 'https://haijshusgcbdexfueunr.supabase.co';
-  const SUPABASE_ANON = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const RESEND_KEY    = process.env.RESEND_API_KEY;
-
-  if (!RESEND_KEY || !SUPABASE_ANON) {
-    return res.status(500).json({ error: 'Server misconfigured — missing env vars' });
-  }
-
-  // 1. Look up the outbid wallet's email from Supabase
-  let email = null;
-  try {
-    const sbRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/collector_notifications?wallet_address=eq.${encodeURIComponent(outbid_wallet)}&auction_id=eq.${encodeURIComponent(auction_id)}&limit=1&select=email`,
-      { headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + SUPABASE_ANON } }
-    );
-    const rows = await sbRes.json();
-    if (Array.isArray(rows) && rows.length > 0) email = rows[0].email;
-  } catch (e) {
+  if (!outbid_wallet || !new_amount) return res.status(400).json({ error: 'Missing required fields' });
+  let email;
+  try { email = await _lookupBidderEmail(outbid_wallet, auction_id); } catch (e) {
     return res.status(500).json({ error: 'Supabase lookup failed: ' + e.message });
   }
+  if (!email) return res.status(200).json({ sent: false, reason: 'No email registered' });
 
-  if (!email) {
-    return res.status(200).json({ sent: false, reason: 'No email registered' });
-  }
-
-  // 2. Format display values
-  const shortOutbid = outbid_wallet.slice(0, 6) + '…' + outbid_wallet.slice(-4);
-  const shortBidder = (new_bidder || '').slice(0, 6) + '…' + (new_bidder || '').slice(-4);
-  const title       = art_title || 'an Àpótí Ọlọ́wọ̀ piece';
+  const shortBidder = (new_bidder || '').slice(0, 6) + '\u2026' + (new_bidder || '').slice(-4);
+  const title       = art_title   || 'an \u00c0p\u00f3t\u00ed \u1ecdl\u1d52w\u1eb9\u0300 piece';
   const url         = auction_url || 'https://kaysworks.com/auction';
+  const subject     = `You've been outbid \u2014 ${new_amount} on ${title}`;
 
-  // 3. Send email via Resend
-  const emailBody = {
-    from:    'Àpótí Ọlọ́wọ̀ Auction <auction@mail.kaysworks.com>',
-    to:      [email],
-    subject: `Ohhh — ${shortBidder} just swept in and took your crown`,
-    html: `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Outbid Notice</title>
-</head>
-<body style="margin:0;padding:0;background:#1e1510;font-family:'Georgia',serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#1e1510;padding:40px 0">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#2a1c14;border:1px solid rgba(196,132,90,0.25);border-radius:6px;overflow:hidden;max-width:560px;width:100%">
-        <tr>
-          <td style="padding:28px 32px 20px;border-bottom:1px solid rgba(196,132,90,0.18)">
-            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works · Live Auction</p>
-            <h1 style="margin:0;font-family:'Georgia',serif;font-size:26px;font-weight:400;color:#e8d5b0;line-height:1.2">${title}</h1>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:24px 32px">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(158,79,46,0.12);border:1px solid rgba(196,132,90,0.3);border-radius:4px">
-              <tr><td style="padding:18px 20px">
-                <p style="margin:0 0 10px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#c4845a;font-family:'Georgia',serif">You've been outbid</p>
-                <p style="margin:0 0 8px;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">${shortBidder} just dropped <strong style="color:#c4845a">${new_amount}</strong> and took your spot.</p>
-                <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">Are you going to let that stand? The Àpótí doesn't wait for anyone — and neither does this room.</p>
-              </td></tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:0 32px 20px">
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
-                  <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">New leading bid</span>
-                </td>
-                <td align="right" style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
-                  <span style="font-size:16px;color:#e8d5b0;font-weight:600;font-family:'Georgia',serif">${new_amount}</span>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding:10px 0">
-                  <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Bidder ahead of you</span>
-                </td>
-                <td align="right" style="padding:10px 0">
-                  <span style="font-size:13px;color:#c4845a;font-style:italic;font-family:'Georgia',serif">${shortBidder}</span>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:4px 32px 32px;text-align:center">
-            <a href="${url}" style="display:inline-block;background:#9e4f2e;color:#f5ede0;text-decoration:none;font-family:'Georgia',serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 32px;border-radius:4px">Bid back — reclaim your lead</a>
-            <p style="margin:18px 0 0;font-size:12px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">This is your moment to respond. The auction is still live.</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:16px 32px;border-top:1px solid rgba(196,132,90,0.18);text-align:center">
-            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">© Kay's Works · <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`,
-  };
+  const heading = `
+    <p style="margin:0 0 10px;font-size:20px;font-weight:400;color:#ffffff;font-family:Georgia,serif">
+      Someone just placed <strong style="color:#f5d060">${new_amount}</strong> and moved ahead of you.
+    </p>
+    <p style="margin:0;font-size:14px;color:#c8a878;font-style:italic;font-family:Georgia,serif;line-height:1.65">
+      I don\u2019t want you to lose this one. Come back and take your spot \u2014 the auction is still open.
+    </p>`;
 
+  const bodyRows = `
+    <tr>
+      <td style="padding:10px 0">
+        <span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#a08060;font-family:Georgia,serif">New leading bid</span>
+      </td>
+      <td align="right" style="padding:10px 0">
+        <span style="font-size:15px;color:#2d211b;font-weight:600;font-family:Georgia,serif">${new_amount}</span>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:10px 0">
+        <span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#a08060;font-family:Georgia,serif">Bidder ahead</span>
+      </td>
+      <td align="right" style="padding:10px 0">
+        <span style="font-size:13px;color:#9e4f2e;font-style:italic;font-family:Georgia,serif">${shortBidder}</span>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:10px 0">
+        <span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#a08060;font-family:Georgia,serif">Piece</span>
+      </td>
+      <td align="right" style="padding:10px 0">
+        <span style="font-size:13px;color:#9e4f2e;font-style:italic;font-family:Georgia,serif">${title}</span>
+      </td>
+    </tr>`;
+
+  const cta = `
+    <a href="${url}" style="display:inline-block;background:linear-gradient(90deg,#b8821e 0%,#e8c45a 35%,#f5d878 55%,#d4a030 80%,#b8821e 100%);color:#2d1508;text-decoration:none;font-family:Arial,sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:14px 34px;border-radius:999px">Come back and bid</a>
+    <p style="margin:16px 0 0;font-size:12px;color:#7a5a40;font-style:italic;font-family:Georgia,serif">The auction is still live. I\u2019m rooting for you.</p>`;
+
+  const html = _emailShell(title, 'rgba(158,79,46,0.12)', "You've been outbid", heading, bodyRows, cta);
   try {
-    const resendRes = await fetch('https://api.resend.com/emails', {
-      method:  'POST',
-      headers: { Authorization: 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
-      body:    JSON.stringify(emailBody),
-    });
-    const resendData = await resendRes.json();
-    if (!resendRes.ok) throw new Error(resendData.message || 'Resend error');
-    return res.status(200).json({ sent: true, id: resendData.id });
+    const data = await _sendEmail({ from: '\u00c0p\u00f3t\u00ed \u1ecdl\u1d52w\u1eb9\u0300 Auction <auction@mail.kaysworks.com>', to: [email], subject, html });
+    return res.status(200).json({ sent: true, id: data.id });
   } catch (e) {
     return res.status(500).json({ error: 'Email send failed: ' + e.message });
   }
 }
+
+// \u2500\u2500 POST /api/game?action=notify-bid-confirm \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Email sent to the bidder themselves when their bid lands.
+async function handleNotifyBidConfirm(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const { bidder_wallet, amount, auction_id, art_title, auction_url, is_first } = req.body || {};
+  if (!bidder_wallet || !amount) return res.status(400).json({ error: 'Missing required fields' });
+  let email;
+  try { email = await _lookupBidderEmail(bidder_wallet, auction_id); } catch (e) {
+    return res.status(500).json({ error: 'Supabase lookup failed: ' + e.message });
+  }
+  if (!email) return res.status(200).json({ sent: false, reason: 'No email registered' });
+
+  const title      = art_title   || 'an \u00c0p\u00f3t\u00ed \u1ecdl\u1d52w\u1eb9\u0300 piece';
+  const url        = auction_url || 'https://kaysworks.com/auction';
+  const badgeLabel = is_first ? 'First bid confirmed' : 'Bid confirmed \u2014 you lead';
+  const subject    = is_first
+    ? `Your bid is in \u2014 ${amount} on ${title}`
+    : `You're back in front \u2014 ${amount} on ${title}`;
+
+  const heading = is_first
+    ? `<p style="margin:0 0 10px;font-size:20px;font-weight:400;color:#ffffff;font-family:Georgia,serif">
+        <strong style="color:#f5d060">${amount}</strong> \u2014 you’re in. I see you up there.
+       </p>
+       <p style="margin:0;font-size:14px;color:#c8a878;font-style:italic;font-family:Georgia,serif;line-height:1.65">
+        You just started something real. I’ll be watching with you and will let you know the moment anyone tries to move ahead.
+       </p>`
+    : `<p style="margin:0 0 10px;font-size:20px;font-weight:400;color:#ffffff;font-family:Georgia,serif">
+        <strong style="color:#f5d060">${amount}</strong> \u2014 and you’re back at the front.
+       </p>
+       <p style="margin:0;font-size:14px;color:#c8a878;font-style:italic;font-family:Georgia,serif;line-height:1.65">
+        I saw that. Your bid is confirmed and the lead is yours again. I’ll let you know the moment anyone challenges your position.
+       </p>`;
+
+  const bodyRows = `
+    <tr>
+      <td style="padding:10px 0">
+        <span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#a08060;font-family:Georgia,serif">Your bid</span>
+      </td>
+      <td align="right" style="padding:10px 0">
+        <span style="font-size:15px;color:#2d211b;font-weight:600;font-family:Georgia,serif">${amount}</span>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:10px 0">
+        <span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#a08060;font-family:Georgia,serif">Status</span>
+      </td>
+      <td align="right" style="padding:10px 0">
+        <span style="font-size:13px;color:#3a6e30;font-family:Georgia,serif">Leading</span>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:10px 0">
+        <span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#a08060;font-family:Georgia,serif">Piece</span>
+      </td>
+      <td align="right" style="padding:10px 0">
+        <span style="font-size:13px;color:#9e4f2e;font-style:italic;font-family:Georgia,serif">${title}</span>
+      </td>
+    </tr>`;
+
+  const cta = `
+    <a href="${url}" style="display:inline-block;background:linear-gradient(90deg,#b8821e 0%,#e8c45a 35%,#f5d878 55%,#d4a030 80%,#b8821e 100%);color:#2d1508;text-decoration:none;font-family:Arial,sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:14px 34px;border-radius:999px">Watch the auction</a>
+    <p style="margin:16px 0 0;font-size:12px;color:#7a5a40;font-style:italic;font-family:Georgia,serif">I\u2019ll be in touch the moment anyone tries to take your spot.</p>`;
+
+  const html = _emailShell(title, 'rgba(107,124,92,0.12)', badgeLabel, heading, bodyRows, cta);
+  try {
+    const data = await _sendEmail({ from: '\u00c0p\u00f3t\u00ed \u1ecdl\u1d52w\u1eb9\u0300 Auction <auction@mail.kaysworks.com>', to: [email], subject, html });
+    return res.status(200).json({ sent: true, id: data.id });
+  } catch (e) {
+    return res.status(500).json({ error: 'Email send failed: ' + e.message });
+  }
+}
+
+// \u2500\u2500 POST /api/game?action=notify-winner \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Email sent to the winning bidder when the auction settles.
+async function handleNotifyWinner(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const { winner_wallet, amount, auction_id, art_title, auction_url } = req.body || {};
+  if (!winner_wallet || !amount) return res.status(400).json({ error: 'Missing required fields' });
+  let email;
+  try { email = await _lookupBidderEmail(winner_wallet, auction_id); } catch (e) {
+    return res.status(500).json({ error: 'Supabase lookup failed: ' + e.message });
+  }
+  if (!email) return res.status(200).json({ sent: false, reason: 'No email registered' });
+
+  const title   = art_title   || 'an \u00c0p\u00f3t\u00ed \u1ecdl\u1d52w\u1eb9\u0300 piece';
+  const url     = auction_url || 'https://kaysworks.com/auction';
+  const subject = `Sold \u2014 ${title} is yours. Kay salutes you.`;
+
+  const heading = `
+    <p style="margin:0 0 10px;font-size:20px;font-weight:400;color:#ffffff;font-family:Georgia,serif">
+      <strong style="color:#f5d060">${amount}</strong> \u2014 and it\u2019s yours.
+    </p>
+    <p style="margin:0;font-size:14px;color:#c8a878;font-style:italic;font-family:Georgia,serif;line-height:1.65">
+      I made this piece and I\u2019m genuinely glad it found you. Welcome to the collection \u2014 I\u2019ll be in touch personally with next steps.
+    </p>`;
+
+  const bodyRows = `
+    <tr>
+      <td style="padding:10px 0">
+        <span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#a08060;font-family:Georgia,serif">Winning bid</span>
+      </td>
+      <td align="right" style="padding:10px 0">
+        <span style="font-size:15px;color:#9e6e10;font-weight:600;font-family:Georgia,serif">${amount}</span>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:10px 0">
+        <span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#a08060;font-family:Georgia,serif">Status</span>
+      </td>
+      <td align="right" style="padding:10px 0">
+        <span style="font-size:13px;color:#9e6e10;font-family:Georgia,serif">Auction settled</span>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:10px 0">
+        <span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#a08060;font-family:Georgia,serif">Piece</span>
+      </td>
+      <td align="right" style="padding:10px 0">
+        <span style="font-size:13px;color:#9e4f2e;font-style:italic;font-family:Georgia,serif">${title}</span>
+      </td>
+    </tr>`;
+
+  const cta = `
+    <a href="${url}" style="display:inline-block;background:linear-gradient(90deg,#b8821e 0%,#e8c45a 35%,#f5d878 55%,#d4a030 80%,#b8821e 100%);color:#2d1508;text-decoration:none;font-family:Arial,sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:14px 34px;border-radius:999px">View the auction</a>
+    <p style="margin:16px 0 0;font-size:12px;color:#7a5a40;font-style:italic;font-family:Georgia,serif">Thank you for being in that room. It means everything.</p>`;
+
+  const html = _emailShell(title, 'rgba(201,153,58,0.12)', 'Auction won', heading, bodyRows, cta);
+  try {
+    const data = await _sendEmail({ from: '\u00c0p\u00f3t\u00ed \u1ecdl\u1d52w\u1eb9\u0300 Auction <auction@mail.kaysworks.com>', to: [email], subject, html });
+    return res.status(200).json({ sent: true, id: data.id });
+  } catch (e) {
+    return res.status(500).json({ error: 'Email send failed: ' + e.message });
+  }
+}
+
 
 // ── Shared helper: look up a bidder's email from collector_notifications ──────
 async function _lookupBidderEmail(wallet, auction_id) {
@@ -400,50 +471,61 @@ async function _sendEmail(emailBody) {
 }
 
 // ── Shared email shell ────────────────────────────────────────────────────────
-function _emailShell(title, badgeColor, badgeLabel, headingHtml, bodyRowsHtml, ctaHtml) {
+function _emailShell(title, badgeColor, badgeLabel, headingHtml, bodyRowsHtml, ctaHtml, eyebrow) {
+  const eye = eyebrow || "Kay\u2019s Works \u00b7 Live Auction";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 </head>
-<body style="margin:0;padding:0;background:#1e1510;font-family:'Georgia',serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#1e1510;padding:40px 0">
+<body style="margin:0;padding:0;background:#f5ede0;font-family:Georgia,serif;color:#2d211b;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5ede0;padding:32px 0">
     <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#2a1c14;border:1px solid rgba(196,132,90,0.25);border-radius:6px;overflow:hidden;max-width:560px;width:100%">
-        <tr>
-          <td style="padding:28px 32px 20px;border-bottom:1px solid rgba(196,132,90,0.18)">
-            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works · Live Auction</p>
-            <h1 style="margin:0;font-family:'Georgia',serif;font-size:26px;font-weight:400;color:#e8d5b0;line-height:1.2">${title}</h1>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:24px 32px">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:${badgeColor};border:1px solid rgba(196,132,90,0.3);border-radius:4px">
-              <tr><td style="padding:18px 20px">
-                <p style="margin:0 0 6px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#c4845a;font-family:'Georgia',serif">${badgeLabel}</p>
-                ${headingHtml}
-              </td></tr>
-            </table>
-          </td>
-        </tr>
-        ${bodyRowsHtml}
-        <tr>
-          <td style="padding:4px 32px 32px;text-align:center">
-            ${ctaHtml}
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:16px 32px;border-top:1px solid rgba(196,132,90,0.18);text-align:center">
-            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">© Kay's Works · <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
-          </td>
-        </tr>
+      <table width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#ede0c8;border-radius:24px;overflow:hidden;">
+
+        <!-- Hero with gold trim bottom -->
+        <tr><td style="padding:0">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr><td style="padding:10px 10px 0">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:20px 20px 16px 16px;overflow:hidden;background:#2a1508;background-image:radial-gradient(ellipse at 50% 110%,rgba(196,140,60,0.38) 0%,transparent 62%),linear-gradient(180deg,#2a1508 0%,#3d2010 55%,#5a2e14 100%);">
+                <tr><td style="padding:40px 36px 44px;text-align:center;">
+                  <p style="margin:0 0 20px;font-family:Arial,sans-serif;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:#ffffff;font-weight:700">${eye}</p>
+                  <p style="margin:0 0 14px;font-size:28px;font-weight:400;color:#ffffff;line-height:1.2;font-family:Georgia,serif">${title}</p>
+                  <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#c9993a;font-weight:700">${badgeLabel}</p>
+                  ${headingHtml}
+                </td></tr>
+              </table>
+              <!-- Gold trim strip -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(90deg,#b8821e 0%,#e8c45a 35%,#f5d060 55%,#d4a030 80%,#b8821e 100%);height:5px;"><tr><td style="height:5px;line-height:5px;font-size:0">&nbsp;</td></tr></table>
+            </td></tr>
+          </table>
+        </td></tr>
+
+        <!-- Body rows -->
+        <tr><td style="padding:32px 36px 12px">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            ${bodyRowsHtml}
+          </table>
+        </td></tr>
+
+        <!-- CTA -->
+        <tr><td style="padding:8px 36px 36px;text-align:center">
+          ${ctaHtml}
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="padding:20px 36px 28px;border-top:1px solid rgba(90,55,30,0.15);text-align:center">
+          <p style="margin:0;font-size:10px;color:#b09070;font-family:Georgia,serif">&copy; Kay\u2019s Works &middot; <a href="https://kaysworks.com" style="color:#b09070">kaysworks.com</a></p>
+        </td></tr>
+
       </table>
     </td></tr>
   </table>
 </body>
 </html>`;
 }
+
 
 // ── POST /api/game?action=notify-bid-confirm ──────────────────────────────────
 // Email sent to the bidder themselves when their bid lands (first bid or retake).
@@ -2364,4 +2446,3 @@ module.exports = async (req, res) => {
     }
   }
 };
-
