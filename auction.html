@@ -2977,10 +2977,9 @@ async function _ccPoll(pairKey) {
     } else {
       // This browser is on the passive/locked chain
       if (_ccClaimRow.status === "waiting-bid") {
-        // Show chooser with waiting overlays so the passive collector can see the countdown
+        // Show chooser with waiting overlays so the passive collector sees the countdown
         const chooser = document.getElementById("cc-chooser");
         if (chooser && !chooser.classList.contains("show")) {
-          // Only show chooser if it's not already visible — don't disrupt the active collector
           chooser.classList.add("show");
         }
         _ccSetWaitingState(_ccClaimRow);
@@ -2988,9 +2987,17 @@ async function _ccPoll(pairKey) {
         // Bid placed on the other chain — lock this chain out permanently
         _ccClearWaitingState();
         _ccUpdateChooserLock(activeChain);
-        // Hide the chooser — replace it with just the banner
+        // Hide the chooser and restore the bid panel so the page isn't blank
         const chooser = document.getElementById("cc-chooser");
         if (chooser) chooser.classList.remove("show");
+        unlockXtzRate();
+        // Restore bid panel elements for the passive collector
+        const chain = (slot?.chain || "eth") === "tezos" ? "tezos" : "eth";
+        if (chain === "tezos") {
+          refreshTezosState(_switchToken).catch(() => {});
+        } else {
+          refreshState().catch(() => {});
+        }
         _ccFireNotification(
           "Auction is live on another chain",
           "The auction started on " + (activeChain === "eth" ? "Ethereum" : "Tezos") + ". This chain is now permanently locked."
@@ -3828,10 +3835,11 @@ function _setupCrossChainForSlot(slot) {
   const ccKey = _pairKeyForSlot(slot);
   if (!ccKey) return;
   _ccPairKey = ccKey;
-  // Store the admin-fixed USD cap (may be null — falls back to ETH reserve derivation)
   window._ccUsdHardCap = slot.usdHardCap ? parseFloat(slot.usdHardCap) : null;
   _ccShowChooser();
-  _ccStartPolling(ccKey);
+  // Poll immediately on load — don't wait 8s for the first interval tick
+  // This ensures a refreshing collector sees the current state right away
+  _ccPoll(ccKey).then(() => _ccStartPolling(ccKey));
   _ccPopulateChooserPrices(ccKey).catch(e => console.warn("_ccPopulateChooserPrices:", e));
 }
 
