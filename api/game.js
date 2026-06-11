@@ -1596,6 +1596,95 @@ async function releaseVariantStock(supabase, item) {
   }
 }
 
+function shopEscapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+}
+
+function shopMoney(ngn, usd) {
+  const n = Number(ngn || 0).toLocaleString('en-NG');
+  const u = Number(usd || 0).toFixed(2);
+  return `NGN ${n} / USD ${u}`;
+}
+
+async function sendShopSellerNotification({ order, orderRef, checkout, paymentMethod, paymentRef, payerAddress, chainVerification, cardVerification }) {
+  const to = process.env.SHOP_ORDER_EMAIL ||
+    process.env.FORM_ALERT_TO_EMAIL ||
+    process.env.SELLER_EMAIL ||
+    process.env.CONTACT_EMAIL ||
+    'oyeniyikayode4@gmail.com';
+  const from = process.env.SHOP_ORDER_FROM_EMAIL ||
+    process.env.FORM_ALERT_FROM_EMAIL ||
+    "Kay's Works Queue <auction@mail.kaysworks.com>";
+  const customerName = order.customer_name || 'Shop customer';
+  const delivery = checkout.method === 'pickup'
+    ? 'Kaduna pickup (free)'
+    : `Ship to: ${order.address || 'No address saved'}; zone: ${checkout.zone}; delivery: NGN ${Number(checkout.deliveryNgn || 0).toLocaleString('en-NG')}`;
+  const itemsHtml = checkout.trustedItems.map(item => `
+    <tr>
+      <td style="padding:8px 0;border-bottom:1px solid #eee">${shopEscapeHtml(item.name)}<br><span style="color:#777">${shopEscapeHtml(item.variant)}</span></td>
+      <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:center">${Number(item.qty || 1)}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right">${shopMoney(item.priceNgn * item.qty, item.priceUsd * item.qty)}</td>
+    </tr>`).join('');
+  const verificationLines = [
+    paymentRef ? `Payment ref: ${paymentRef}` : '',
+    payerAddress ? `Sender wallet: ${payerAddress}` : '',
+    chainVerification?.received_amount ? `Received: ${chainVerification.received_amount} ${String(paymentMethod).toUpperCase()}` : '',
+    cardVerification?.gateway_status ? `Gateway status: ${cardVerification.gateway_status}` : '',
+  ].filter(Boolean).map(line => `<p style="margin:4px 0;color:#444">${shopEscapeHtml(line)}</p>`).join('');
+
+  const html = `<!doctype html>
+<html><body style="margin:0;padding:24px;background:#f4eee3;font-family:Georgia,serif;color:#2d211b">
+  <div style="max-width:680px;margin:0 auto;background:#fffaf2;border:1px solid #d9c8b5;padding:24px">
+    <p style="margin:0 0 8px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#a85d3d">Kay's Works Shop</p>
+    <h1 style="margin:0 0 16px;font-size:26px;font-weight:400">Paid shop order</h1>
+    <p style="margin:0 0 16px">Order <strong>${shopEscapeHtml(orderRef)}</strong> has been paid and is ready for fulfilment.</p>
+    <h2 style="font-size:15px;margin:20px 0 8px">Customer</h2>
+    <p style="margin:4px 0">${shopEscapeHtml(customerName)}</p>
+    <p style="margin:4px 0">${shopEscapeHtml(order.email || '')}</p>
+    <p style="margin:4px 0">${shopEscapeHtml(order.phone || '')}</p>
+    <p style="margin:4px 0">${shopEscapeHtml(delivery)}</p>
+    <h2 style="font-size:15px;margin:20px 0 8px">Payment</h2>
+    <p style="margin:4px 0">${shopEscapeHtml(String(paymentMethod || '').toUpperCase())}</p>
+    ${verificationLines}
+    <h2 style="font-size:15px;margin:20px 0 8px">Items</h2>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+      ${itemsHtml}
+    </table>
+    <p style="margin:18px 0 0;text-align:right"><strong>Total: ${shopMoney(checkout.totalNgn, checkout.totalUsd)}</strong></p>
+  </div>
+</body></html>`;
+
+  const text = [
+    `Paid shop order: ${orderRef}`,
+    `Customer: ${customerName}`,
+    `Email: ${order.email || ''}`,
+    `Phone: ${order.phone || ''}`,
+    `Delivery: ${delivery}`,
+    `Payment: ${String(paymentMethod || '').toUpperCase()}`,
+    paymentRef ? `Payment ref: ${paymentRef}` : '',
+    payerAddress ? `Sender wallet: ${payerAddress}` : '',
+    '',
+    'Items:',
+    ...checkout.trustedItems.map(item => `- ${item.name} (${item.variant}) x ${item.qty}`),
+    '',
+    `Total: ${shopMoney(checkout.totalNgn, checkout.totalUsd)}`,
+  ].filter(line => line !== '').join('\n');
+
+  return _sendEmail({
+    from,
+    to: [to],
+    subject: `Paid shop order ${orderRef} - ${customerName}`,
+    html,
+    text,
+  });
+}
+
 // ── ORDER REFERENCE ───────────────────────────────────────────────────────────
 function makeOrderRef() {
   return 'ORD-' + Date.now().toString(36).toUpperCase() + '-' + crypto.randomBytes(3).toString('hex').toUpperCase();
@@ -1632,10 +1721,10 @@ function readCryptoOrderLock(order) {
   return null;
 }
 
-// ── PENDING-FIRST FLOW ────────────────────────────────────────────────────────
+// -- PENDING-FIRST FLOW --------------------------------------------------------
 // Step 1: create a pending order BEFORE payment. Records items, totals, customer,
 // and a generated order_ref. No stock touched, no payment verified yet. The
-// returned order_ref is the durable handle — payment can be confirmed later even
+// returned order_ref is the durable handle - payment can be confirmed later even
 // if the customer's cart is gone.
 async function handleShopOrderCreate(req, res, supabase) {
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
@@ -1692,7 +1781,7 @@ async function handleShopOrderCreate(req, res, supabase) {
 }
 
 // Step 2: confirm payment for an existing pending order. Looks the order up by
-// order_ref (NOT the cart — so this works even if the browser cart is gone),
+// order_ref (not the cart, so this works even if the browser cart is gone),
 // re-derives a checkout from the SAVED items, verifies the payment on-chain or
 // via the card gateway, decrements stock, and flips the order to 'paid'.
 async function handleShopOrderConfirm(req, res, supabase) {
@@ -1701,7 +1790,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
   const orderRef = String(body.order_ref || '').trim().slice(0, 80);
   if (!orderRef) return json(400, { error: 'order_ref is required' });
 
-  // Load the pending order — this is the source of truth for what was bought.
+  // Load the pending order. This is the source of truth for what was bought.
   const { data: order, error: loadErr } = await supabase
     .from('shop_orders')
     .select('*')
@@ -1709,13 +1798,39 @@ async function handleShopOrderConfirm(req, res, supabase) {
     .maybeSingle();
   if (loadErr && loadErr.code !== 'PGRST116') return json(500, { error: loadErr.message });
   if (!order) return json(404, { error: 'Order not found for that reference' });
+  const paymentMethod = String(body.payment_method || order.payment_method || '').slice(0, 40);
+  const paymentRef = String(body.payment_ref || order.payment_ref || '').trim().slice(0, 200);
+  const storedLock = readCryptoOrderLock(order);
+  const payerAddress = String(body.payer_address || storedLock?.payer_address || order.payment_metadata?.payer_address || '').trim().slice(0, 120);
   if (order.status === 'paid') {
-    return json(200, { ok: true, already_paid: true, order_id: order.id, order_ref: orderRef });
+    const paidCheckout = {
+      trustedItems: Array.isArray(order.items) ? order.items : [],
+      totalNgn: Number(order.total_ngn) || 0,
+      totalUsd: Number(order.total_usd) || 0,
+      deliveryNgn: Number(order.delivery_fee_ngn) || 0,
+      method: order.delivery_method || 'pickup',
+      zone: order.delivery_zone || 'pickup',
+    };
+    let sellerNotification = { sent: false };
+    try {
+      const emailResult = await sendShopSellerNotification({
+        order,
+        orderRef,
+        checkout: paidCheckout,
+        paymentMethod,
+        paymentRef,
+        payerAddress,
+        chainVerification: order.payment_metadata || null,
+        cardVerification: null,
+      });
+      sellerNotification = { sent: true, id: emailResult?.id || null };
+    } catch (notifyErr) {
+      sellerNotification = { sent: false, error: notifyErr.message || String(notifyErr) };
+      console.error('[shop-order] seller notification failed:', orderRef, sellerNotification.error);
+    }
+    return json(200, { ok: true, already_paid: true, order_id: order.id, order_ref: orderRef, seller_notification: sellerNotification });
   }
 
-  const paymentMethod = String(body.payment_method || order.payment_method || '').slice(0, 40);
-  const paymentRef = String(body.payment_ref || '').trim().slice(0, 200);
-  const payerAddress = String(body.payer_address || '').trim().slice(0, 120);
   const isCryptoPayment = ['eth','tezos','usdc','usdt'].includes(paymentMethod);
   const isCardPayment = ['paystack','flutterwave'].includes(paymentMethod);
 
@@ -1841,6 +1956,24 @@ async function handleShopOrderConfirm(req, res, supabase) {
     return json(500, { error: updErr.message });
   }
 
+  let sellerNotification = { sent: false };
+  try {
+    const emailResult = await sendShopSellerNotification({
+      order,
+      orderRef,
+      checkout,
+      paymentMethod,
+      paymentRef,
+      payerAddress,
+      chainVerification,
+      cardVerification,
+    });
+    sellerNotification = { sent: true, id: emailResult?.id || null };
+  } catch (notifyErr) {
+    sellerNotification = { sent: false, error: notifyErr.message || String(notifyErr) };
+    console.error('[shop-order] seller notification failed:', orderRef, sellerNotification.error);
+  }
+
   return json(200, {
     ok: true,
     order_id: order.id,
@@ -1850,6 +1983,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
     delivery_fee_ngn: checkout.deliveryNgn,
     chain_verification: chainVerification,
     card_verification: cardVerification,
+    seller_notification: sellerNotification,
   });
 }
 
