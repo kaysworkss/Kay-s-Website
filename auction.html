@@ -2872,6 +2872,7 @@ async function _ccCancelClaim() {
 // and _ccCancelClaim (user-initiated). Idempotent: safe to call more than once.
 function _ccHandleReset(cancelledByUser = false) {
   _ccClaimRow = null;
+  window._ccClaimNoticeShown = false;
   _ccStopNoBidCountdown();
   _ccStopPolling();
   _renderCcBanner();
@@ -3025,6 +3026,15 @@ async function _ccPoll(pairKey) {
 
       if (_ccClaimRow.status === "waiting-bid") {
         _ccSetWaitingState(_ccClaimRow);
+        if (!window._ccClaimNoticeShown) {
+          const activeName = activeChain === "eth" ? "Ethereum" : "Tezos";
+          window._ccClaimNoticeShown = true;
+          notify(
+            "info",
+            "Chain being claimed",
+            `Another collector is starting the auction on ${activeName}. Both chains are paused until they bid or the window expires.`
+          );
+        }
       } else if (_ccClaimRow.status === "live") {
         _ccClearWaitingState();
         const activeName    = activeChain === "eth" ? "Ethereum" : "Tezos";
@@ -3062,6 +3072,7 @@ async function _ccPoll(pairKey) {
 
 function _ccStartPolling(pairKey) {
   _ccStopPolling();
+  if (pairKey) _ccPoll(pairKey);
   _ccPollTimer = setInterval(() => _ccPoll(pairKey), CC_POLL_MS);
 }
 
@@ -3080,6 +3091,7 @@ function _ccReset() {
   _ccIsActiveBrowser = false;
   _ccNoBidCountdownRef = null;
   window._ccNotifyRequested = false;
+  window._ccClaimNoticeShown = false;
   _renderCcBanner();
   // Always hide the chooser and sim trigger — _setupCrossChainForSlot re-shows
   // them only for paired slots; single-chain auctions never see them.
@@ -3891,9 +3903,8 @@ function _setupCrossChainForSlot(slot) {
   _ccPairKey = ccKey;
   window._ccUsdHardCap = slot.usdHardCap ? parseFloat(slot.usdHardCap) : null;
   _ccShowChooser();
-  // Poll immediately on load — don't wait 8s for the first interval tick
-  // This ensures a refreshing collector sees the current state right away
-  _ccPoll(ccKey).then(() => _ccStartPolling(ccKey));
+  // Poll immediately on load so refreshing collectors see current state right away.
+  _ccStartPolling(ccKey);
   _ccPopulateChooserPrices(ccKey).catch(e => console.warn("_ccPopulateChooserPrices:", e));
 }
 
