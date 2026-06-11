@@ -1114,6 +1114,11 @@ function _buildPieceForm(idx) {
       <div class="field-hint">Give two listings the same key to make them an ETH/Tezos pair for one artwork. First active chain wins; the other listing locks.</div>
     </div>
     <div class="field">
+      <label>USD hard cap <span style="font-family:'Crimson Pro',serif;font-style:italic;font-weight:400;letter-spacing:0;text-transform:none;font-size:0.85em;color:var(--text-muted)">cross-chain only</span></label>
+      <input id="${_pieceFieldId(idx,'usdHardCap')}" type="number" min="0" step="1" placeholder="e.g. 500" value="${d.usdHardCap||''}"/>
+      <div class="field-hint">Fix the dollar value both chains are anchored to. ETH and XTZ minimums will float to always equal this amount — ignoring on-chain reserve prices. Leave blank to derive from the ETH reserve at runtime.</div>
+    </div>
+    <div class="field">
       <label>Title</label>
       <input id="${_pieceFieldId(idx,'artTitle')}" placeholder="e.g. ìgbáradì" value="${d.artTitle||''}"/>
     </div>
@@ -1627,7 +1632,7 @@ document.addEventListener("keyup", (e) => {
 
 function _savePieceFormValues(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
-  const fields = ["chain","contractAddr","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status","chatLocked","chatLockMsg"];
+  const fields = ["chain","contractAddr","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","usdHardCap","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status","chatLocked","chatLockMsg"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
     if (!el) return;
@@ -1635,6 +1640,9 @@ function _savePieceFormValues(idx) {
       _pieces[idx][f] = _rteSanitize(el.innerHTML || "").trim();
     } else if (f === "chatLocked") {
       _pieces[idx][f] = el.value === "true";
+    } else if (f === "usdHardCap") {
+      const v = parseFloat(el.value);
+      _pieces[idx][f] = isFinite(v) && v > 0 ? v : null;
     } else {
       _pieces[idx][f] = (el.value || "").trim();
     }
@@ -1971,6 +1979,7 @@ async function saveConfig() {
     tezosNetwork:      primary.tezosNetwork      || "mainnet",
     tezosRpcUrl:       primary.tezosRpcUrl       || "",
     crossChainPairKey: primary.crossChainPairKey || "",
+    usdHardCap:        primary.usdHardCap        || null,
     artTitle:     primary.artTitle     || "",
     artArtist:    primary.artArtist    || "",
     artAbout:     primary.artAbout     || "",
@@ -2258,6 +2267,7 @@ function _buildPreviewPayload(forcePieceIdx) {
     tezosNetwork: primary.tezosNetwork || "mainnet",
     tezosRpcUrl: primary.tezosRpcUrl || "",
     crossChainPairKey: primary.crossChainPairKey || "",
+    usdHardCap:   primary.usdHardCap   || null,
     artTitle:    primary.artTitle  || "",
     artArtist:   primary.artArtist || "",
     artAbout:    primary.artAbout  || "",
