@@ -652,7 +652,7 @@ async function handleCrosschainClaim(req, res, supabase) {
     await supabase.from('crosschain_auction_claims').delete().eq('pair_key', pairKey).eq('bid_count', 0);
     return handleCrosschainClaim(req, res, supabase);
   }
-  return res.status(409).json({ ok: false, claim: data || null, error: 'PAIR_ALREADY_CLAIMED' });
+  return res.status(200).json({ ok: true, claim: data || null, claimed: false, conflict: true });
 }
 
 
