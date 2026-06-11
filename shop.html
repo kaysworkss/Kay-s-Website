@@ -1537,6 +1537,7 @@ footer a:hover { color:var(--rust); }
               <input class="form-input" id="ethManualRef" type="text" placeholder="Order hash (ORD-…)" style="margin-bottom:0.5rem;font-size:0.78rem"/>
               <input class="form-input" id="ethManualSender" type="text" placeholder="Sending wallet address" style="margin-bottom:0.5rem;font-size:0.78rem"/>
               <input class="form-input" id="ethManualTx" type="text" placeholder="Transaction hash / ID" style="font-size:0.78rem"/>
+              <button type="button" id="ethManualCancel" style="margin-top:0.65rem;background:none;border:none;color:var(--text-muted);font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase">Cancel manual confirmation</button>
             </div>
             <button class="submit-pay-btn" id="cryptoConfirmBtn" style="display:none;background:transparent;border:1px solid rgba(139,156,247,0.3);color:#8b9cf7;margin-top:0.5rem">I've sent manually — confirm</button>
           </div>
@@ -1580,6 +1581,7 @@ footer a:hover { color:var(--rust); }
               <input class="form-input" id="tezosManualRef" type="text" placeholder="Order hash (ORD-…)" style="margin-bottom:0.5rem;font-size:0.78rem"/>
               <input class="form-input" id="tezosManualSender" type="text" placeholder="Sending Tezos wallet address" style="margin-bottom:0.5rem;font-size:0.78rem"/>
               <input class="form-input" id="tezosManualTx" type="text" placeholder="Operation hash" style="font-size:0.78rem"/>
+              <button type="button" id="tezosManualCancel" style="margin-top:0.65rem;background:none;border:none;color:var(--text-muted);font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase">Cancel manual confirmation</button>
             </div>
             <button class="submit-pay-btn" id="tezosManualBtn" style="display:none;background:transparent;border:1px solid rgba(90,192,245,0.3);color:#5ac0f5;margin-top:0.5rem">I've sent manually — confirm</button>
           </div>
@@ -3247,6 +3249,27 @@ function revealManualCryptoFields(chain) {
   return false;    // already revealed: allow submit to proceed
 }
 
+function cancelManualCrypto(chain) {
+  const fields = document.getElementById(chain === 'tezos' ? 'tezosManualFields' : 'ethManualFields');
+  const btn = document.getElementById(chain === 'tezos' ? 'tezosManualBtn' : 'cryptoConfirmBtn');
+  if (fields) {
+    fields.dataset.revealed = '0';
+    fields.style.display = 'none';
+  }
+  if (btn) btn.textContent = chain === 'tezos' ? "I've sent manually - confirm" : "I've sent manually - confirm";
+  if (window.__manualCryptoMode === chain) window.__manualCryptoMode = null;
+
+  const lock = window.__activeLock;
+  stopLockTimer();
+  if (lock && lock.method === chain && lock.expires > Date.now()) {
+    _lockTimer = setInterval(updateLockCountdown, 1000);
+    updateLockCountdown();
+  } else {
+    refreshLock(chain, true);
+    _lockTimer = setInterval(updateLockCountdown, 1000);
+  }
+}
+
 async function submitManualCrypto(chain) {
   if (!validateForm()) return;
   if (revealManualCryptoFields(chain)) return;
@@ -3306,6 +3329,9 @@ document.getElementById('paystackPayBtn').addEventListener('click', async ()=>{
 // ETH manual confirm (shown after rate loads, for wallets without MetaMask)
 document.getElementById('cryptoConfirmBtn').addEventListener('click', () => {
   submitManualCrypto('eth');
+});
+document.getElementById('ethManualCancel')?.addEventListener('click', () => {
+  cancelManualCrypto('eth');
 });
 
 // ── PENDING-FIRST ORDER HELPERS ───────────────────────────────────────────────
@@ -5013,13 +5039,19 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
       console.error('[Tezos] send error:', e);
     }
   } finally {
-    btn.disabled = false; btn.textContent = 'Send ' + tezosXtzAmount() + ' XTZ';
+    const sendAmt = window.__activeLock?.method === 'tezos'
+      ? window.__activeLock.quote?.crypto_amount
+      : tezosXtzAmount();
+    btn.disabled = false; btn.textContent = 'Send ' + (sendAmt || '') + ' XTZ';
   }
 });
 
 // Manual confirm (fallback — user sent from wallet app directly)
 document.getElementById('tezosManualBtn').addEventListener('click', () => {
   submitManualCrypto('tezos');
+});
+document.getElementById('tezosManualCancel')?.addEventListener('click', () => {
+  cancelManualCrypto('tezos');
 });
 
 // Re-render crypto panels whenever their tab becomes active
@@ -5326,35 +5358,3 @@ finalizeReturnedGatewayCheckout();
       <button id="shopDiagClose" style="font-size:11px;padding:3px 8px;background:#3a2418;color:#e8d5b0;border:none;border-radius:3px;">Hide</button>
     </span>
   </div>
-  <div id="shopDiagBody" style="padding:8px 10px;white-space:pre-wrap;word-break:break-word;">No requests yet. Attempt a payment, then read the latest entry at the top.</div>
-</div>
-<button id="shopDiagToggle" style="position:fixed;right:8px;bottom:8px;z-index:100000;font-family:ui-monospace,monospace;font-size:11px;padding:6px 10px;background:#9e4f2e;color:#fff;border:none;border-radius:14px;opacity:0.85;">DIAG</button>
-<script>
-(function(){
-  function render(){
-    var body=document.getElementById('shopDiagBody');
-    if(!body) return;
-    var list=window.__shopDiag||[];
-    if(!list.length){ body.textContent='No requests yet. Attempt a payment, then read the latest entry at the top.'; return; }
-    body.textContent=list.map(function(e){
-      return '['+e.t+']  '+e.url+'\n  status: '+e.status+'\n  '+e.body;
-    }).join('\n\n──────────\n\n');
-  }
-  window.__renderShopDiag=render;
-  var panel=document.getElementById('shopDiag');
-  document.getElementById('shopDiagToggle').onclick=function(){
-    panel.style.display = panel.style.display==='none' ? 'block':'none';
-    render();
-  };
-  document.getElementById('shopDiagClose').onclick=function(){ panel.style.display='none'; };
-  document.getElementById('shopDiagCopy').onclick=function(){
-    var txt=(window.__shopDiag||[]).map(function(e){return '['+e.t+'] '+e.url+' status:'+e.status+' '+e.body;}).join('\n');
-    navigator.clipboard && navigator.clipboard.writeText(txt);
-    this.textContent='Copied'; var b=this; setTimeout(function(){b.textContent='Copy';},1200);
-  };
-  render();
-})();
-</script>
-<!-- ════════ END DIAGNOSTIC PANEL ════════ -->
-</body>
-</html>
