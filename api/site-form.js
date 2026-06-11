@@ -208,205 +208,197 @@ async function insertSubmission(row) {
   throw lastError;
 }
 
-async function sendOfferConfirmation(row, id) {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) throw new Error('RESEND_API_KEY missing');
 
-  const name     = row.name           || 'Collector';
-  const artwork  = row.artwork        || 'the piece';
-  const amount   = row.offer_amount && row.offer_currency
-    ? `${row.offer_amount} ${row.offer_currency}`
-    : null;
-  const subject  = `Your offer on "${artwork}" — received`;
+// ── Shared parchment email shell ─────────────────────────────────────────────
+function _siteEmailShell({ eyebrow, heroTitle, bodyHtml, rows, ctaHref, ctaText, ctaSub, logoUrl }) {
+  const rowsHtml = (rows || []).map(([label, value, color]) => `
+    <tr>
+      <td style="padding:8px 0;vertical-align:top">
+        <span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#a08060;font-family:Georgia,serif">${label}</span>
+      </td>
+      <td align="right" style="padding:8px 0;vertical-align:top">
+        <span style="font-size:13px;color:${color || '#2d211b'};font-family:Georgia,serif;${color ? '' : 'font-weight:600'}">${value}</span>
+      </td>
+    </tr>`).join('');
 
-  const amountRow = amount ? `
-        <tr>
-          <td style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
-            <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Your offer</span>
-          </td>
-          <td align="right" style="padding:10px 0;border-bottom:1px solid rgba(196,132,90,0.12)">
-            <span style="font-size:16px;color:#e8d5b0;font-weight:600;font-family:'Georgia',serif">${amount}</span>
-          </td>
-        </tr>` : '';
-
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 </head>
-<body style="margin:0;padding:0;background:#1e1510;font-family:'Georgia',serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#1e1510;padding:40px 0">
+<body style="margin:0;padding:0;background:#f5ede0;font-family:Georgia,serif;color:#2d211b;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5ede0;padding:32px 0">
     <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#2a1c14;border:1px solid rgba(196,132,90,0.25);border-radius:6px;overflow:hidden;max-width:560px;width:100%">
+      <table width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#ede0c8;border-radius:24px;overflow:hidden;">
 
-        <!-- Header -->
-        <tr>
-          <td style="padding:28px 32px 20px;border-bottom:1px solid rgba(196,132,90,0.18)">
-            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works · Private Offer</p>
-            <h1 style="margin:0;font-family:'Georgia',serif;font-size:26px;font-weight:400;color:#e8d5b0;line-height:1.2">${artwork}</h1>
-          </td>
-        </tr>
+        <!-- Hero block -->
+        <tr><td style="padding:10px">
+          <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:20px;overflow:hidden;">
+            <tr><td style="background:#2a1508;background-image:radial-gradient(ellipse at 50% 110%,rgba(196,140,60,0.38) 0%,transparent 62%),linear-gradient(180deg,#2a1508 0%,#3d2010 55%,#5a2e14 100%);padding:36px 32px 40px;text-align:center;border-radius:20px 20px 0 0;">
+              <p style="margin:0 0 16px;font-family:Arial,sans-serif;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:#ffffff;font-weight:700">${eyebrow}</p>
+              ${logoUrl ? `<img src="${logoUrl}" alt="Kay’s Works" width="120" style="display:block;width:120px;max-width:50%;height:auto;margin:0 auto 20px"/>` : ''}
+              <p style="margin:0;font-size:26px;font-weight:400;color:#ffffff;line-height:1.15;font-family:Georgia,serif">${heroTitle}</p>
+            </td></tr>
+            <!-- Gold trim inside the rounded wrapper -->
+            <tr><td style="background:linear-gradient(90deg,#b8821e 0%,#e8c45a 35%,#f5d060 55%,#d4a030 80%,#b8821e 100%);height:5px;line-height:5px;font-size:0;border-radius:0 0 20px 20px;">&nbsp;</td></tr>
+          </table>
+        </td></tr>
 
-        <!-- Badge -->
-        <tr>
-          <td style="padding:24px 32px">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(196,132,90,0.08);border:1px solid rgba(196,132,90,0.3);border-radius:4px">
-              <tr><td style="padding:18px 20px">
-                <p style="margin:0 0 8px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#c4845a;font-family:'Georgia',serif">Offer received</p>
-                <p style="margin:0 0 8px;font-size:22px;color:#e8d5b0;font-family:'Georgia',serif">Thank you, ${name}.</p>
-                <p style="margin:0;font-size:14px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">Your interest in this work means a great deal. Kay has been notified and will review your offer personally — expect a response within a few days.</p>
-              </td></tr>
-            </table>
-          </td>
-        </tr>
+        <!-- Body text -->
+        <tr><td style="padding:28px 32px 0">
+          ${bodyHtml}
+        </td></tr>
 
         <!-- Detail rows -->
-        <tr>
-          <td style="padding:0 32px 20px">
-            <table width="100%" cellpadding="0" cellspacing="0">
-              ${amountRow}
-              <tr>
-                <td style="padding:10px 0${amount ? ';border-bottom:1px solid rgba(196,132,90,0.12)' : ''}">
-                  <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Piece</span>
-                </td>
-                <td align="right" style="padding:10px 0${amount ? ';border-bottom:1px solid rgba(196,132,90,0.12)' : ''}">
-                  <span style="font-size:13px;color:#c4845a;font-style:italic;font-family:'Georgia',serif">${artwork}</span>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding:10px 0">
-                  <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9a8070;font-family:'Georgia',serif">Reference</span>
-                </td>
-                <td align="right" style="padding:10px 0">
-                  <span style="font-size:11px;color:#4a3228;font-family:'Georgia',serif">${id || '—'}</span>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
+        ${rowsHtml ? `<tr><td style="padding:8px 32px 4px"><table width="100%" cellpadding="0" cellspacing="0">${rowsHtml}</table></td></tr>` : ''}
 
         <!-- CTA -->
-        <tr>
-          <td style="padding:4px 32px 32px;text-align:center">
-            <a href="https://kaysworks.com/auction" style="display:inline-block;background:#9e4f2e;color:#f5ede0;text-decoration:none;font-family:'Georgia',serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 32px;border-radius:4px">View the auction</a>
-            <p style="margin:18px 0 0;font-size:12px;color:#9a8070;font-style:italic;font-family:'Georgia',serif">In the meantime the auction remains open — you are always welcome to place a bid.</p>
-          </td>
-        </tr>
+        <tr><td style="padding:20px 32px 32px;text-align:center">
+          <a href="${ctaHref}" style="display:inline-block;background:linear-gradient(90deg,#b8821e 0%,#e8c45a 35%,#f5d878 55%,#d4a030 80%,#b8821e 100%);color:#2d1508;text-decoration:none;font-family:Arial,sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:14px 34px;border-radius:999px">${ctaText}</a>
+          ${ctaSub ? `<p style="margin:12px 0 0;font-size:12px;color:#7a5a40;font-style:italic;font-family:Georgia,serif">${ctaSub}</p>` : ''}
+        </td></tr>
 
         <!-- Footer -->
-        <tr>
-          <td style="padding:16px 32px;border-top:1px solid rgba(196,132,90,0.18);text-align:center">
-            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">© Kay's Works · <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
-          </td>
-        </tr>
+        <tr><td style="padding:16px 32px 24px;border-top:1px solid rgba(90,55,30,0.15);text-align:center">
+          <p style="margin:0;font-size:10px;color:#b09070;font-family:Georgia,serif">&copy; Kay\u2019s Works &middot; <a href="https://kaysworks.com" style="color:#b09070">kaysworks.com</a></p>
+        </td></tr>
 
       </table>
     </td></tr>
   </table>
 </body>
 </html>`;
+}
+
+// ── Client confirmation — private offer ───────────────────────────────────────
+async function sendOfferConfirmation(row, id) {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) throw new Error('RESEND_API_KEY missing');
+
+  const name    = row.name    || 'Collector';
+  const artwork = row.artwork || 'the piece';
+  const amount  = row.offer_amount && row.offer_currency
+    ? `${row.offer_amount} ${row.offer_currency}` : null;
+  const subject = `Offer received \u2014 \u201c${artwork}\u201d`;
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px;font-size:16px;color:#2d211b;font-family:Georgia,serif;line-height:1.6">
+      Thank you, ${name}.
+    </p>
+    <p style="margin:0 0 6px;font-size:13px;color:#5c3e2e;font-style:italic;font-family:Georgia,serif;line-height:1.65">
+      Your interest in this work means a great deal to me. I\u2019ll review your offer personally and be in touch within a few days.
+    </p>`;
+
+  const rows = [
+    amount              ? ['Your offer', amount,   null]       : null,
+    ['Piece',             artwork,                 '#9e4f2e'  ],
+    ['Reference',         id || '\u2014',           '#b09070'  ],
+  ].filter(Boolean);
+
+  const html = _siteEmailShell({
+    eyebrow:   "Kay\u2019s Works \u00b7 Private Offer",
+    heroTitle: "Your offer has been received",
+    bodyHtml,
+    rows,
+    ctaHref:   'https://kaysworks.com/auction',
+    ctaText:   'View the auction',
+    ctaSub:    'The auction remains open \u2014 you\u2019re always welcome to place a bid.',
+    logoUrl:   process.env.SHOP_LOGO_URL || 'https://www.kaysworks.com/images/kaysworkslogo.svg',
+  });
 
   const text = [
+    `Offer received \u2014 ${artwork}`,
+    '',
     `Thank you, ${name}.`,
+    `Your interest means a great deal. I\u2019ll review your offer personally and be in touch within a few days.`,
     '',
-    `Your offer on "${artwork}" has been received.`,
     amount ? `Offer: ${amount}` : '',
-    `Reference: ${id || '—'}`,
+    `Piece: ${artwork}`,
+    `Reference: ${id || '\u2014'}`,
     '',
-    `Kay has been notified and will review your offer personally — expect a response within a few days.`,
-    '',
-    `In the meantime the auction remains open — you are welcome to place a bid.`,
     `https://kaysworks.com/auction`,
   ].filter(l => l !== undefined).join('\n');
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${resendKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: ALERT_FROM_EMAIL,
-      to:   [row.email],
-      bcc:  emailList(ALERT_TO_EMAIL),
-      reply_to: ALERT_TO_EMAIL,
-      subject,
-      text,
-      html,
+      from: ALERT_FROM_EMAIL, to: [row.email],
+      reply_to: ALERT_TO_EMAIL, subject, text, html,
     }),
   });
-
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.message || `Resend confirmation failed with ${response.status}`);
+    throw new Error(data.message || `Resend confirmation failed ${response.status}`);
   }
   return response.json().catch(() => ({}));
 }
 
+// ── Admin alert ───────────────────────────────────────────────────────────────
 async function sendMinimalAlert(row, id) {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) throw new Error('RESEND_API_KEY missing');
 
-  const label = alertLabel(row.form_type);
+  const label   = alertLabel(row.form_type);
   const subject = `New ${label}`;
+
+  const bodyHtml = `
+    <p style="margin:0 0 6px;font-size:13px;color:#5c3e2e;font-style:italic;font-family:Georgia,serif;line-height:1.65">
+      A new ${label} has just come in. Open the admin queue to review the full submission and respond.
+    </p>`;
+
+  const rows = [];
+  if (row.form_type === 'private-offer') {
+    if (row.offer_amount) rows.push(['Offer',   `${row.offer_amount} ${row.offer_currency || ''}`.trim(), null]);
+    if (row.artwork)      rows.push(['Artwork',  row.artwork,   '#9e4f2e']);
+    if (row.chain)        rows.push(['Chain',    row.chain,     '#7a5a40']);
+  }
+  rows.push(['Collector', row.name || row.collector_name || '\u2014', null]);
+  rows.push(['Email',     row.email || '\u2014',    '#7a5a40']);
+  if (row.wallet_address) rows.push(['Wallet',   row.wallet_address, '#7a5a40']);
+  if (row.message)        rows.push(['Message',  row.message.slice(0, 140) + (row.message.length > 140 ? '\u2026' : ''), '#5c3e2e']);
+  rows.push(['Ref',       id || 'saved',          '#b09070']);
+
+  const html = _siteEmailShell({
+    eyebrow:   "Kay\u2019s Works \u00b7 Admin Queue",
+    heroTitle: `New ${label}`,
+    bodyHtml,
+    rows,
+    ctaHref:   ADMIN_URL,
+    ctaText:   'Open admin queue',
+    ctaSub:    null,
+    logoUrl:   process.env.SHOP_LOGO_URL || 'https://www.kaysworks.com/images/kaysworkslogo.svg',
+  });
+
   const text = [
-    `A new ${label} has been recorded in the Kay's Works admin queue.`,
+    `New ${label} \u2014 Kay\u2019s Works`,
     '',
-    `Submission ID: ${id || 'saved'}`,
-    `Collector: ${row.name || row.collector_name || '—'}`,
-    `Email: ${row.email || '—'}`,
-    row.form_type === 'private-offer' ? `Offer: ${row.offer_amount || '—'} ${row.offer_currency || ''}`.trim() : '',
-    row.form_type === 'private-offer' ? `Artwork: ${row.artwork || '—'}` : '',
-    row.form_type === 'private-offer' ? `Chain: ${row.chain || '—'}` : '',
-    row.wallet_address ? `Wallet: ${row.wallet_address}` : '',
+    `Collector: ${row.name || row.collector_name || '\u2014'}`,
+    `Email: ${row.email || '\u2014'}`,
+    row.form_type === 'private-offer' ? `Offer: ${row.offer_amount || '\u2014'} ${row.offer_currency || ''}`.trim() : '',
+    row.form_type === 'private-offer' ? `Artwork: ${row.artwork || '\u2014'}` : '',
     row.message ? `Message: ${row.message}` : '',
+    `Ref: ${id || 'saved'}`,
     '',
-    `Open the admin queue: ${ADMIN_URL}`,
+    ADMIN_URL,
   ].filter(Boolean).join('\n');
-
-
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head>
-<body style="margin:0;padding:0;background:#1e1510;font-family:Georgia,serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#1e1510;padding:36px 0">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#2a1c14;border:1px solid rgba(196,132,90,0.25);border-radius:6px;overflow:hidden">
-        <tr><td style="padding:28px 32px">
-          <p style="margin:0 0 6px;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works Queue</p>
-          <h1 style="margin:0 0 12px;color:#e8d5b0;font-size:26px;font-weight:400;line-height:1.25">${subject}</h1>
-          <p style="margin:0 0 22px;color:#9a8070;font-size:15px;line-height:1.55">A new request was recorded. Open the admin queue to review the details.</p>
-          <a href="${ADMIN_URL}" style="display:inline-block;background:#9e4f2e;color:#f5ede0;text-decoration:none;font-size:12px;letter-spacing:2px;text-transform:uppercase;padding:13px 22px;border-radius:4px">Open admin queue</a>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${resendKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: ALERT_FROM_EMAIL,
-      to: emailList(ALERT_TO_EMAIL),
-      reply_to: row.email || undefined,
-      subject,
-      text,
-      html,
+      from: ALERT_FROM_EMAIL, to: emailList(ALERT_TO_EMAIL),
+      reply_to: row.email || undefined, subject, text, html,
     }),
   });
-
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.message || `Resend alert failed with ${response.status}`);
+    throw new Error(data.message || `Resend alert failed ${response.status}`);
   }
   return response.json().catch(() => ({}));
 }
+
 
 async function handleCreate(req, res) {
   const payload = await readBody(req);
