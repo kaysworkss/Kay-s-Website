@@ -3554,6 +3554,8 @@ function _setupCrossChainForSlot(slot) {
   const ccKey = _pairKeyForSlot(slot);
   if (!ccKey) return;
   _ccPairKey = ccKey;
+  // Store the admin-fixed USD cap (may be null — falls back to ETH reserve derivation)
+  window._ccUsdHardCap = slot.usdHardCap ? parseFloat(slot.usdHardCap) : null;
   _ccShowChooser();
   _ccStartPolling(ccKey);
   _ccPopulateChooserPrices(ccKey).catch(e => console.warn("_ccPopulateChooserPrices:", e));
@@ -3577,10 +3579,11 @@ async function _ccPopulateChooserPrices(pairKey) {
       const s = await c.auctionState();
       const noBids = s[5] === ethers.ZeroAddress;
       const displayWei = s[1] && !noBids ? s[6] : s[7];
-      // s[7] is _minNextBid (reserve when no bids), store it for XTZ conversion
-      window._ccEthReserveWei = s[7]; // reserve / min-next-bid in wei
+      window._ccEthReserveWei = s[7]; // reserve in wei — used as USD cap anchor
       if (ethPriceEl) ethPriceEl.textContent = ethers.formatEther(displayWei) + " ETH";
-      if (ethSubEl)   ethSubEl.textContent   = noBids ? "≈ reserve price" : "≈ current bid";
+      // Sub-label: hard cap USD if set, otherwise derive from this ETH amount
+      const _ethCardUsd = _usdAnchor(displayWei);
+      if (ethSubEl) ethSubEl.textContent = _ethCardUsd ? `≈ ${_fmtUsd(_ethCardUsd)}` : (noBids ? "≈ minimum bid" : "≈ current bid");
       if (ethStatusEl) ethStatusEl.style.display = "";
     } catch(_) {}
   }
@@ -3593,28 +3596,27 @@ async function _ccPopulateChooserPrices(pairKey) {
         const mutez  = noBids ? auction.minNextBidMutez : auction.highestBidMutez;
         const xtz    = (mutez / 1_000_000).toFixed(6).replace(/\.?0+$/, "");
 
-        // --- ETH-equivalent overlay -------------------------------------------
+        // --- USD hard cap → XTZ floor ----------------------------------------
         const rate   = _xtzRate();
         const ethRsv = window._ccEthReserveWei ?? null;
 
         if (noBids && rate && ethRsv) {
           const ethEquivXtz = _xtzEthEquivFloor(auction.minNextBidMutez, ethRsv);
-          if (ethEquivXtz && ethEquivXtz > 0) {
-            const displayXtz = Math.ceil(ethEquivXtz).toLocaleString();
-            if (xtzPriceEl) xtzPriceEl.textContent = displayXtz + " XTZ";
-            if (xtzSubEl)   xtzSubEl.textContent   = "≈ minimum bid";
-          } else {
-            const displayXtz = Math.ceil(mutez / 1_000_000).toLocaleString();
-            if (xtzPriceEl) xtzPriceEl.textContent = displayXtz + " XTZ";
-            if (xtzSubEl)   xtzSubEl.textContent   = "≈ minimum bid";
-          }
+          const displayXtz  = ethEquivXtz && ethEquivXtz > 0
+            ? Math.ceil(ethEquivXtz).toLocaleString()
+            : Math.ceil(mutez / 1_000_000).toLocaleString();
+          if (xtzPriceEl) xtzPriceEl.textContent = displayXtz + " XTZ";
+          // Mirror the same USD figure shown on the ETH card
+          const usdCap = _usdAnchor(ethRsv);
+          if (xtzSubEl) xtzSubEl.textContent = usdCap ? `≈ ${_fmtUsd(usdCap)}` : "≈ minimum bid";
         } else {
-          // Bids exist — show the current XTZ high bid
           const displayXtz = noBids
             ? Math.ceil(mutez / 1_000_000).toLocaleString()
             : (mutez / 1_000_000).toFixed(6).replace(/\.?0+$/, "");
           if (xtzPriceEl) xtzPriceEl.textContent = displayXtz + " XTZ";
-          if (xtzSubEl)   xtzSubEl.textContent   = noBids ? "≈ minimum bid" : "≈ current bid";
+          // For live bids show the current XTZ bid's USD value
+          const bidUsd = _xtzUsd() ? (mutez / 1_000_000) * _xtzUsd() : null;
+          if (xtzSubEl) xtzSubEl.textContent = bidUsd ? `≈ ${_fmtUsd(bidUsd)}` : (noBids ? "≈ minimum bid" : "≈ current bid");
         }
         // ----------------------------------------------------------------------
 
@@ -4586,10 +4588,10 @@ function updateBidHint() {
     const ethRsv     = window._ccEthReserveWei ?? null;
     const equivFloor = _xtzEthEquivFloor(minNextBidMutez, ethRsv);
     const floor      = (equivFloor && equivFloor > rawMinXtz) ? equivFloor : rawMinXtz;
-    // Round up to whole XTZ — clean, no trailing decimals
     const minRounded = Math.ceil(floor);
+    const _usdCap    = ethRsv ? _usdAnchor(ethRsv) : null;
 
-    document.getElementById("bid-hint").textContent = `Minimum bid: ${minRounded.toLocaleString()} XTZ`;
+    document.getElementById("bid-hint").textContent = `Minimum bid: ${minRounded.toLocaleString()} XTZ${_usdCap ? ` · ≈ ${_fmtUsd(_usdCap)}` : ""}`;
     if (!bidInput.value) bidInput.value = minRounded;
     bidInput.step = "1";
     if (currLabel) currLabel.textContent = "XTZ";
@@ -4851,7 +4853,11 @@ async function refreshTezosState(runToken = _switchToken) {
       ? Math.ceil(_statEquivFloor).toLocaleString() + " XTZ"
       : `${(auction.minNextBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "")} XTZ`;
     document.getElementById("stat-min").textContent = _statMin;
-    document.getElementById("stat-min-sub").textContent = noBids ? "Minimum bid" : "Min increment";
+    // Sub-label: show USD cap when available, otherwise generic label
+    const _statUsd = noBids && _statEthRsv ? _usdAnchor(_statEthRsv) : null;
+    document.getElementById("stat-min-sub").textContent = noBids
+      ? (_statUsd ? `≈ ${_fmtUsd(_statUsd)}` : "Minimum bid")
+      : "Min increment";
     document.getElementById("bid-form").style.display = acceptingBids ? "block" : "none";
     document.getElementById("history-section").style.display = "block";
     document.getElementById("history-list").innerHTML = noBids ? "" : `
@@ -6640,98 +6646,143 @@ function simSettle() {
 //    ETH reserve at the locked (or live) rate, always ≥ the on-chain floor
 // ─────────────────────────────────────────────────────────────────────────────
 const _XTZ_PRICE_TTL_MS  = 5 * 60 * 1000; // 5-minute refresh cadence
-const _XTZ_PRICE_SOURCES = [
-  // Primary: CoinGecko simple price — no key required
-  async () => {
+const _XTZ_PRICE_TTL_MS = 5 * 60 * 1000;
+
+const _xtzPriceState = {
+  ethUsd:      null,   // USD per 1 ETH
+  xtzUsd:      null,   // USD per 1 XTZ
+  liveRate:    null,   // XTZ per 1 ETH  (derived: ethUsd / xtzUsd)
+  lockedEthUsd: null,  // snapshots taken when chooser modal opens
+  lockedXtzUsd: null,
+  lockedRate:   null,
+  fetchedAt:   0,
+  fetching:    false,
+  intervalId:  null,
+};
+
+async function _fetchXtzRate() {
+  if (_xtzPriceState.fetching) return;
+  _xtzPriceState.fetching = true;
+
+  // Primary: CoinGecko — returns both USD prices in one call
+  try {
     const r = await fetch(
       "https://api.coingecko.com/api/v3/simple/price?ids=tezos%2Cethereum&vs_currencies=usd",
       { cache: "no-store", signal: AbortSignal.timeout(8000) }
     );
-    if (!r.ok) throw new Error(`CG ${r.status}`);
-    const d = await r.json();
-    // XTZ per 1 ETH = ETH_USD / XTZ_USD
-    const ethUsd = d?.ethereum?.usd;
-    const xtzUsd = d?.tezos?.usd;
-    if (!ethUsd || !xtzUsd) throw new Error("CG price missing");
-    return ethUsd / xtzUsd;
-  },
-  // Fallback: Binance order-book ticker (no auth)
-  async () => {
+    if (r.ok) {
+      const d = await r.json();
+      const ethUsd = d?.ethereum?.usd;
+      const xtzUsd = d?.tezos?.usd;
+      if (ethUsd && xtzUsd) {
+        _xtzPriceState.ethUsd     = ethUsd;
+        _xtzPriceState.xtzUsd     = xtzUsd;
+        _xtzPriceState.liveRate   = ethUsd / xtzUsd;
+        _xtzPriceState.fetchedAt  = Date.now();
+        console.debug(`[xtzPrice] ETH=$${ethUsd} XTZ=$${xtzUsd} rate=${_xtzPriceState.liveRate.toFixed(2)}`);
+        _xtzPriceState.fetching = false;
+        return;
+      }
+    }
+  } catch(e) { console.warn("[xtzPrice] CoinGecko failed:", e.message); }
+
+  // Fallback: Binance USDT pairs
+  try {
     const [eth, xtz] = await Promise.all([
       fetch("https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT", { cache: "no-store", signal: AbortSignal.timeout(8000) }).then(r => r.json()),
       fetch("https://api.binance.com/api/v3/ticker/price?symbol=XTZUSDT", { cache: "no-store", signal: AbortSignal.timeout(8000) }).then(r => r.json()),
     ]);
     const ethUsd = parseFloat(eth?.price);
     const xtzUsd = parseFloat(xtz?.price);
-    if (!ethUsd || !xtzUsd) throw new Error("Binance price missing");
-    return ethUsd / xtzUsd;
-  },
-];
-
-const _xtzPriceState = {
-  liveRate:   null,   // XTZ per 1 ETH — updated every TTL
-  lockedRate: null,   // snapshot taken when chooser modal opens
-  fetchedAt:  0,
-  fetching:   false,
-  intervalId: null,
-};
-
-async function _fetchXtzRate() {
-  if (_xtzPriceState.fetching) return;
-  _xtzPriceState.fetching = true;
-  for (const source of _XTZ_PRICE_SOURCES) {
-    try {
-      const rate = await source();
-      if (rate && isFinite(rate) && rate > 0) {
-        _xtzPriceState.liveRate  = rate;
-        _xtzPriceState.fetchedAt = Date.now();
-        console.debug(`[xtzPrice] rate updated: 1 ETH = ${rate.toFixed(2)} XTZ`);
-        _xtzPriceState.fetching  = false;
-        return;
-      }
-    } catch (err) {
-      console.warn("[xtzPrice] source failed:", err.message);
+    if (ethUsd && xtzUsd) {
+      _xtzPriceState.ethUsd    = ethUsd;
+      _xtzPriceState.xtzUsd    = xtzUsd;
+      _xtzPriceState.liveRate  = ethUsd / xtzUsd;
+      _xtzPriceState.fetchedAt = Date.now();
+      console.debug(`[xtzPrice] Binance ETH=$${ethUsd} XTZ=$${xtzUsd}`);
+      _xtzPriceState.fetching = false;
+      return;
     }
-  }
+  } catch(e) { console.warn("[xtzPrice] Binance failed:", e.message); }
+
   _xtzPriceState.fetching = false;
-  console.warn("[xtzPrice] all price sources failed — keeping stale rate");
+  console.warn("[xtzPrice] all sources failed — keeping stale prices");
 }
 
 function _initXtzPriceEngine() {
-  if (_xtzPriceState.intervalId) return; // already running
+  if (_xtzPriceState.intervalId) return;
   _fetchXtzRate();
   _xtzPriceState.intervalId = setInterval(_fetchXtzRate, _XTZ_PRICE_TTL_MS);
 }
 
-/** Current rate to use: locked snapshot while chooser is open, else live */
+/** XTZ-per-ETH rate: locked snapshot while chooser is open, else live */
 function _xtzRate() {
   return _xtzPriceState.lockedRate ?? _xtzPriceState.liveRate;
 }
 
-/** Call when the cross-chain chooser modal opens — freezes the displayed rate */
+/** USD per ETH: locked snapshot while chooser is open, else live */
+function _ethUsd() {
+  return _xtzPriceState.lockedEthUsd ?? _xtzPriceState.ethUsd;
+}
+
+/** USD per XTZ: locked snapshot while chooser is open, else live */
+function _xtzUsd() {
+  return _xtzPriceState.lockedXtzUsd ?? _xtzPriceState.xtzUsd;
+}
+
+/** Lock all prices the moment the chooser modal opens */
 function lockXtzRate() {
   if (_xtzPriceState.liveRate) {
-    _xtzPriceState.lockedRate = _xtzPriceState.liveRate;
-    console.debug("[xtzPrice] rate LOCKED at", _xtzPriceState.lockedRate.toFixed(2));
+    _xtzPriceState.lockedRate    = _xtzPriceState.liveRate;
+    _xtzPriceState.lockedEthUsd  = _xtzPriceState.ethUsd;
+    _xtzPriceState.lockedXtzUsd  = _xtzPriceState.xtzUsd;
   }
 }
 
-/** Call after chain is chosen (or modal dismissed) — resumes live rate */
+/** Release snapshot after chain is chosen or modal dismissed */
 function unlockXtzRate() {
-  _xtzPriceState.lockedRate = null;
+  _xtzPriceState.lockedRate    = null;
+  _xtzPriceState.lockedEthUsd  = null;
+  _xtzPriceState.lockedXtzUsd  = null;
 }
 
 /**
- * Returns the minimum XTZ bid amount that is worth at least the ETH reserve.
+ * Convert an ETH amount (in wei) to its USD value using the current/locked rate.
+ * Returns null if prices aren't loaded yet.
+ */
+function _usdFromEthWei(wei) {
+  const ethUsd = _ethUsd();
+  if (!ethUsd || wei == null) return null;
+  const eth = parseFloat(ethers.formatEther(wei));
+  if (!isFinite(eth) || eth <= 0) return null;
+  return eth * ethUsd;
+}
+
+/**
+ * Convert a USD amount to whole XTZ, rounded up.
+ * Returns null if prices aren't loaded yet.
+ */
+function _xtzFromUsd(usd) {
+  const xtzUsd = _xtzUsd();
+  if (!xtzUsd || !usd) return null;
+  return Math.ceil(usd / xtzUsd);
+}
+
+/**
+ * Format a USD value for display: "$506" / "$1,240"
+ * Rounds to nearest dollar — we want a hard cap, not a trailing-cents distraction.
+ */
+function _fmtUsd(usd) {
+  if (!usd) return "";
+  return "$" + Math.round(usd).toLocaleString();
+}
+
+/**
+ * Returns the minimum XTZ bid that honours the USD hard cap derived from the ETH reserve.
+ * Floor is always >= the on-chain XTZ minimum.
  *
- * Logic:
- *   ethReserveXtz = ethReserveWei / 1e18 * xtzPerEth
- *   floor = max(ethReserveXtz, minNextBidMutez / 1e6)
- *
- * If no rate is available yet, returns null (caller falls back to raw XTZ minimum).
- *
- * @param {number} minNextBidMutez   - on-chain minimum next bid in mutez
- * @param {bigint|null} ethReserveWei - ETH reserve price in wei (optional, from ETH slot)
+ * @param {number} minNextBidMutez  - on-chain minimum in mutez
+ * @param {bigint|null} ethReserveWei - ETH reserve in wei (from the paired ETH slot)
  */
 function _xtzEthEquivFloor(minNextBidMutez, ethReserveWei) {
   const rate = _xtzRate();
@@ -6739,28 +6790,36 @@ function _xtzEthEquivFloor(minNextBidMutez, ethReserveWei) {
 
   const rawFloorXtz = minNextBidMutez / 1_000_000;
 
-  if (ethReserveWei == null) return null;
+  // USD cap: admin hard cap takes priority, then derive from ETH reserve
+  const usdCap = _usdAnchor(ethReserveWei);
+  if (!usdCap && ethReserveWei == null) return null; // no anchor at all
 
-  const ethReserveFloat = parseFloat(ethers.formatEther(ethReserveWei));
-  if (!isFinite(ethReserveFloat) || ethReserveFloat <= 0) return null;
+  let xtzFromCap;
+  if (usdCap) {
+    xtzFromCap = _xtzFromUsd(usdCap);
+  } else {
+    const ethReserveFloat = parseFloat(ethers.formatEther(ethReserveWei));
+    xtzFromCap = isFinite(ethReserveFloat) && ethReserveFloat > 0
+      ? ethReserveFloat * rate
+      : null;
+  }
 
-  // ETH reserve expressed in XTZ
-  const ethAsXtz = ethReserveFloat * rate;
-
-  // Take the higher of the two floors, rounded up to 6 decimals
-  const floor = Math.max(ethAsXtz, rawFloorXtz);
-  // Round UP to nearest mutez to avoid sub-minimum bids
+  const floor = Math.max(xtzFromCap ?? 0, rawFloorXtz);
   return Math.ceil(floor * 1_000_000) / 1_000_000;
 }
 
-/** Format rate for display: "1 ETH ≈ 3,241 XTZ" */
-function _xtzRateLabel() {
-  const r = _xtzRate();
-  if (!r) return "";
-  return `1 ETH ≈ ${Math.round(r).toLocaleString()} XTZ`;
+/**
+ * The USD value that both chains anchor to.
+ * Priority: admin-fixed hard cap → derived from ETH reserve at runtime.
+ */
+function _usdAnchor(ethReserveWei) {
+  if (window._ccUsdHardCap && isFinite(window._ccUsdHardCap) && window._ccUsdHardCap > 0) {
+    return window._ccUsdHardCap;
+  }
+  return _usdFromEthWei(ethReserveWei);
 }
 
-// Boot the engine as soon as the page loads
+// Boot the engine on page load
 _initXtzPriceEngine();
 
 function simStop() {
