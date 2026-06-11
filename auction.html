@@ -1188,13 +1188,6 @@ body {
   font-family: 'Crimson Pro', serif; font-size: 0.82rem;
   color: var(--text-muted); margin-bottom: 14px; font-style: italic;
 }
-.bid-legal-notice {
-  font-family: 'Crimson Pro', serif; font-size: 0.72rem;
-  color: var(--text-muted); opacity: 0.55; line-height: 1.55;
-  margin-top: 14px; padding-top: 12px;
-  border-top: 1px solid rgba(196,132,90,0.1);
-  font-style: italic; text-align: left;
-}
 
 /* Bid button — matches site btn-mint style */
 @keyframes pulseBid {
@@ -2051,6 +2044,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
                 <button class="cc-choice-btn xtz" onclick="_ccChooseChain('tezos')">Start the Bid on Tezos</button>
               </div>
             </div>
+            <div id="cc-offer-anchor"></div>
           </div>
           <div class="cc-nobid-bar-wrap" id="cc-nobid-bar-wrap">
             <div class="cc-nobid-bar" id="cc-nobid-bar"></div>
@@ -2116,13 +2110,6 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             <button class="cc-cancel-claim-btn" id="cc-cancel-claim-btn-bid" onclick="_ccCancelClaim()" style="margin-top:6px">
               ← Back to chain selection
             </button>
-            <p class="bid-legal-notice">
-              Bids are final and cannot be reversed — blockchain transactions are irreversible.
-              Token amounts shown are calculated from live exchange rates and may differ slightly at the moment your transaction confirms.
-              The 1/1 original transfers on-chain to the winning address only after the auction settles.
-              For cross-chain auctions, only one chain will complete — the other closes permanently once a bid is placed.
-              By placing a bid you confirm you understand these terms.
-            </p>
           </div>
 
           <!-- Buy now section -->
@@ -2141,6 +2128,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           </div>
 
           <!-- Private offer section -->
+          <div id="offer-bid-panel-anchor"></div>
           <div id="offer-section" style="display:none;margin-bottom:24px">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
               <div style="flex:1;height:1px;background:var(--divider)"></div>
@@ -2554,6 +2542,7 @@ function _ccFireNotification(title, body) {
 function _ccShowChooser() {
   // Freeze the XTZ/ETH rate for the duration the chooser is open
   lockXtzRate();
+  _placeOfferSection("chooser");
   // Show the two-chain chooser, hide bid form and countdown until chosen
   const chooser = document.getElementById("cc-chooser");
   if (chooser) chooser.classList.add("show");
@@ -2565,7 +2554,7 @@ function _ccShowChooser() {
   document.getElementById("bid-form").style.display          = "none";
   document.getElementById("history-section").style.display   = "none";
   document.getElementById("buynow-section").style.display    = "none";
-  _closeOfferPanel(); document.getElementById("offer-section").style.display = "none";
+  _closeOfferPanel(); document.getElementById("offer-section").style.display = "block";
   document.getElementById("status-line").textContent         = "";
 }
 
@@ -2614,6 +2603,10 @@ async function _ccChooseChain(chain) {
       _renderCcBanner();
     }
     _ccHideChooser();
+    _placeOfferSection("bid");
+    _closeOfferPanel();
+    const offerSection = document.getElementById("offer-section");
+    if (offerSection) offerSection.style.display = "none";
     _ccStartNoBidCountdown();
     // Immediately populate the bid panel — don't wait for the 15s poll timer
     const _refreshChain = _slotChain(_activeCfg());
@@ -4760,7 +4753,8 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     // Private offer — only while no bids have been placed
     const offerSection = document.getElementById("offer-section");
     if (offerSection) {
-      offerSection.style.display = (noBids && deposited && !settled) ? "block" : "none";
+      _placeOfferSection(_isCrossChainOfferContext() ? "chooser" : "bid");
+      offerSection.style.display = (!_isCrossChainOfferContext() && noBids && deposited && !settled) ? "block" : "none";
       if (!noBids) _closeOfferPanel(); // collapse quietly when a bid lands
     }
 
@@ -5063,7 +5057,8 @@ async function refreshTezosState(runToken = _switchToken) {
     // Private offer — only while no bids have been placed on Tezos
     const _tezOfferSection = document.getElementById("offer-section");
     if (_tezOfferSection) {
-      _tezOfferSection.style.display = (noBids && !auction.settled) ? "block" : "none";
+      _placeOfferSection(_isCrossChainOfferContext() ? "chooser" : "bid");
+      _tezOfferSection.style.display = (!_isCrossChainOfferContext() && noBids && !auction.settled) ? "block" : "none";
       if (!noBids) _closeOfferPanel();
     }
     document.getElementById("history-list").innerHTML = noBids ? "" : `
@@ -5208,6 +5203,16 @@ async function checkTezosEligibility(runToken = _switchToken) {
 // ─── Bid ─────────────────────────────────────────────────────────────────────
 
 // ── Private offer panel ──────────────────────────────────────────────────────
+
+function _placeOfferSection(target) {
+  const offer = document.getElementById("offer-section");
+  const anchor = document.getElementById(target === "chooser" ? "cc-offer-anchor" : "offer-bid-panel-anchor");
+  if (offer && anchor && offer.previousElementSibling !== anchor) anchor.after(offer);
+}
+
+function _isCrossChainOfferContext() {
+  return !!(_activeCfg()?.crossChainPairKey || _ccPairKey);
+}
 
 function toggleOfferPanel() {
   const panel  = document.getElementById("offer-panel");
