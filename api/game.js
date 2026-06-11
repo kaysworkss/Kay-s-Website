@@ -1503,7 +1503,61 @@ async function verifyCardPayment({ provider, reference, expectedTotalNgn }) {
   throw e;
 }
 
-// ── STOCK CLAIM / RELEASE ─────────────────────────────────────────────────────
+// -- STOCK CLAIM / RELEASE -----------------------------------------------------
+function isUuidTextOperatorError(error) {
+  return /operator does not exist:\s*uuid\s*=\s*text/i.test(error?.message || '');
+}
+
+async function adjustVariantStockDirect(supabase, item, qtyDelta) {
+  const vkey = item.variantKey || item.variant;
+  const { data: product, error: loadErr } = await supabase
+    .from('shop_products')
+    .select('id, name, stock, stock_by_variant')
+    .eq('id', item.id)
+    .single();
+  if (loadErr) {
+    const e = new Error(`Stock lookup failed for ${item.name || item.id}: ${loadErr.message}`);
+    e.statusCode = 500;
+    throw e;
+  }
+  if (!product) {
+    const e = new Error(`Unknown product in order: ${item.id}`);
+    e.statusCode = 400;
+    throw e;
+  }
+
+  const patch = {};
+  const stockByVariant = product.stock_by_variant && typeof product.stock_by_variant === 'object'
+    ? { ...product.stock_by_variant }
+    : null;
+  if (stockByVariant && stockByVariant[vkey] !== undefined) {
+    const current = Number(stockByVariant[vkey]);
+    const next = current + qtyDelta;
+    if (qtyDelta < 0 && next < 0) return { ok: false };
+    stockByVariant[vkey] = next;
+    patch.stock_by_variant = stockByVariant;
+  }
+
+  if (product.stock !== null && product.stock !== undefined) {
+    const current = Number(product.stock);
+    const next = current + qtyDelta;
+    if (qtyDelta < 0 && next < 0) return { ok: false };
+    patch.stock = next;
+  }
+
+  if (!Object.keys(patch).length) return { ok: true };
+  const { error: updErr } = await supabase
+    .from('shop_products')
+    .update(patch)
+    .eq('id', item.id);
+  if (updErr) {
+    const e = new Error(`Stock update failed for ${item.name || item.id}: ${updErr.message}`);
+    e.statusCode = 500;
+    throw e;
+  }
+  return { ok: true };
+}
+
 async function claimVariantStock(supabase, item) {
   const vkey = item.variantKey || item.variant;
   const { data, error } = await supabase.rpc('decrement_variant_stock', {
@@ -1512,6 +1566,9 @@ async function claimVariantStock(supabase, item) {
     p_qty: item.qty,
   });
   if (error) {
+    if (isUuidTextOperatorError(error)) {
+      return adjustVariantStockDirect(supabase, item, -Math.abs(Number(item.qty) || 1));
+    }
     const e = new Error(`Stock claim failed for ${item.name || item.id}: ${error.message}`);
     e.statusCode = 500;
     throw e;
@@ -1527,7 +1584,13 @@ async function releaseVariantStock(supabase, item) {
       p_variant_key: vkey,
       p_qty: -item.qty,
     });
-    if (error) console.error('[shop-order] stock release failed:', item.id, vkey, error.message);
+    if (error) {
+      if (isUuidTextOperatorError(error)) {
+        await adjustVariantStockDirect(supabase, item, Math.abs(Number(item.qty) || 1));
+        return;
+      }
+      console.error('[shop-order] stock release failed:', item.id, vkey, error.message);
+    }
   } catch (e) {
     console.error('[shop-order] stock release threw:', item.id, vkey, e.message);
   }
