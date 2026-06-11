@@ -1329,6 +1329,40 @@ body {
 
 hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 
+/* ── Cross-chain refresh prompt ── */
+.cc-refresh-overlay {
+  display:none;position:fixed;inset:0;z-index:9100;
+  background:rgba(10,6,3,0.82);backdrop-filter:blur(6px);
+  align-items:center;justify-content:center;
+}
+.cc-refresh-overlay.show{display:flex;}
+.cc-refresh-card {
+  background:#2a1c14;border:1px solid rgba(196,132,90,0.35);
+  border-radius:16px;padding:36px 28px;width:340px;max-width:94vw;
+  text-align:center;box-shadow:0 24px 60px rgba(0,0,0,0.7);
+}
+.cc-refresh-icon{font-size:2.2rem;margin-bottom:16px;}
+.cc-refresh-title{
+  font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.2em;
+  text-transform:uppercase;color:#c9993a;margin-bottom:12px;
+}
+.cc-refresh-body{
+  font-family:'Crimson Pro',serif;font-size:1rem;color:var(--linen);
+  line-height:1.65;margin-bottom:12px;
+}
+.cc-refresh-sub{
+  font-family:'Crimson Pro',serif;font-size:0.82rem;color:var(--text-muted);
+  font-style:italic;margin-bottom:28px;line-height:1.5;
+}
+.cc-refresh-btn{
+  width:100%;font-family:'Cinzel',serif;font-size:0.65rem;
+  letter-spacing:0.2em;text-transform:uppercase;
+  background:linear-gradient(90deg,#b8821e 0%,#e8c45a 35%,#f5d878 55%,#d4a030 80%,#b8821e 100%);
+  color:#2d1508;border:none;border-radius:4px;
+  padding:14px;cursor:pointer;font-weight:700;
+}
+.cc-refresh-btn:hover{filter:brightness(1.1);}
+
 /* ── ETH WalletConnect picker modal ── */
 .wc-modal-overlay {
   display:none;position:fixed;inset:0;z-index:9000;
@@ -2109,8 +2143,8 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
               </div>
               <div class="cc-wait-overlay" id="cc-eth-wait-overlay">
                 <div class="cc-wait-spinner"></div>
-                <div class="cc-wait-lbl">Claim in progress</div>
-                <div class="cc-wait-sub">Another collector is starting this chain</div>
+                <div class="cc-wait-lbl">A choice is being made</div>
+                <div class="cc-wait-sub">A collector is deciding which chain to start — both chains are paused until they bid or the window expires</div>
                 <div class="cc-wait-timer" id="cc-eth-wait-timer"></div>
               </div>
               <div class="cc-choice-head eth">⟠ Ethereum</div>
@@ -2132,8 +2166,8 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
               </div>
               <div class="cc-wait-overlay" id="cc-xtz-wait-overlay">
                 <div class="cc-wait-spinner"></div>
-                <div class="cc-wait-lbl">Claim in progress</div>
-                <div class="cc-wait-sub">Another collector is starting this chain</div>
+                <div class="cc-wait-lbl">A choice is being made</div>
+                <div class="cc-wait-sub">A collector is deciding which chain to start — both chains are paused until they bid or the window expires</div>
                 <div class="cc-wait-timer" id="cc-xtz-wait-timer"></div>
               </div>
               <div class="cc-choice-head xtz">ꜩ Tezos</div>
@@ -2975,32 +3009,34 @@ async function _ccPoll(pairKey) {
         _ccFireNotification("Auction is live!", "A bid was placed. The auction is now running.");
       }
     } else {
-      // This browser is on the passive/locked chain
+      // This browser is on the passive/locked chain — keep the chooser visible
+      // so both cards are visible with the appropriate overlay state
+      const chooser = document.getElementById("cc-chooser");
+      if (chooser && !chooser.classList.contains("show")) chooser.classList.add("show");
+
       if (_ccClaimRow.status === "waiting-bid") {
-        // Show chooser with waiting overlays so the passive collector sees the countdown
-        const chooser = document.getElementById("cc-chooser");
-        if (chooser && !chooser.classList.contains("show")) {
-          chooser.classList.add("show");
-        }
+        // Both cards grey out with spinner and countdown
         _ccSetWaitingState(_ccClaimRow);
       } else if (_ccClaimRow.status === "live") {
-        // Bid placed on the other chain — lock this chain out permanently
+        // Bid placed on the other chain — show refresh prompt to passive collector
         _ccClearWaitingState();
-        _ccUpdateChooserLock(activeChain);
-        // Hide the chooser and restore the bid panel so the page isn't blank
-        const chooser = document.getElementById("cc-chooser");
-        if (chooser) chooser.classList.remove("show");
-        unlockXtzRate();
-        // Restore bid panel elements for the passive collector
-        const chain = (slot?.chain || "eth") === "tezos" ? "tezos" : "eth";
-        if (chain === "tezos") {
-          refreshTezosState(_switchToken).catch(() => {});
-        } else {
-          refreshState().catch(() => {});
+        const activeName    = activeChain === "eth" ? "Ethereum" : "Tezos";
+        const activeSlotIdx = _findPairedSlotIndex(_ccPairKey, activeChain);
+        const refreshBody   = document.getElementById("cc-refresh-body");
+        if (refreshBody) refreshBody.textContent = `A bid has been placed on ${activeName}. The auction is now live — refresh to join it and place your own bid.`;
+        const refreshOverlay = document.getElementById("cc-refresh-overlay");
+        if (refreshOverlay) refreshOverlay.classList.add("show");
+        // Switch to the active chain slot on reload so they land on the live auction
+        if (activeSlotIdx >= 0) {
+          const activeSlug = _auctions[activeSlotIdx]?.artTitle || "";
+          // Store which slot to activate so after reload we switch to it
+          try { sessionStorage.setItem("cc_redirect_slot", String(activeSlotIdx)); } catch(_) {}
         }
+        // Auto-reload after 5 seconds if they don't tap the button
+        setTimeout(() => location.reload(), 5000);
         _ccFireNotification(
-          "Auction is live on another chain",
-          "The auction started on " + (activeChain === "eth" ? "Ethereum" : "Tezos") + ". This chain is now permanently locked."
+          "Auction is live — refresh now",
+          "A bid was placed on " + activeName + ". Tap to refresh and join the auction."
         );
       }
     }
@@ -3149,6 +3185,20 @@ window.addEventListener("load", async () => {
       gateLink:     cfg.gateLink,
     }];
   }
+
+  // If the passive collector was redirected here after a cross-chain bid,
+  // switch to the active chain slot immediately
+  try {
+    const redirectIdx = sessionStorage.getItem("cc_redirect_slot");
+    if (redirectIdx !== null) {
+      sessionStorage.removeItem("cc_redirect_slot");
+      const idx = parseInt(redirectIdx, 10);
+      if (!isNaN(idx) && idx >= 0 && idx < _auctions.length) {
+        // Will be picked up below when the live view initialises
+        _activeIdx = idx;
+      }
+    }
+  } catch(_) {}
 
   // Compute effective status per piece.
   // Rule: individual piece.status always wins over the global default.
@@ -7414,6 +7464,16 @@ function simReset() {
   <div class="wc-modal">
     <p class="wc-modal-title" id="wc-modal-title">Connect Ethereum Wallet</p>
     <div id="wc-modal-body"></div>
+  </div>
+</div>
+<!-- Cross-chain refresh prompt — shown to passive collector when a bid lands on the other chain -->
+<div class="cc-refresh-overlay" id="cc-refresh-overlay">
+  <div class="cc-refresh-card">
+    <div class="cc-refresh-icon">⚡</div>
+    <p class="cc-refresh-title">Auction is live</p>
+    <p class="cc-refresh-body" id="cc-refresh-body">A bid has been placed and the auction is now running.</p>
+    <p class="cc-refresh-sub">Refresh the page to see the live auction and place your own bid.</p>
+    <button class="cc-refresh-btn" onclick="location.reload()">Refresh now</button>
   </div>
 </div>
 </body>
