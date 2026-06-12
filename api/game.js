@@ -1600,6 +1600,14 @@ async function claimVariantStock(supabase, item) {
     e.statusCode = 500;
     throw e;
   }
+  // The RPC returns false when the product/variant has no stock_by_variant row
+  // (i.e. an open edition with unlimited stock). Treat that as ok=true — only
+  // a real stock check can tell us it's sold out; missing rows mean unlimited.
+  if (data === false) {
+    // Double-check via direct lookup: if the product genuinely has no stock
+    // tracking set, it's unlimited. Only block if stock is explicitly 0.
+    return adjustVariantStockDirect(supabase, item, -Math.abs(Number(item.qty) || 1));
+  }
   return { ok: data === true };
 }
 
