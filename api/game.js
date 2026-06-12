@@ -757,27 +757,19 @@ async function applyProductTags(products, supabase) {
   });
 }
 
-// CHECKOUT COMPUTATION (server-authoritative)
-// Delivery rates and carrier rules mirror the checkout in shop.html.
+// ── CHECKOUT COMPUTATION (server-authoritative) ───────────────────────────────
+// Server-authoritative delivery rates — MUST mirror DELIVERY_RATES in shop.html.
 const SERVER_DELIVERY_RATES = {
-  'NG-KD':     { label: 'Kaduna State',             small: { ngn: 2500, usd: 0 }, large: { ngn: 3800,  usd: 0 } },
-  'NG-ABJ':    { label: 'FCT - Abuja',              small: { ngn: 3800, usd: 0 }, large: { ngn: 5500,  usd: 0 } },
-  'NG-NORTH2': { label: 'North / North-West',       small: { ngn: 4200, usd: 0 }, large: { ngn: 6000,  usd: 0 } },
-  'NG-NORTH3': { label: 'North-East / Mid-Belt',    small: { ngn: 5500, usd: 0 }, large: { ngn: 7500,  usd: 0 } },
-  'NG-SW':     { label: 'South-West',               small: { ngn: 7500, usd: 0 }, large: { ngn: 10000, usd: 0 } },
-  'NG-SS':     { label: 'South-South / South-East', small: { ngn: 9000, usd: 0 }, large: { ngn: 12500, usd: 0 } },
-  WA:  { label: 'West Africa',    ups: { small: 18, large: 28 }, dhl: { small: 20, large: 30 } },
-  EU:  { label: 'Europe / UK',    ups: { small: 34, large: 50 }, dhl: { small: 48, large: 68 } },
-  NA:  { label: 'North America',  ups: { small: 38, large: 55 }, dhl: { small: 52, large: 72 } },
-  AO:  { label: 'Asia / Oceania', ups: { small: 46, large: 64 }, dhl: { small: 56, large: 78 } },
-  ROW: { label: 'Rest of world',  ups: { small: 42, large: 60 }, dhl: { small: 50, large: 70 } },
+  'pickup':   { small: { ngn: 0,    usd: 0  }, large: { ngn: 0,    usd: 0  } },
+  'NG-other': { small: { ngn: 4500, usd: 0  }, large: { ngn: 6500, usd: 0  } },
+  'WA':       { small: { ngn: 0,    usd: 22 }, large: { ngn: 0,    usd: 30 } },
+  'EU':       { small: { ngn: 0,    usd: 35 }, large: { ngn: 0,    usd: 48 } },
+  'NA':       { small: { ngn: 0,    usd: 42 }, large: { ngn: 0,    usd: 58 } },
+  'AO':       { small: { ngn: 0,    usd: 50 }, large: { ngn: 0,    usd: 68 } },
+  'ROW':      { small: { ngn: 0,    usd: 48 }, large: { ngn: 0,    usd: 62 } },
 };
-const SERVER_LARGE_PRINT_VARIANTS = ['12x16"', '12x18"', '18x24"', '24x36"'];
+const SERVER_LARGE_PRINT_VARIANTS = ['12×16"', '12×18"', '18×24"', '24×36"'];
 const NGN_PER_USD = 1600;
-const SERVER_HIGH_CART_USD = 60;
-const SERVER_COMPLIMENTARY_SHIPPING_USD = 500;
-const SERVER_SHIPPING_DIM_DIVISOR = 5000;
-const SERVER_SHIPPING_BUFFER = 1.2;
 
 function serverVariantPrice(product, variantKey, variant, currency) {
   const prices = currency === 'usd' ? (product.prices_usd || {}) : (product.prices_ngn || {});
@@ -788,137 +780,9 @@ function serverVariantPrice(product, variantKey, variant, currency) {
   return 0;
 }
 
-function serverIsInternationalZone(zone) {
-  return !!zone && zone !== 'pickup' && !zone.startsWith('NG-');
-}
-function serverNormalizedSizeLabel(value) {
-  return String(value || '').replace(/[xX?]/g, 'x');
-}
-function serverParsePrintInches(size) {
-  const m = serverNormalizedSizeLabel(size).match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
-  if (!m) return null;
-  return { max: Math.max(Number(m[1]), Number(m[2])) };
-}
-function serverOptionShippingMeta(product, type, size) {
-  const opts = Array.isArray(product?.variants) ? product.variants : [];
-  const opt = opts.find(v => v && typeof v === 'object' && String(v.type || v.name || v.label || '') === String(type || ''));
-  const meta = opt?.shipping_meta || opt?.shipping || {};
-  return meta?.[size] || meta?.[serverNormalizedSizeLabel(size)] || null;
-}
-function serverPrintDefaultProfile(type, size) {
-  const parsed = serverParsePrintInches(size);
-  const max = parsed?.max || 10;
-  if (max <= 7) return { weightKg: 0.45, dimsCm: [32, 24, 3], packageType: 'flat mailer', packageClass: 'flat_art' };
-  if (max <= 14) return { weightKg: 0.75, dimsCm: [46, 38, 3], packageType: 'flat mailer', packageClass: 'flat_art' };
-  return { weightKg: 1.35, dimsCm: [76, 10, 10], packageType: 'protective tube', packageClass: 'tube_art' };
-}
-function serverDefaultProductShippingProfile(product, variantLabel) {
-  const cat = String(product?.category || '').toLowerCase();
-  const name = String(product?.name || '').toLowerCase();
-  if (cat === 'prints') {
-    const parts = String(variantLabel || '').split('|');
-    return serverPrintDefaultProfile(parts[0] || '', parts[1] || variantLabel);
-  }
-  if (name.includes('hoodie')) return { weightKg: 0.9, dimsCm: [34, 28, 8], packageType: 'soft parcel', packageClass: 'soft_parcel' };
-  if (name.includes('shirt') || name.includes('tee')) return { weightKg: 0.35, dimsCm: [30, 24, 4], packageType: 'soft parcel', packageClass: 'soft_parcel' };
-  if (name.includes('journal') || cat === 'notebooks') return { weightKg: 0.55, dimsCm: [28, 22, 5], packageType: 'rigid mailer', packageClass: 'rigid_parcel' };
-  if (name.includes('tote')) return { weightKg: 0.4, dimsCm: [32, 26, 4], packageType: 'soft parcel', packageClass: 'soft_parcel' };
-  if (name.includes('sticker') || cat === 'stickers') return { weightKg: 0.12, dimsCm: [22, 16, 1], packageType: 'flat mailer', packageClass: 'sticker_flat' };
-  return { weightKg: 0.6, dimsCm: [34, 26, 6], packageType: 'parcel', packageClass: 'rigid_parcel' };
-}
-function serverItemShippingProfile(product, item) {
-  const variant = item.variantKey || item.variant || '';
-  const parts = String(variant).split('|');
-  const type = parts[0] || '';
-  const size = parts[1] || item.variant || variant;
-  const meta = product.category === 'prints' ? serverOptionShippingMeta(product, type, size) : null;
-  const fallback = serverDefaultProductShippingProfile(product, variant);
-  const dims = [Number(meta?.length_cm), Number(meta?.width_cm), Number(meta?.height_cm)];
-  return {
-    weightKg: Number(meta?.weight_kg) || fallback.weightKg,
-    dimsCm: dims.every(n => n > 0) ? dims : fallback.dimsCm,
-    packageType: meta?.package_type || fallback.packageType,
-    packageClass: meta?.package_class || fallback.packageClass || (/tube/i.test(meta?.package_type || fallback.packageType) ? 'tube_art' : 'rigid_parcel'),
-    carrierPrice: { ups: Number(meta?.ups_usd) || 0, dhl: Number(meta?.dhl_usd) || 0 },
-  };
-}
-function serverMakeShippingPiece(kind, label, entries) {
-  let rawKg = 0, maxL = 0, maxW = 0, maxH = 0;
-  const carrierOverride = { ups: 0, dhl: 0 };
-  for (const entry of entries) {
-    const profile = entry.profile;
-    const qty = Math.max(1, Number(entry.qty) || 1);
-    rawKg += profile.weightKg * qty;
-    maxL = Math.max(maxL, profile.dimsCm[0]);
-    maxW = Math.max(maxW, profile.dimsCm[1]);
-    maxH = Math.max(maxH, profile.dimsCm[2] + Math.max(0, qty - 1) * 0.4);
-    carrierOverride.ups = Math.max(carrierOverride.ups, profile.carrierPrice.ups || 0);
-    carrierOverride.dhl = Math.max(carrierOverride.dhl, profile.carrierPrice.dhl || 0);
-  }
-  const actualKg = +(rawKg * SERVER_SHIPPING_BUFFER).toFixed(2);
-  const volumetricKg = maxL && maxW && maxH ? +((maxL * maxW * maxH) / SERVER_SHIPPING_DIM_DIVISOR).toFixed(2) : 0;
-  return { kind, label, actualKg, volumetricKg, billableKg: Math.max(actualKg, volumetricKg), dimsCm: [maxL, maxW, maxH], carrierOverride };
-}
-function serverShippingPieces(trustedItems, productCache) {
-  const entries = trustedItems.map(item => ({ item, qty: item.qty, profile: serverItemShippingProfile(productCache[item.id] || {}, item) }));
-  const byClass = cls => entries.filter(e => e.profile.packageClass === cls);
-  const tube = byClass('tube_art');
-  const flat = byClass('flat_art');
-  const stickers = byClass('sticker_flat');
-  const parcels = entries.filter(e => ['soft_parcel','rigid_parcel'].includes(e.profile.packageClass));
-  const pieces = [];
-  if (tube.length) {
-    pieces.push(serverMakeShippingPiece('tube_art', 'Tube artwork package', [...tube, ...flat]));
-    if (parcels.length || stickers.length) pieces.push(serverMakeShippingPiece('parcel', 'Merch and accessories package', [...parcels, ...stickers]));
-  } else if (flat.length) {
-    pieces.push(serverMakeShippingPiece('flat_art', 'Flat artwork package', [...flat, ...stickers]));
-    if (parcels.length) pieces.push(serverMakeShippingPiece('parcel', 'Merch and accessories package', parcels));
-  } else if (parcels.length || stickers.length) {
-    pieces.push(serverMakeShippingPiece('parcel', 'Parcel package', [...parcels, ...stickers]));
-  }
-  return pieces;
-}
-function serverShippingProfile(trustedItems, productCache) {
-  const pieces = serverShippingPieces(trustedItems, productCache);
-  const carrierOverride = { ups: 0, dhl: 0 };
-  for (const piece of pieces) {
-    carrierOverride.ups = Math.max(carrierOverride.ups, piece.carrierOverride.ups || 0);
-    carrierOverride.dhl = Math.max(carrierOverride.dhl, piece.carrierOverride.dhl || 0);
-  }
-  const actualKg = +pieces.reduce((sum, piece) => sum + piece.actualKg, 0).toFixed(2);
-  const volumetricKg = +pieces.reduce((sum, piece) => sum + piece.volumetricKg, 0).toFixed(2);
-  const billableKg = +pieces.reduce((sum, piece) => sum + piece.billableKg, 0).toFixed(2);
-  const tube = pieces.some(piece => piece.kind === 'tube_art');
-  return { actualKg, volumetricKg, billableKg, tube, pieces, carrierOverride };
-}
-function serverIntlCarrierTier(zone, subtotalUsd, requestedCarrier = '') {
-  if (!serverIsInternationalZone(zone)) return '';
-  const requested = String(requestedCarrier || '').toLowerCase();
-  if (requested === 'ups' || requested === 'dhl') return requested;
-  if (zone === 'NA') return 'ups';
-  return Number(subtotalUsd || 0) >= SERVER_HIGH_CART_USD ? 'dhl' : 'ups';
-}
-function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd = 0, requestedCarrier = '', shippingProfile = null) {
-  if (subtotalUsd >= SERVER_COMPLIMENTARY_SHIPPING_USD) return 0;
-  const z = SERVER_DELIVERY_RATES[zone] || SERVER_DELIVERY_RATES.ROW;
-  const carrierTier = serverIntlCarrierTier(zone, subtotalUsd, requestedCarrier);
-  let tier;
-  if (carrierTier) {
-    const pieces = shippingProfile?.pieces?.length ? shippingProfile.pieces : [{ kind: hasLarge ? 'tube_art' : 'parcel', billableKg: hasLarge ? 1.5 : 0.7, carrierOverride: {} }];
-    const usd = pieces.reduce((sum, piece) => {
-      const override = piece.carrierOverride?.[carrierTier] || 0;
-      if (override > 0) return sum + override;
-      const kg = piece.billableKg || (piece.kind === 'tube_art' ? 1.5 : 0.7);
-      const isTube = piece.kind === 'tube_art';
-      const base = z[carrierTier][kg > 0.8 || isTube ? 'large' : 'small'];
-      const includedKg = kg > 0.8 || isTube ? 1.5 : 0.8;
-      const extraKg = Math.max(0, Math.ceil(kg - includedKg));
-      return sum + base + extraKg * (carrierTier === 'dhl' ? 14 : 12);
-    }, 0);
-    tier = { usd, ngn: 0 };
-  } else {
-    tier = hasLarge ? z.large : z.small;
-  }
+function serverDeliveryFee(zone, hasLarge, currency) {
+  const z = SERVER_DELIVERY_RATES[zone] || SERVER_DELIVERY_RATES['ROW'];
+  const tier = hasLarge ? z.large : z.small;
   if (currency === 'usd') {
     if (tier.usd > 0) return tier.usd;
     return tier.ngn > 0 ? +(tier.ngn / NGN_PER_USD).toFixed(2) : 0;
@@ -986,7 +850,7 @@ async function computeShopCheckout(body, supabase) {
     subtotalNgn += priceNgn * qty;
     subtotalUsd += priceUsd * qty;
     if (product.category === 'prints' &&
-        (product.is_large_print === true || SERVER_LARGE_PRINT_VARIANTS.includes(serverNormalizedSizeLabel(item.variant)))) {
+        (product.is_large_print === true || SERVER_LARGE_PRINT_VARIANTS.includes(item.variant))) {
       hasLarge = true;
     }
     trustedItems.push({
@@ -1000,18 +864,10 @@ async function computeShopCheckout(body, supabase) {
     });
   }
 
-  const method = String(body.delivery_method || 'ship');
-  const zone = String(body.delivery_zone || '');
-  if (method === 'ship' && !zone) {
-    const err = new Error('Delivery country / region is required');
-    err.statusCode = 400;
-    throw err;
-  }
-  const shippingProfile = serverShippingProfile(trustedItems, productCache);
-  hasLarge = hasLarge || shippingProfile.tube;
-  const deliveryCarrier = method === 'ship' ? serverIntlCarrierTier(zone, subtotalUsd, body.delivery_carrier) : '';
-  const deliveryNgn = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'ngn', subtotalUsd, deliveryCarrier, shippingProfile) : 0;
-  const deliveryUsd = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'usd', subtotalUsd, deliveryCarrier, shippingProfile) : 0;
+  const zone = String(body.delivery_zone || 'pickup');
+  const method = String(body.delivery_method || 'pickup');
+  const deliveryNgn = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'ngn') : 0;
+  const deliveryUsd = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'usd') : 0;
   const totalNgn = subtotalNgn + deliveryNgn;
   const totalUsd = +(subtotalUsd + deliveryUsd).toFixed(2);
 
@@ -1019,10 +875,8 @@ async function computeShopCheckout(body, supabase) {
     productCache,
     trustedItems,
     hasLarge,
-    shippingProfile,
     zone,
     method,
-    deliveryCarrier,
     subtotalNgn,
     subtotalUsd: +subtotalUsd.toFixed(2),
     deliveryNgn,
@@ -1053,8 +907,6 @@ function makeShopQuote(checkout, extra = {}) {
     items: checkout.trustedItems.map(i => ({ id: i.id, variantKey: i.variantKey, qty: i.qty })),
     delivery_method: checkout.method,
     delivery_zone: checkout.zone,
-    delivery_carrier: checkout.deliveryCarrier,
-    shipping_billable_kg: checkout.shippingProfile?.billableKg || 0,
     subtotal_ngn: checkout.subtotalNgn,
     subtotal_usd: checkout.subtotalUsd,
     delivery_fee_ngn: checkout.deliveryNgn,
@@ -1078,7 +930,6 @@ function verifyShopQuote(quote, checkout, expected = {}) {
   if (Number(payload.total_usd) !== checkout.totalUsd) return false;
   if (String(payload.delivery_method) !== checkout.method) return false;
   if (String(payload.delivery_zone) !== checkout.zone) return false;
-  if (String(payload.delivery_carrier || '') !== String(checkout.deliveryCarrier || '')) return false;
   const quoteItems = JSON.stringify(payload.items || []);
   const trustedItems = JSON.stringify(checkout.trustedItems.map(i => ({ id: i.id, variantKey: i.variantKey, qty: i.qty })));
   if (quoteItems !== trustedItems) return false;
@@ -1579,7 +1430,7 @@ async function adjustVariantStockDirect(supabase, item, qtyDelta) {
     patch.stock = next;
   }
 
-  if (!Object.keys(patch).length) return { ok: true };
+  if (!Object.keys(patch).length) return { ok: true, stockKey: stockKey || null };
   const { error: updErr } = await supabase
     .from('shop_products')
     .update(patch)
@@ -1595,9 +1446,9 @@ async function adjustVariantStockDirect(supabase, item, qtyDelta) {
 function stockKeyFingerprint(value) {
   return String(value || '')
     .toLowerCase()
-    .replace(/[“”"]/g, '')
+    .replace(/[??"]/g, '')
     .replace(/\s+/g, '')
-    .replace(/[×*]/g, 'x');
+    .replace(/[?*]/g, 'x');
 }
 
 function stockVariantKeyCandidates(item, stockByVariant = null) {
@@ -1700,7 +1551,9 @@ async function sendShopSellerNotification({ order, orderRef, checkout, paymentMe
     process.env.FORM_ALERT_FROM_EMAIL ||
     "Kay's Works Queue <auction@mail.kaysworks.com>";
   const customerName = order.customer_name || 'Shop customer';
-  const delivery = `Ship to: ${order.address || 'No address saved'}; zone: ${checkout.zone}; delivery: NGN ${Number(checkout.deliveryNgn || 0).toLocaleString('en-NG')}`;
+  const delivery = checkout.method === 'pickup'
+    ? 'Kaduna pickup (free)'
+    : `Ship to: ${order.address || 'No address saved'}; zone: ${checkout.zone}; delivery: NGN ${Number(checkout.deliveryNgn || 0).toLocaleString('en-NG')}`;
   const itemsHtml = checkout.trustedItems.map(item => `
     <tr>
       <td style="padding:8px 0;border-bottom:1px solid #eee">${shopEscapeHtml(item.name)}<br><span style="color:#777">${shopEscapeHtml(item.variant)}</span></td>
@@ -1775,7 +1628,9 @@ async function sendShopCustomerReceipt({ order, orderRef, checkout, paymentMetho
   const customerName = order.customer_name || 'there';
   const shopUrl = process.env.SHOP_URL || 'https://www.kaysworks.com/shop';
   const logoUrl = process.env.SHOP_LOGO_URL || 'https://www.kaysworks.com/images/kaysworkslogo.svg';
-  const delivery = `Ship to: ${order.address || 'the address on your order'}.`;
+  const delivery = checkout.method === 'pickup'
+    ? 'Kaduna pickup. Kay will contact you with pickup details.'
+    : `Ship to: ${order.address || 'the address on your order'}.`;
   const deliveryFeeLabel = Number(checkout.deliveryNgn || 0) > 0
     ? `Delivery fee: NGN ${Number(checkout.deliveryNgn || 0).toLocaleString('en-NG')}`
     : 'Delivery fee: Free';
@@ -1798,657 +1653,3 @@ async function sendShopCustomerReceipt({ order, orderRef, checkout, paymentMetho
       <table width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#ede0c8;border-collapse:separate;border-spacing:0;border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(74,50,40,0.16)">
         <tr>
           <td align="center" style="background:#4a3228;background-image:radial-gradient(circle at 50% 0%,rgba(196,132,90,0.3),transparent 36%),linear-gradient(145deg,#4a3228 0%,#2d1d16 100%);padding:36px 36px 42px;color:#e8d5b0;border-radius:0 0 18px 18px;text-align:center">
-            <p style="margin:0 0 24px;font-family:Arial,sans-serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#f5ede0">Order confirmation</p>
-            <img src="${shopEscapeHtml(logoUrl)}" alt="Kay's Works" width="132" style="display:block;width:132px;max-width:46%;height:auto;margin:0 auto 24px">
-            <div style="width:58px;height:58px;background:rgba(245,237,224,0.12);border-radius:50%;text-align:center;line-height:58px;font-family:Arial,sans-serif;font-size:30px;color:#f5ede0;margin:0 auto 22px">&#10003;</div>
-            <h1 style="margin:0 0 14px;font-size:34px;font-weight:400;line-height:1.12;color:#f5ede0">Thanks for your purchase</h1>
-            <p style="margin:0 auto;line-height:1.7;color:#e8d5b0;font-size:16px;max-width:500px">Hi ${shopEscapeHtml(customerName)}, welcome to the Kay's Works collector circle. Your payment is confirmed, and your order is now being prepared with care.</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:32px 36px;background:#ede0c8">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5ede0;border-radius:12px;margin:0 0 18px">
-              <tr>
-                <td style="padding:16px 18px">
-                  <p style="margin:0 0 6px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#9e4f2e"><strong>Order No:</strong> ${shopEscapeHtml(orderRef)}</p>
-                  <p style="margin:0;font-size:13px;color:#5c463a"><strong>Payment:</strong> ${shopEscapeHtml(String(paymentMethod || '').toUpperCase())}${paymentRef ? ` &middot; ${shopEscapeHtml(paymentRef)}` : ''}</p>
-                </td>
-              </tr>
-            </table>
-            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
-              <tr>
-                <th align="left" style="padding:0 18px 9px;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#8a7060">Item</th>
-                <th align="center" style="padding:0 10px 9px;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#8a7060">Qty</th>
-                <th align="right" style="padding:0 18px 9px;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#8a7060">Price</th>
-              </tr>
-              ${itemsHtml}
-            </table>
-            <p style="margin:12px 0 8px;text-align:right"><span style="display:inline-block;background:#f5ede0;border-radius:10px;padding:11px 18px;font-size:13px;color:#5c463a">${shopEscapeHtml(deliveryFeeLabel)}</span></p>
-            <p style="margin:0 0 30px;text-align:right"><span style="display:inline-block;background:#f5ede0;border-radius:10px;padding:14px 24px;font-size:16px"><strong>Total: ${shopMoney(checkout.totalNgn, checkout.totalUsd)}</strong></span></p>
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td width="50%" valign="top" style="padding:18px;background:#f5ede0;border-radius:12px">
-                  <h2 style="margin:0 0 8px;font-size:16px">Payment method</h2>
-                  <p style="margin:0;color:#5c463a;line-height:1.5">${shopEscapeHtml(String(paymentMethod || '').toUpperCase())}<br>${paymentRef ? shopEscapeHtml(paymentRef) : 'Payment confirmed'}</p>
-                </td>
-                <td width="16"></td>
-                <td width="50%" valign="top" style="padding:18px;background:#f5ede0;border-radius:12px">
-                  <h2 style="margin:0 0 8px;font-size:16px">Delivery details</h2>
-                  <p style="margin:0;color:#5c463a;line-height:1.5">${shopEscapeHtml(delivery)}</p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="background:#4a3228;padding:30px 36px;text-align:center;color:#e8d5b0">
-            <h2 style="margin:0 0 16px;font-size:24px;font-weight:400;color:#f5ede0">Come back anytime</h2>
-            <a href="${shopEscapeHtml(shopUrl)}" style="display:inline-block;background:linear-gradient(90deg,#c9993a,#f3c85f);color:#2d211b;text-decoration:none;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;padding:14px 30px;border-radius:999px">Continue shopping</a>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:28px 36px;color:#5c463a;line-height:1.6;font-size:14px;background:#ede0c8">
-            <p style="margin:0 0 14px">Thank you again for your order. If you have any questions, reply to this email and we will help.</p>
-            <p style="margin:0">Warmly,<br>Kay's Works</p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`;
-  const text = [
-    `Hi ${customerName}, your order has been received and your payment is confirmed.`,
-    "Thank you for collecting from Kay's Works. Kay will review the details, prepare your pieces with care, and follow up with fulfilment updates.",
-    '',
-    `Order: ${orderRef}`,
-    `Payment: ${String(paymentMethod || '').toUpperCase()}`,
-    paymentRef ? `Reference: ${paymentRef}` : '',
-    `Delivery: ${delivery}`,
-    deliveryFeeLabel,
-    '',
-    'Items:',
-    ...checkout.trustedItems.map(item => `- ${item.name} (${item.variant}) x ${item.qty}`),
-    '',
-    `Total: ${shopMoney(checkout.totalNgn, checkout.totalUsd)}`,
-    `Continue shopping: ${shopUrl}`,
-  ].filter(line => line !== '').join('\n');
-
-  return _sendEmail({
-    from,
-    to: [to],
-    subject: `Your Kay's Works order ${orderRef}`,
-    html,
-    text,
-  });
-}
-
-function makeOrderRef() {
-  return 'ORD-' + Date.now().toString(36).toUpperCase() + '-' + crypto.randomBytes(3).toString('hex').toUpperCase();
-}
-
-// Pack the crypto lock (asset, exact amount, usd price, and the full signed
-// quote) into a single object stored in the shop_orders.payment_metadata JSONB
-// column — no dedicated crypto columns required.
-function cryptoOrderLockFromQuote(orderRef, paymentMethod, quote) {
-  if (!['eth','tezos','usdc','usdt'].includes(paymentMethod) || !quote || !quote.crypto_amount) return null;
-  return {
-    kind: 'crypto_order_lock',
-    order_hash: orderRef,
-    payment_method: paymentMethod,
-    crypto_asset: quote.crypto_asset || paymentMethod,
-    crypto_amount: quote.crypto_amount,
-    crypto_usd_price: quote.crypto_usd_price || null,
-    quote_iat: quote.iat || null,
-    quote_exp: quote.exp || null,
-    total_usd: quote.total_usd || null,
-    checkout_quote: quote,
-  };
-}
-
-function shopOrderMetadata(body, checkout, cryptoLock = null) {
-  const note = String(body.order_note || '').trim().slice(0, 800);
-  const meta = {
-    ...(cryptoLock || {}),
-    order_note: note || undefined,
-    delivery_carrier: checkout.deliveryCarrier || undefined,
-    shipping_billable_kg: checkout.shippingProfile?.billableKg || undefined,
-    shipping_pieces: checkout.shippingProfile?.pieces || undefined,
-  };
-  Object.keys(meta).forEach(k => meta[k] === undefined && delete meta[k]);
-  return Object.keys(meta).length ? meta : undefined;
-}
-
-// Read the crypto lock back from a stored order (payment_metadata, with a
-// legacy fallback to admin_note in case an older order stored it there).
-function readCryptoOrderLock(order) {
-  for (const source of [order.payment_metadata, order.admin_note]) {
-    try {
-      const note = typeof source === 'string' ? JSON.parse(source) : source;
-      if (note && note.kind === 'crypto_order_lock') return note;
-    } catch (_) {}
-  }
-  return null;
-}
-
-// -- PENDING-FIRST FLOW --------------------------------------------------------
-// Step 1: create a pending order BEFORE payment. Records items, totals, customer,
-// and a generated order_ref. No stock touched, no payment verified yet. The
-// returned order_ref is the durable handle - payment can be confirmed later even
-// if the customer's cart is gone.
-async function handleShopOrderCreate(req, res, supabase) {
-  if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
-  const body = req.body || {};
-  let checkout;
-  try {
-    checkout = await computeShopCheckout(body, supabase);
-  } catch (e) {
-    return jsonError(e);
-  }
-
-  const paymentMethod = String(body.payment_method || '').slice(0, 40);
-  const quoteRequired = ['paystack','flutterwave','eth','tezos','usdc','usdt'].includes(paymentMethod);
-  // Verify the signed quote so a pending order can't be created with tampered totals.
-  if (quoteRequired && !verifyShopQuote(body.checkout_quote, checkout, { payment_method: paymentMethod })) {
-    return json(400, { error: 'Invalid or expired server checkout quote' });
-  }
-
-  const orderRef = makeOrderRef();
-  // For crypto orders, store the exact locked amount + full signed quote in
-  // payment_metadata (JSONB) — matches the live schema, no extra columns needed.
-  const cryptoLock = cryptoOrderLockFromQuote(orderRef, paymentMethod, body.checkout_quote);
-  const { data: order, error: orderError } = await supabase
-    .from('shop_orders')
-    .insert({
-      order_ref:       orderRef,
-      customer_name:   String(body.name    || '').slice(0, 200),
-      email:           String(body.email   || '').slice(0, 320),
-      phone:           String(body.phone   || '').slice(0, 60),
-      address:         String(body.address || '').slice(0, 500),
-      items:           checkout.trustedItems,
-      total_ngn:       checkout.totalNgn,
-      total_usd:       checkout.totalUsd,
-      delivery_fee_ngn: checkout.deliveryNgn,
-      delivery_method:  checkout.method.slice(0, 40),
-      delivery_zone:    checkout.zone.slice(0, 40),
-      payment_method:  paymentMethod,
-      payment_metadata: shopOrderMetadata(body, checkout, cryptoLock),
-      status: 'pending',
-    })
-    .select('id, order_ref')
-    .single();
-  if (orderError) return json(500, { error: orderError.message });
-
-  return json(200, {
-    ok: true,
-    order_ref: order.order_ref,
-    order_id: order.id,
-    total_ngn: checkout.totalNgn,
-    total_usd: checkout.totalUsd,
-    crypto_amount: cryptoLock?.crypto_amount ?? null,
-    crypto_asset: cryptoLock?.crypto_asset ?? null,
-  });
-}
-
-// Step 2: confirm payment for an existing pending order. Looks the order up by
-// order_ref (not the cart, so this works even if the browser cart is gone),
-// re-derives a checkout from the SAVED items, verifies the payment on-chain or
-// via the card gateway, decrements stock, and flips the order to 'paid'.
-async function handleShopOrderConfirm(req, res, supabase) {
-  if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
-  const body = req.body || {};
-  const orderRef = String(body.order_ref || '').trim().slice(0, 80);
-  if (!orderRef) return json(400, { error: 'order_ref is required' });
-
-  // Load the pending order. This is the source of truth for what was bought.
-  const { data: order, error: loadErr } = await supabase
-    .from('shop_orders')
-    .select('*')
-    .eq('order_ref', orderRef)
-    .maybeSingle();
-  if (loadErr && loadErr.code !== 'PGRST116') return json(500, { error: loadErr.message });
-  if (!order) return json(404, { error: 'Order not found for that reference' });
-  const paymentMethod = String(body.payment_method || order.payment_method || '').slice(0, 40);
-  const paymentRef = String(body.payment_ref || order.payment_ref || '').trim().slice(0, 200);
-  const storedLock = readCryptoOrderLock(order);
-  const payerAddress = String(body.payer_address || storedLock?.payer_address || order.payment_metadata?.payer_address || '').trim().slice(0, 120);
-  if (order.status === 'paid') {
-    const paidCheckout = {
-      trustedItems: Array.isArray(order.items) ? order.items : [],
-      totalNgn: Number(order.total_ngn) || 0,
-      totalUsd: Number(order.total_usd) || 0,
-      deliveryNgn: Number(order.delivery_fee_ngn) || 0,
-      method: order.delivery_method || 'ship',
-      zone: order.delivery_zone || '',
-    };
-    let sellerNotification = { sent: false };
-    try {
-      const emailResult = await sendShopSellerNotification({
-        order,
-        orderRef,
-        checkout: paidCheckout,
-        paymentMethod,
-        paymentRef,
-        payerAddress,
-        chainVerification: order.payment_metadata || null,
-        cardVerification: null,
-      });
-      sellerNotification = { sent: true, id: emailResult?.id || null };
-    } catch (notifyErr) {
-      sellerNotification = { sent: false, error: notifyErr.message || String(notifyErr) };
-      console.error('[shop-order] seller notification failed:', orderRef, sellerNotification.error);
-    }
-    let customerNotification = { sent: false };
-    try {
-      const emailResult = await sendShopCustomerReceipt({
-        order,
-        orderRef,
-        checkout: paidCheckout,
-        paymentMethod,
-        paymentRef,
-      });
-      customerNotification = { sent: true, id: emailResult?.id || null };
-    } catch (notifyErr) {
-      customerNotification = { sent: false, error: notifyErr.message || String(notifyErr) };
-      console.error('[shop-order] customer receipt failed:', orderRef, customerNotification.error);
-    }
-    return json(200, {
-      ok: true,
-      already_paid: true,
-      order_id: order.id,
-      order_ref: orderRef,
-      seller_notification: sellerNotification,
-      customer_notification: customerNotification,
-    });
-  }
-
-  const isCryptoPayment = ['eth','tezos','usdc','usdt'].includes(paymentMethod);
-  const isCardPayment = ['paystack','flutterwave'].includes(paymentMethod);
-
-  if ((isCryptoPayment || isCardPayment) && !paymentRef) {
-    return json(400, { error: 'Payment reference / transaction hash is required' });
-  }
-
-  // Guard against the same payment_ref being used for a different order.
-  if (paymentRef) {
-    const { data: dupe } = await supabase
-      .from('shop_orders')
-      .select('id, order_ref, status')
-      .eq('payment_ref', paymentRef)
-      .maybeSingle();
-    if (dupe && dupe.order_ref !== orderRef) {
-      return json(409, { error: 'This payment has already been recorded for another order' });
-    }
-  }
-
-  // Reconstruct the trusted checkout from the SAVED order items so verification
-  // uses authoritative server data, not anything the client re-sends now.
-  const savedItems = Array.isArray(order.items) ? order.items : [];
-  const checkout = {
-    trustedItems: savedItems,
-    totalNgn: Number(order.total_ngn) || 0,
-    totalUsd: Number(order.total_usd) || 0,
-    deliveryNgn: Number(order.delivery_fee_ngn) || 0,
-    method: order.delivery_method || 'ship',
-    zone: order.delivery_zone || '',
-  };
-
-  // Verify payment BEFORE touching stock.
-  let chainVerification = null, cardVerification = null;
-  if (isCryptoPayment) {
-    if (!payerAddress) return json(400, { error: 'Sending wallet address is required' });
-    // Optional order-hash cross-check (the customer may supply it on manual confirm).
-    const bodyOrderHash = String(body.order_hash || body.order_ref || '').trim().slice(0, 80);
-    if (bodyOrderHash && bodyOrderHash !== orderRef) {
-      return json(400, { error: 'Order hash does not match this order' });
-    }
-    // Read the locked crypto details from payment_metadata — the authoritative
-    // amount + signed quote captured when the pending order was created.
-    const cryptoLock = readCryptoOrderLock(order);
-    if (!cryptoLock || !cryptoLock.checkout_quote || !cryptoLock.checkout_quote.crypto_amount) {
-      return json(400, { error: 'Locked crypto amount is missing for this order' });
-    }
-    if (cryptoLock.payment_method && cryptoLock.payment_method !== paymentMethod) {
-      return json(400, { error: 'Payment method does not match the locked order' });
-    }
-    try {
-      chainVerification = await verifyCryptoPaymentOnChain({
-        paymentMethod,
-        paymentRef,
-        payerAddress,
-        quote: cryptoLock.checkout_quote,
-        supabase,
-      });
-      chainVerification = {
-        ...chainVerification,
-        locked_crypto_amount: cryptoLock.crypto_amount,
-        locked_crypto_asset: cryptoLock.crypto_asset,
-        locked_usd_price: cryptoLock.crypto_usd_price,
-        order_hash: orderRef,
-      };
-    } catch (e) {
-      return jsonError(e);
-    }
-  } else if (isCardPayment) {
-    try {
-      cardVerification = await verifyCardPayment({
-        provider: paymentMethod,
-        reference: paymentRef,
-        expectedTotalNgn: checkout.totalNgn,
-      });
-    } catch (e) {
-      return jsonError(e);
-    }
-  }
-
-  // Decrement stock now that payment is confirmed.
-  const claimed = [];
-  for (const item of checkout.trustedItems) {
-    let result;
-    try {
-      result = await claimVariantStock(supabase, item);
-    } catch (e) {
-      for (const c of claimed) await releaseVariantStock(supabase, c);
-      return jsonError(e);
-    }
-    if (!result.ok) {
-      for (const c of claimed) await releaseVariantStock(supabase, c);
-      return json(409, {
-        error: `Sold out: ${item.name} · ${item.variant} is no longer available`,
-        product_id: item.id,
-        variant: item.variant,
-        sold_out: true,
-      });
-    }
-    claimed.push({ ...item, _claimedStockKey: result.stockKey || item.variantKey || item.variant });
-  }
-
-  // Flip the order to paid. For crypto, fold the payment details back into the
-  // payment_metadata lock (no dedicated payer_address/crypto_received columns).
-  const { error: updErr } = await supabase
-    .from('shop_orders')
-    .update({
-      status: 'paid',
-      payment_method: paymentMethod,
-      payment_ref: paymentRef,
-      payment_metadata: isCryptoPayment ? {
-        ...(readCryptoOrderLock(order) || {}),
-        payer_address: payerAddress,
-        payment_ref: paymentRef,
-        received_amount: chainVerification?.received_amount,
-        confirmations: chainVerification?.confirmations,
-        paid_at: new Date().toISOString(),
-      } : order.payment_metadata,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('order_ref', orderRef);
-  if (updErr) {
-    for (const c of claimed) await releaseVariantStock(supabase, c);
-    return json(500, { error: updErr.message });
-  }
-
-  let sellerNotification = { sent: false };
-  try {
-    const emailResult = await sendShopSellerNotification({
-      order,
-      orderRef,
-      checkout,
-      paymentMethod,
-      paymentRef,
-      payerAddress,
-      chainVerification,
-      cardVerification,
-    });
-    sellerNotification = { sent: true, id: emailResult?.id || null };
-  } catch (notifyErr) {
-    sellerNotification = { sent: false, error: notifyErr.message || String(notifyErr) };
-    console.error('[shop-order] seller notification failed:', orderRef, sellerNotification.error);
-  }
-  let customerNotification = { sent: false };
-  try {
-    const emailResult = await sendShopCustomerReceipt({
-      order,
-      orderRef,
-      checkout,
-      paymentMethod,
-      paymentRef,
-    });
-    customerNotification = { sent: true, id: emailResult?.id || null };
-  } catch (notifyErr) {
-    customerNotification = { sent: false, error: notifyErr.message || String(notifyErr) };
-    console.error('[shop-order] customer receipt failed:', orderRef, customerNotification.error);
-  }
-
-  return json(200, {
-    ok: true,
-    order_id: order.id,
-    order_ref: orderRef,
-    total_ngn: checkout.totalNgn,
-    total_usd: checkout.totalUsd,
-    delivery_fee_ngn: checkout.deliveryNgn,
-    chain_verification: chainVerification,
-    card_verification: cardVerification,
-    seller_notification: sellerNotification,
-    customer_notification: customerNotification,
-  });
-}
-
-// ── ORDER (legacy single-shot — kept for backward compatibility) ──────────────
-async function handleShopOrder(req, res, supabase) {
-  if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
-  const body = req.body || {};
-  let checkout;
-  try {
-    checkout = await computeShopCheckout(body, supabase);
-  } catch (e) {
-    return jsonError(e);
-  }
-
-  const paymentMethod = String(body.payment_method || '').slice(0, 40);
-  const paymentRef = String(body.payment_ref || '').slice(0, 200);
-  const payerAddress = String(body.payer_address || '').slice(0, 120);
-  const quoteRequired = ['paystack','flutterwave','eth','tezos','usdc','usdt'].includes(paymentMethod);
-  if (quoteRequired && !verifyShopQuote(body.checkout_quote, checkout, {
-    payment_method: paymentMethod,
-    ...(paymentMethod === 'paystack' || paymentMethod === 'flutterwave' ? { payment_ref: paymentRef } : {}),
-    ...(payerAddress ? { payer_address: payerAddress } : {}),
-  })) {
-    return json(400, { error: 'Invalid or expired server checkout quote' });
-  }
-  const isCryptoPayment = ['eth','tezos','usdc','usdt'].includes(paymentMethod);
-  if (isCryptoPayment) {
-    if (!paymentRef) return json(400, { error: 'Crypto transaction hash is required' });
-    if (!payerAddress) return json(400, { error: 'Sending wallet address is required' });
-    const { data: existingOrder, error: existingError } = await supabase
-      .from('shop_orders')
-      .select('id')
-      .eq('payment_ref', paymentRef)
-      .maybeSingle();
-    if (existingError && existingError.code !== 'PGRST116') return json(500, { error: existingError.message });
-    if (existingOrder) return json(409, { error: 'This crypto transaction has already been submitted for an order' });
-  }
-  let chainVerification = null;
-  if (isCryptoPayment) {
-    try {
-      chainVerification = await verifyCryptoPaymentOnChain({
-        paymentMethod,
-        paymentRef,
-        payerAddress,
-        quote: body.checkout_quote,
-        supabase,
-      });
-    } catch (e) {
-      return jsonError(e);
-    }
-  }
-
-  const isCardPayment = ['paystack', 'flutterwave'].includes(paymentMethod);
-  let cardVerification = null;
-  if (isCardPayment) {
-    try {
-      cardVerification = await verifyCardPayment({
-        provider: paymentMethod,
-        reference: paymentRef,
-        expectedTotalNgn: checkout.totalNgn,
-      });
-    } catch (e) {
-      return jsonError(e);
-    }
-    const { data: dupe, error: dupeErr } = await supabase
-      .from('shop_orders')
-      .select('id')
-      .eq('payment_ref', paymentRef)
-      .maybeSingle();
-    if (dupeErr && dupeErr.code !== 'PGRST116') return json(500, { error: dupeErr.message });
-    if (dupe) return json(409, { error: 'This payment has already been recorded for an order' });
-  }
-
-  const paymentConfirmed = isCryptoPayment || isCardPayment;
-
-  const claimed = [];
-  for (const item of checkout.trustedItems) {
-    let result;
-    try {
-      result = await claimVariantStock(supabase, item);
-    } catch (e) {
-      for (const c of claimed) await releaseVariantStock(supabase, c);
-      return jsonError(e);
-    }
-    if (!result.ok) {
-      for (const c of claimed) await releaseVariantStock(supabase, c);
-      return json(409, {
-        error: `Sold out: ${item.name} · ${item.variant} is no longer available`,
-        product_id: item.id,
-        variant: item.variant,
-        sold_out: true,
-      });
-    }
-    claimed.push({ ...item, _claimedStockKey: result.stockKey || item.variantKey || item.variant });
-  }
-
-  const { data: order, error: orderError } = await supabase
-    .from('shop_orders')
-    .insert({
-      customer_name:   String(body.name    || '').slice(0, 200),
-      email:           String(body.email   || '').slice(0, 320),
-      phone:           String(body.phone   || '').slice(0, 60),
-      address:         String(body.address || '').slice(0, 500),
-      items:           checkout.trustedItems,
-      total_ngn:       checkout.totalNgn,
-      total_usd:       checkout.totalUsd,
-      delivery_fee_ngn: checkout.deliveryNgn,
-      delivery_method:  checkout.method.slice(0, 40),
-      delivery_zone:    checkout.zone.slice(0, 40),
-      payment_method:  paymentMethod,
-      payment_ref:     paymentRef,
-      payment_metadata: shopOrderMetadata(body, checkout),
-      status: paymentConfirmed ? 'paid' : 'pending',
-    })
-    .select('id')
-    .single();
-  if (orderError) {
-    for (const c of claimed) await releaseVariantStock(supabase, c);
-    return json(500, { error: orderError.message });
-  }
-
-  return json(200, {
-    ok: true,
-    order_id: order.id,
-    total_ngn: checkout.totalNgn,
-    total_usd: checkout.totalUsd,
-    delivery_fee_ngn: checkout.deliveryNgn,
-    chain_verification: chainVerification,
-    card_verification: cardVerification,
-  });
-}
-
-// ── CONFIG ────────────────────────────────────────────────────────────────────
-async function handleShopConfig(req, res, supabase) {
-  if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
-  const { data, error } = await supabase
-    .from('shop_config')
-    .select('*')
-    .order('id', { ascending: true })
-    .limit(1)
-    .single();
-  if (error && error.code !== 'PGRST116') return json(500, { error: error.message });
-  return json(200, data || {});
-}
-
-// ── Netlify entry point ───────────────────────────────────────────────────────
-
-// ── Vercel entry point ────────────────────────────────────────────────────────
-
-// ── Main handler ──────────────────────────────────────────────────────────────
-
-module.exports = async (req, res) => {
-  try {
-    cors(res);
-    if (handleOptions(req, res)) return;
-
-    // Derive action from query string or URL path
-    const urlPath = req.url || '';
-    let action = req.query.action || '';
-
-    if (!action) {
-      // Map legacy direct paths -> actions
-      if (urlPath.includes('/challenges'))     action = 'challenges';
-      else if (urlPath.includes('/challenge')) action = 'challenge';
-      else if (urlPath.includes('/score'))     action = 'score';
-      else if (urlPath.includes('/leaderboard')) {
-        action = 'leaderboard';
-        // Extract challenge id from path e.g. /api/leaderboard/abc-123
-        if (!req.query.id) {
-          const m = urlPath.match(/\/leaderboard\/([^/?]+)/);
-          if (m) req.query.id = m[1];
-        }
-      }
-      else if (urlPath.includes('/hall-of-fame'))   action = 'hall-of-fame';
-      else if (urlPath.includes('/crosschain-claim')) action = 'crosschain-claim';
-      else if (urlPath.includes('/notify-outbid'))      action = 'notify-outbid';
-      else if (urlPath.includes('/notify-bid-confirm')) action = 'notify-bid-confirm';
-      else if (urlPath.includes('/notify-winner'))      action = 'notify-winner';
-      else if (urlPath.includes('/notify-bid'))          action = 'notify-bid';
-      else if (urlPath.includes('/shop-products') || urlPath.includes('/shop/products')) action = 'shop-products';
-      else if (urlPath.includes('/shop-config') || urlPath.includes('/shop/config')) action = 'shop-config';
-      else if (urlPath.includes('/shop-payment-init') || urlPath.includes('/shop/payment-init')) action = 'shop-payment-init';
-      else if (urlPath.includes('/shop-quote') || urlPath.includes('/shop/quote')) action = 'shop-quote';
-      else if (urlPath.includes('/shop-order-create') || urlPath.includes('/shop/order-create')) action = 'shop-order-create';
-      else if (urlPath.includes('/shop-order-confirm') || urlPath.includes('/shop/order-confirm')) action = 'shop-order-confirm';
-      else if (urlPath.includes('/shop-order') || urlPath.includes('/shop/order')) action = 'shop-order';
-    }
-
-    const supabase = getSupabase();
-    _shopRes = res; // shop handlers use res-based json() helper
-
-    switch (action) {
-      case 'challenges':    return handleChallenges(req, res, supabase);
-      case 'upcoming':      return handleUpcoming(req, res, supabase);
-      case 'challenge':     return handleChallenge(req, res, supabase);
-      case 'score':         return handleScore(req, res, supabase);
-      case 'leaderboard':   return handleLeaderboard(req, res, supabase);
-      case 'hall-of-fame':  return handleHallOfFame(req, res, supabase);
-      case 'crosschain-claim': return handleCrosschainClaim(req, res, supabase);
-      case 'notify-outbid':      return handleNotifyOutbid(req, res);
-      case 'notify-bid-confirm': return handleNotifyBidConfirm(req, res);
-      case 'notify-winner':      return handleNotifyWinner(req, res);
-      case 'notify-bid':         return handleNotifyBid(req, res);
-      case 'shop-products':      return handleShopProducts(req, res, supabase);
-      case 'shop-config':        return handleShopConfig(req, res, supabase);
-      case 'shop-quote':         return handleShopQuote(req, res, supabase);
-      case 'shop-payment-init':  return handleShopPaymentInit(req, res, supabase);
-      case 'shop-order-create':  return handleShopOrderCreate(req, res, supabase);
-      case 'shop-order-confirm': return handleShopOrderConfirm(req, res, supabase);
-      case 'shop-order':         return handleShopOrder(req, res, supabase);
-      default:
-        return res.status(404).json({ error: `Unknown action: ${action}` });
-    }
-  } catch (e) {
-    console.error('[api/game] unhandled error:', e);
-    if (!res.headersSent) {
-      return res.status(e.statusCode || 500).json({
-        error: e.message || 'Unhandled server error',
-        stack: process.env.NODE_ENV === 'production' ? undefined : e.stack,
-      });
-    }
-  }
-};
