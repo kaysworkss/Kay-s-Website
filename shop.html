@@ -37,6 +37,9 @@ html, body, * { cursor: none !important; }
 
 /* ── Reset ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* Ensure only this page's elements are visible — kills any bfcache-ghosted
+   fixed-position navs painted by the browser during cross-page transitions */
+nav:not(#nav) { display: none !important; }
 a{color:inherit;text-decoration:none;-webkit-tap-highlight-color:transparent}
 button{-webkit-tap-highlight-color:transparent;cursor:pointer}
 img{display:block;max-width:100%}
@@ -94,12 +97,13 @@ body::before {
 
 /* ── Nav ── */
 nav {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 clamp(1.2rem,4vw,3rem);
   height: 60px;
   background: transparent;
   transition: background 0.4s, backdrop-filter 0.4s;
+  isolation: isolate;
 }
 nav.scrolled {
   background: var(--nav-scrolled);
@@ -107,6 +111,16 @@ nav.scrolled {
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
 }
+/* Gradient shield: prevents ghost links from adjacent pages bleeding
+   through the transparent nav on the dark hero */
+nav::before {
+  content: '';
+  position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(to bottom, rgba(20,12,8,0.5) 0%, transparent 100%);
+  pointer-events: none;
+  opacity: 1; transition: opacity 0.4s;
+}
+nav.scrolled::before { opacity: 0; }
 .nav-logo {
   font-family: 'Montserrat', sans-serif;
   font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase;
@@ -600,11 +614,13 @@ body.dark .shop-filters {
   font-size: 2.5rem; color: var(--clay); opacity: 0.3;
 }
 /* Quick-view overlay on card image */
-.card-img-hover {
+.card-img-hover,
+a.card-img-hover {
   position: absolute; inset: 0;
   background: rgba(20,12,8,0.45);
   display: flex; align-items: center; justify-content: center;
   opacity: 0; transition: opacity 0.3s;
+  text-decoration: none;
 }
 .product-card:hover .card-img-hover { opacity: 1; }
 .card-img-hover-label {
@@ -738,8 +754,9 @@ body.dark .variant-chip.selected { color: var(--sand); }
 /* ── Cart Drawer ── */
 .cart-overlay {
   position: fixed; inset: 0; z-index: 200;
-  background: rgba(20,16,16,0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(20,16,16,0.75);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   opacity: 0; pointer-events: none;
   transition: opacity 0.3s;
 }
@@ -791,9 +808,11 @@ body.dark .variant-chip.selected { color: var(--sand); }
   width: 64px; height: 64px; border-radius: 10px;
   background: var(--bg-alt); overflow: hidden; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.4rem; color: var(--clay); opacity: 0.5;
+  font-size: 1.4rem; color: var(--clay);
 }
-.cart-item-img img { width:100%; height:100%; object-fit:cover; }
+.cart-item-img > span,
+.cart-item-img > .cart-item-emoji { opacity: 0.5; }
+.cart-item-img img { width:100%; height:100%; object-fit:cover; opacity: 1; }
 .cart-item-info { flex:1; min-width:0; }
 .cart-item-name {
   font-family: 'Cormorant Garamond', serif;
@@ -885,27 +904,67 @@ body.dark .variant-chip.selected { color: var(--sand); }
   margin-bottom: 0.75rem;
 }
 body.dark .cart-rec-head { color: var(--sand); }
-.cart-rec-grid { display: grid; grid-template-columns: 1fr; gap: 0.65rem; }
-.cart-rec-card {
-  display: grid; grid-template-columns: 64px 1fr auto; gap: 0.75rem; align-items: center;
-  background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px;
-  padding: 0.65rem;
+
+/* Carousel track */
+.cart-rec-carousel {
+  position: relative;
+  overflow: hidden;
 }
+.cart-rec-track {
+  display: flex;
+  gap: 0.65rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px; /* prevent shadow clip */
+}
+.cart-rec-track::-webkit-scrollbar { display: none; }
+.cart-rec-card {
+  flex: 0 0 calc(50% - 0.33rem);
+  scroll-snap-align: start;
+  display: flex; flex-direction: column;
+  background: var(--bg-alt); border: 1px solid var(--border); border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.cart-rec-card:hover { border-color: var(--border-hover); }
 .cart-rec-img {
-  width: 64px; height: 64px; border-radius: 7px; overflow: hidden;
-  background: var(--bg-card); display: flex; align-items: center; justify-content: center;
-  color: var(--clay); font-size: 1.3rem;
+  width: 100%; aspect-ratio: 1/1;
+  background: var(--bg-card); overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--clay); font-size: 2rem;
 }
 .cart-rec-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.cart-rec-name { font-family: 'Cormorant Garamond', serif; font-size: 0.98rem; color: var(--text); line-height: 1.2; }
-.cart-rec-meta { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.18rem; }
+.cart-rec-body { padding: 0.6rem 0.65rem 0.65rem; flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
+.cart-rec-name { font-family: 'Cormorant Garamond', serif; font-size: 0.95rem; color: var(--text); line-height: 1.2; }
+.cart-rec-meta { font-size: 0.65rem; color: var(--text-muted); }
+.cart-rec-price { font-family: 'Cormorant Garamond', serif; font-size: 0.9rem; color: var(--gold); }
 .cart-rec-add {
-  width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 7px;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--clay); background: var(--bg-card); font-size: 1.1rem;
-  transition: border-color 0.15s, background 0.15s;
+  width: 100%; padding: 0.5rem;
+  border: 1px solid var(--border); border-top: none; border-radius: 0 0 10px 10px;
+  display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+  color: var(--clay); background: var(--bg-card);
+  font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.14em; text-transform: uppercase;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
-.cart-rec-add:hover { border-color: var(--clay); background: rgba(196,132,90,0.08); }
+.cart-rec-add:hover { border-color: var(--clay); background: rgba(196,132,90,0.08); color: var(--rust); }
+
+/* Carousel nav arrows */
+.cart-rec-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--bg-card); border: 1px solid var(--border);
+  color: var(--text); font-size: 0.75rem;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: background 0.15s, border-color 0.15s;
+  z-index: 2; opacity: 0; pointer-events: none;
+}
+.cart-rec-carousel:hover .cart-rec-arrow { opacity: 1; pointer-events: all; }
+.cart-rec-arrow:hover { background: var(--clay); border-color: var(--clay); color: #fff; }
+.cart-rec-arrow.prev { left: 4px; }
+.cart-rec-arrow.next { right: 4px; }
 .cart-note-wrap { margin-bottom: 1rem; border-top: 1px solid var(--border); padding-top: 0.9rem; }
 .cart-note-toggle {
   font-family: 'Crimson Pro', serif; font-size: 0.95rem; color: var(--bark);
@@ -923,82 +982,208 @@ body.dark .cart-note-toggle { color: var(--sand); }
 
 
 
-/* ── Checkout Modal ── */
+/* ── Checkout Modal — Shopify-inspired clean layout ── */
 .modal-overlay {
-  position: fixed; inset:0; z-index:300;
-  background: rgba(14,10,8,0.75);
-  backdrop-filter: blur(6px);
-  display: flex; align-items: center; justify-content: center;
-  padding: 1.5rem;
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(14,10,8,0.78);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 0;
+  overflow-y: auto;
   opacity: 0; pointer-events: none;
   transition: opacity 0.3s;
 }
-.modal-overlay.open { opacity:1; pointer-events:all; }
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+
 .modal {
   background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  width: 100%; max-width: 500px;
-  max-height: 90vh; overflow-y: auto;
-  transform: translateY(16px);
+  width: 100%; min-height: 100vh;
+  max-width: 1100px;
+  transform: translateY(0);
   transition: transform 0.3s;
+  display: flex; flex-direction: column;
 }
 .modal-overlay.open .modal { transform: translateY(0); }
-.modal-head {
-  padding: 1.6rem 2rem 1.2rem;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: flex-start; justify-content: space-between; gap:1rem;
+
+/* Two-column layout: form left, summary right */
+#formScreen {
+  display: flex; flex-direction: column; flex: 1; min-height: 100vh;
 }
-.modal-title {
-  font-family: 'Cinzel', serif; font-size: 0.65rem;
+@media(min-width: 720px) {
+  #formScreen {
+    flex-direction: row;
+    align-items: stretch;
+  }
+  #ckFormCol {
+    flex: 1;
+    padding: 2.5rem clamp(1.5rem, 4vw, 3.5rem);
+    overflow-y: auto;
+    max-height: 100vh;
+    border-right: 1px solid var(--border);
+  }
+  #orderSummaryCol {
+    width: 380px; flex-shrink: 0;
+    background: var(--bg-alt);
+    padding: 2.5rem 2rem;
+    overflow-y: auto;
+    max-height: 100vh;
+    position: sticky; top: 0;
+    align-self: flex-start;
+  }
+}
+@media(max-width: 719px) {
+  #ckFormCol { padding: 1.5rem 1.2rem; }
+  #orderSummaryCol {
+    padding: 1.5rem 1.2rem;
+    border-top: 1px solid var(--border);
+    background: var(--bg-alt);
+  }
+}
+
+/* Remove old modal-head — we'll use per-column branding */
+.modal-head { display: none; }
+
+/* Checkout brand header inside form col */
+.ck-brand-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 2rem;
+}
+.ck-brand-name {
+  font-family: 'Cinzel', serif; font-size: 0.9rem;
   letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold);
 }
-.modal-sub {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 1.1rem; color: var(--text-muted); font-style:italic;
-  margin-top: 0.2rem;
-}
-.modal-close {
+.ck-close {
   background: none; border: none; font-size: 1.2rem;
-  color: var(--text-muted); line-height:1;
-  transition: color 0.2s; flex-shrink:0;
+  color: var(--text-muted); line-height: 1; cursor: pointer;
+  transition: color 0.2s;
 }
-.modal-close:hover { color: var(--rust); }
-.modal-body { padding: 1.8rem 2rem; }
+.ck-close:hover { color: var(--rust); }
 
-/* Form */
-.form-row { margin-bottom: 1.2rem; }
+/* Section headers inside form */
+.ck-section-title {
+  font-family: 'Cinzel', serif; font-size: 0.6rem;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--text); margin: 1.6rem 0 1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+.ck-section-title:first-of-type { margin-top: 0; }
+
+/* Form fields */
+.form-row { margin-bottom: 1rem; }
 .form-label {
   display: block;
-  font-family: 'Cinzel', serif; font-size: 0.52rem;
-  letter-spacing: 0.2em; text-transform: uppercase;
-  color: var(--text-muted); margin-bottom: 0.5rem;
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 0.4rem;
 }
 .form-input, .form-select {
   width: 100%;
   font-family: 'Crimson Pro', serif; font-size: 1rem;
   padding: 0.7rem 1rem;
-  background: var(--bg-alt);
+  background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 10px; color: var(--text);
-  transition: border-color 0.2s;
+  border-radius: 8px; color: var(--text);
+  transition: border-color 0.2s, box-shadow 0.2s;
   outline: none; appearance: none;
 }
-.form-input:focus, .form-select:focus { border-color: var(--clay); }
-.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-
-/* Order summary inside modal */
-.order-summary {
-  background: var(--bg-alt);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1.2rem;
-  margin-bottom: 1.6rem;
+.form-input:focus, .form-select:focus {
+  border-color: var(--clay);
+  box-shadow: 0 0 0 3px rgba(196,132,90,0.12);
 }
-.order-summary-label {
-  font-family: 'Cinzel', serif; font-size: 0.5rem;
-  letter-spacing: 0.25em; text-transform: uppercase;
-  color: var(--gold); margin-bottom: 0.8rem;
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
+/* Delivery method toggle */
+.ck-delivery-btns {
+  display: flex; gap: 0.5rem; margin-bottom: 1rem;
+}
+.ck-delivery-btn {
+  flex: 1; padding: 0.75rem 1rem;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: transparent; color: var(--text-muted);
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.ck-delivery-btn:hover { border-color: var(--clay); color: var(--clay); }
+.ck-delivery-btn.active {
+  border-color: var(--rust); background: rgba(158,79,46,0.07); color: var(--rust);
+}
+.ck-delivery-btn .ck-radio {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 1.5px solid currentColor; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.ck-delivery-btn.active .ck-radio::after {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--rust);
+}
+
+/* Payment method tabs — redesigned as pill radio buttons */
+.ck-pay-methods {
+  display: flex; flex-direction: column; gap: 0.5rem;
+  margin-bottom: 1.2rem;
+}
+.ck-pay-method {
+  display: flex; align-items: center; gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border); border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.ck-pay-method.active { border-color: var(--rust); background: rgba(158,79,46,0.05); }
+.ck-pay-radio {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid var(--border); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.2s;
+}
+.ck-pay-method.active .ck-pay-radio { border-color: var(--rust); }
+.ck-pay-method.active .ck-pay-radio::after {
+  content: ''; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--rust);
+}
+.ck-pay-label {
+  font-family: 'Cinzel', serif; font-size: 0.54rem;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text); flex: 1;
+}
+.ck-pay-icons { display: flex; gap: 0.3rem; align-items: center; }
+.ck-pay-icon {
+  height: 20px; padding: 2px 5px; border-radius: 3px;
+  background: rgba(128,128,128,0.12);
+  font-size: 0.55rem; font-family: 'Montserrat', sans-serif;
+  font-weight: 600; color: var(--text-muted);
+  display: flex; align-items: center;
+}
+
+/* Pay panel content */
+.pay-panel { display: none; }
+.pay-panel.active { display: block; }
+
+/* Keep the old pay-tabs hidden (JS still switches panels by id) */
+.pay-tabs { display: none; }
+
+/* Primary pay button */
+.submit-pay-btn {
+  width: 100%;
+  font-family: 'Cinzel', serif; font-size: 0.62rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  padding: 1rem;
+  background: var(--rust); color: var(--linen);
+  border: none; border-radius: 8px;
+  transition: background 0.2s, opacity 0.2s;
+  margin-top: 1rem;
+}
+.submit-pay-btn:hover { background: var(--bark); }
+.submit-pay-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Order summary column (right side) */
+.ck-summary-title {
+  font-family: 'Cinzel', serif; font-size: 0.56rem;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 1.2rem;
 }
 .order-line {
   display: flex; justify-content: space-between;
@@ -1006,30 +1191,42 @@ body.dark .cart-note-toggle { color: var(--sand); }
   padding: 0.3rem 0;
 }
 .order-line.item {
-  align-items: center;
+  align-items: flex-start;
   gap: 0.9rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border);
 }
-.order-line-main {
-  min-width: 0;
-  flex: 1;
+.order-line-thumb {
+  width: 64px; height: 64px; border-radius: 8px;
+  overflow: hidden; flex-shrink: 0;
+  background: var(--bg-card);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; color: var(--clay);
+  position: relative;
 }
-.order-line-name {
-  color: var(--text);
-  overflow-wrap: anywhere;
+/* Quantity badge on thumb — like Shopify */
+.order-line-thumb::after {
+  content: attr(data-qty);
+  position: absolute; top: -6px; right: -6px;
+  background: var(--bark); color: var(--sand);
+  font-family: 'Montserrat', sans-serif; font-size: 0.55rem;
+  font-weight: 600; width: 18px; height: 18px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+}
+.order-line-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.order-line-main { min-width: 0; flex: 1; }
+.order-line-name { color: var(--text); overflow-wrap: anywhere; font-size: 0.92rem; line-height: 1.35; }
+.order-line-variant {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.6rem; color: var(--text-muted); letter-spacing: 0.04em; margin: 0.2rem 0 0.4rem;
 }
 .order-line-controls {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-top: 0.35rem;
+  display: inline-flex; align-items: center; gap: 0.45rem; margin-top: 0.35rem;
 }
-.order-line-controls .qty-btn {
-  width: 1.55rem;
-  height: 1.55rem;
-}
+.order-line-controls .qty-btn { width: 1.55rem; height: 1.55rem; }
 .order-line-price {
-  white-space: nowrap;
-  color: var(--text);
+  white-space: nowrap; color: var(--text);
+  font-family: 'Cormorant Garamond', serif; font-size: 1rem; flex-shrink: 0;
 }
 .order-total {
   display: flex; justify-content: space-between;
@@ -1041,28 +1238,22 @@ body.dark .cart-note-toggle { color: var(--sand); }
   letter-spacing: 0.2em; text-transform: uppercase; color: var(--text);
 }
 .order-total-val {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 1.15rem; color: var(--text);
+  font-family: 'Cormorant Garamond', serif; font-size: 1.15rem; color: var(--text);
 }
 
-/* Payment tabs */
+/* Summary label */
+.order-summary { margin-bottom: 0; }
+.order-summary-label {
+  font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 0.8rem;
+}
+#orderSummaryCol .order-summary-label { display: none; }
+/* Payment tabs — hidden, replaced by .ck-pay-methods radio UI */
 .pay-tabs {
-  display: flex; border: 1px solid var(--border);
-  border-radius: 10px; overflow: hidden;
-  margin-bottom: 1.4rem;
+  display: none !important;
 }
-.pay-tab {
-  flex: 1;
-  font-family: 'Cinzel', serif; font-size: 0.52rem;
-  letter-spacing: 0.15em; text-transform: uppercase;
-  padding: 0.75rem;
-  background: transparent; border: none; color: var(--text-muted);
-  border-right: 1px solid var(--border);
-  transition: background 0.2s, color 0.2s;
-}
-.pay-tab:last-child { border-right: none; }
-.pay-tab:hover { background: var(--bg-alt); color: var(--clay); }
-.pay-tab.active { background: var(--rust); color: var(--linen); }
+.pay-tab { display: none; }
 
 .pay-panel { display: none; }
 .pay-panel.active { display: block; }
@@ -1814,6 +2005,27 @@ footer {
 .faq-a-inner a { color: var(--clay); }
 .faq-a-inner a:hover { color: var(--rust); }
 </style>
+
+<!-- ── Ghost-nav prevention ──────────────────────────────────────────────────
+  The nav showing "Home · Auction · Commission · Contact" is index.html's
+  fixed nav being painted by the browser during the cross-document navigation
+  transition (or served from bfcache). Three defences:
+  1. CSS: nav:not(#nav) { display:none } — already in the stylesheet above.
+  2. pageshow: force a full reload if the browser serves a bfcache snapshot.
+  3. pagehide on index is ideal but we patch it here via sessionStorage so any
+     page that loads shop.html knows it should skip the cached paint.
+─────────────────────────────────────────────────────────────────────────── -->
+<script>
+(function() {
+  // Defence 2: bfcache restore → reload fresh so index's frozen DOM never shows
+  window.addEventListener('pageshow', function(e) {
+    if (e.persisted) { window.location.reload(); }
+  });
+
+  // Defence 3: mark that we're on shop so outgoing pages can react
+  try { sessionStorage.setItem('kw-last-page', 'shop'); } catch(_) {}
+})();
+</script>
 </head>
 <body>
 
@@ -1952,35 +2164,39 @@ footer {
 </section>
 
 <!-- Featured artwork spotlight -->
-<section class="featured-section">
+<section class="featured-section" id="featuredSection" style="display:none">
   <div class="featured-inner">
     <div class="featured-img-col">
-      <div class="featured-img-frame">
-        <img src="/images/monostudy.png" alt="Featured artwork" class="featured-img" onerror="this.parentElement.style.background='var(--bg-alt)'"/>
+      <div class="featured-img-frame" id="featuredImgFrame">
+        <a id="featuredImgLink" href="#" style="display:block">
+          <img src="/images/monostudy.png" alt="Featured artwork" class="featured-img" id="featuredImg"
+               onerror="this.parentElement.parentElement.style.background='var(--bg-alt)'"/>
+        </a>
         <div class="featured-img-mat"></div>
       </div>
-      <div class="featured-img-caption">Available as fine art prints · Multiple sizes</div>
+      <div class="featured-img-caption" id="featuredCaption">Available as fine art prints · Multiple sizes</div>
     </div>
     <div class="featured-text-col">
       <p class="featured-eyebrow">Featured this month</p>
-      <h2 class="featured-heading">Monochrome<br><em>Study</em></h2>
-      <p class="featured-body">A quiet study in form and restraint. Kay's monochrome explorations strip away colour to reveal the raw structure of his work — available as giclée prints on 100% cotton rag, hand-signed by the artist.</p>
-      <div class="featured-meta">
+      <h2 class="featured-heading" id="featuredHeading">Monochrome<br><em>Study</em></h2>
+      <p class="featured-body" id="featuredBody">A quiet study in form and restraint. Kay's monochrome explorations strip away colour to reveal the raw structure of his work — available as giclée prints on 100% cotton rag, hand-signed by the artist.</p>
+      <div class="featured-meta" id="featuredMeta">
         <div class="featured-meta-item">
           <span class="featured-meta-label">Medium</span>
-          <span class="featured-meta-val">Giclée on cotton rag</span>
+          <span class="featured-meta-val" id="featuredMedium">Giclée on cotton rag</span>
         </div>
         <div class="featured-meta-item">
           <span class="featured-meta-label">Edition</span>
-          <span class="featured-meta-val">Open · Hand-signed</span>
+          <span class="featured-meta-val" id="featuredEdition">Open · Hand-signed</span>
         </div>
         <div class="featured-meta-item">
           <span class="featured-meta-label">Sizes from</span>
-          <span class="featured-meta-val">4×4" to 18×24"</span>
+          <span class="featured-meta-val" id="featuredSizes">4×4" to 18×24"</span>
         </div>
       </div>
       <div class="featured-ctas">
-        <button class="hero-cta-primary" onclick="document.querySelector('[data-filter=prints]').click();document.getElementById('shopGrid').scrollIntoView({behavior:'smooth'})">Shop all prints</button>
+        <a id="featuredViewBtn" href="#" class="hero-cta-primary" style="display:inline-block;text-align:center">View this print</a>
+        <button class="hero-cta-ghost" onclick="document.querySelector('[data-filter=prints]').click();document.getElementById('shopGrid').scrollIntoView({behavior:'smooth'})">Shop all prints</button>
       </div>
     </div>
   </div>
@@ -2083,7 +2299,7 @@ footer {
   <div class="faq-item">
     <button class="faq-q">Do you deliver within Nigeria?<span class="faq-icon">+</span></button>
     <div class="faq-a"><div class="faq-a-inner">
-      Yes. Nigerian orders ship via <strong>GIG Logistics</strong> to any state. If you'd prefer terminal pickup at a nearby GIG station rather than door delivery, note your preferred station in the street address field.
+      Yes. Nigerian orders ship via <strong>GIG Logistics</strong> to any state, or you can collect <strong>free in Kaduna</strong> — choose your option at checkout. If you'd prefer pickup at a nearby GIG station rather than your door, note it in the address field.
     </div></div>
   </div>
 
@@ -2208,17 +2424,17 @@ footer {
 
     <!-- Form screen -->
     <div id="formScreen">
-      <div class="modal-head">
-        <div>
-          <p class="modal-title">Checkout</p>
-          <p class="modal-sub">Complete your order</p>
+
+      <!-- LEFT: Form column -->
+      <div id="ckFormCol">
+        <!-- Brand bar with close -->
+        <div class="ck-brand-bar">
+          <span class="ck-brand-name">Kay's Works</span>
+          <button class="ck-close" id="checkoutClose" aria-label="Close checkout">✕</button>
         </div>
-        <button class="modal-close" id="checkoutClose">✕</button>
-      </div>
-      <div class="modal-body">
 
-        <div class="order-summary" id="orderSummary"></div>
-
+        <!-- Contact -->
+        <p class="ck-section-title">Contact</p>
         <div class="form-row">
           <label class="form-label">Full name</label>
           <input class="form-input" id="ckName" type="text" placeholder="Your name" autocomplete="name"/>
@@ -2232,7 +2448,18 @@ footer {
           <input class="form-input" id="ckPhone" type="tel" placeholder="+234 …"/>
         </div>
 
-        <div id="shippingFields">
+        <!-- Delivery -->
+        <p class="ck-section-title">Delivery</p>
+        <div class="ck-delivery-btns">
+          <button class="ck-delivery-btn active" id="pickupBtn" onclick="setDeliveryMethod('pickup')">
+            <span class="ck-radio"></span>Collect in person
+          </button>
+          <button class="ck-delivery-btn" id="shipBtn" onclick="setDeliveryMethod('ship')">
+            <span class="ck-radio"></span>Ship to me
+          </button>
+        </div>
+
+        <div id="shippingFields" style="display:none">
           <div class="form-row">
             <label class="form-label">Country / region</label>
             <select class="form-select" id="ckCountry">
@@ -2282,7 +2509,6 @@ footer {
                 <option value="WA">Togo</option>
                 <option value="WA">Senegal</option>
                 <option value="WA">Côte d'Ivoire</option>
-                <option value="WA">Niger</option>
                 <option value="WA">Cameroon</option>
               </optgroup>
               <optgroup label="Europe &amp; UK">
@@ -2313,7 +2539,6 @@ footer {
                 <option value="AO">South Korea</option>
                 <option value="AO">Singapore</option>
                 <option value="AO">India</option>
-                <option value="AO">China</option>
                 <option value="AO">United Arab Emirates</option>
               </optgroup>
               <optgroup label="Rest of world">
@@ -2322,7 +2547,7 @@ footer {
             </select>
           </div>
 
-          <!-- GIG Logistics fields (Nigeria) -->
+          <!-- GIG fields (Nigeria) -->
           <div id="gigFields" style="display:none">
             <div class="form-row">
               <label class="form-label">City / town</label>
@@ -2335,15 +2560,15 @@ footer {
             <p style="font-size:0.72rem;color:var(--text-muted);line-height:1.5;margin:-0.4rem 0 1rem">Delivered by GIG Logistics. Prefer terminal pickup? Note your nearest GIG station in the street field.</p>
           </div>
 
-          <!-- UPS fields (international) -->
+          <!-- International fields -->
           <div id="upsFields" style="display:none">
             <div class="form-row">
               <label class="form-label">Address line 1</label>
-              <input class="form-input" id="ckUpsLine1" type="text" placeholder="Street address, P.O. box, company name"/>
+              <input class="form-input" id="ckUpsLine1" type="text" placeholder="Street address, P.O. box"/>
             </div>
             <div class="form-row">
               <label class="form-label">Address line 2 (optional)</label>
-              <input class="form-input" id="ckUpsLine2" type="text" placeholder="Apartment, suite, unit, building, floor"/>
+              <input class="form-input" id="ckUpsLine2" type="text" placeholder="Apartment, suite, unit, floor"/>
             </div>
             <div class="form-row-2">
               <div>
@@ -2359,11 +2584,11 @@ footer {
               <label class="form-label">Postal / ZIP code</label>
               <input class="form-input" id="ckUpsPostal" type="text" placeholder="Postal or ZIP code"/>
             </div>
-            <p style="font-size:0.72rem;color:var(--text-muted);line-height:1.5;margin:-0.4rem 0 1rem">Shipped internationally via DHL or UPS. A postal code and reachable phone number are required for customs and delivery.</p>
+            <p style="font-size:0.72rem;color:var(--text-muted);line-height:1.5;margin:-0.4rem 0 1rem">Shipped internationally via DHL or UPS. A postal code and reachable phone number are required for customs.</p>
           </div>
 
           <!-- Live delivery estimate -->
-          <div id="deliveryEstimate" style="display:none;margin-bottom:1.2rem;padding:0.9rem 1rem;background:var(--bg-alt);border:1px solid var(--border);border-radius: 10px">
+          <div id="deliveryEstimate" style="display:none;margin-bottom:1.2rem;padding:0.9rem 1rem;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem">
               <div>
                 <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem">Estimated delivery fee</div>
@@ -2379,8 +2604,40 @@ footer {
           </div>
         </div>
 
-        <!-- Payment method tabs -->
-        <div class="pay-tabs" id="payTabs">
+        <div id="pickupFields">
+          <div style="padding:0.9rem 1rem;background:var(--bg-alt);border:1px solid rgba(107,124,92,0.3);border-radius:8px;margin-bottom:1rem">
+            <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:#6b7c5c;margin-bottom:0.3rem">Collection · Arrange with Kay</div>
+            <div style="font-size:0.88rem;color:var(--text-muted);line-height:1.6">Kay will contact you with pickup details after your order is confirmed. No delivery fee.</div>
+          </div>
+        </div>
+
+        <!-- Payment -->
+        <p class="ck-section-title">Payment</p>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1rem">All transactions are secure and encrypted.</p>
+
+        <!-- New payment method radio list -->
+        <div class="ck-pay-methods">
+          <div class="ck-pay-method active" data-pay="paystack" onclick="switchPayTab('paystack')">
+            <span class="ck-pay-radio"></span>
+            <span class="ck-pay-label">Card (Paystack)</span>
+            <div class="ck-pay-icons">
+              <span class="ck-pay-icon">VISA</span>
+              <span class="ck-pay-icon">MC</span>
+              <span class="ck-pay-icon">Verve</span>
+            </div>
+          </div>
+          <div class="ck-pay-method" data-pay="eth" onclick="switchPayTab('eth')">
+            <span class="ck-pay-radio"></span>
+            <span class="ck-pay-label">⬡ Ethereum (ETH · USDC · USDT)</span>
+          </div>
+          <div class="ck-pay-method" data-pay="tezos" onclick="switchPayTab('tezos')">
+            <span class="ck-pay-radio"></span>
+            <span class="ck-pay-label" style="color:#5ac0f5">✦ Tezos (XTZ)</span>
+          </div>
+        </div>
+
+        <!-- Hidden original pay-tabs (JS target, visually replaced) -->
+        <div class="pay-tabs" id="payTabs" aria-hidden="true">
           <button class="pay-tab active" data-pay="paystack">Paystack</button>
           <button class="pay-tab" data-pay="eth">⬡ ETH</button>
           <button class="pay-tab" data-pay="tezos" style="color:#5ac0f5">XTZ Tezos</button>
@@ -2389,36 +2646,25 @@ footer {
         <!-- Paystack panel -->
         <div class="pay-panel active" id="panel-paystack">
           <p class="pay-info">Pay securely with <strong>Paystack</strong> — local orders are charged in <strong>NGN</strong>, and international card checkout in <strong>USD</strong>.</p>
-          <button class="submit-pay-btn" id="paystackPayBtn">Pay with Paystack</button>
+          <button class="submit-pay-btn" id="paystackPayBtn">Pay now</button>
         </div>
 
         <!-- ETH/Crypto panel -->
         <div class="pay-panel" id="panel-eth">
           <p class="pay-info">Connect your <strong style="color:#8b9cf7">Ethereum wallet</strong> and send ETH directly — or copy the address and send manually.</p>
           <div id="ethPayBlock">
-            <!-- Amount + address block -->
             <div class="crypto-option" id="ethAmountBlock" style="display:none;border-color:rgba(139,156,247,0.25)">
               <div class="crypto-name" style="color:#8b9cf7">ETH · Ethereum</div>
               <div class="crypto-amount" id="ethEthAmount">— ETH</div>
               <div class="crypto-address" id="ethToAddr">—</div>
               <button class="copy-btn" id="ethCopyBtn" style="border-color:rgba(139,156,247,0.3);color:#8b9cf7">Copy address</button>
             </div>
-            <div id="ethLockBox" style="display:none;margin-bottom:1rem;padding:0.7rem 0.9rem;background:var(--bg-alt);border:1px solid rgba(139,156,247,0.22);border-radius: 12px;font-family:'Montserrat',sans-serif">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.35rem">
-                <span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Locked amount</span>
-                <span id="ethLockAmt" style="font-size:0.82rem;color:#8b9cf7;font-weight:600">— ETH</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.35rem">
-                <span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Order hash</span>
-                <span id="ethLockRef" style="font-size:0.66rem;color:var(--text);word-break:break-all;text-align:right">—</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:baseline">
-                <span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Price locked for</span>
-                <span id="ethLockTimer" style="font-size:0.72rem;color:#8b9cf7">5:00</span>
-              </div>
+            <div id="ethLockBox" style="display:none;margin-bottom:1rem;padding:0.7rem 0.9rem;background:var(--bg-alt);border:1px solid rgba(139,156,247,0.22);border-radius:12px;font-family:'Montserrat',sans-serif">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.35rem"><span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Locked amount</span><span id="ethLockAmt" style="font-size:0.82rem;color:#8b9cf7;font-weight:600">— ETH</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.35rem"><span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Order hash</span><span id="ethLockRef" style="font-size:0.66rem;color:var(--text);word-break:break-all;text-align:right">—</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Price locked for</span><span id="ethLockTimer" style="font-size:0.72rem;color:#8b9cf7">5:00</span></div>
               <div style="font-size:0.58rem;color:var(--text-muted);margin-top:0.4rem;line-height:1.4">Save your order hash. If anything interrupts the payment, you can confirm later using it.</div>
             </div>
-            <!-- USDC / USDT — wallet send -->
             <div id="ethStableOptions" style="display:none">
               <div class="crypto-option" style="border-color:rgba(139,156,247,0.15)">
                 <div class="crypto-name" style="color:#8b9cf7">USDC · ERC-20</div>
@@ -2439,9 +2685,8 @@ footer {
                 </div>
               </div>
             </div>
-            <!-- Connected wallet row -->
             <div id="ethWalletInfo" style="margin-bottom:1rem;display:none">
-              <div style="display:flex;align-items:center;gap:0.6rem;padding:0.7rem 1rem;background:var(--bg-alt);border:1px solid rgba(139,156,247,0.2);border-radius: 10px">
+              <div style="display:flex;align-items:center;gap:0.6rem;padding:0.7rem 1rem;background:var(--bg-alt);border:1px solid rgba(139,156,247,0.2);border-radius:10px">
                 <span style="width:8px;height:8px;border-radius:50%;background:#8b9cf7;flex-shrink:0"></span>
                 <span id="ethWalletAddr" style="font-family:'Montserrat',sans-serif;font-size:0.62rem;color:#8b9cf7;word-break:break-all"></span>
                 <button id="ethDisconnectBtn" style="margin-left:auto;background:none;border:none;font-size:0.65rem;color:var(--text-muted);font-family:'Cinzel',sans-serif;letter-spacing:0.1em;white-space:nowrap">Disconnect</button>
@@ -2469,23 +2714,14 @@ footer {
               <div class="crypto-address" id="tezosToAddr">—</div>
               <button class="copy-btn" id="tezosCopyBtn" style="border-color:rgba(90,192,245,0.3);color:#5ac0f5">Copy address</button>
             </div>
-            <div id="tezosLockBox" style="display:none;margin-bottom:1rem;padding:0.7rem 0.9rem;background:var(--bg-alt);border:1px solid rgba(90,192,245,0.22);border-radius: 12px;font-family:'Montserrat',sans-serif">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.35rem">
-                <span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Locked amount</span>
-                <span id="tezosLockAmt" style="font-size:0.82rem;color:#5ac0f5;font-weight:600">— XTZ</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.35rem">
-                <span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Order hash</span>
-                <span id="tezosLockRef" style="font-size:0.66rem;color:var(--text);word-break:break-all;text-align:right">—</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:baseline">
-                <span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Price locked for</span>
-                <span id="tezosLockTimer" style="font-size:0.72rem;color:#5ac0f5">5:00</span>
-              </div>
+            <div id="tezosLockBox" style="display:none;margin-bottom:1rem;padding:0.7rem 0.9rem;background:var(--bg-alt);border:1px solid rgba(90,192,245,0.22);border-radius:12px;font-family:'Montserrat',sans-serif">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.35rem"><span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Locked amount</span><span id="tezosLockAmt" style="font-size:0.82rem;color:#5ac0f5;font-weight:600">— XTZ</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.35rem"><span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Order hash</span><span id="tezosLockRef" style="font-size:0.66rem;color:var(--text);word-break:break-all;text-align:right">—</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Price locked for</span><span id="tezosLockTimer" style="font-size:0.72rem;color:#5ac0f5">5:00</span></div>
               <div style="font-size:0.58rem;color:var(--text-muted);margin-top:0.4rem;line-height:1.4">Save your order hash. If anything interrupts the payment, you can confirm later using it.</div>
             </div>
             <div id="tezosWalletInfo" style="margin-bottom:1rem;display:none">
-              <div style="display:flex;align-items:center;gap:0.6rem;padding:0.7rem 1rem;background:var(--bg-alt);border:1px solid rgba(90,192,245,0.2);border-radius: 10px">
+              <div style="display:flex;align-items:center;gap:0.6rem;padding:0.7rem 1rem;background:var(--bg-alt);border:1px solid rgba(90,192,245,0.2);border-radius:10px">
                 <span style="width:8px;height:8px;border-radius:50%;background:#5ac0f5;flex-shrink:0"></span>
                 <span id="tezosWalletAddr" style="font-family:'Montserrat',sans-serif;font-size:0.62rem;color:#5ac0f5;word-break:break-all"></span>
                 <button id="tezosDisconnectBtn" style="margin-left:auto;background:none;border:none;font-size:0.65rem;color:var(--text-muted);font-family:'Cinzel',sans-serif;letter-spacing:0.1em;white-space:nowrap">Disconnect</button>
@@ -2503,8 +2739,18 @@ footer {
           </div>
         </div>
 
+      </div><!-- /ckFormCol -->
+
+      <!-- RIGHT: Order summary column -->
+      <div id="orderSummaryCol">
+        <p class="ck-summary-title">Order summary</p>
+        <div id="orderSummaryItems"></div>
+        <div id="orderSummaryTotals" style="padding-top:0.8rem;margin-top:0.4rem"></div>
+        <!-- Mobile inline summary (hidden on desktop) -->
+        <div class="order-summary" id="orderSummary" style="display:none"></div>
       </div>
-    </div>
+
+    </div><!-- /formScreen -->
 
     <!-- Confirmation screen -->
     <div class="confirm-screen" id="confirmScreen">
@@ -2652,6 +2898,25 @@ footer {
         <button class="admin-close" id="adminConfigClose">✕</button>
       </div>
       <div class="admin-body">
+
+        <!-- Featured this month -->
+        <p class="admin-section-title" style="margin-top:0">Featured this month</p>
+        <p style="font-size:0.82rem;color:var(--text-muted);line-height:1.6;margin-bottom:0.8rem">
+          Choose which print is spotlighted in the homepage-style featured section. Visitors will be taken to its detail page if it has a slug.
+        </p>
+        <div class="form-row">
+          <label class="form-label">Featured print</label>
+          <select class="form-select" id="cfgFeaturedProduct">
+            <option value="">— None (hide the featured section) —</option>
+          </select>
+        </div>
+        <div id="cfgFeaturedPreview" style="display:none;margin-bottom:1.2rem;padding:0.8rem;background:var(--bg-alt);border:1px solid var(--border);border-radius:10px;display:flex;gap:0.8rem;align-items:center">
+          <img id="cfgFeaturedThumb" src="" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0"/>
+          <div>
+            <div id="cfgFeaturedName" style="font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--text)"></div>
+            <div id="cfgFeaturedSlug" style="font-family:'Montserrat',sans-serif;font-size:0.65rem;color:var(--clay);margin-top:0.2rem"></div>
+          </div>
+        </div>
 
         <!-- Crypto wallets -->
         <p class="admin-section-title">Crypto wallet addresses</p>
@@ -2873,8 +3138,9 @@ footer {
 
 /* ─── Config (loaded from Supabase / Edge Config or defaults) ─── */
 let SHOP_CONFIG = {
-  ethAddress:   '0x04CB6Ef95d6fd1c1d2819f5d4e18E38C11dc0d37',
-  tezosAddress: 'tz1WpjkcxaoRtKzV3Ni1T6KFEnpUdkYzELwd',
+  ethAddress:         '0x04CB6Ef95d6fd1c1d2819f5d4e18E38C11dc0d37',
+  tezosAddress:       'tz1WpjkcxaoRtKzV3Ni1T6KFEnpUdkYzELwd',
+  featured_product_id: '', // set in admin — ID of the featured print this month
   products: [
     // One print product is one artwork. The print formats and sizes live inside variants.
     {
@@ -3299,7 +3565,8 @@ function buildEditionBadge(p) {
 // the product has a slug to link to.
 function detailsLink(p) {
   if (!p.slug) return '';
-  return `<a class="details-link" href="/shop/${p.slug}" target="_blank" rel="noopener">Show product details</a>`;
+  const label = p.category === 'prints' ? 'View print' : 'View details';
+  return `<a class="details-link" href="/shop/${p.slug}" rel="noopener">${label}</a>`;
 }
 
 function buildCard(p) {
@@ -3372,8 +3639,11 @@ function buildPrintCard(p) {
   card.dataset.category = p.category;
 
   if (!options.length) {
+    const viewHover = p.slug
+      ? `<a class="card-img-hover" href="/shop/${p.slug}" rel="noopener" style="text-decoration:none"><span class="card-img-hover-label">View print</span></a>`
+      : `<div class="card-img-hover"><span class="card-img-hover-label">View print</span></div>`;
     card.innerHTML = `
-      <div class="card-img">${imgHtml}${badgeHtml}${buildSoldOverlay(p)}<div class="card-img-hover"><span class="card-img-hover-label">View print</span></div></div>
+      <div class="card-img">${imgHtml}${badgeHtml}${buildSoldOverlay(p)}${viewHover}</div>
       <div class="card-body">
         ${buildEditionBadge(p)}
         <p class="card-category">${p.category}</p>
@@ -3427,7 +3697,7 @@ function buildPrintCard(p) {
   }
 
   card.innerHTML = `
-    <div class="card-img">${imgHtml}${badgeHtml}${buildSoldOverlay(p)}<div class="card-img-hover"><span class="card-img-hover-label">View print</span></div></div>
+    <div class="card-img">${imgHtml}${badgeHtml}${buildSoldOverlay(p)}${p.slug ? `<a class="card-img-hover" href="/shop/${p.slug}" rel="noopener" style="text-decoration:none"><span class="card-img-hover-label">View print</span></a>` : `<div class="card-img-hover"><span class="card-img-hover-label">View print</span></div>`}</div>
     <div class="card-body">
       ${buildEditionBadge(p)}
       <p class="card-category">${p.category}</p>
@@ -3535,8 +3805,79 @@ function syncCardStock(pid, variantKey) {
   }
 }
 
+/* ─── Featured section ─── */
+function renderFeaturedSection() {
+  const featId = SHOP_CONFIG.featured_product_id;
+  const p = featId ? SHOP_CONFIG.products.find(x => x.id === featId && !x._isSample) : null;
+
+  // Elements
+  const imgEl      = document.getElementById('featuredImg');
+  const imgLinkEl  = document.getElementById('featuredImgLink');
+  const captionEl  = document.getElementById('featuredCaption');
+  const headingEl  = document.getElementById('featuredHeading');
+  const bodyEl     = document.getElementById('featuredBody');
+  const mediumEl   = document.getElementById('featuredMedium');
+  const editionEl  = document.getElementById('featuredEdition');
+  const sizesEl    = document.getElementById('featuredSizes');
+  const viewBtn    = document.getElementById('featuredViewBtn');
+
+  if (!p) {
+    // Nothing selected or product not found — hide the section
+    const sec = document.getElementById('featuredSection');
+    if (sec) sec.style.display = 'none';
+    return;
+  }
+
+  const sec = document.getElementById('featuredSection');
+  if (sec) sec.style.display = '';
+
+  // Image
+  const img = normalizeImg(p.image);
+  if (imgEl) { imgEl.src = img || '/images/monostudy.png'; imgEl.alt = p.name; }
+
+  // Link: goes to slug page if available, otherwise scrolls to the product grid
+  const dest = p.slug ? `/shop/${p.slug}` : null;
+  if (imgLinkEl) {
+    if (dest) { imgLinkEl.href = dest; imgLinkEl.removeAttribute('onclick'); }
+    else { imgLinkEl.href = '#shopGrid'; imgLinkEl.setAttribute('onclick', "event.preventDefault();document.getElementById('shopGrid').scrollIntoView({behavior:'smooth'})"); }
+  }
+  if (viewBtn) {
+    if (dest) { viewBtn.href = dest; viewBtn.style.display = ''; }
+    else { viewBtn.style.display = 'none'; }
+  }
+
+  // Text
+  if (headingEl) headingEl.textContent = p.name;
+  if (bodyEl) bodyEl.textContent = p.desc || '';
+  if (captionEl) {
+    const options = availablePrintOptions(p);
+    captionEl.textContent = options.length > 1
+      ? `Available as ${options.map(o => o.type).join(', ')}`
+      : p.category === 'prints' ? 'Available as a fine art print' : '';
+  }
+
+  // Meta
+  if (mediumEl) mediumEl.textContent = p.medium || (p.category === 'prints' ? 'Fine art print' : p.category);
+  if (editionEl) {
+    const edMap = { one_of_one: 'Unique Work · 1/1', limited: 'Limited Edition', open: 'Open Edition · Hand-signed' };
+    editionEl.textContent = edMap[p.print_edition] || (p.is_sold ? 'Sold' : 'Available');
+  }
+  if (sizesEl) {
+    const choices = availablePrintChoices(p);
+    if (choices.length > 1) {
+      const prices = choices.map(c => productPrice(p, c.key, 'ngn')).filter(Boolean);
+      sizesEl.textContent = prices.length ? `From ${fmt(Math.min(...prices))}` : `${choices.length} options`;
+    } else if (choices.length === 1) {
+      sizesEl.textContent = fmt(productPrice(p, choices[0].key, 'ngn'));
+    } else {
+      sizesEl.textContent = '';
+    }
+  }
+}
+
 function renderProducts() {
   SHOP_CONFIG.products = (SHOP_CONFIG.products || []).filter(p => p && p.active !== false).map(normalizeProduct);
+  renderFeaturedSection();
   const grids = {
     prints: document.getElementById('printsGrid'),
     merch: document.getElementById('merchGrid'),
@@ -3692,22 +4033,49 @@ function recommendedCartProducts(limit = 3) {
 }
 
 function renderCartRecommendations() {
-  const recs = recommendedCartProducts(3);
+  const recs = recommendedCartProducts(6); // show up to 6 in carousel
   if (!recs.length) return '';
+  const cards = recs.map(({ p, choice, priceNgn, priceUsd }) => {
+    const img = normalizeImg(p.image);
+    const slugLink = p.slug ? `/shop/${p.slug}` : null;
+    const nameHtml = slugLink
+      ? `<a href="${slugLink}" class="cart-rec-name" style="color:inherit;text-decoration:none">${escapeText(p.name)}</a>`
+      : `<div class="cart-rec-name">${escapeText(p.name)}</div>`;
+    return `
+      <div class="cart-rec-card">
+        ${slugLink
+          ? `<a href="${slugLink}" class="cart-rec-img" style="display:flex">${img ? `<img src="${img}" alt="${escapeAttr(p.name)}"/>` : (p.emoji || '🖼')}</a>`
+          : `<div class="cart-rec-img">${img ? `<img src="${img}" alt="${escapeAttr(p.name)}"/>` : (p.emoji || '🖼')}</div>`}
+        <div class="cart-rec-body">
+          ${nameHtml}
+          <div class="cart-rec-meta">${escapeText(choice.label)}</div>
+          <div class="cart-rec-price">${priceNgn ? fmt(priceNgn) : priceUsd ? `$${priceUsd}` : ''}</div>
+        </div>
+        <button class="cart-rec-add" type="button" data-pid="${escapeAttr(p.id)}" data-v="${escapeAttr(choice.key)}" title="Add to bag">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>
+          Add to bag
+        </button>
+      </div>`;
+  }).join('');
+
   return `<div class="cart-recommendations">
     <div class="cart-rec-head"><span>These would suit beautifully</span></div>
-    <div class="cart-rec-grid">
-      ${recs.map(({ p, choice, priceNgn, priceUsd }) => `
-        <div class="cart-rec-card">
-          <div class="cart-rec-img">${normalizeImg(p.image) ? `<img src="${normalizeImg(p.image)}" alt="${escapeAttr(p.name)}"/>` : (p.emoji || '')}</div>
-          <div>
-            <div class="cart-rec-name">${escapeText(p.name)}</div>
-            <div class="cart-rec-meta">${choice.label}${priceNgn ? ` - ${fmt(priceNgn)}` : priceUsd ? ` - $${priceUsd}` : ''}</div>
-          </div>
-          <button class="cart-rec-add" type="button" data-pid="${escapeAttr(p.id)}" data-v="${escapeAttr(choice.key)}" title="Add to bag">+</button>
-        </div>`).join('')}
+    <div class="cart-rec-carousel" id="cartRecCarousel">
+      <button class="cart-rec-arrow prev" id="cartRecPrev" aria-label="Previous">&#8249;</button>
+      <div class="cart-rec-track" id="cartRecTrack">${cards}</div>
+      <button class="cart-rec-arrow next" id="cartRecNext" aria-label="Next">&#8250;</button>
     </div>
   </div>`;
+}
+
+function initCartCarousel() {
+  const track = document.getElementById('cartRecTrack');
+  const prev  = document.getElementById('cartRecPrev');
+  const next  = document.getElementById('cartRecNext');
+  if (!track || !prev || !next) return;
+  const scrollBy = () => track.querySelector('.cart-rec-card')?.offsetWidth + 10 || 160;
+  prev.addEventListener('click', () => track.scrollBy({ left: -scrollBy(), behavior: 'smooth' }));
+  next.addEventListener('click', () => track.scrollBy({ left:  scrollBy(), behavior: 'smooth' }));
 }
 
 function refreshCheckoutPricing() {
@@ -3834,6 +4202,7 @@ function updateCartUI() {
       if (p) addToCart(p, b.dataset.v);
     });
   });
+  initCartCarousel();
 
   // Keep the displayed crypto amount in sync with the order. The cached rate
   // recomputes instantly against the new total, so the figure tracks the cart
@@ -4016,8 +4385,8 @@ const COMPLIMENTARY_SHIPPING_USD = 500;
 const SHIPPING_DIM_DIVISOR = 5000;
 const SHIPPING_BUFFER = 1.2;
 const LARGE_PRINT_VARIANTS = ['12x16"','12x18"','18x24"','24x36"'];
-let _deliveryMethod = 'ship';
-let _deliveryZone = '';
+let _deliveryMethod = 'pickup';
+let _deliveryZone = 'pickup';
 let _deliveryCarrier = '';
 
 function isInternationalZone(zone) {
@@ -4159,7 +4528,7 @@ function intlRate(zone, isLarge, carrier = selectedIntlCarrier(zone)) {
   return rateForBillableWeight(zone, carrier);
 }
 function deliveryFeeNgn() {
-  if (!_deliveryZone) return 0;
+  if (_deliveryMethod === 'pickup' || !_deliveryZone) return 0;
   if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 0;
   const r = DELIVERY_RATES[_deliveryZone];
   if (!r) return 0;
@@ -4168,7 +4537,7 @@ function deliveryFeeNgn() {
   return Math.round(intlRate(_deliveryZone, isLarge) * 1600);
 }
 function deliveryFeeUsd() {
-  if (!_deliveryZone) return 0;
+  if (_deliveryMethod === 'pickup' || !_deliveryZone) return 0;
   if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 0;
   const r = DELIVERY_RATES[_deliveryZone];
   if (!r) return 0;
@@ -4183,7 +4552,7 @@ function deliveryFeeDisplay(carrier = selectedIntlCarrier(_deliveryZone)) {
   if (!_deliveryZone) return 'TBD';
   const r = DELIVERY_RATES[_deliveryZone];
   if (!r) return 'TBD';
-  if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 'Complimentary';
+  if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD && _deliveryMethod === 'ship') return 'Complimentary';
   const isLarge = cartHasLargePrint();
   if (r.small !== undefined) return fmt((isLarge ? r.large : r.small).ngn);
   const usd = intlRate(_deliveryZone, isLarge, carrier);
@@ -4196,11 +4565,18 @@ function deliveryFeeForCarrier(carrier) {
 }
 
 function setDeliveryMethod(method) {
-  _deliveryMethod = 'ship';
-  const shippingFields = document.getElementById('shippingFields');
-  if (shippingFields) shippingFields.style.display = '';
-  _deliveryZone = document.getElementById('ckCountry')?.value || '';
-  if (!_deliveryCarrier) _deliveryCarrier = preferredCarrier(_deliveryZone);
+  _deliveryMethod = method;
+  document.getElementById('pickupBtn').classList.toggle('active', method === 'pickup');
+  document.getElementById('shipBtn').classList.toggle('active', method === 'ship');
+  document.getElementById('shippingFields').style.display = method === 'ship'   ? '' : 'none';
+  document.getElementById('pickupFields').style.display   = method === 'pickup' ? '' : 'none';
+  if (method === 'pickup') {
+    _deliveryZone = '';
+    _deliveryCarrier = '';
+  } else {
+    _deliveryZone = document.getElementById('ckCountry').value || '';
+    if (!_deliveryCarrier) _deliveryCarrier = preferredCarrier(_deliveryZone);
+  }
   updateShippingFieldGroups();
   updateDeliveryEstimate();
   buildOrderSummary();
@@ -4209,7 +4585,7 @@ function setDeliveryMethod(method) {
 function updateDeliveryEstimate() {
   const el    = document.getElementById('deliveryEstimate');
   const zone  = _deliveryZone;
-  if (!zone) {
+  if (!zone || _deliveryMethod === 'pickup') {
     el.style.display = 'none';
     return;
   }
@@ -4274,8 +4650,8 @@ function updateShippingFieldGroups() {
   const ups = document.getElementById('upsFields');
   const isNigeria = _deliveryZone && _deliveryZone.startsWith('NG-');
   const isIntl = _deliveryZone && _deliveryZone !== 'pickup' && !isNigeria;
-  if (gig) gig.style.display = isNigeria ? '' : 'none';
-  if (ups) ups.style.display = isIntl ? '' : 'none';
+  if (gig) gig.style.display = (_deliveryMethod === 'ship' && isNigeria) ? '' : 'none';
+  if (ups) ups.style.display = (_deliveryMethod === 'ship' && isIntl)   ? '' : 'none';
 }
 
 // Wire up country selector
@@ -4289,8 +4665,8 @@ document.getElementById('ckCountry') && document.getElementById('ckCountry').add
   buildOrderSummary();
 });
 
-// Delivery is now the only checkout flow.
-setDeliveryMethod('ship');
+// Init pickup as default active
+setDeliveryMethod('pickup');
 
 /* ─── Updated total helpers (include delivery) ─── */
 function cartNgnTotal() { return cart.reduce((a,c)=>a+c.priceNgn*c.qty, 0); }
@@ -4312,10 +4688,16 @@ function openCheckout(defaultTab) {
 }
 
 function buildOrderSummary() {
-  const lines = cart.map(c=>`
+  const lines = cart.map(c => {
+    const thumbHtml = c.image
+      ? `<div class="order-line-thumb"><img src="${c.image}" alt="${escapeAttr(c.name)}" onerror="this.style.display='none'"/></div>`
+      : `<div class="order-line-thumb">${c.emoji || '🖼'}</div>`;
+    return `
     <div class="order-line item">
+      ${thumbHtml}
       <div class="order-line-main">
-        <div class="order-line-name">${c.name} · ${c.variant}</div>
+        <div class="order-line-name">${escapeText(c.name)}</div>
+        <div class="order-line-variant">${escapeText(c.variant)}</div>
         <div class="order-line-controls">
           <button type="button" class="qty-btn order-qty-btn" data-key="${cartDomKey(c.key)}" data-dir="-1">−</button>
           <span class="qty-val">${c.qty}</span>
@@ -4323,23 +4705,34 @@ function buildOrderSummary() {
         </div>
       </div>
       <span class="order-line-price">${fmt(c.priceNgn * c.qty)}</span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
-  const deliveryLine = _deliveryZone
+  const deliveryLine = _deliveryZone && _deliveryZone !== 'pickup' && _deliveryMethod === 'ship'
     ? `<div class="order-line">
         <span>Delivery${isInternationalZone(_deliveryZone) ? ` - ${carrierLabel(selectedIntlCarrier(_deliveryZone))}` : ''}${cartHasLargePrint() ? ' (tube)' : ''}</span>
         <span>${deliveryFeeDisplay()}</span>
        </div>`
-    : `<div class="order-line"><span>Delivery</span><span style="color:#6b7c5c">Select country / region</span></div>`;
+    : `<div class="order-line"><span>Delivery</span><span style="color:#6b7c5c">Free — Kaduna pickup</span></div>`;
 
-  document.getElementById('orderSummary').innerHTML = `
-    <p class="order-summary-label">Order summary</p>
-    ${lines}
+  const totalsHtml = `
     ${deliveryLine}
     <div class="order-total">
       <span class="order-total-label">Total</span>
       <span class="order-total-val">${fmt(grandTotalNgn())} <span style="font-size:0.78rem;color:var(--text-muted)">/ $${grandTotalUsd().toFixed(0)}</span></span>
     </div>`;
+
+  // Desktop: populate the right-side order summary column
+  const colItems = document.getElementById('orderSummaryItems');
+  const colTotals = document.getElementById('orderSummaryTotals');
+  if (colItems) colItems.innerHTML = lines;
+  if (colTotals) colTotals.innerHTML = totalsHtml;
+
+  // Mobile fallback: hidden on desktop, shown on narrow screens
+  document.getElementById('orderSummary').innerHTML = `
+    <p class="order-summary-label">Order summary</p>
+    ${lines}
+    ${totalsHtml}`;
 
   document.querySelectorAll('.order-qty-btn').forEach(b=>{
     b.addEventListener('click',()=>{
@@ -4353,8 +4746,9 @@ function buildOrderSummary() {
 function switchPayTab(tab) {
   document.querySelectorAll('.pay-tab').forEach(t=>t.classList.toggle('active', t.dataset.pay===tab));
   document.querySelectorAll('.pay-panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+tab));
-  // Price-lock lifecycle: crypto tabs lock a price + create the pending order on
-  // open; leaving crypto stops the countdown.
+  // Update new radio-style payment method UI
+  document.querySelectorAll('.ck-pay-method').forEach(m=>m.classList.toggle('active', m.dataset.pay===tab));
+  // Price-lock lifecycle
   if (tab === 'tezos' || tab === 'eth') {
     startLock(tab);
   } else {
@@ -4383,6 +4777,7 @@ function gv(id) { const el = document.getElementById(id); return el ? el.value.t
 // Assemble a single human-readable address string from the carrier-specific
 // fields, plus structured pieces for the order record.
 function buildShippingAddress() {
+  if (_deliveryMethod === 'pickup') return { address: 'Collection — arrange with Kay', parts: {} };
   if (_deliveryZone && _deliveryZone.startsWith('NG-')) {
     // Derive state label from the selected option text in the country dropdown
     const countryEl = document.getElementById('ckCountry');
@@ -4407,8 +4802,8 @@ function getFormData() {
     phone:          gv('ckPhone'),
     address:        shipping.address,
     addressParts:   shipping.parts,
-    country:        countryEl ? (countryEl.options[countryEl.selectedIndex]?.text || '') : '',
-    deliveryMethod: 'ship',
+    country:        _deliveryMethod === 'pickup' ? 'Nigeria (Kaduna pickup)' : (countryEl ? (countryEl.options[countryEl.selectedIndex]?.text || '') : ''),
+    deliveryMethod: _deliveryMethod,
     deliveryZone:   _deliveryZone,
     deliveryCarrier: isInternationalZone(_deliveryZone) ? selectedIntlCarrier(_deliveryZone) : '',
     orderNote:      cartOrderNote,
@@ -4423,18 +4818,21 @@ function validateForm() {
   if (!d.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) { showToast('Please enter a valid email address'); return false; }
   const phoneDigits = (d.phone || '').replace(/[^\d]/g, '');
   if (phoneDigits.length < 7) { showToast('Please enter a phone number we can reach you on'); return false; }
-  if (!_deliveryZone) { showToast('Please select your country'); return false; }
-  if (_deliveryZone.startsWith('NG-')) {
-    // GIG Logistics required fields.
-    if (!document.getElementById('ckCountry')?.value) { showToast('Please select your state / region'); return false; }
-    if (!gv('ckGigCity'))  { showToast('Please enter your city or town'); return false; }
-    if (gv('ckGigStreet').length < 4) { showToast('Please enter your full street address'); return false; }
-  } else {
-    // UPS/DHL required fields (international).
-    if (gv('ckUpsLine1').length < 4) { showToast('Please enter your street address'); return false; }
-    if (!gv('ckUpsCity'))  { showToast('Please enter your city'); return false; }
-    if (!gv('ckUpsState')) { showToast('Please enter your state or province'); return false; }
-    if (!gv('ckUpsPostal')) { showToast('Please enter your postal / ZIP code'); return false; }
+
+  if (_deliveryMethod === 'ship') {
+    if (!_deliveryZone) { showToast('Please select your country'); return false; }
+    if (_deliveryZone.startsWith('NG-')) {
+      // GIG Logistics required fields.
+      if (!document.getElementById('ckCountry')?.value) { showToast('Please select your state / region'); return false; }
+      if (!gv('ckGigCity'))  { showToast('Please enter your city or town'); return false; }
+      if (gv('ckGigStreet').length < 4) { showToast('Please enter your full street address'); return false; }
+    } else {
+      // UPS required fields (international).
+      if (gv('ckUpsLine1').length < 4) { showToast('Please enter your street address'); return false; }
+      if (!gv('ckUpsCity'))  { showToast('Please enter your city'); return false; }
+      if (!gv('ckUpsState')) { showToast('Please enter your state or province'); return false; }
+      if (!gv('ckUpsPostal')) { showToast('Please enter your postal / ZIP code'); return false; }
+    }
   }
   return true;
 }
@@ -4660,8 +5058,8 @@ async function createPendingOrder(customer, method, checkoutQuote) {
 async function confirmPendingOrder(orderRef, opts) {
   const payload = Object.assign({ order_ref: orderRef, order_hash: orderRef }, opts);
   // Tezos/ETH indexers can lag behind a just-broadcast tx. Keep each server call
-  // short, but let the browser retry for about ten minutes before giving up.
-  const maxAttempts = 120;
+  // short, but let the browser retry for about three minutes before giving up.
+  const maxAttempts = 36;
   const RETRY_MS = 5000;
   let lastErr = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -4683,7 +5081,7 @@ async function confirmPendingOrder(orderRef, opts) {
       if (res.ok) return data;
       if (res.status === 409 && /confirm|not confirmed|waiting|found/i.test(data.error || '') && attempt < maxAttempts) {
         lastErr = new Error(data.error || 'Awaiting on-chain confirmation');
-        if (typeof showToast === 'function' && attempt === 1) showToast('Payment found - waiting for blockchain confirmations...');
+        if (typeof showToast === 'function' && attempt === 1) showToast('Payment sent - confirming on-chain, please wait...');
         await new Promise(r => setTimeout(r, RETRY_MS));
         continue;
       }
@@ -4744,7 +5142,7 @@ function renderLockUI(method) {
   box.style.display = 'block';
   const amtEl = document.getElementById(ids.amt);
   const refEl = document.getElementById(ids.ref);
-  if (amtEl) amtEl.textContent = (lock.quote?.crypto_amount || '-') + ' ' + lockMethodToAsset(method);
+  if (amtEl) amtEl.textContent = (lock.quote?.crypto_amount - '—') + ' ' + lockMethodToAsset(method);
   if (refEl) refEl.textContent = lock.order_ref || '—';
 }
 
@@ -4822,7 +5220,9 @@ async function notifyOrder(customer, ref, method, checkoutQuote = null) {
   const quotedTotalNgn = checkoutQuote?.total_ngn - grandTotalNgn();
   const quotedTotalUsd = checkoutQuote?.total_usd - grandTotalUsd();
   const carrierInfo = customer.deliveryCarrier ? `${carrierLabel(customer.deliveryCarrier)}; ` : '';
-  const deliveryInfo = `${carrierInfo}Ship to: ${customer.address}, ${customer.country}, Fee: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}${cartHasLargePrint() ? ' (tube)' : ''}`;
+  const deliveryInfo = customer.deliveryMethod === 'pickup'
+    ? 'Collection (arrange with Kay)'
+    : `${carrierInfo}Ship to: ${customer.address}, ${customer.country}, Fee: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}${cartHasLargePrint() ? ' (tube)' : ''}`;
 
   // 1. Record order in Supabase — decrements stock.
   //    Crypto verification can race ahead of chain indexing (tzkt / ETH RPC
@@ -4941,7 +5341,40 @@ document.getElementById('adminLoginBtn').addEventListener('click', async ()=>{
 function loadAdminConfig() {
   // addresses are hardcoded and shown read-only in the admin panel
   populatePrintPageSelector();
+  populateFeaturedSelector();
 }
+
+/* ─── Featured product selector ─── */
+function populateFeaturedSelector() {
+  const sel = document.getElementById('cfgFeaturedProduct');
+  if (!sel) return;
+  const prints = SHOP_CONFIG.products.filter(p => p.category === 'prints' && !p._isSample);
+  sel.innerHTML = '<option value="">— None (hide the featured section) —</option>' +
+    prints.map(p => `<option value="${p.id}"${SHOP_CONFIG.featured_product_id === p.id ? ' selected' : ''}>${escapeText(p.name)}${p.slug ? ' (/shop/'+p.slug+')' : ''}</option>`).join('');
+  updateFeaturedPreview(SHOP_CONFIG.featured_product_id);
+}
+
+function updateFeaturedPreview(id) {
+  const preview = document.getElementById('cfgFeaturedPreview');
+  const thumb   = document.getElementById('cfgFeaturedThumb');
+  const name    = document.getElementById('cfgFeaturedName');
+  const slug    = document.getElementById('cfgFeaturedSlug');
+  if (!preview) return;
+  const p = id ? SHOP_CONFIG.products.find(x => x.id === id) : null;
+  if (!p) { preview.style.display = 'none'; return; }
+  preview.style.display = 'flex';
+  if (thumb) { thumb.src = normalizeImg(p.image) || ''; thumb.style.display = p.image ? '' : 'none'; }
+  if (name) name.textContent = p.name;
+  if (slug) slug.textContent = p.slug ? `/shop/${p.slug}` : 'No slug set — visitors won\'t be linked to a detail page';
+}
+
+document.addEventListener('change', function(e) {
+  if (e.target && e.target.id === 'cfgFeaturedProduct') {
+    SHOP_CONFIG.featured_product_id = e.target.value;
+    updateFeaturedPreview(e.target.value);
+    renderFeaturedSection();
+  }
+});
 
 /* ─── Print page editor ─── */
 function slugify(s) {
@@ -5492,6 +5925,10 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
   btn.disabled = true; btn.textContent = 'Saving…';
 
   try {
+    // ── Capture featured product selection ──────────────────────────────
+    const featuredSel = document.getElementById('cfgFeaturedProduct');
+    if (featuredSel) SHOP_CONFIG.featured_product_id = featuredSel.value || '';
+
     // ── Read and save each product ──────────────────────────────────────
     document.querySelectorAll('.admin-product-row').forEach(row => {
       const idx = Number(row.dataset.idx);
@@ -5659,9 +6096,10 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
       body: JSON.stringify({
-        eth_address:   SHOP_CONFIG.ethAddress,
-        tezos_address: SHOP_CONFIG.tezosAddress,
-        announcement:  SHOP_CONFIG.announcement || '',
+        eth_address:          SHOP_CONFIG.ethAddress,
+        tezos_address:        SHOP_CONFIG.tezosAddress,
+        announcement:         SHOP_CONFIG.announcement || '',
+        featured_product_id:  SHOP_CONFIG.featured_product_id || '',
       }),
     });
     if (!cfgRes.ok) {
@@ -5671,7 +6109,7 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
 
     renderProducts();
     populatePrintPageSelector();
-    if (typeof buildOrderSummary === 'function') buildOrderSummary();
+    populateFeaturedSelector();
     showToast('Saved ✦');
     closeAdmin();
   } catch (e) {
@@ -6497,8 +6935,9 @@ async function loadShopData() {
 
     if (configRes.ok) {
       const cfg = await configRes.json();
-      if (cfg.eth_address)   SHOP_CONFIG.ethAddress   = cfg.eth_address;
-      if (cfg.tezos_address) SHOP_CONFIG.tezosAddress = cfg.tezos_address;
+      if (cfg.eth_address)          SHOP_CONFIG.ethAddress          = cfg.eth_address;
+      if (cfg.tezos_address)        SHOP_CONFIG.tezosAddress        = cfg.tezos_address;
+      if (cfg.featured_product_id)  SHOP_CONFIG.featured_product_id = cfg.featured_product_id;
     }
   } catch (e) {
     // API not reachable or tables don't exist yet — use hardcoded defaults
