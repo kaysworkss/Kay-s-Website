@@ -4417,9 +4417,27 @@ let _deliveryCarrier = '';
 function isInternationalZone(zone) {
   return !!zone && zone !== 'pickup' && !zone.startsWith('NG-');
 }
+function zoneFromCountryText(text) {
+  const value = String(text || '').toLowerCase();
+  if (!value || value.includes('select')) return '';
+  if (value.includes('nigeria') || value.includes('kaduna') || value.includes('abuja') || value.includes('lagos')) return _deliveryZone || 'NG-KD';
+  if (/(united states|canada)/i.test(value)) return 'NA';
+  if (/(ghana|benin|togo|senegal|ivory|ivoire|niger|cameroon)/i.test(value)) return 'WA';
+  if (/(united kingdom|germany|france|netherlands|italy|spain|sweden|norway|denmark|switzerland|belgium|austria|poland|portugal|ireland)/i.test(value)) return 'EU';
+  if (/(australia|new zealand|japan|korea|singapore|india|china|emirates|uae)/i.test(value)) return 'AO';
+  return 'ROW';
+}
+function fallbackDeliveryZoneFromAddress() {
+  const hasIntlAddress = ['ckUpsLine1','ckUpsCity','ckUpsState','ckUpsPostal'].some(id => gv(id));
+  if (hasIntlAddress) return 'ROW';
+  const hasNigeriaAddress = ['ckGigCity','ckGigStreet'].some(id => gv(id));
+  if (hasNigeriaAddress) return 'NG-KD';
+  return '';
+}
 function syncDeliveryZoneFromForm() {
   const el = document.getElementById('ckCountry');
-  const zone = el?.value || _deliveryZone || '';
+  const selectedText = el ? (el.options[el.selectedIndex]?.text || '') : '';
+  const zone = el?.value || el?.selectedOptions?.[0]?.value || zoneFromCountryText(selectedText) || _deliveryZone || fallbackDeliveryZoneFromAddress();
   if (zone !== _deliveryZone) {
     _deliveryZone = zone;
     _deliveryCarrier = preferredCarrier(_deliveryZone);
@@ -4883,7 +4901,7 @@ function checkoutPayload(customer, method, extra = {}) {
       qty: c.qty,
     })),
     delivery_method:  customer.deliveryMethod,
-    delivery_zone:    customer.deliveryZone,
+    delivery_zone:    customer.deliveryZone || syncDeliveryZoneFromForm(),
     delivery_carrier: customer.deliveryCarrier || '',
     order_note:       customer.orderNote || '',
     payment_method:   method,
@@ -4927,6 +4945,7 @@ function checkoutQuoteReady(customer, silent = false) {
     if (!silent) showToast('Select your delivery country before confirming payment');
     return false;
   }
+  if (customer && !customer.deliveryZone) customer.deliveryZone = zone;
   return true;
 }
 
