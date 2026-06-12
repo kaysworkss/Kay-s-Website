@@ -1090,7 +1090,8 @@ async function fetchServerCryptoPrice(asset) {
   const symbol = asset === 'xtz' ? 'XTZUSDT' : 'ETHUSDT';
   const coingeckoId = asset === 'xtz' ? 'tezos' : 'ethereum';
   const coinbasePair = asset === 'xtz' ? 'XTZ-USD' : 'ETH-USD';
-  const TIMEOUT_MS = 5000;
+  const TIMEOUT_MS = 7000; // raised from 3500 — Netlify cold starts + slow upstreams
+  const errors = [];
 
   async function withTimeout(promise, ms) {
     return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
@@ -1120,29 +1121,13 @@ async function fetchServerCryptoPrice(asset) {
     return price;
   }
 
-  // Race all three — return whichever responds first with a valid price.
-  // This means quotes arrive in ~1-2s instead of waiting for all sources.
-  const errors = [];
-  const result = await Promise.race(
-    [
-      ['binance', binance],
-      ['coingecko', coingecko],
-      ['coinbase', coinbase],
-    ].map(([name, fn]) =>
-      fn().catch(e => {
-        errors.push(`${name}: ${e?.message}`);
-        return null;
-      })
-    ).concat([
-      // Fallback: if the fastest source errors immediately, wait for any success
-      Promise.allSettled([binance(), coingecko(), coinbase()]).then(results => {
-        for (const r of results) if (r.status === 'fulfilled' && r.value > 0) return r.value;
-        return null;
-      }),
-    ])
-  );
-
-  if (result && result > 0) return result;
+  // Try each source; collect errors so a total failure is diagnosable in logs.
+  const sources = [['binance', binance], ['coingecko', coingecko], ['coinbase', coinbase]];
+  const settled = await Promise.allSettled(sources.map(([, fn]) => fn()));
+  for (let i = 0; i < settled.length; i++) {
+    if (settled[i].status === 'fulfilled' && settled[i].value > 0) return settled[i].value;
+    errors.push(`${sources[i][0]}: ${settled[i].reason?.message || settled[i].reason}`);
+  }
   console.error(`[shop-quote] all crypto price sources failed for ${asset}:`, errors.join(' | '));
   return null;
 }
@@ -1267,25 +1252,13 @@ async function ethRpc(method, params = []) {
     err.statusCode = 503;
     throw err;
   }
-  let r, data;
-  try {
-    r = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
-    });
-    data = await r.json().catch(() => ({}));
-  } catch (networkErr) {
-    // RPC unreachable — treat as "not confirmed yet" so browser keeps retrying
-    const e = new Error('Transaction is not confirmed yet — RPC temporarily unreachable');
-    e.statusCode = 409;
-    throw e;
-  }
-  if (!r.ok || data.error) {
-    const e = new Error('Transaction is not confirmed yet — RPC error: ' + (data.error?.message || r.status));
-    e.statusCode = 409;
-    throw e;
-  }
+  const r = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok || data.error) throw new Error(data.error?.message || `Ethereum RPC ${method} failed`);
   return data.result;
 }
 
@@ -1375,7 +1348,7 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
   );
   let list = [];
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
+  const timer = setTimeout(() => controller.abort(), 4500);
   try {
     const r = await fetch(`${api}/v1/operations/${encodeURIComponent(opHash)}`, {
       headers: { Accept: 'application/json' },
@@ -1388,17 +1361,15 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
     }
     const data = await r.json().catch(() => null);
     if (!r.ok) {
-      // Indexer error — treat as "not yet confirmed" so browser keeps retrying
-      const e = new Error('Transaction is not confirmed yet — indexer temporarily unavailable');
-      e.statusCode = 409;
+      const e = new Error(`Could not reach TzKT operation lookup: HTTP ${r.status}`);
+      e.statusCode = 502;
       throw e;
     }
     list = operationRows(data);
   } catch (err) {
     if (err.statusCode) throw err;
-    // Network error or abort (timeout waiting for indexer) — keep retrying
-    const e = new Error('Transaction is not confirmed yet — waiting for indexer');
-    e.statusCode = 409;
+    const e = new Error(`Could not reach TzKT operation lookup: ${err.message || err}`);
+    e.statusCode = 502;
     throw e;
   } finally {
     clearTimeout(timer);
@@ -1629,10 +1600,11 @@ async function claimVariantStock(supabase, item) {
     e.statusCode = 500;
     throw e;
   }
-  // The RPC returns true = stock decremented OK.
-  // It returns false when no stock_by_variant row exists for this variant key,
-  // which means the product has no per-variant stock limit (open edition /
-  // unlimited). Treat false as ok=true — not sold out, just untracked.
+  // RPC returns true  → stock decremented successfully.
+  // RPC returns false → no stock_by_variant row exists for this variant key,
+  //                     meaning the product has no per-variant stock limit
+  //                     (open edition). Use adjustVariantStockDirect which
+  //                     returns { ok: true } when stock fields are null/absent.
   if (data === false) {
     return adjustVariantStockDirect(supabase, item, -Math.abs(Number(item.qty) || 1));
   }
