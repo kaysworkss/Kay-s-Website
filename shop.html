@@ -4681,6 +4681,10 @@ document.getElementById('ckCountry') && document.getElementById('ckCountry').add
   updateShippingFieldGroups();
   updateDeliveryEstimate();
   buildOrderSummary();
+  const activeCryptoTab = document.querySelector('.pay-tab.active')?.dataset.pay;
+  if ((activeCryptoTab === 'eth' || activeCryptoTab === 'tezos') && checkoutQuoteReady(getFormData(), true)) {
+    startLock(activeCryptoTab);
+  }
 });
 
 // Delivery is now the only checkout flow.
@@ -4893,11 +4897,25 @@ async function postShopJson(url, payload) {
   if (window.__renderShopDiag) window.__renderShopDiag();
   // ── END DIAGNOSTIC CAPTURE ──
   if (window.__shopLoadDone) window.__shopLoadDone();
-  if (!res.ok) throw new Error(data.error || `${url} failed`);
+  if (!res.ok) {
+    const friendly = data.error || (url.includes('/api/shop/quote') ? 'Select your delivery country before confirming payment' : `${url} failed`);
+    throw new Error(friendly);
+  }
   return data;
 }
 
+function checkoutQuoteReady(customer, silent = false) {
+  if (!customer?.deliveryZone) {
+    if (!silent) showToast('Select your delivery country before confirming payment');
+    return false;
+  }
+  return true;
+}
+
 async function getServerCheckoutQuote(customer, method, extra = {}) {
+  if (!checkoutQuoteReady(customer, true)) {
+    throw new Error('Select your delivery country before confirming payment');
+  }
   return postShopJson('/api/shop/quote', checkoutPayload(customer, method, extra));
 }
 
@@ -5012,6 +5030,7 @@ async function submitManualCrypto(chain) {
       orderRef = window.__activeLock.order_ref;
     }
     if (!orderRef) {
+      if (!checkoutQuoteReady(getFormData(), false)) return;
       showToast('Enter the existing order hash from the locked payment box');
       return;
     }
@@ -5256,6 +5275,12 @@ async function refreshLock(method, silent) {
 // Start the lock lifecycle for a panel (called when the crypto tab opens).
 function startLock(method) {
   stopLockTimer();
+  const d = getFormData();
+  if (!checkoutQuoteReady(d, false)) {
+    window.__activeLock = null;
+    renderLockUI(method);
+    return;
+  }
   refreshLock(method, false);
   _lockTimer = setInterval(updateLockCountdown, 1000);
 }
@@ -5268,7 +5293,7 @@ function stopLockTimer() {
 function relockOnCartChange() {
   const lock = window.__activeLock;
   if (lock && window.__manualCryptoMode === lock.method) return;
-  if (lock && lock.method) refreshLock(lock.method, true);
+  if (lock && lock.method && checkoutQuoteReady(getFormData(), true)) refreshLock(lock.method, true);
 }
 
 
