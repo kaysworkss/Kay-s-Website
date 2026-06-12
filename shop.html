@@ -1094,31 +1094,7 @@ body.dark .cart-note-toggle { color: var(--sand); }
 .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 
 /* Delivery method toggle */
-.ck-delivery-btns {
-  display: flex; gap: 0.5rem; margin-bottom: 1rem;
-}
-.ck-delivery-btn {
-  flex: 1; padding: 0.75rem 1rem;
-  border: 1px solid var(--border); border-radius: 8px;
-  background: transparent; color: var(--text-muted);
-  font-family: 'Cinzel', serif; font-size: 0.52rem;
-  letter-spacing: 0.14em; text-transform: uppercase;
-  transition: border-color 0.2s, color 0.2s, background 0.2s;
-  display: flex; align-items: center; gap: 0.5rem;
-}
-.ck-delivery-btn:hover { border-color: var(--clay); color: var(--clay); }
-.ck-delivery-btn.active {
-  border-color: var(--rust); background: rgba(158,79,46,0.07); color: var(--rust);
-}
-.ck-delivery-btn .ck-radio {
-  width: 14px; height: 14px; border-radius: 50%;
-  border: 1.5px solid currentColor; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-}
-.ck-delivery-btn.active .ck-radio::after {
-  content: ''; width: 6px; height: 6px; border-radius: 50%;
-  background: var(--rust);
-}
+/* Delivery toggle removed — shipping is the only method */
 
 /* Payment method tabs — redesigned as pill radio buttons */
 .ck-pay-methods {
@@ -1585,33 +1561,6 @@ body.dark .cart-note-toggle { color: var(--sand); }
 }
 body.dark .toast { background:#2a1c14; }
 .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-
-.chain-wait-overlay {
-  position: fixed; inset: 0; z-index: 620;
-  display: none; align-items: center; justify-content: center;
-  padding: 1.2rem; background: rgba(20,16,16,0.58);
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-}
-.chain-wait-overlay.open { display: flex; }
-.chain-wait-modal {
-  width: min(440px, 100%); background: var(--bg-card); color: var(--text);
-  border: 1px solid var(--border-hover); border-radius: 10px;
-  box-shadow: 0 24px 80px rgba(0,0,0,0.28); padding: 1.4rem;
-}
-.chain-wait-icon {
-  width: 42px; height: 42px; border-radius: 50%; margin-bottom: 1rem;
-  border: 2px solid rgba(196,132,90,0.22); border-top-color: var(--clay);
-  animation: chainWaitSpin 1s linear infinite;
-}
-@keyframes chainWaitSpin { to { transform: rotate(360deg); } }
-.chain-wait-kicker { font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:0.45rem; }
-.chain-wait-title { font-family:'Cormorant Garamond',serif; font-size:1.55rem; line-height:1.1; margin-bottom:0.65rem; }
-.chain-wait-copy { font-size:0.9rem; line-height:1.65; color:var(--text-muted); margin-bottom:1rem; }
-.chain-wait-meta { display:grid; gap:0.55rem; padding:0.85rem; background:var(--bg-alt); border:1px solid var(--border); border-radius:8px; font-family:'Montserrat',sans-serif; font-size:0.68rem; }
-.chain-wait-row { display:flex; justify-content:space-between; gap:1rem; }
-.chain-wait-row span:last-child { color:var(--text); text-align:right; word-break:break-all; }
-.chain-wait-note { margin-top:0.85rem; font-size:0.72rem; line-height:1.55; color:var(--text-muted); }
-
 
 /* ── Footer ── */
 /* ══ Footer ══ */
@@ -2326,7 +2275,7 @@ footer {
   <div class="faq-item">
     <button class="faq-q">Do you deliver within Nigeria?<span class="faq-icon">+</span></button>
     <div class="faq-a"><div class="faq-a-inner">
-      Yes. Nigerian orders ship via <strong>GIG Logistics</strong> to any state. If you'd prefer terminal pickup at a nearby GIG station rather than door delivery, note your preferred station in the street address field.
+      Yes. Nigerian orders ship via <strong>GIG Logistics</strong> to any state. If you'd prefer pickup at a nearby GIG station rather than your door, note it in the address field at checkout.
     </div></div>
   </div>
 
@@ -2474,6 +2423,9 @@ footer {
           <label class="form-label">Phone</label>
           <input class="form-input" id="ckPhone" type="tel" placeholder="+234 …"/>
         </div>
+
+        <!-- Delivery -->
+        <p class="ck-section-title">Delivery</p>
 
         <div id="shippingFields">
           <div class="form-row">
@@ -3068,22 +3020,6 @@ footer {
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
-<div class="chain-wait-overlay" id="chainWaitOverlay" role="status" aria-live="polite" aria-modal="true">
-  <div class="chain-wait-modal">
-    <div class="chain-wait-icon" aria-hidden="true"></div>
-    <div class="chain-wait-kicker">Blockchain confirmation</div>
-    <div class="chain-wait-title" id="chainWaitTitle">Waiting for confirmation</div>
-    <div class="chain-wait-copy" id="chainWaitCopy">Your transaction has been submitted. We are waiting for the blockchain to confirm it before finalising your order.</div>
-    <div class="chain-wait-meta">
-      <div class="chain-wait-row"><strong>Network</strong><span id="chainWaitNetwork">-</span></div>
-      <div class="chain-wait-row"><strong>Status</strong><span id="chainWaitStatus">Preparing check...</span></div>
-      <div class="chain-wait-row"><strong>Attempt</strong><span id="chainWaitAttempt">-</span></div>
-      <div class="chain-wait-row"><strong>Tx hash</strong><span id="chainWaitTx">-</span></div>
-    </div>
-    <div class="chain-wait-note">Please keep this tab open. This can take a few minutes when the network or indexers are still catching up.</div>
-  </div>
-</div>
-
 <!-- Footer -->
 <footer>
   <div class="footer-top">
@@ -3266,11 +3202,6 @@ let SHOP_CONFIG = {
 };
 
 const SHOP_DEFAULT_PRODUCTS = SHOP_CONFIG.products.map(p => JSON.parse(JSON.stringify(p)));
-const SHOP_FALLBACK_PRODUCT_IDS = new Set(SHOP_DEFAULT_PRODUCTS.map(p => String(p.id || '')));
-let shopProductsLoadedFromApi = false;
-function isFallbackProduct(p) {
-  return !!(p && (p._isSample || SHOP_FALLBACK_PRODUCT_IDS.has(String(p.id || ''))));
-}
 
 /* ─── Cart state ─── */
 let cart = [];
@@ -3368,7 +3299,7 @@ function ensureExampleSections() {
     );
     // Drop any leftover samples for this category before re-deciding.
     SHOP_CONFIG.products = SHOP_CONFIG.products.filter(p =>
-      !((p._isSample || SHOP_FALLBACK_PRODUCT_IDS.has(String(p.id || ''))) && (p.category || '') === cat));
+      !(p._isSample && (p.category || '') === cat));
     if (hasReal) return; // category has real items — show no samples
 
     const examples = SHOP_DEFAULT_PRODUCTS.filter(p => p.category === cat);
@@ -4210,7 +4141,7 @@ function updateCartUI() {
   const deliveryUsd = deliveryFeeUsd();
   document.getElementById('cartTotals').innerHTML = `
     <div class="cart-total-row"><span>Subtotal</span><span>${fmt(ngnTotal)}</span></div>
-    <div class="cart-total-row"><span>Delivery</span><span>${_deliveryMethod === 'ship' && _deliveryZone ? deliveryFeeDisplay() : '<span style="color:#6b7c5c">Calculated at checkout</span>'}</span></div>
+    <div class="cart-total-row"><span>Delivery</span><span>${_deliveryZone ? deliveryFeeDisplay() : '<span style="color:var(--text-muted)">Calculated at checkout</span>'}</span></div>
     <div class="cart-total-row grand"><span>Est. Total</span><span>${fmt(ngnTotal)} <span style="font-size:0.75rem;color:var(--text-muted)">+ delivery</span></span></div>`;
 
   // Qty / remove events
@@ -4420,83 +4351,7 @@ let _deliveryZone = '';
 let _deliveryCarrier = '';
 
 function isInternationalZone(zone) {
-  return !!zone && zone !== 'pickup' && !zone.startsWith('NG-');
-}
-function zoneFromCountryText(text) {
-  const value = String(text || '').toLowerCase();
-  if (!value || value.includes('select')) return '';
-  if (value.includes('kaduna')) return 'NG-KD';
-  if (value.includes('abuja') || value.includes('fct')) return 'NG-ABJ';
-  if (/(kano|katsina|niger|plateau|nasarawa|kebbi|sokoto|zamfara)/i.test(value)) return 'NG-NORTH2';
-  if (/(adamawa|bauchi|benue|borno|gombe|jigawa|kogi|kwara|taraba|yobe)/i.test(value)) return 'NG-NORTH3';
-  if (/(ekiti|lagos|ogun|ondo|osun|oyo)/i.test(value)) return 'NG-SW';
-  if (/(abia|akwa|anambra|bayelsa|cross river|delta|ebonyi|edo|enugu|imo|rivers)/i.test(value)) return 'NG-SS';
-  if (value.includes('nigeria')) return 'NG-KD';
-  if (/(united states|canada)/i.test(value)) return 'NA';
-  if (/(ghana|benin|togo|senegal|ivory|ivoire|niger|cameroon)/i.test(value)) return 'WA';
-  if (/(united kingdom|germany|france|netherlands|italy|spain|sweden|norway|denmark|switzerland|belgium|austria|poland|portugal|ireland)/i.test(value)) return 'EU';
-  if (/(australia|new zealand|japan|korea|singapore|india|china|emirates|uae)/i.test(value)) return 'AO';
-  return 'ROW';
-}
-function fieldValue(id) {
-  const el = document.getElementById(id);
-  return el ? String(el.value || '').trim() : '';
-}
-function fallbackDeliveryZoneFromAddress() {
-  const hasIntlAddress = ['ckUpsLine1','ckUpsCity','ckUpsState','ckUpsPostal'].some(id => fieldValue(id));
-  if (hasIntlAddress) return 'ROW';
-  const hasNigeriaAddress = ['ckGigCity','ckGigStreet'].some(id => fieldValue(id));
-  if (hasNigeriaAddress) return 'NG-KD';
-  return '';
-}
-function resolveDeliveryState(options = {}) {
-  const allowConservativeFallback = options.allowConservativeFallback === true;
-  const el = document.getElementById('ckCountry');
-  const selectedOption = el && el.selectedIndex >= 0 ? el.options[el.selectedIndex] : null;
-  const selectedText = selectedOption ? (selectedOption.text || '') : '';
-  let zone = (el && String(el.value || '').trim()) || (selectedOption && String(selectedOption.value || '').trim()) || zoneFromCountryText(selectedText) || fallbackDeliveryZoneFromAddress();
-  if (!zone && allowConservativeFallback) zone = 'ROW';
-  const country = selectedText && !selectedText.toLowerCase().includes('select')
-    ? selectedText
-    : (zone ? (DELIVERY_RATES[zone]?.label || 'Rest of world') : '');
-  return { zone, country };
-}
-function syncDeliveryZoneFromForm(options = {}) {
-  const state = resolveDeliveryState(options);
-  if (state.zone !== _deliveryZone) {
-    _deliveryZone = state.zone;
-    _deliveryCarrier = preferredCarrier(_deliveryZone);
-  }
-  return _deliveryZone;
-}
-function isDeliveryAddressComplete(customer = null) {
-  const zone = customer?.deliveryZone || resolveDeliveryState({ allowConservativeFallback: false }).zone;
-  if (!zone) return false;
-  if (zone.startsWith('NG-')) {
-    return !!(fieldValue('ckGigCity') && fieldValue('ckGigStreet').length >= 4);
-  }
-  return !!(
-    fieldValue('ckUpsLine1').length >= 4 &&
-    fieldValue('ckUpsCity') &&
-    fieldValue('ckUpsState') &&
-    fieldValue('ckUpsPostal')
-  );
-}
-function paymentQuotePendingMessage() {
-  return 'Complete delivery address to calculate final payment quote';
-}
-function refreshDeliveryState() {
-  syncDeliveryZoneFromForm({ allowConservativeFallback: false });
-  updateShippingFieldGroups();
-  updateDeliveryEstimate();
-  if (typeof buildOrderSummary === 'function') buildOrderSummary();
-  const activeCryptoTab = document.querySelector('.pay-tab.active')?.dataset.pay;
-  if ((activeCryptoTab === 'eth' || activeCryptoTab === 'tezos') && checkoutQuoteReady(getFormData(), true)) {
-    startLock(activeCryptoTab);
-  } else if (window.__activeLock && !isDeliveryAddressComplete()) {
-    window.__activeLock = null;
-    renderLockUI(activeCryptoTab || 'eth');
-  }
+  return !!zone && !zone.startsWith('NG-');
 }
 function normalizedSizeLabel(value) {
   return String(value || '').replace(/[xX?]/g, 'x');
@@ -4634,50 +4489,47 @@ function intlRate(zone, isLarge, carrier = selectedIntlCarrier(zone)) {
   return rateForBillableWeight(zone, carrier);
 }
 function deliveryFeeNgn() {
-  const zone = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
-  if (!zone) return 0;
+  if (!_deliveryZone) return 0;
   if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 0;
-  const r = DELIVERY_RATES[zone];
+  const r = DELIVERY_RATES[_deliveryZone];
   if (!r) return 0;
   const isLarge = cartHasLargePrint();
   if (r.small !== undefined) return (isLarge ? r.large : r.small).ngn || 0;
-  return Math.round(intlRate(zone, isLarge) * 1600);
+  return Math.round(intlRate(_deliveryZone, isLarge) * 1600);
 }
 function deliveryFeeUsd() {
-  const zone = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
-  if (!zone) return 0;
+  if (!_deliveryZone) return 0;
   if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 0;
-  const r = DELIVERY_RATES[zone];
+  const r = DELIVERY_RATES[_deliveryZone];
   if (!r) return 0;
   const isLarge = cartHasLargePrint();
   if (r.small !== undefined) {
     const t = isLarge ? r.large : r.small;
     return t.ngn ? +(t.ngn / 1600).toFixed(2) : 0;
   }
-  return intlRate(zone, isLarge);
+  return intlRate(_deliveryZone, isLarge);
 }
-function deliveryFeeDisplay(carrier = selectedIntlCarrier(syncDeliveryZoneFromForm({ allowConservativeFallback: false }))) {
-  const zone = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
-  if (!zone) return 'TBD';
-  const r = DELIVERY_RATES[zone];
+function deliveryFeeDisplay(carrier = selectedIntlCarrier(_deliveryZone)) {
+  if (!_deliveryZone) return 'TBD';
+  const r = DELIVERY_RATES[_deliveryZone];
   if (!r) return 'TBD';
   if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 'Complimentary';
   const isLarge = cartHasLargePrint();
   if (r.small !== undefined) return fmt((isLarge ? r.large : r.small).ngn);
-  const usd = intlRate(zone, isLarge, carrier);
+  const usd = intlRate(_deliveryZone, isLarge, carrier);
   return '$' + usd.toFixed(0) + ' USD (~' + fmt(Math.round(usd * 1600)) + ')';
 }
 function carrierLabel(carrier) { return carrier === 'dhl' ? 'DHL Express' : 'UPS'; }
 function deliveryFeeForCarrier(carrier) {
-  const usd = intlRate(syncDeliveryZoneFromForm({ allowConservativeFallback: false }), cartHasLargePrint(), carrier);
+  const usd = intlRate(_deliveryZone, cartHasLargePrint(), carrier);
   return '$' + usd.toFixed(0) + ' USD';
 }
 
 function setDeliveryMethod(method) {
+  // Shipping is the only delivery method — ignore any 'pickup' calls
   _deliveryMethod = 'ship';
-  const shippingFields = document.getElementById('shippingFields');
-  if (shippingFields) shippingFields.style.display = '';
-  syncDeliveryZoneFromForm({ allowConservativeFallback: false });
+  _deliveryZone = (document.getElementById('ckCountry')?.value) || '';
+  if (!_deliveryCarrier) _deliveryCarrier = preferredCarrier(_deliveryZone);
   updateShippingFieldGroups();
   updateDeliveryEstimate();
   buildOrderSummary();
@@ -4685,7 +4537,7 @@ function setDeliveryMethod(method) {
 
 function updateDeliveryEstimate() {
   const el    = document.getElementById('deliveryEstimate');
-  const zone  = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
+  const zone  = _deliveryZone;
   if (!zone) {
     el.style.display = 'none';
     return;
@@ -4749,21 +4601,24 @@ function updateDeliveryEstimate() {
 function updateShippingFieldGroups() {
   const gig = document.getElementById('gigFields');
   const ups = document.getElementById('upsFields');
-  const zone = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
-  const isNigeria = zone && zone.startsWith('NG-');
-  const isIntl = zone && !isNigeria;
-  if (gig) gig.style.display = isNigeria ? '' : 'none';
-  if (ups) ups.style.display = isIntl ? '' : 'none';
+  const isNigeria = _deliveryZone && _deliveryZone.startsWith('NG-');
+  const isIntl = _deliveryZone && !isNigeria;
+  if (gig) gig.style.display = (_deliveryMethod === 'ship' && isNigeria) ? '' : 'none';
+  if (ups) ups.style.display = (_deliveryMethod === 'ship' && isIntl)   ? '' : 'none';
 }
 
-// Wire up shipping fields so quote/payment state never goes stale.
-['ckCountry','ckGigCity','ckGigStreet','ckUpsLine1','ckUpsLine2','ckUpsCity','ckUpsState','ckUpsPostal'].forEach(id => {
-  const el = document.getElementById(id);
-  if (!el) return;
-  ['change','input','blur'].forEach(evt => el.addEventListener(evt, refreshDeliveryState));
+// Wire up country selector
+document.addEventListener('DOMContentLoaded', () => {});
+// Country change
+document.getElementById('ckCountry') && document.getElementById('ckCountry').addEventListener('change', function() {
+  _deliveryZone = this.value || '';
+  _deliveryCarrier = preferredCarrier(_deliveryZone);
+  updateShippingFieldGroups();
+  updateDeliveryEstimate();
+  buildOrderSummary();
 });
 
-// Delivery is now the only checkout flow.
+// Shipping is the only delivery method — initialise it
 setDeliveryMethod('ship');
 
 /* ─── Updated total helpers (include delivery) ─── */
@@ -4806,13 +4661,12 @@ function buildOrderSummary() {
     </div>`;
   }).join('');
 
-  const summaryZone = syncDeliveryZoneFromForm();
-  const deliveryLine = summaryZone
+  const deliveryLine = _deliveryZone
     ? `<div class="order-line">
-        <span>Delivery${isInternationalZone(summaryZone) ? ` - ${carrierLabel(selectedIntlCarrier(summaryZone))}` : ''}${cartHasLargePrint() ? ' (tube)' : ''}</span>
+        <span>Delivery${isInternationalZone(_deliveryZone) ? ` - ${carrierLabel(selectedIntlCarrier(_deliveryZone))}` : ''}${cartHasLargePrint() ? ' (tube)' : ''}</span>
         <span>${deliveryFeeDisplay()}</span>
        </div>`
-    : `<div class="order-line"><span>Delivery</span><span style="color:#6b7c5c">Select country / region</span></div>`;
+    : `<div class="order-line"><span>Delivery</span><span style="color:var(--text-muted)">Select country to calculate</span></div>`;
 
   const totalsHtml = `
     ${deliveryLine}
@@ -4876,8 +4730,7 @@ function gv(id) { const el = document.getElementById(id); return el ? el.value.t
 // Assemble a single human-readable address string from the carrier-specific
 // fields, plus structured pieces for the order record.
 function buildShippingAddress() {
-  const zone = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
-  if (zone && zone.startsWith('NG-')) {
+  if (_deliveryZone && _deliveryZone.startsWith('NG-')) {
     // Derive state label from the selected option text in the country dropdown
     const countryEl = document.getElementById('ckCountry');
     const stateLabel = countryEl ? (countryEl.options[countryEl.selectedIndex]?.text || '') : '';
@@ -4894,9 +4747,6 @@ function buildShippingAddress() {
 
 function getFormData() {
   const countryEl = document.getElementById('ckCountry');
-  const deliveryState = resolveDeliveryState({ allowConservativeFallback: false });
-  _deliveryZone = deliveryState.zone;
-  if (!_deliveryCarrier) _deliveryCarrier = preferredCarrier(_deliveryZone);
   const shipping = buildShippingAddress();
   return {
     name:           gv('ckName'),
@@ -4904,10 +4754,10 @@ function getFormData() {
     phone:          gv('ckPhone'),
     address:        shipping.address,
     addressParts:   shipping.parts,
-    country:        deliveryState.country || (countryEl ? (countryEl.options[countryEl.selectedIndex]?.text || '') : ''),
-    deliveryMethod: 'ship',
-    deliveryZone:   deliveryState.zone,
-    deliveryCarrier: isInternationalZone(deliveryState.zone) ? selectedIntlCarrier(deliveryState.zone) : '',
+    country:        countryEl ? (countryEl.options[countryEl.selectedIndex]?.text || '') : '',
+    deliveryMethod: _deliveryMethod,
+    deliveryZone:   _deliveryZone,
+    deliveryCarrier: isInternationalZone(_deliveryZone) ? selectedIntlCarrier(_deliveryZone) : '',
     orderNote:      cartOrderNote,
     deliveryFeeNgn: deliveryFeeNgn(),
     deliveryFeeUsd: deliveryFeeUsd(),
@@ -4915,18 +4765,20 @@ function getFormData() {
 }
 function validateForm() {
   const d = getFormData();
-  // Contact details: always required so the carrier and Kay can reach the buyer.
+  // Contact details — always required so the carrier and Kay can reach the buyer.
   if (!d.name || d.name.length < 2) { showToast('Please enter your full name'); return false; }
   if (!d.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) { showToast('Please enter a valid email address'); return false; }
   const phoneDigits = (d.phone || '').replace(/[^\d]/g, '');
   if (phoneDigits.length < 7) { showToast('Please enter a phone number we can reach you on'); return false; }
-  const zone = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
-  if (!zone) { showToast('Please select your country'); return false; }
-  if (zone.startsWith('NG-')) {
+
+  if (!_deliveryZone) { showToast('Please select your country'); return false; }
+  if (_deliveryZone.startsWith('NG-')) {
+    // GIG Logistics required fields.
     if (!document.getElementById('ckCountry')?.value) { showToast('Please select your state / region'); return false; }
     if (!gv('ckGigCity'))  { showToast('Please enter your city or town'); return false; }
     if (gv('ckGigStreet').length < 4) { showToast('Please enter your full street address'); return false; }
   } else {
+    // UPS required fields (international).
     if (gv('ckUpsLine1').length < 4) { showToast('Please enter your street address'); return false; }
     if (!gv('ckUpsCity'))  { showToast('Please enter your city'); return false; }
     if (!gv('ckUpsState')) { showToast('Please enter your state or province'); return false; }
@@ -4948,7 +4800,7 @@ function checkoutPayload(customer, method, extra = {}) {
       qty: c.qty,
     })),
     delivery_method:  customer.deliveryMethod,
-    delivery_zone:    customer.deliveryZone || '',
+    delivery_zone:    customer.deliveryZone,
     delivery_carrier: customer.deliveryCarrier || '',
     order_note:       customer.orderNote || '',
     payment_method:   method,
@@ -4958,7 +4810,7 @@ function checkoutPayload(customer, method, extra = {}) {
 
 async function postShopJson(url, payload) {
   if (window.__shopLoadStart) window.__shopLoadStart();
-  // DIAGNOSTIC CAPTURE (remove with the diagnostic panel once stable)
+  // ── DIAGNOSTIC CAPTURE (remove with the diagnostic panel once stable) ──
   window.__shopDiag = window.__shopDiag || [];
   let res, data;
   try {
@@ -4977,29 +4829,13 @@ async function postShopJson(url, payload) {
   window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url, status: res.status, body: JSON.stringify(data) });
   if (window.__shopDiag.length > 8) window.__shopDiag.length = 8;
   if (window.__renderShopDiag) window.__renderShopDiag();
-  // END DIAGNOSTIC CAPTURE
+  // ── END DIAGNOSTIC CAPTURE ──
   if (window.__shopLoadDone) window.__shopLoadDone();
-  if (!res.ok) {
-    const friendly = data.error || (url.includes('/api/shop/quote') ? paymentQuotePendingMessage() : `${url} failed`);
-    throw new Error(friendly);
-  }
+  if (!res.ok) throw new Error(data.error || `${url} failed`);
   return data;
 }
 
-function checkoutQuoteReady(customer, silent = false) {
-  const zone = customer?.deliveryZone || resolveDeliveryState({ allowConservativeFallback: false }).zone;
-  if (customer && !customer.deliveryZone) customer.deliveryZone = zone;
-  if (!isDeliveryAddressComplete(customer)) {
-    if (!silent) showToast(paymentQuotePendingMessage());
-    return false;
-  }
-  return true;
-}
-
 async function getServerCheckoutQuote(customer, method, extra = {}) {
-  if (!checkoutQuoteReady(customer, true)) {
-    throw new Error(paymentQuotePendingMessage());
-  }
   return postShopJson('/api/shop/quote', checkoutPayload(customer, method, extra));
 }
 
@@ -5114,7 +4950,6 @@ async function submitManualCrypto(chain) {
       orderRef = window.__activeLock.order_ref;
     }
     if (!orderRef) {
-      if (!checkoutQuoteReady(getFormData(), false)) return;
       showToast('Enter the existing order hash from the locked payment box');
       return;
     }
@@ -5160,37 +4995,8 @@ document.getElementById('ethManualCancel')?.addEventListener('click', () => {
   cancelManualCrypto('eth');
 });
 
-// Pending-first order helpers
+// ── PENDING-FIRST ORDER HELPERS ───────────────────────────────────────────────
 // Create a pending order on the server BEFORE payment. Returns { order_ref, ... }.
-
-function chainWaitLabel(method) {
-  if (method === 'tezos') return 'Tezos';
-  if (method === 'usdc') return 'Ethereum / USDC';
-  if (method === 'usdt') return 'Ethereum / USDT';
-  return 'Ethereum';
-}
-function shortHash(value) {
-  const valueText = String(value || '');
-  return valueText.length > 22 ? valueText.slice(0, 12) + '...' + valueText.slice(-8) : (valueText || '-');
-}
-function openChainWaitModal(meta = {}) {
-  const overlay = document.getElementById('chainWaitOverlay');
-  if (!overlay) return;
-  overlay.classList.add('open');
-  document.getElementById('chainWaitNetwork').textContent = chainWaitLabel(meta.method || meta.payment_method || 'eth');
-  document.getElementById('chainWaitTx').textContent = shortHash(meta.payment_ref || meta.txHash || '');
-  updateChainWaitModal('Broadcast received. Waiting before the first confirmation check...', 0, meta.maxAttempts || 0);
-}
-function updateChainWaitModal(status, attempt, maxAttempts) {
-  const statusEl = document.getElementById('chainWaitStatus');
-  const attemptEl = document.getElementById('chainWaitAttempt');
-  if (statusEl) statusEl.textContent = status || 'Checking blockchain...';
-  if (attemptEl) attemptEl.textContent = attempt ? (attempt + ' of ' + maxAttempts) : 'Starting';
-}
-function closeChainWaitModal() {
-  document.getElementById('chainWaitOverlay')?.classList.remove('open');
-}
-
 async function createPendingOrder(customer, method, checkoutQuote) {
   return postShopJson('/api/shop/order-create', checkoutPayload(customer, method, {
     checkout_quote: checkoutQuote,
@@ -5201,65 +5007,61 @@ async function createPendingOrder(customer, method, checkoutQuote) {
 // while the chain is still indexing (server returns 409 "not confirmed yet").
 async function confirmPendingOrder(orderRef, opts) {
   const payload = Object.assign({ order_ref: orderRef, order_hash: orderRef }, opts);
-  const method = String(opts?.payment_method || '').toLowerCase();
-  const isCryptoConfirm = ['eth', 'tezos', 'usdc', 'usdt'].includes(method);
-  const maxAttempts = isCryptoConfirm ? 120 : 1;
+  // ETH/Tezos indexers can lag 30–90s behind a just-broadcast tx.
+  // Retry for up to 6 minutes (72 × 5 s) before giving up.
+  const maxAttempts = 72;
   const RETRY_MS = 5000;
-  const INITIAL_WAIT_MS = isCryptoConfirm ? 12000 : 0;
+  // Errors that definitively mean "stop retrying immediately"
+  const FATAL_RE = /sold.out|order.not.found|invalid.*quote|payment.method.*match|hash.*does.not.match|payer.*required/i;
   let lastErr = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch('/api/shop/order-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const rawText = await res.text().catch(() => '');
+      let data;
+      try { data = rawText ? JSON.parse(rawText) : {}; } catch (_) { data = { raw: rawText }; }
+      // diagnostic capture
+      window.__shopDiag = window.__shopDiag || [];
+      const diagBody = Object.keys(data || {}).length ? JSON.stringify(data) : (rawText || '(empty response body)');
+      window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url: '/api/shop/order-confirm', status: res.status, body: diagBody });
+      if (window.__shopDiag.length > 8) window.__shopDiag.length = 8;
+      if (window.__renderShopDiag) window.__renderShopDiag();
 
-  if (isCryptoConfirm) {
-    openChainWaitModal({ method, payment_ref: opts?.payment_ref, maxAttempts });
-    await new Promise(r => setTimeout(r, INITIAL_WAIT_MS));
-  }
+      if (res.ok) return data;
 
-  try {
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      if (isCryptoConfirm) updateChainWaitModal('Checking blockchain confirmation...', attempt, maxAttempts);
-      try {
-        const res = await fetch('/api/shop/order-confirm', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        const rawText = await res.text().catch(() => '');
-        let data;
-        try { data = rawText ? JSON.parse(rawText) : {}; } catch (_) { data = { raw: rawText }; }
-        window.__shopDiag = window.__shopDiag || [];
-        const diagBody = Object.keys(data || {}).length ? JSON.stringify(data) : (rawText || '(empty response body)');
-        window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url: '/api/shop/order-confirm', status: res.status, body: diagBody });
-        if (window.__shopDiag.length > 8) window.__shopDiag.length = 8;
-        if (window.__renderShopDiag) window.__renderShopDiag();
-        if (res.ok) {
-          if (isCryptoConfirm) updateChainWaitModal('Confirmed. Finalising your order...', attempt, maxAttempts);
-          return data;
-        }
-        const errText = data.error || rawText || '';
-        const stillWaiting = res.status === 409 && /confirm|not confirmed|waiting|found|index|receipt|pending/i.test(errText);
-        if (isCryptoConfirm && stillWaiting && attempt < maxAttempts) {
-          lastErr = new Error(errText || 'Awaiting on-chain confirmation');
-          updateChainWaitModal(errText || 'Still waiting for blockchain confirmation...', attempt, maxAttempts);
-          await new Promise(r => setTimeout(r, RETRY_MS));
-          continue;
-        }
-        const err = new Error(errText || ('Order confirmation failed with HTTP ' + res.status));
-        err.nonRetryable = true;
-        throw err;
-      } catch (e) {
-        lastErr = e;
-        if (e && e.nonRetryable) throw e;
-        if (isCryptoConfirm && attempt < maxAttempts) {
-          updateChainWaitModal('Network is slow. Retrying confirmation check...', attempt, maxAttempts);
-          await new Promise(r => setTimeout(r, RETRY_MS));
-          continue;
-        }
+      const errMsg = data.error || rawText || `HTTP ${res.status}`;
+
+      // Definitely stop — these won't resolve with more retries
+      if (data.sold_out || FATAL_RE.test(errMsg)) {
+        const e = new Error(errMsg);
+        e.nonRetryable = true;
         throw e;
       }
+
+      // 404 = order not in DB yet (race on first attempt) — retry briefly
+      // 409 = tx not indexed yet — keep retrying
+      // 4xx other = likely a transient issue — retry with backoff
+      // 5xx = server error — retry
+      lastErr = new Error(errMsg);
+      if (attempt === 1) showToast('Payment sent — confirming on-chain, please wait…');
+      if (attempt % 6 === 0) {
+        const mins = Math.floor((attempt * RETRY_MS) / 60000);
+        showToast(`Still confirming… (${mins}m elapsed). Keep this page open.`);
+      }
+      await new Promise(r => setTimeout(r, RETRY_MS));
+
+    } catch (e) {
+      lastErr = e;
+      if (e && e.nonRetryable) throw e;
+      if (attempt < maxAttempts) { await new Promise(r => setTimeout(r, RETRY_MS)); continue; }
+      throw e;
     }
-    if (lastErr) throw lastErr;
-  } finally {
-    if (isCryptoConfirm) closeChainWaitModal();
   }
+  if (lastErr) throw lastErr;
 }
 
 // Local safety net: remember an unconfirmed order so a returning customer (or
@@ -5273,11 +5075,11 @@ function clearPendingOrder(orderRef) {
   if (window.__pendingOrders) delete window.__pendingOrders[orderRef];
 }
 
-// Price-lock engine
+// ── PRICE-LOCK ENGINE ─────────────────────────────────────────────────────────
 // When a crypto panel opens, we immediately lock a price by fetching a signed
 // quote AND creating a pending order. The customer is shown the locked amount,
 // the order hash (order_ref), and a 5-minute countdown. On expiry — or when the
-// we silently re-lock: new quote, new pending order, new hash.
+// cart changes — we silently re-lock: new quote, new pending order, new hash.
 // The send paths reuse this locked order instead of creating another.
 const LOCK_MS = 5 * 60 * 1000; // 5 minutes
 window.__activeLock = null;    // { method, order_ref, quote, expires, payerAddress }
@@ -5306,7 +5108,7 @@ function renderLockUI(method) {
   box.style.display = 'block';
   const amtEl = document.getElementById(ids.amt);
   const refEl = document.getElementById(ids.ref);
-  if (amtEl) amtEl.textContent = (lock.quote?.crypto_amount || '-') + ' ' + lockMethodToAsset(method);
+  if (amtEl) amtEl.textContent = (lock.quote?.crypto_amount - '—') + ' ' + lockMethodToAsset(method);
   if (refEl) refEl.textContent = lock.order_ref || '—';
 }
 
@@ -5320,7 +5122,7 @@ function updateLockCountdown() {
   const timerEl = document.getElementById(lock.method === 'tezos' ? 'tezosLockTimer' : 'ethLockTimer');
   if (timerEl) timerEl.textContent = mm + ':' + ss;
   if (remaining <= 0) {
-    // Expired: silently re-lock with a fresh quote/order/hash.
+    // Expired — silently re-lock with a fresh quote/order/hash.
     refreshLock(lock.method, true);
   }
 }
@@ -5329,9 +5131,9 @@ function updateLockCountdown() {
 async function refreshLock(method, silent) {
   const seq = ++_lockSeq;
   const d = getFormData();
-  // Do not lock until the form is complete; otherwise the pending order
+  // Don't lock until the form is minimally valid — otherwise the pending order
   // would be missing customer details. Quiet return; lock starts once valid.
-  if (!d.name || !d.email || !checkoutQuoteReady(d, silent)) { window.__activeLock = null; renderLockUI(method); return; }
+  if (!d.name || !d.email) { window.__activeLock = null; renderLockUI(method); return; }
   try {
     const payer = lockPayerAddress(method);
     const q = await getServerCheckoutQuote(d, method, payer ? { payer_address: payer } : {});
@@ -5351,7 +5153,7 @@ async function refreshLock(method, silent) {
     if (method === 'tezos' && typeof renderTezosPanel === 'function') renderTezosPanel();
     if (method === 'eth' && typeof renderEthPanel === 'function') renderEthPanel();
   } catch (e) {
-    if (!silent) showToast(e.message || 'Could not lock price - retrying');
+    if (!silent) showToast(e.message || 'Could not lock price — retrying');
     // leave any previous lock in place; countdown will retry on next expiry
   }
 }
@@ -5359,12 +5161,6 @@ async function refreshLock(method, silent) {
 // Start the lock lifecycle for a panel (called when the crypto tab opens).
 function startLock(method) {
   stopLockTimer();
-  const d = getFormData();
-  if (!checkoutQuoteReady(d, false)) {
-    window.__activeLock = null;
-    renderLockUI(method);
-    return;
-  }
   refreshLock(method, false);
   _lockTimer = setInterval(updateLockCountdown, 1000);
 }
@@ -5373,11 +5169,11 @@ function stopLockTimer() {
   if (_lockTimer) { clearInterval(_lockTimer); _lockTimer = null; }
 }
 
-// Called when the cart changes: invalidate and re-lock the active crypto panel.
+// Called when the cart changes — invalidate and re-lock the active crypto panel.
 function relockOnCartChange() {
   const lock = window.__activeLock;
   if (lock && window.__manualCryptoMode === lock.method) return;
-  if (lock && lock.method && checkoutQuoteReady(getFormData(), true)) refreshLock(lock.method, true);
+  if (lock && lock.method) refreshLock(lock.method, true);
 }
 
 
@@ -5392,7 +5188,7 @@ async function notifyOrder(customer, ref, method, checkoutQuote = null) {
   const carrierInfo = customer.deliveryCarrier ? `${carrierLabel(customer.deliveryCarrier)}; ` : '';
   const deliveryInfo = `${carrierInfo}Ship to: ${customer.address}, ${customer.country}, Fee: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}${cartHasLargePrint() ? ' (tube)' : ''}`;
 
-  // 1. Record order in Supabase; decrements stock.
+  // 1. Record order in Supabase — decrements stock.
   //    Crypto verification can race ahead of chain indexing (tzkt / ETH RPC
   //    haven't seen the just-broadcast tx yet), which the server reports as a
   //    409 "not confirmed yet". Retry a few times with a delay before giving up.
@@ -5441,7 +5237,7 @@ async function notifyOrder(customer, ref, method, checkoutQuote = null) {
         name:            customer.name,
         email:           customer.email,
         commission_type: 'shop-order',
-        message: `Shop order -— ${method.toUpperCase()} · Ref: ${ref}\n${checkoutQuote?.payer_address ? `Sender wallet: ${checkoutQuote.payer_address}\n` : ''}\nDelivery: ${deliveryInfo}\nPhone: ${customer.phone||'—'}${customer.orderNote ? `\nOrder note: ${customer.orderNote}` : ''}\n\nItems:\n${cart.map(c=>`${c.name} (${c.variant}) × ${c.qty}`).join('\n')}\n\nSubtotal: ${fmt(quotedSubtotalNgn)} / $${quotedSubtotalUsd}\nDelivery: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}\nGrand total: ${fmt(quotedTotalNgn)} / $${quotedTotalUsd}`,
+        message: `Shop order — ${method.toUpperCase()} · Ref: ${ref}\n${checkoutQuote?.payer_address ? `Sender wallet: ${checkoutQuote.payer_address}\n` : ''}\nDelivery: ${deliveryInfo}\nPhone: ${customer.phone||'—'}${customer.orderNote ? `\nOrder note: ${customer.orderNote}` : ''}\n\nItems:\n${cart.map(c=>`${c.name} (${c.variant}) × ${c.qty}`).join('\n')}\n\nSubtotal: ${fmt(quotedSubtotalNgn)} / $${quotedSubtotalUsd}\nDelivery: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}\nGrand total: ${fmt(quotedTotalNgn)} / $${quotedTotalUsd}`,
       }),
     });
   } catch(_) {}
@@ -6250,13 +6046,10 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
     });
 
     // Save all products to API and replace temporary/sample ids with real
-    // Supabase UUIDs. Fallback/sample products are never saved.
-    if (!shopProductsLoadedFromApi) {
-      throw new Error('Product list did not load from Supabase. Save blocked to protect your existing products. Refresh and try again.');
-    }
+    // Supabase UUIDs. Sample/placeholder products (_isSample) are never saved.
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     await Promise.all(SHOP_CONFIG.products.map(async p => {
-      if (isFallbackProduct(p)) return null;
+      if (p._isSample) return null;
       const saved = await apiSaveProduct(p, token);
       if (saved?.id && !UUID_RE.test(String(p.id))) p.id = saved.id;
       return saved;
@@ -6321,7 +6114,7 @@ function ethEthAmount() {
   return (grandTotalUsd() / price).toFixed(5);
 }
 
-/* Render ETH panel */
+/* ── Render ETH panel ── */
 function renderEthPanel() {
   const addr     = SHOP_CONFIG.ethAddress;
   const ethAmt   = ethEthAmount();
@@ -6352,7 +6145,7 @@ function renderEthPanel() {
   if (ethCopy) {
     ethCopy.onclick = () => {
       navigator.clipboard.writeText(addr).then(() => {
-        ethCopy.textContent = 'Copied\u2713';
+        ethCopy.textContent = 'Copied \u2713';
         setTimeout(() => { ethCopy.textContent = 'Copy address'; }, 2000);
       });
     };
@@ -6361,7 +6154,7 @@ function renderEthPanel() {
   document.querySelectorAll('.ethStableCopy').forEach(btn => {
     btn.onclick = () => {
       navigator.clipboard.writeText(addr).then(() => {
-        btn.textContent = 'Copied';
+        btn.textContent = 'Copied \u2713';
         setTimeout(() => { btn.textContent = 'Copy address'; }, 2000);
       });
     };
@@ -6372,7 +6165,7 @@ function renderEthPanel() {
   if (sendAmt) sendAmt.textContent = ethAmt !== null ? ethAmt + ' ETH' : '\u2026';
 
   // Wallet connection state
-  const rateReady = addr && ethAmt !== null && checkoutQuoteReady(getFormData(), true);
+  const rateReady = addr && ethAmt !== null;
   if (_ethConnectedAddr) {
     document.getElementById('ethWalletInfo').style.display   = '';
     document.getElementById('ethWalletAddr').textContent     = ethShortAddr(_ethConnectedAddr);
@@ -6389,7 +6182,7 @@ function renderEthPanel() {
   }
 }
 
-/* Connect ETH wallet */
+/* ── Connect ETH wallet ── */
 async function ethConnectWallet() {
   if (_ethConnectedAddr || _ethConnecting) return;
 
@@ -6431,7 +6224,7 @@ async function ethConnectWallet() {
   }
 }
 
-/* Send ETH via connected wallet */
+/* ── Send ETH via connected wallet ── */
 document.getElementById('ethConnectBtn').addEventListener('click', ethConnectWallet);
 
 document.getElementById('ethDisconnectBtn').addEventListener('click', () => {
@@ -6493,7 +6286,7 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
   }
 });
 
-/* Send ERC-20 (USDC / USDT) via connected wallet */
+/* ── Send ERC-20 (USDC / USDT) via connected wallet ── */
 async function sendErc20(token) {
   if (!validateForm()) return;
   const toAddr = SHOP_CONFIG.ethAddress;
@@ -6898,7 +6691,7 @@ async function tezosConnectWallet() {
   }
 }
 
-/* Render the Tezos panel */
+/* ── Render the Tezos panel ── */
 function renderTezosPanel() {
   const addr = SHOP_CONFIG.tezosAddress;
   const lockedQuote = window.__activeLock?.method === 'tezos'
@@ -6925,7 +6718,7 @@ function renderTezosPanel() {
   if (copyBtn) {
     copyBtn.onclick = () => {
       navigator.clipboard.writeText(addr).then(() => {
-        copyBtn.textContent = 'Copied✓';
+        copyBtn.textContent = 'Copied ✓';
         setTimeout(() => { copyBtn.textContent = 'Copy address'; }, 2000);
       });
     };
@@ -6937,7 +6730,7 @@ function renderTezosPanel() {
     document.getElementById('tezosWalletAddr').textContent = tezosShortAddr(_tezosConnectedAddr);
     document.getElementById('tezosConnectBtn').style.display = 'none';
     // Only show Send button once the rate is known
-    document.getElementById('tezosSendBtn').style.display = (addr && xtz !== null && checkoutQuoteReady(getFormData(), true)) ? '' : 'none';
+    document.getElementById('tezosSendBtn').style.display = (addr && xtz !== null) ? '' : 'none';
   } else {
     document.getElementById('tezosWalletInfo').style.display = 'none';
     document.getElementById('tezosConnectBtn').style.display = '';
@@ -6981,9 +6774,9 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
       await refreshLock('tezos', true);
       lock = window.__activeLock;
     }
-    if (!lock || !lock.order_ref) { showToast('XTZ quote unavailable - try again in a moment'); return; }
+    if (!lock || !lock.order_ref) { showToast('XTZ quote unavailable — try again in a moment'); return; }
     const xtzAmt = lock.quote?.crypto_amount;
-    if (!xtzAmt) { showToast('XTZ quote unavailable - try again in a moment'); return; }
+    if (!xtzAmt) { showToast('XTZ quote unavailable — try again in a moment'); return; }
     const orderRef = lock.order_ref;
 
     const mutez = String(Math.round(parseFloat(xtzAmt) * 1_000_000));
@@ -7009,7 +6802,7 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
     if (/reject|cancel|denied|aborted/i.test(msg)) {
       showToast('Transaction cancelled');
     } else {
-      showToast('Transaction sent - confirming. If this does not complete, use confirm manually with your transaction hash.');
+      showToast('Transaction sent — confirming. If this doesn\u2019t complete, use “confirm manually” with your transaction hash.');
       console.error('[Tezos] send error:', e);
     }
   } finally {
@@ -7020,7 +6813,7 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
   }
 });
 
-// Manual confirm fallback: user sent from wallet app directly.
+// Manual confirm (fallback — user sent from wallet app directly)
 document.getElementById('tezosManualBtn').addEventListener('click', () => {
   submitManualCrypto('tezos');
 });
@@ -7059,7 +6852,6 @@ async function loadShopData() {
     if (productsRes.ok) {
       const rows = await productsRes.json();
       if (Array.isArray(rows) && rows.length) {
-        shopProductsLoadedFromApi = true;
         SHOP_CONFIG.products = rows.map(r => ({
           id:                 r.id,
           category:           r.category,
