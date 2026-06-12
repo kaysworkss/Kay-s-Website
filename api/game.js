@@ -1348,7 +1348,7 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
   );
   let list = [];
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4500);
+  const timer = setTimeout(() => controller.abort(), 12000);
   try {
     const r = await fetch(`${api}/v1/operations/${encodeURIComponent(opHash)}`, {
       headers: { Accept: 'application/json' },
@@ -1599,14 +1599,6 @@ async function claimVariantStock(supabase, item) {
     const e = new Error(`Stock claim failed for ${item.name || item.id}: ${error.message}`);
     e.statusCode = 500;
     throw e;
-  }
-  // The RPC returns false when the product/variant has no stock_by_variant row
-  // (i.e. an open edition with unlimited stock). Treat that as ok=true — only
-  // a real stock check can tell us it's sold out; missing rows mean unlimited.
-  if (data === false) {
-    // Double-check via direct lookup: if the product genuinely has no stock
-    // tracking set, it's unlimited. Only block if stock is explicitly 0.
-    return adjustVariantStockDirect(supabase, item, -Math.abs(Number(item.qty) || 1));
   }
   return { ok: data === true };
 }
@@ -2102,25 +2094,51 @@ async function handleShopOrderConfirm(req, res, supabase) {
   }
 
   // Decrement stock now that payment is confirmed.
+  // ── Idempotency guard ────────────────────────────────────────────────────
+  // Atomically flip status from 'pending' → 'confirming' before touching stock.
+  // If a previous attempt already moved the order to 'confirming' or 'paid'
+  // (e.g. Vercel timed out after stock was claimed but before status update),
+  // we skip stock decrement entirely to avoid a double-decrement that would
+  // make the product appear sold out on the next retry.
+  const alreadyConfirming = order.status === 'confirming';
+  if (!alreadyConfirming) {
+    const { error: lockErr } = await supabase
+      .from('shop_orders')
+      .update({ status: 'confirming', updated_at: new Date().toISOString() })
+      .eq('order_ref', orderRef)
+      .eq('status', 'pending'); // only succeeds if still pending
+    // If lockErr it means concurrent request grabbed it — that's fine, continue
+  }
+
   const claimed = [];
-  for (const item of checkout.trustedItems) {
-    let result;
-    try {
-      result = await claimVariantStock(supabase, item);
-    } catch (e) {
-      for (const c of claimed) await releaseVariantStock(supabase, c);
-      return jsonError(e);
+  if (!alreadyConfirming) {
+    // Only claim stock if this is the first confirm attempt for this order
+    for (const item of checkout.trustedItems) {
+      let result;
+      try {
+        result = await claimVariantStock(supabase, item);
+      } catch (e) {
+        // Release whatever we claimed, reset order back to pending, re-throw
+        for (const c of claimed) await releaseVariantStock(supabase, c);
+        await supabase.from('shop_orders')
+          .update({ status: 'pending', updated_at: new Date().toISOString() })
+          .eq('order_ref', orderRef);
+        return jsonError(e);
+      }
+      if (!result.ok) {
+        for (const c of claimed) await releaseVariantStock(supabase, c);
+        await supabase.from('shop_orders')
+          .update({ status: 'pending', updated_at: new Date().toISOString() })
+          .eq('order_ref', orderRef);
+        return json(409, {
+          error: `Sold out: ${item.name} · ${item.variant} is no longer available`,
+          product_id: item.id,
+          variant: item.variant,
+          sold_out: true,
+        });
+      }
+      claimed.push(item);
     }
-    if (!result.ok) {
-      for (const c of claimed) await releaseVariantStock(supabase, c);
-      return json(409, {
-        error: `Sold out: ${item.name} · ${item.variant} is no longer available`,
-        product_id: item.id,
-        variant: item.variant,
-        sold_out: true,
-      });
-    }
-    claimed.push(item);
   }
 
   // Flip the order to paid. For crypto, fold the payment details back into the
