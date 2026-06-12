@@ -757,19 +757,28 @@ async function applyProductTags(products, supabase) {
   });
 }
 
-// ── CHECKOUT COMPUTATION (server-authoritative) ───────────────────────────────
-// Server-authoritative delivery rates — MUST mirror DELIVERY_RATES in shop.html.
+// CHECKOUT COMPUTATION (server-authoritative)
+// Delivery rates and carrier rules mirror the checkout in shop.html.
 const SERVER_DELIVERY_RATES = {
-  'pickup':   { small: { ngn: 0,    usd: 0  }, large: { ngn: 0,    usd: 0  } },
-  'NG-other': { small: { ngn: 4500, usd: 0  }, large: { ngn: 6500, usd: 0  } },
-  'WA':       { small: { ngn: 0,    usd: 22 }, large: { ngn: 0,    usd: 30 } },
-  'EU':       { small: { ngn: 0,    usd: 35 }, large: { ngn: 0,    usd: 48 } },
-  'NA':       { small: { ngn: 0,    usd: 42 }, large: { ngn: 0,    usd: 58 } },
-  'AO':       { small: { ngn: 0,    usd: 50 }, large: { ngn: 0,    usd: 68 } },
-  'ROW':      { small: { ngn: 0,    usd: 48 }, large: { ngn: 0,    usd: 62 } },
+  pickup:     { label: 'Kaduna pickup',            small: { ngn: 0,    usd: 0 }, large: { ngn: 0,     usd: 0 } },
+  'NG-KD':     { label: 'Kaduna State',             small: { ngn: 2500, usd: 0 }, large: { ngn: 3800,  usd: 0 } },
+  'NG-ABJ':    { label: 'FCT - Abuja',              small: { ngn: 3800, usd: 0 }, large: { ngn: 5500,  usd: 0 } },
+  'NG-NORTH2': { label: 'North / North-West',       small: { ngn: 4200, usd: 0 }, large: { ngn: 6000,  usd: 0 } },
+  'NG-NORTH3': { label: 'North-East / Mid-Belt',    small: { ngn: 5500, usd: 0 }, large: { ngn: 7500,  usd: 0 } },
+  'NG-SW':     { label: 'South-West',               small: { ngn: 7500, usd: 0 }, large: { ngn: 10000, usd: 0 } },
+  'NG-SS':     { label: 'South-South / South-East', small: { ngn: 9000, usd: 0 }, large: { ngn: 12500, usd: 0 } },
+  WA:  { label: 'West Africa',    ups: { small: 18, large: 28 }, dhl: { small: 20, large: 30 } },
+  EU:  { label: 'Europe / UK',    ups: { small: 34, large: 50 }, dhl: { small: 48, large: 68 } },
+  NA:  { label: 'North America',  ups: { small: 38, large: 55 }, dhl: { small: 52, large: 72 } },
+  AO:  { label: 'Asia / Oceania', ups: { small: 46, large: 64 }, dhl: { small: 56, large: 78 } },
+  ROW: { label: 'Rest of world',  ups: { small: 42, large: 60 }, dhl: { small: 50, large: 70 } },
 };
-const SERVER_LARGE_PRINT_VARIANTS = ['12×16"', '12×18"', '18×24"', '24×36"'];
+const SERVER_LARGE_PRINT_VARIANTS = ['12x16"', '12x18"', '18x24"', '24x36"'];
 const NGN_PER_USD = 1600;
+const SERVER_HIGH_CART_USD = 60;
+const SERVER_COMPLIMENTARY_SHIPPING_USD = 500;
+const SERVER_SHIPPING_DIM_DIVISOR = 5000;
+const SERVER_SHIPPING_BUFFER = 1.2;
 
 function serverVariantPrice(product, variantKey, variant, currency) {
   const prices = currency === 'usd' ? (product.prices_usd || {}) : (product.prices_ngn || {});
@@ -780,9 +789,137 @@ function serverVariantPrice(product, variantKey, variant, currency) {
   return 0;
 }
 
-function serverDeliveryFee(zone, hasLarge, currency) {
-  const z = SERVER_DELIVERY_RATES[zone] || SERVER_DELIVERY_RATES['ROW'];
-  const tier = hasLarge ? z.large : z.small;
+function serverIsInternationalZone(zone) {
+  return !!zone && zone !== 'pickup' && !zone.startsWith('NG-');
+}
+function serverNormalizedSizeLabel(value) {
+  return String(value || '').replace(/[xX?]/g, 'x');
+}
+function serverParsePrintInches(size) {
+  const m = serverNormalizedSizeLabel(size).match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
+  if (!m) return null;
+  return { max: Math.max(Number(m[1]), Number(m[2])) };
+}
+function serverOptionShippingMeta(product, type, size) {
+  const opts = Array.isArray(product?.variants) ? product.variants : [];
+  const opt = opts.find(v => v && typeof v === 'object' && String(v.type || v.name || v.label || '') === String(type || ''));
+  const meta = opt?.shipping_meta || opt?.shipping || {};
+  return meta?.[size] || meta?.[serverNormalizedSizeLabel(size)] || null;
+}
+function serverPrintDefaultProfile(type, size) {
+  const parsed = serverParsePrintInches(size);
+  const max = parsed?.max || 10;
+  if (max <= 7) return { weightKg: 0.45, dimsCm: [32, 24, 3], packageType: 'flat mailer', packageClass: 'flat_art' };
+  if (max <= 14) return { weightKg: 0.75, dimsCm: [46, 38, 3], packageType: 'flat mailer', packageClass: 'flat_art' };
+  return { weightKg: 1.35, dimsCm: [76, 10, 10], packageType: 'protective tube', packageClass: 'tube_art' };
+}
+function serverDefaultProductShippingProfile(product, variantLabel) {
+  const cat = String(product?.category || '').toLowerCase();
+  const name = String(product?.name || '').toLowerCase();
+  if (cat === 'prints') {
+    const parts = String(variantLabel || '').split('|');
+    return serverPrintDefaultProfile(parts[0] || '', parts[1] || variantLabel);
+  }
+  if (name.includes('hoodie')) return { weightKg: 0.9, dimsCm: [34, 28, 8], packageType: 'soft parcel', packageClass: 'soft_parcel' };
+  if (name.includes('shirt') || name.includes('tee')) return { weightKg: 0.35, dimsCm: [30, 24, 4], packageType: 'soft parcel', packageClass: 'soft_parcel' };
+  if (name.includes('journal') || cat === 'notebooks') return { weightKg: 0.55, dimsCm: [28, 22, 5], packageType: 'rigid mailer', packageClass: 'rigid_parcel' };
+  if (name.includes('tote')) return { weightKg: 0.4, dimsCm: [32, 26, 4], packageType: 'soft parcel', packageClass: 'soft_parcel' };
+  if (name.includes('sticker') || cat === 'stickers') return { weightKg: 0.12, dimsCm: [22, 16, 1], packageType: 'flat mailer', packageClass: 'sticker_flat' };
+  return { weightKg: 0.6, dimsCm: [34, 26, 6], packageType: 'parcel', packageClass: 'rigid_parcel' };
+}
+function serverItemShippingProfile(product, item) {
+  const variant = item.variantKey || item.variant || '';
+  const parts = String(variant).split('|');
+  const type = parts[0] || '';
+  const size = parts[1] || item.variant || variant;
+  const meta = product.category === 'prints' ? serverOptionShippingMeta(product, type, size) : null;
+  const fallback = serverDefaultProductShippingProfile(product, variant);
+  const dims = [Number(meta?.length_cm), Number(meta?.width_cm), Number(meta?.height_cm)];
+  return {
+    weightKg: Number(meta?.weight_kg) || fallback.weightKg,
+    dimsCm: dims.every(n => n > 0) ? dims : fallback.dimsCm,
+    packageType: meta?.package_type || fallback.packageType,
+    packageClass: meta?.package_class || fallback.packageClass || (/tube/i.test(meta?.package_type || fallback.packageType) ? 'tube_art' : 'rigid_parcel'),
+    carrierPrice: { ups: Number(meta?.ups_usd) || 0, dhl: Number(meta?.dhl_usd) || 0 },
+  };
+}
+function serverMakeShippingPiece(kind, label, entries) {
+  let rawKg = 0, maxL = 0, maxW = 0, maxH = 0;
+  const carrierOverride = { ups: 0, dhl: 0 };
+  for (const entry of entries) {
+    const profile = entry.profile;
+    const qty = Math.max(1, Number(entry.qty) || 1);
+    rawKg += profile.weightKg * qty;
+    maxL = Math.max(maxL, profile.dimsCm[0]);
+    maxW = Math.max(maxW, profile.dimsCm[1]);
+    maxH = Math.max(maxH, profile.dimsCm[2] + Math.max(0, qty - 1) * 0.4);
+    carrierOverride.ups = Math.max(carrierOverride.ups, profile.carrierPrice.ups || 0);
+    carrierOverride.dhl = Math.max(carrierOverride.dhl, profile.carrierPrice.dhl || 0);
+  }
+  const actualKg = +(rawKg * SERVER_SHIPPING_BUFFER).toFixed(2);
+  const volumetricKg = maxL && maxW && maxH ? +((maxL * maxW * maxH) / SERVER_SHIPPING_DIM_DIVISOR).toFixed(2) : 0;
+  return { kind, label, actualKg, volumetricKg, billableKg: Math.max(actualKg, volumetricKg), dimsCm: [maxL, maxW, maxH], carrierOverride };
+}
+function serverShippingPieces(trustedItems, productCache) {
+  const entries = trustedItems.map(item => ({ item, qty: item.qty, profile: serverItemShippingProfile(productCache[item.id] || {}, item) }));
+  const byClass = cls => entries.filter(e => e.profile.packageClass === cls);
+  const tube = byClass('tube_art');
+  const flat = byClass('flat_art');
+  const stickers = byClass('sticker_flat');
+  const parcels = entries.filter(e => ['soft_parcel','rigid_parcel'].includes(e.profile.packageClass));
+  const pieces = [];
+  if (tube.length) {
+    pieces.push(serverMakeShippingPiece('tube_art', 'Tube artwork package', [...tube, ...flat]));
+    if (parcels.length || stickers.length) pieces.push(serverMakeShippingPiece('parcel', 'Merch and accessories package', [...parcels, ...stickers]));
+  } else if (flat.length) {
+    pieces.push(serverMakeShippingPiece('flat_art', 'Flat artwork package', [...flat, ...stickers]));
+    if (parcels.length) pieces.push(serverMakeShippingPiece('parcel', 'Merch and accessories package', parcels));
+  } else if (parcels.length || stickers.length) {
+    pieces.push(serverMakeShippingPiece('parcel', 'Parcel package', [...parcels, ...stickers]));
+  }
+  return pieces;
+}
+function serverShippingProfile(trustedItems, productCache) {
+  const pieces = serverShippingPieces(trustedItems, productCache);
+  const carrierOverride = { ups: 0, dhl: 0 };
+  for (const piece of pieces) {
+    carrierOverride.ups = Math.max(carrierOverride.ups, piece.carrierOverride.ups || 0);
+    carrierOverride.dhl = Math.max(carrierOverride.dhl, piece.carrierOverride.dhl || 0);
+  }
+  const actualKg = +pieces.reduce((sum, piece) => sum + piece.actualKg, 0).toFixed(2);
+  const volumetricKg = +pieces.reduce((sum, piece) => sum + piece.volumetricKg, 0).toFixed(2);
+  const billableKg = +pieces.reduce((sum, piece) => sum + piece.billableKg, 0).toFixed(2);
+  const tube = pieces.some(piece => piece.kind === 'tube_art');
+  return { actualKg, volumetricKg, billableKg, tube, pieces, carrierOverride };
+}
+function serverIntlCarrierTier(zone, subtotalUsd, requestedCarrier = '') {
+  if (!serverIsInternationalZone(zone)) return '';
+  const requested = String(requestedCarrier || '').toLowerCase();
+  if (requested === 'ups' || requested === 'dhl') return requested;
+  if (zone === 'NA') return 'ups';
+  return Number(subtotalUsd || 0) >= SERVER_HIGH_CART_USD ? 'dhl' : 'ups';
+}
+function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd = 0, requestedCarrier = '', shippingProfile = null) {
+  if (subtotalUsd >= SERVER_COMPLIMENTARY_SHIPPING_USD) return 0;
+  const z = SERVER_DELIVERY_RATES[zone] || SERVER_DELIVERY_RATES.ROW;
+  const carrierTier = serverIntlCarrierTier(zone, subtotalUsd, requestedCarrier);
+  let tier;
+  if (carrierTier) {
+    const pieces = shippingProfile?.pieces?.length ? shippingProfile.pieces : [{ kind: hasLarge ? 'tube_art' : 'parcel', billableKg: hasLarge ? 1.5 : 0.7, carrierOverride: {} }];
+    const usd = pieces.reduce((sum, piece) => {
+      const override = piece.carrierOverride?.[carrierTier] || 0;
+      if (override > 0) return sum + override;
+      const kg = piece.billableKg || (piece.kind === 'tube_art' ? 1.5 : 0.7);
+      const isTube = piece.kind === 'tube_art';
+      const base = z[carrierTier][kg > 0.8 || isTube ? 'large' : 'small'];
+      const includedKg = kg > 0.8 || isTube ? 1.5 : 0.8;
+      const extraKg = Math.max(0, Math.ceil(kg - includedKg));
+      return sum + base + extraKg * (carrierTier === 'dhl' ? 14 : 12);
+    }, 0);
+    tier = { usd, ngn: 0 };
+  } else {
+    tier = hasLarge ? z.large : z.small;
+  }
   if (currency === 'usd') {
     if (tier.usd > 0) return tier.usd;
     return tier.ngn > 0 ? +(tier.ngn / NGN_PER_USD).toFixed(2) : 0;
@@ -850,7 +987,7 @@ async function computeShopCheckout(body, supabase) {
     subtotalNgn += priceNgn * qty;
     subtotalUsd += priceUsd * qty;
     if (product.category === 'prints' &&
-        (product.is_large_print === true || SERVER_LARGE_PRINT_VARIANTS.includes(item.variant))) {
+        (product.is_large_print === true || SERVER_LARGE_PRINT_VARIANTS.includes(serverNormalizedSizeLabel(item.variant)))) {
       hasLarge = true;
     }
     trustedItems.push({
@@ -866,8 +1003,11 @@ async function computeShopCheckout(body, supabase) {
 
   const zone = String(body.delivery_zone || 'pickup');
   const method = String(body.delivery_method || 'pickup');
-  const deliveryNgn = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'ngn') : 0;
-  const deliveryUsd = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'usd') : 0;
+  const shippingProfile = serverShippingProfile(trustedItems, productCache);
+  hasLarge = hasLarge || shippingProfile.tube;
+  const deliveryCarrier = method === 'ship' ? serverIntlCarrierTier(zone, subtotalUsd, body.delivery_carrier) : '';
+  const deliveryNgn = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'ngn', subtotalUsd, deliveryCarrier, shippingProfile) : 0;
+  const deliveryUsd = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'usd', subtotalUsd, deliveryCarrier, shippingProfile) : 0;
   const totalNgn = subtotalNgn + deliveryNgn;
   const totalUsd = +(subtotalUsd + deliveryUsd).toFixed(2);
 
@@ -875,8 +1015,10 @@ async function computeShopCheckout(body, supabase) {
     productCache,
     trustedItems,
     hasLarge,
+    shippingProfile,
     zone,
     method,
+    deliveryCarrier,
     subtotalNgn,
     subtotalUsd: +subtotalUsd.toFixed(2),
     deliveryNgn,
@@ -907,6 +1049,8 @@ function makeShopQuote(checkout, extra = {}) {
     items: checkout.trustedItems.map(i => ({ id: i.id, variantKey: i.variantKey, qty: i.qty })),
     delivery_method: checkout.method,
     delivery_zone: checkout.zone,
+    delivery_carrier: checkout.deliveryCarrier,
+    shipping_billable_kg: checkout.shippingProfile?.billableKg || 0,
     subtotal_ngn: checkout.subtotalNgn,
     subtotal_usd: checkout.subtotalUsd,
     delivery_fee_ngn: checkout.deliveryNgn,
@@ -930,6 +1074,7 @@ function verifyShopQuote(quote, checkout, expected = {}) {
   if (Number(payload.total_usd) !== checkout.totalUsd) return false;
   if (String(payload.delivery_method) !== checkout.method) return false;
   if (String(payload.delivery_zone) !== checkout.zone) return false;
+  if (String(payload.delivery_carrier || '') !== String(checkout.deliveryCarrier || '')) return false;
   const quoteItems = JSON.stringify(payload.items || []);
   const trustedItems = JSON.stringify(checkout.trustedItems.map(i => ({ id: i.id, variantKey: i.variantKey, qty: i.qty })));
   if (quoteItems !== trustedItems) return false;
@@ -1713,6 +1858,19 @@ function cryptoOrderLockFromQuote(orderRef, paymentMethod, quote) {
   };
 }
 
+function shopOrderMetadata(body, checkout, cryptoLock = null) {
+  const note = String(body.order_note || '').trim().slice(0, 800);
+  const meta = {
+    ...(cryptoLock || {}),
+    order_note: note || undefined,
+    delivery_carrier: checkout.deliveryCarrier || undefined,
+    shipping_billable_kg: checkout.shippingProfile?.billableKg || undefined,
+    shipping_pieces: checkout.shippingProfile?.pieces || undefined,
+  };
+  Object.keys(meta).forEach(k => meta[k] === undefined && delete meta[k]);
+  return Object.keys(meta).length ? meta : undefined;
+}
+
 // Read the crypto lock back from a stored order (payment_metadata, with a
 // legacy fallback to admin_note in case an older order stored it there).
 function readCryptoOrderLock(order) {
@@ -1766,7 +1924,7 @@ async function handleShopOrderCreate(req, res, supabase) {
       delivery_method:  checkout.method.slice(0, 40),
       delivery_zone:    checkout.zone.slice(0, 40),
       payment_method:  paymentMethod,
-      payment_metadata: cryptoLock || undefined,
+      payment_metadata: shopOrderMetadata(body, checkout, cryptoLock),
       status: 'pending',
     })
     .select('id, order_ref')
@@ -2135,6 +2293,7 @@ async function handleShopOrder(req, res, supabase) {
       delivery_zone:    checkout.zone.slice(0, 40),
       payment_method:  paymentMethod,
       payment_ref:     paymentRef,
+      payment_metadata: shopOrderMetadata(body, checkout),
       status: paymentConfirmed ? 'paid' : 'pending',
     })
     .select('id')
