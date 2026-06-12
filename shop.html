@@ -14,6 +14,27 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet"/>
 
 <style>
+/* ── Custom cursor (matches index.html) ── */
+html, body, * { cursor: none !important; }
+.cursor { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999; }
+.cursor-dot {
+  width: 10px; height: 10px; background: #c4845a;
+  border-radius: 50%; position: absolute;
+  transform: translate(-50%, -50%);
+  transition: background 0.3s ease, transform 0.1s ease;
+}
+.cursor-ring {
+  width: 36px; height: 36px; border: 1.5px solid #c4845a;
+  border-radius: 50%; position: absolute;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s, border-color 0.3s ease;
+  opacity: 0.8;
+}
+.cursor-dot.light { background: #f5ede0; }
+.cursor-ring.light { border-color: #f5ede0; opacity: 1; }
+.cursor-dot.gold { background: var(--gold); }
+.cursor-ring.gold { border-color: var(--gold); }
+
 /* ── Reset ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 a{color:inherit;text-decoration:none;-webkit-tap-highlight-color:transparent}
@@ -87,10 +108,13 @@ nav.scrolled {
   border-bottom: 1px solid var(--border);
 }
 .nav-logo {
-  font-family: 'Cinzel', serif;
-  font-size: 0.78rem; letter-spacing: 0.28em; text-transform: uppercase;
-  color: var(--gold);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--bark); text-decoration: none;
+  display: flex; align-items: center;
+  -webkit-tap-highlight-color: transparent;
 }
+body.dark .nav-logo { color: #e0c8a8; }
 .nav-right { display: flex; align-items: center; gap: 1.4rem; }
 .nav-links { display: flex; gap: 1.4rem; }
 .nav-links a {
@@ -127,29 +151,358 @@ nav.scrolled {
 }
 .cart-badge.visible { opacity: 1; transform: scale(1); }
 
-/* ── Hero ── */
+/* ── Hero — full bleed cinematic ── */
 .shop-hero {
-  padding: calc(60px + clamp(3rem,8vw,6rem)) clamp(1.2rem,4vw,3rem) clamp(2rem,5vw,4rem);
-  text-align: center;
-  background: var(--bg);
+  position: relative;
+  min-height: 92vh;
+  display: flex; align-items: flex-end;
+  overflow: hidden;
+  background: var(--bark);
+}
+.shop-hero-bg {
+  position: absolute; inset: 0; z-index: 0;
+  background: linear-gradient(135deg, #2a1810 0%, #4a3228 40%, #6b4030 70%, #3a2015 100%);
+}
+.shop-hero-bg-img {
+  position: absolute; inset: 0; z-index: 1;
+  background-image: url('/images/seriesinvite.jpg');
+  background-size: cover; background-position: center 30%;
+  opacity: 0.35;
+  transition: transform 8s ease;
+}
+.shop-hero:hover .shop-hero-bg-img { transform: scale(1.04); }
+.shop-hero-vignette {
+  position: absolute; inset: 0; z-index: 2;
+  background: linear-gradient(
+    to bottom,
+    rgba(20,12,8,0.5) 0%,
+    rgba(20,12,8,0.1) 40%,
+    rgba(20,12,8,0.7) 75%,
+    rgba(20,12,8,0.95) 100%
+  );
+}
+.shop-hero-content {
+  position: relative; z-index: 3;
+  padding: 0 clamp(1.4rem,6vw,5rem) clamp(3rem,7vw,6rem);
+  max-width: 900px;
 }
 .shop-hero-eyebrow {
-  font-family: 'Cinzel', serif; font-size: 0.62rem;
-  letter-spacing: 0.38em; text-transform: uppercase;
-  color: var(--clay); margin-bottom: 1rem;
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.45em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 1.2rem;
+  display: flex; align-items: center; gap: 0.8rem;
+}
+.shop-hero-eyebrow::before {
+  content: ''; display: inline-block; width: 32px; height: 1px;
+  background: var(--clay);
 }
 .shop-hero-title {
   font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(2.6rem, 6vw, 4.8rem);
-  font-weight: 300; line-height: 1.05;
-  color: var(--text);
-  margin-bottom: 1rem;
+  font-size: clamp(3.2rem, 8vw, 7rem);
+  font-weight: 300; line-height: 0.95;
+  color: #f0e4cc;
+  margin-bottom: 1.4rem;
+  letter-spacing: -0.01em;
 }
-.shop-hero-title em { font-style: italic; color: var(--rust); }
+.shop-hero-title em { font-style: italic; color: var(--clay); }
 .shop-hero-sub {
-  font-size: 1.08rem; color: var(--text-muted);
-  line-height: 1.7; max-width: 520px; margin: 0 auto 2.5rem;
+  font-size: 1.1rem; color: rgba(232,213,176,0.72);
+  line-height: 1.75; max-width: 440px; margin-bottom: 2.4rem;
+  font-family: 'Crimson Pro', serif;
 }
+.shop-hero-ctas {
+  display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;
+}
+.hero-cta-primary {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 0.9rem 2.2rem;
+  background: var(--clay); color: #fff;
+  border: none; border-radius: 10px;
+  transition: background 0.2s, transform 0.15s;
+}
+.hero-cta-primary:hover { background: var(--rust); transform: translateY(-1px); }
+.hero-cta-ghost {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 0.9rem 2.2rem;
+  background: transparent; color: rgba(240,228,204,0.8);
+  border: 1px solid rgba(240,228,204,0.35); border-radius: 10px;
+  text-decoration: none;
+  transition: border-color 0.2s, color 0.2s;
+}
+.hero-cta-ghost:hover { border-color: var(--clay); color: var(--clay); }
+/* Scroll hint */
+.hero-scroll-hint {
+  position: absolute; bottom: 2rem; right: clamp(1.4rem,5vw,4rem);
+  z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.28em; text-transform: uppercase; color: rgba(240,228,204,0.4);
+}
+.hero-scroll-line {
+  width: 1px; height: 48px;
+  background: linear-gradient(to bottom, transparent, rgba(240,228,204,0.4));
+  animation: scrollPulse 2s ease-in-out infinite;
+}
+@keyframes scrollPulse { 0%,100%{opacity:0.4;} 50%{opacity:1;} }
+
+/* ── Marquee strip ── */
+.marquee-strip {
+  background: var(--rust);
+  padding: 0.75rem 0;
+  overflow: hidden; white-space: nowrap;
+}
+.marquee-track {
+  display: inline-flex; gap: 0;
+  animation: marqueeScroll 28s linear infinite;
+}
+.marquee-track:hover { animation-play-state: paused; }
+@keyframes marqueeScroll { 0%{transform:translateX(0);} 100%{transform:translateX(-50%);} }
+.marquee-item {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.3em; text-transform: uppercase; color: var(--linen);
+  padding: 0 2.5rem; display: inline-flex; align-items: center; gap: 2.5rem;
+}
+.marquee-item::after { content: '✦'; color: var(--clay); opacity: 0.7; }
+
+/* ── Collection tiles ── */
+.collections-section {
+  padding: clamp(3rem,6vw,5rem) clamp(1.4rem,5vw,4rem);
+  background: var(--bg);
+}
+.collections-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 2.4rem; flex-wrap: wrap; gap: 1rem;
+}
+.collections-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.32em; text-transform: uppercase; color: var(--gold);
+  margin-bottom: 0.5rem;
+}
+.collections-heading {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 300; color: var(--text); line-height: 1.1;
+}
+.collections-heading em { font-style: italic; color: var(--rust); }
+.collections-browse-all {
+  font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--text-muted); text-decoration: none;
+  display: flex; align-items: center; gap: 0.5rem;
+  transition: color 0.2s; white-space: nowrap;
+}
+.collections-browse-all:hover { color: var(--clay); }
+.collections-browse-all::after { content: '→'; }
+.collections-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 0.8rem;
+  height: 480px;
+}
+@media(max-width:700px) {
+  .collections-grid { grid-template-columns: 1fr; height: auto; }
+  .coll-tile { height: 300px; }
+}
+.coll-tile {
+  position: relative; overflow: hidden;
+  cursor: pointer; background: var(--bg-alt);
+  border-radius: 14px;
+  transition: transform 0.3s;
+}
+.coll-tile:hover { transform: scale(0.99); }
+.coll-tile-chips {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.7rem 0 0.8rem;
+}
+.coll-chip {
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  padding: 0.32rem 0.75rem;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 20px; color: rgba(240,228,204,0.8);
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.coll-chip:hover {
+  background: rgba(196,132,90,0.35);
+  border-color: var(--clay); color: #fff;
+}
+.coll-tile-img {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  transition: transform 0.7s ease;
+}
+.coll-tile:hover .coll-tile-img { transform: scale(1.06); }
+.coll-tile-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(20,12,8,0.8) 0%, rgba(20,12,8,0.1) 60%);
+}
+.coll-tile-body {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 1.4rem 1.6rem;
+}
+.coll-tile-label {
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 0.4rem;
+}
+.coll-tile-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.3rem, 2.5vw, 1.8rem);
+  font-weight: 300; color: #f0e4cc; line-height: 1.1;
+}
+.coll-tile-name em { font-style: italic; color: var(--clay); }
+.coll-tile-arrow {
+  display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.6rem;
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: rgba(240,228,204,0.6);
+  transition: color 0.2s;
+}
+.coll-tile:hover .coll-tile-arrow { color: var(--clay); }
+
+/* ── Promo ticker (replaces bulky banner) ── */
+.promo-ticker {
+  background: var(--parchment);
+  border-top: 1px solid rgba(196,132,90,0.2);
+  border-bottom: 1px solid rgba(196,132,90,0.2);
+  padding: 0.6rem 0;
+  overflow: hidden; white-space: nowrap;
+}
+body.dark .promo-ticker { background: #1a1210; }
+.promo-ticker-track {
+  display: inline-flex; align-items: center; gap: 1.4rem;
+  animation: tickerScroll 32s linear infinite;
+}
+.promo-ticker-track:hover { animation-play-state: paused; }
+@keyframes tickerScroll { 0%{transform:translateX(0);} 100%{transform:translateX(-50%);} }
+.promo-ticker-item {
+  font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.promo-ticker-sep {
+  color: var(--gold); font-size: 0.45rem; opacity: 0.6;
+}
+
+/* ── Shop editorial image breaks ── */
+.shop-editorial-break {
+  position: relative;
+  height: clamp(300px, 42vw, 560px);
+  overflow: hidden;
+  display: flex; align-items: flex-end;
+}
+.shop-editorial-img {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  transition: transform 8s ease;
+}
+.shop-editorial-break:hover .shop-editorial-img { transform: scale(1.04); }
+.shop-editorial-overlay {
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(to top, rgba(20,12,8,0.85) 0%, rgba(20,12,8,0.1) 55%);
+}
+.shop-editorial-content {
+  position: relative; z-index: 2;
+  padding: clamp(2rem,5vw,4.5rem);
+  display: flex; flex-direction: column; gap: 0.7rem;
+}
+.shop-editorial-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: 0.3em; text-transform: uppercase; color: var(--clay);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.shop-editorial-eyebrow::before { content: '✦'; font-size: 0.38rem; }
+.shop-editorial-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.8rem, 4vw, 3.4rem);
+  font-weight: 300; line-height: 1.0; color: #f0e4cc;
+}
+.shop-editorial-title em { font-style: italic; color: var(--clay); }
+.shop-editorial-link {
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: rgba(240,228,204,0.7); text-decoration: none;
+  border-bottom: 1px solid rgba(196,132,90,0.35);
+  padding-bottom: 2px; width: fit-content;
+  transition: color 0.2s, border-color 0.2s;
+}
+.shop-editorial-link:hover { color: var(--clay); border-color: var(--clay); }
+
+
+/* ── Featured spotlight ── */
+.featured-section {
+  padding: clamp(3rem,6vw,5rem) clamp(1.4rem,5vw,4rem);
+  background: var(--bg-alt);
+  border-top: 1px solid var(--border);
+}
+.featured-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(2rem,5vw,5rem);
+  align-items: center;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+@media(max-width:760px){
+  .featured-inner { grid-template-columns: 1fr; }
+  .featured-img-col { order: 1; max-width: 380px; margin: 0 auto; }
+  .featured-text-col { order: 2; }
+}
+.featured-img-col { position: relative; }
+.featured-img-frame {
+  position: relative;
+  background: #fff;
+  padding: 1.5rem 1.5rem 2.5rem;
+  box-shadow: 0 12px 48px rgba(74,50,40,0.18);
+  border-radius: 16px;
+  transform: rotate(-1.5deg);
+  transition: transform 0.4s;
+}
+.featured-img-frame:hover { transform: rotate(0deg) scale(1.01); }
+.featured-img { width: 100%; display: block; aspect-ratio: 3/4; object-fit: cover; }
+.featured-img-mat {
+  position: absolute; inset: 0;
+  border: 2px solid rgba(255,255,255,0.6);
+  pointer-events: none;
+}
+.featured-img-caption {
+  text-align: center; margin-top: 1rem;
+  font-family: 'Cinzel', serif; font-size: 0.46rem;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
+}
+.featured-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.35em; text-transform: uppercase; color: var(--clay);
+  margin-bottom: 0.9rem; display: flex; align-items: center; gap: 0.7rem;
+}
+.featured-eyebrow::before { content: '✦'; font-size: 0.38rem; }
+.featured-heading {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.4rem,5vw,4rem); font-weight: 300;
+  line-height: 0.95; color: var(--text); margin-bottom: 1.4rem;
+}
+.featured-heading em { font-style: italic; color: var(--rust); }
+.featured-body {
+  font-family: 'Crimson Pro', serif; font-size: 1.08rem;
+  line-height: 1.8; color: var(--text-muted); margin-bottom: 1.8rem;
+  max-width: 380px;
+}
+.featured-meta {
+  display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: 2rem;
+  padding-top: 1.4rem; border-top: 1px solid var(--border);
+}
+.featured-meta-item { display: flex; flex-direction: column; gap: 0.25rem; }
+.featured-meta-label {
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
+}
+.featured-meta-val {
+  font-family: 'Cormorant Garamond', serif; font-size: 1rem; color: var(--gold);
+}
+.featured-ctas { display: flex; gap: 1rem; }
+
+/* ── Divider ── */
 .divider-ornament {
   display: flex; align-items: center; gap: 1rem;
   justify-content: center; margin-bottom: 2.5rem;
@@ -166,15 +519,24 @@ nav.scrolled {
 /* ── Filters ── */
 .shop-filters {
   display: flex; justify-content: center; flex-wrap: wrap; gap: 0.5rem;
-  padding: 0 clamp(1.2rem,4vw,3rem) 3rem;
+  padding: 2.5rem clamp(1.2rem,4vw,3rem) 2.5rem;
+  background: var(--bg);
+  position: sticky; top: 60px; z-index: 50;
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(245,237,224,0.92);
+}
+body.dark .shop-filters {
+  background: rgba(20,16,16,0.92);
 }
 .filter-btn {
-  font-family: 'Cinzel', serif; font-size: 0.58rem;
-  letter-spacing: 0.2em; text-transform: uppercase;
-  padding: 0.55rem 1.3rem;
+  font-family: 'Cinzel', serif; font-size: 0.55rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 0.6rem 1.5rem;
   border: 1px solid var(--border);
   background: transparent; color: var(--text-muted);
-  border-radius: 2px;
+  border-radius: 40px;
   transition: border-color 0.2s, color 0.2s, background 0.2s;
 }
 .filter-btn:hover { border-color: var(--clay); color: var(--clay); }
@@ -185,13 +547,17 @@ nav.scrolled {
 
 /* ── Grid ── */
 .shop-section {
-  padding: 0 clamp(1.2rem,4vw,3rem) 5rem;
+  padding: 3rem clamp(1.2rem,4vw,3rem) 5rem;
 }
 .section-label {
-  font-family: 'Cinzel', serif; font-size: 0.58rem;
-  letter-spacing: 0.35em; text-transform: uppercase;
-  color: var(--gold); margin-bottom: 1.8rem;
+  font-family: 'Cinzel', serif; font-size: 0.55rem;
+  letter-spacing: 0.38em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 2rem;
   display: flex; align-items: center; gap: 1rem;
+  padding-top: 1.5rem;
+}
+.section-label::before {
+  content: '✦'; font-size: 0.45rem; color: var(--clay);
 }
 .section-label::after {
   content:''; flex:1; height:1px;
@@ -207,7 +573,7 @@ nav.scrolled {
 .product-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: 16px;
   overflow: hidden;
   transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
   cursor: pointer;
@@ -221,24 +587,38 @@ nav.scrolled {
 .product-card.hidden { display: none; }
 
 .card-img {
-  aspect-ratio: 4/3; overflow: hidden;
+  aspect-ratio: 3/4; overflow: hidden;
   background: var(--bg-alt);
   position: relative;
 }
-.card-img img { width:100%; height:100%; object-fit:cover; transition: transform 0.5s ease; }
-.product-card:hover .card-img img { transform: scale(1.04); }
+.card-img img { width:100%; height:100%; object-fit:cover; transition: transform 0.6s ease; }
+.product-card:hover .card-img img { transform: scale(1.05); }
 .card-img-placeholder {
   width:100%; height:100%;
   display: flex; align-items: center; justify-content: center;
   font-family: 'Cormorant Garamond', serif;
   font-size: 2.5rem; color: var(--clay); opacity: 0.3;
 }
+/* Quick-view overlay on card image */
+.card-img-hover {
+  position: absolute; inset: 0;
+  background: rgba(20,12,8,0.45);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.3s;
+}
+.product-card:hover .card-img-hover { opacity: 1; }
+.card-img-hover-label {
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.24em; text-transform: uppercase;
+  color: #fff; padding: 0.5rem 1.2rem;
+  border: 1px solid rgba(255,255,255,0.5); border-radius: 1px;
+}
 .card-badge {
   position: absolute; top: 12px; left: 12px;
   font-family: 'Cinzel', serif; font-size: 0.48rem;
   letter-spacing: 0.2em; text-transform: uppercase;
   background: var(--rust); color: #fff;
-  padding: 0.3rem 0.6rem; border-radius: 2px;
+  padding: 0.3rem 0.6rem; border-radius: 20px;
 }
 .card-badge-stack {
   position: absolute; top: 12px; left: 12px;
@@ -248,7 +628,7 @@ nav.scrolled {
 .card-badge-stack .card-tag {
   font-family: 'Cinzel', serif; font-size: 0.48rem;
   letter-spacing: 0.2em; text-transform: uppercase;
-  color: #fff; padding: 0.3rem 0.6rem; border-radius: 2px;
+  color: #fff; padding: 0.3rem 0.6rem; border-radius: 10px;
 }
 .card-tag-manual { background: var(--rust); }
 .card-tag-new { background: var(--moss); }
@@ -277,7 +657,7 @@ nav.scrolled {
   letter-spacing: 0.06em; font-weight: 500;
   padding: 0.28rem 0.65rem;
   border: 1px solid var(--border);
-  border-radius: 2px; color: var(--text-muted);
+  border-radius: 20px; color: var(--text-muted);
   transition: border-color 0.15s, color 0.15s, background 0.15s;
   cursor: pointer;
 }
@@ -297,7 +677,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   color: var(--text);
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 2px;
+  border-radius: 8px;
   padding: 0.5rem 2rem 0.5rem 0.7rem;
   cursor: pointer;
   appearance: none; -webkit-appearance: none;
@@ -335,7 +715,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   letter-spacing: 0.18em; text-transform: uppercase;
   padding: 0.65rem 1.1rem;
   background: var(--rust); color: var(--linen);
-  border: none; border-radius: 2px;
+  border: none; border-radius: 8px;
   transition: background 0.2s, transform 0.15s;
   white-space: nowrap;
 }
@@ -369,6 +749,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   width: min(420px, 100vw);
   background: var(--bg);
   border-left: 1px solid var(--border);
+  border-radius: 16px 0 0 16px;
   display: flex; flex-direction: column;
   transform: translateX(100%);
   transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
@@ -407,7 +788,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   border-bottom: 1px solid var(--border);
 }
 .cart-item-img {
-  width: 64px; height: 64px; border-radius: 2px;
+  width: 64px; height: 64px; border-radius: 10px;
   background: var(--bg-alt); overflow: hidden; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 1.4rem; color: var(--clay); opacity: 0.5;
@@ -441,7 +822,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
 }
 .qty-btn {
   background: var(--bg-alt); border: 1px solid var(--border);
-  width: 22px; height: 22px; border-radius: 2px;
+  width: 22px; height: 22px; border-radius: 6px;
   font-size: 0.85rem; color: var(--text);
   display: flex; align-items: center; justify-content: center;
   transition: border-color 0.15s;
@@ -487,7 +868,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   letter-spacing: 0.2em; text-transform: uppercase;
   padding: 1rem;
   background: var(--rust); color: var(--linen);
-  border: none; border-radius: 2px;
+  border: none; border-radius: 10px;
   transition: background 0.2s;
   margin-bottom: 0.8rem;
 }
@@ -508,7 +889,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
 .modal {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 20px;
   width: 100%; max-width: 500px;
   max-height: 90vh; overflow-y: auto;
   transform: translateY(16px);
@@ -551,7 +932,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   padding: 0.7rem 1rem;
   background: var(--bg-alt);
   border: 1px solid var(--border);
-  border-radius: 2px; color: var(--text);
+  border-radius: 10px; color: var(--text);
   transition: border-color 0.2s;
   outline: none; appearance: none;
 }
@@ -562,7 +943,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
 .order-summary {
   background: var(--bg-alt);
   border: 1px solid var(--border);
-  border-radius: 2px;
+  border-radius: 12px;
   padding: 1.2rem;
   margin-bottom: 1.6rem;
 }
@@ -619,7 +1000,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
 /* Payment tabs */
 .pay-tabs {
   display: flex; border: 1px solid var(--border);
-  border-radius: 2px; overflow: hidden;
+  border-radius: 10px; overflow: hidden;
   margin-bottom: 1.4rem;
 }
 .pay-tab {
@@ -646,7 +1027,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
 
 /* Crypto addresses */
 .crypto-option {
-  border: 1px solid var(--border); border-radius: 2px;
+  border: 1px solid var(--border); border-radius: 12px;
   padding: 1rem; margin-bottom: 0.8rem;
   transition: border-color 0.2s;
 }
@@ -664,7 +1045,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   font-family: 'Montserrat', sans-serif; font-size: 0.62rem;
   color: var(--text-muted); word-break: break-all;
   background: var(--bg-alt); padding: 0.5rem 0.7rem;
-  border-radius: 2px; margin-bottom: 0.5rem;
+  border-radius: 10px; margin-bottom: 0.5rem;
 }
 .pay-opt-btn {
   flex: 1;
@@ -673,7 +1054,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   padding: 0.7rem;
   border: 1px solid var(--border);
   background: transparent; color: var(--text-muted);
-  border-radius: 2px;
+  border-radius: 8px;
   transition: border-color 0.2s, color 0.2s;
 }
 .pay-opt-btn:hover { border-color: var(--clay); color: var(--clay); }
@@ -681,7 +1062,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   font-family: 'Cinzel', serif; font-size: 0.48rem;
   letter-spacing: 0.15em; text-transform: uppercase;
   padding: 0.35rem 0.8rem;
-  border: 1px solid var(--border); border-radius: 2px;
+  border: 1px solid var(--border); border-radius: 8px;
   background: none; color: var(--text-muted);
   transition: border-color 0.15s, color 0.15s;
 }
@@ -694,7 +1075,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   letter-spacing: 0.2em; text-transform: uppercase;
   padding: 1rem;
   background: var(--rust); color: var(--linen);
-  border: none; border-radius: 2px;
+  border: none; border-radius: 10px;
   transition: background 0.2s, opacity 0.2s;
   margin-top: 1rem;
 }
@@ -727,7 +1108,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   letter-spacing: 0.2em; text-transform: uppercase;
   padding: 0.85rem 2rem;
   background: none; border: 1px solid var(--border);
-  color: var(--text-muted); border-radius: 2px;
+  color: var(--text-muted); border-radius: 10px;
   transition: border-color 0.2s, color 0.2s;
 }
 .continue-btn:hover { border-color: var(--clay); color: var(--clay); }
@@ -756,7 +1137,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
 .admin-panel.open { opacity:1; pointer-events:all; }
 .admin-box {
   background: var(--bg); border: 1px solid var(--border);
-  border-radius: 4px; width:100%; max-width:680px;
+  border-radius: 20px; width:100%; max-width:680px;
   max-height:90vh; overflow-y:auto;
   transform: translateY(16px); transition: transform 0.3s;
 }
@@ -784,7 +1165,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
 .admin-product-row {
   display:grid; grid-template-columns:1fr 1fr;
   gap:0.8rem; margin-bottom:1rem; padding:1rem;
-  border:1px solid var(--border); border-radius:2px;
+  border:1px solid var(--border); border-radius: 10px;
   position:relative;
 }
 .admin-product-row .form-row { margin-bottom:0.5rem; }
@@ -798,7 +1179,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   letter-spacing:0.2em; text-transform:uppercase;
   padding:0.75rem 1.8rem;
   background:var(--rust); color:var(--linen);
-  border:none; border-radius:2px;
+  border:none; border-radius:10px;
   transition:background 0.2s; margin-top:0.8rem;
 }
 .admin-save-btn:hover { background:var(--bark); }
@@ -807,7 +1188,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   letter-spacing:0.18em; text-transform:uppercase;
   padding:0.6rem 1.2rem;
   border:1px dashed var(--border); background:none;
-  color:var(--text-muted); border-radius:2px;
+  color:var(--text-muted); border-radius: 10px;
   transition:border-color 0.2s, color 0.2s;
   width:100%; margin-bottom:1.2rem;
 }
@@ -838,7 +1219,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
 .size-guide-box {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 20px;
   width: 100%; max-width: 580px;
   max-height: 88vh; overflow-y: auto;
   transform: translateY(16px);
@@ -870,7 +1251,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
 /* Unit toggle */
 .unit-toggle {
   display: flex; align-items: center; gap: 0; margin-bottom: 1.6rem;
-  border: 1px solid var(--border); border-radius: 2px; overflow: hidden;
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
   width: fit-content;
 }
 .unit-btn {
@@ -885,7 +1266,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
 /* How to measure */
 .measure-guide {
   background: var(--bg-alt); border: 1px solid var(--border);
-  border-radius: 2px; padding: 1rem 1.2rem; margin-bottom: 1.6rem;
+  border-radius: 12px; padding: 1rem 1.2rem; margin-bottom: 1.6rem;
 }
 .measure-title {
   font-family: 'Cinzel', serif; font-size: 0.52rem;
@@ -903,7 +1284,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
 /* Size table */
 .size-table-wrap {
   overflow-x: auto; margin-bottom: 1.4rem;
-  border: 1px solid var(--border); border-radius: 2px;
+  border: 1px solid var(--border); border-radius: 10px;
 }
 .size-table {
   width: 100%; border-collapse: collapse;
@@ -958,7 +1339,7 @@ body.dark .variant-chip.selected { color: var(--sand); }
   z-index:500; background:var(--bark); color:var(--sand);
   font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.18em;
   text-transform:uppercase; padding:0.85rem 2rem;
-  border-radius:2px; border:1px solid var(--clay);
+  border-radius: 10px; border:1px solid var(--clay);
   opacity:0; pointer-events:none;
   transition:opacity 0.25s, transform 0.25s;
   white-space:nowrap;
@@ -967,13 +1348,184 @@ body.dark .toast { background:#2a1c14; }
 .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
 /* ── Footer ── */
+/* ══ Footer ══ */
 footer {
-  text-align:center; padding:3rem 2rem;
-  border-top:1px solid var(--border);
-  font-family:'Crimson Pro',serif; font-size:0.9rem; color:var(--text-muted);
+  background: var(--bark);
+  color: rgba(232,213,176,0.6);
+  font-family: 'Crimson Pro', serif;
 }
-footer a { color:var(--clay); transition:color 0.2s; }
-footer a:hover { color:var(--rust); }
+.footer-top {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1.4fr;
+  gap: 2.5rem 3rem;
+  padding: clamp(3rem,6vw,5rem) clamp(1.4rem,5vw,4rem) 3rem;
+  border-bottom: 1px solid rgba(201,153,58,0.15);
+  max-width: 1200px; margin: 0 auto;
+}
+@media(max-width:860px) {
+  .footer-top { grid-template-columns: 1fr 1fr; }
+}
+@media(max-width:520px) {
+  .footer-top { grid-template-columns: 1fr; gap: 2rem; }
+}
+
+/* Brand col */
+.footer-brand-col {}
+.footer-brand {
+  font-family: 'Cinzel', serif; font-size: 0.8rem;
+  letter-spacing: 0.35em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 0.6rem;
+  display: flex; align-items: center; gap: 0.6rem;
+}
+.footer-brand::before {
+  content: '✦'; font-size: 0.6rem; color: var(--clay);
+}
+.footer-tagline {
+  font-size: 1.05rem; color: rgba(232,213,176,0.5);
+  line-height: 1.65; margin-bottom: 1.4rem;
+  max-width: 220px;
+}
+.footer-social {
+  display: flex; gap: 0.6rem;
+}
+.footer-social-link {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid rgba(201,153,58,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; color: rgba(232,213,176,0.4);
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  text-decoration: none;
+}
+.footer-social-link:hover {
+  border-color: var(--gold); color: var(--gold);
+  background: rgba(201,153,58,0.08);
+}
+
+/* Link cols */
+.footer-col-title {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 1.2rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid rgba(201,153,58,0.15);
+}
+.footer-links-list {
+  list-style: none; display: flex; flex-direction: column; gap: 0.7rem;
+}
+.footer-links-list a {
+  font-size: 0.98rem; color: rgba(232,213,176,0.5);
+  text-decoration: none; transition: color 0.2s;
+}
+.footer-links-list a:hover { color: var(--clay); }
+
+/* Newsletter col */
+.footer-newsletter-col {}
+.footer-newsletter-text {
+  font-size: 0.98rem; color: rgba(232,213,176,0.5);
+  line-height: 1.65; margin-bottom: 1.2rem;
+}
+.footer-newsletter-form {
+  display: flex; flex-direction: column; gap: 0.6rem;
+}
+.footer-newsletter-input {
+  width: 100%;
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+  padding: 0.7rem 1rem;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(201,153,58,0.2);
+  border-radius: 10px; color: rgba(232,213,176,0.85);
+  transition: border-color 0.2s; outline: none;
+}
+.footer-newsletter-input::placeholder { color: rgba(232,213,176,0.25); }
+.footer-newsletter-input:focus { border-color: var(--gold); }
+.footer-newsletter-btn {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 0.75rem 1rem;
+  background: var(--gold); color: var(--bark);
+  border: none; border-radius: 10px;
+  cursor: pointer; transition: background 0.2s, transform 0.15s;
+  font-weight: 600;
+}
+.footer-newsletter-btn:hover { background: var(--clay); transform: translateY(-1px); }
+
+/* Gold ornament divider */
+.footer-ornament {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1.6rem clamp(1.4rem,5vw,4rem);
+  justify-content: center;
+  border-bottom: 1px solid rgba(201,153,58,0.1);
+}
+.footer-ornament::before, .footer-ornament::after {
+  content: ''; flex: 1; max-width: 180px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201,153,58,0.3), transparent);
+}
+.footer-ornament-text {
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.4em; text-transform: uppercase;
+  color: rgba(201,153,58,0.4);
+}
+
+/* Bottom bar */
+.footer-bottom {
+  padding: 1.4rem clamp(1.4rem,5vw,4rem);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 0.8rem;
+  max-width: 1200px; margin: 0 auto;
+}
+.footer-copy {
+  font-size: 0.85rem; color: rgba(232,213,176,0.3);
+}
+.footer-copy a { color: var(--clay); text-decoration: none; }
+.footer-copy a:hover { color: var(--gold); }
+.footer-legal {
+  display: flex; gap: 1.4rem;
+}
+.footer-legal a {
+  font-family: 'Cinzel', serif; font-size: 0.42rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: rgba(232,213,176,0.25); text-decoration: none;
+  transition: color 0.2s;
+}
+.footer-legal a:hover { color: var(--clay); }
+
+/* Gold accent on card bodies */
+.card-category {
+  font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 0.4rem;
+}
+/* Gold shimmer on section labels */
+.section-label {
+  background: linear-gradient(90deg, var(--gold), var(--clay), var(--gold));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: goldShimmer 4s linear infinite;
+}
+@keyframes goldShimmer {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+/* Gold top border accent on product cards */
+.product-card::before {
+  content: '';
+  display: block; height: 2px;
+  background: linear-gradient(90deg, var(--gold), var(--clay), var(--gold));
+  background-size: 200% auto;
+  opacity: 0;
+  transition: opacity 0.3s;
+  animation: goldShimmer 3s linear infinite;
+}
+.product-card:hover::before { opacity: 1; }
+/* Gold price */
+.price-ngn {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem; font-weight: 600; color: var(--gold);
+}
+/* Gold divider ornament */
+.footer-links a { color: rgba(232,213,176,0.45); }
 
 /* ── Responsive ── */
 @media(max-width:600px){
@@ -982,6 +1534,8 @@ footer a:hover { color:var(--rust); }
   .form-row-2 { grid-template-columns:1fr; }
   .pay-tabs { flex-wrap:wrap; }
   .pay-tab { flex:1 1 50%; }
+  .shop-hero-title { font-size: clamp(2.4rem, 10vw, 3.8rem); }
+  .shop-filters { padding: 1rem clamp(0.8rem,3vw,1.5rem); top: 60px; }
 }
 @media(max-width:400px){
   .shop-grid { grid-template-columns:1fr; }
@@ -1012,11 +1566,11 @@ footer a:hover { color:var(--rust); }
 }
 .checkout-loading-bar {
   width: min(220px, 60vw); height: 2px;
-  background: rgba(232,213,176,0.15); border-radius: 2px; overflow: hidden;
+  background: rgba(232,213,176,0.15); border-radius: 10px; overflow: hidden;
 }
 .checkout-loading-bar::after {
   content: ''; display: block; height: 100%; width: 40%;
-  background: var(--clay); border-radius: 2px;
+  background: var(--clay); border-radius: 10px;
   animation: ck-slide 1.1s ease-in-out infinite;
 }
 @keyframes ck-slide {
@@ -1026,16 +1580,16 @@ footer a:hover { color:var(--rust); }
 
 /* ── Enquiry widget (floating button + modal) ── */
 .enquire-fab {
-  position: fixed; right: 1.2rem; bottom: 1.2rem; z-index: 8000;
+  position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 8000;
   display: inline-flex; align-items: center; gap: 0.5rem;
-  padding: 0.7rem 1.1rem; border: none; border-radius: 999px;
-  background: var(--rust); color: var(--linen);
+  padding: 0.75rem 1.25rem; border: none; border-radius: 999px;
+  background: var(--gold); color: var(--bark);
   font-family: 'Cinzel', serif; font-size: 0.55rem;
   letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer;
-  box-shadow: 0 6px 22px rgba(20,16,12,0.28);
-  transition: transform 0.18s, background 0.2s;
+  box-shadow: 0 6px 24px rgba(201,153,58,0.35);
+  transition: transform 0.18s, background 0.2s, box-shadow 0.2s;
 }
-.enquire-fab:hover { background: var(--bark); transform: translateY(-2px); }
+.enquire-fab:hover { background: var(--rust); color: var(--linen); transform: translateY(-2px); box-shadow: 0 10px 30px rgba(158,79,46,0.35); }
 .enquire-fab svg { width: 15px; height: 15px; }
 .enquire-overlay {
   position: fixed; inset: 0; z-index: 8500;
@@ -1047,7 +1601,7 @@ footer a:hover { color:var(--rust); }
 .enquire-overlay.show { opacity: 1; pointer-events: all; }
 .enquire-modal {
   background: var(--bg-card, #fff); border: 1px solid var(--border);
-  border-radius: 4px; width: min(440px, 100%); max-height: 92vh; overflow-y: auto;
+  border-radius: 20px; width: min(440px, 100%); max-height: 92vh; overflow-y: auto;
   padding: 1.8rem; transform: translateY(16px); transition: transform 0.25s;
   box-shadow: 0 18px 60px rgba(20,16,12,0.35);
 }
@@ -1060,7 +1614,7 @@ footer a:hover { color:var(--rust); }
 .enquire-wa {
   display: flex; align-items: center; justify-content: center; gap: 0.6rem;
   width: 100%; padding: 0.85rem; margin-bottom: 1.1rem;
-  background: #25d366; color: #fff; border: none; border-radius: 3px;
+  background: #25d366; color: #fff; border: none; border-radius: 10px;
   font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase;
   cursor: pointer; transition: filter 0.18s;
 }
@@ -1071,14 +1625,14 @@ footer a:hover { color:var(--rust); }
 .enquire-field { margin-bottom: 0.9rem; }
 .enquire-field label { display: block; font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.35rem; }
 .enquire-field input, .enquire-field textarea {
-  width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 2px;
+  width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 10px;
   background: var(--bg-card, #fff); color: var(--text);
   font-family: 'Crimson Pro', serif; font-size: 0.95rem;
 }
 .enquire-field textarea { resize: vertical; min-height: 90px; }
 .enquire-field input:focus, .enquire-field textarea:focus { border-color: var(--clay); outline: none; }
 .enquire-send {
-  width: 100%; padding: 0.85rem; border: none; border-radius: 2px;
+  width: 100%; padding: 0.85rem; border: none; border-radius: 10px;
   background: var(--rust); color: var(--linen);
   font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.18em; text-transform: uppercase;
   cursor: pointer; transition: background 0.2s;
@@ -1089,7 +1643,110 @@ footer a:hover { color:var(--rust); }
 .enquire-done-icon { font-size: 2.4rem; color: var(--gold); margin-bottom: 0.8rem; }
 @media(max-width:600px){ .enquire-fab { font-size: 0.48rem; padding: 0.65rem 0.95rem; } }
 
-/* ── FAQ section ── */
+/* ── Edition sublabels ── */
+.edition-sublabel {
+  margin: 2.4rem 0 1.2rem;
+  display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap;
+}
+.edition-sublabel-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.5rem; font-weight: 300; font-style: italic;
+  color: var(--text);
+}
+.edition-sublabel-desc {
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+  color: var(--text-muted);
+}
+.edition-grid:empty { display: none; }
+
+/* ── Sold overlay on cards ── */
+.card-sold-overlay {
+  position: absolute; inset: 0; z-index: 3;
+  background: rgba(20,12,8,0.55);
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.card-sold-stamp {
+  font-family: 'Cinzel', serif; font-size: 0.72rem;
+  letter-spacing: 0.3em; text-transform: uppercase;
+  color: #fff; padding: 0.6rem 1.6rem;
+  border: 2px solid rgba(255,255,255,0.6);
+  border-radius: 4px;
+  transform: rotate(-8deg);
+  background: rgba(158,79,46,0.75);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+}
+.product-card.is-sold { opacity: 0.88; }
+.product-card.is-sold .card-img img { filter: grayscale(30%); }
+
+/* ── Interest form modal ── */
+.interest-overlay {
+  position: fixed; inset: 0; z-index: 8600;
+  background: rgba(14,10,8,0.72);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  opacity: 0; pointer-events: none; transition: opacity 0.25s;
+}
+.interest-overlay.show { opacity: 1; pointer-events: all; }
+.interest-modal {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 20px; width: min(460px, 100%);
+  max-height: 92vh; overflow-y: auto;
+  padding: 2rem; transform: translateY(16px); transition: transform 0.25s;
+  box-shadow: 0 20px 60px rgba(14,10,8,0.35);
+}
+.interest-overlay.show .interest-modal { transform: translateY(0); }
+.interest-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.3rem; }
+.interest-title { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 300; color: var(--text); }
+.interest-piece { font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); margin-bottom: 1rem; }
+.interest-body-text { font-family: 'Crimson Pro', serif; font-size: 1rem; color: var(--text-muted); line-height: 1.65; margin-bottom: 1.4rem; }
+.interest-close { background: none; border: none; font-size: 1rem; color: var(--text-muted); cursor: pointer; transition: color 0.2s; }
+.interest-close:hover { color: var(--rust); }
+.interest-field { margin-bottom: 0.9rem; }
+.interest-field label { display: block; font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.35rem; }
+.interest-field input, .interest-field textarea {
+  width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-alt); color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem; outline: none;
+  transition: border-color 0.2s;
+}
+.interest-field textarea { resize: vertical; min-height: 80px; }
+.interest-field input:focus, .interest-field textarea:focus { border-color: var(--clay); }
+.interest-send {
+  width: 100%; padding: 0.9rem; border: none; border-radius: 10px;
+  background: var(--gold); color: var(--bark);
+  font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.18em; text-transform: uppercase;
+  cursor: pointer; transition: background 0.2s; font-weight: 600;
+}
+.interest-send:hover { background: var(--clay); }
+.interest-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.interest-done { text-align: center; padding: 1.5rem 0.5rem; }
+.interest-done-icon { font-size: 2.4rem; color: var(--gold); margin-bottom: 0.8rem; }
+
+/* ── Express interest button on 1/1 cards ── */
+.interest-btn {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  padding: 0.65rem 1.1rem;
+  background: transparent; color: var(--gold);
+  border: 1px solid rgba(201,153,58,0.5); border-radius: 8px;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+.interest-btn:hover { background: rgba(201,153,58,0.1); border-color: var(--gold); }
+
+/* ── Edition badge on print cards ── */
+.card-edition-badge {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  margin-bottom: 0.35rem;
+}
+.card-edition-badge.one-of-one { color: var(--gold); }
+.card-edition-badge.limited { color: var(--clay); }
+.card-edition-badge::before { content: '✦'; font-size: 0.35rem; }
+
+/* ── FAQ ── */
 .faq-section { max-width: 760px; margin: 4rem auto 2rem; padding: 0 1.4rem; }
 .faq-eyebrow { font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--gold); text-align: center; margin-bottom: 0.5rem; }
 .faq-heading { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 300; color: var(--text); text-align: center; margin-bottom: 2rem; }
@@ -1112,9 +1769,15 @@ footer a:hover { color:var(--rust); }
 </head>
 <body>
 
+<!-- Custom cursor -->
+<div class="cursor" id="cursor" style="opacity:0;transition:opacity 0.3s;">
+  <div class="cursor-ring" id="cursorRing"></div>
+  <div class="cursor-dot" id="cursorDot"></div>
+</div>
+
 <!-- Nav -->
 <nav id="nav">
-  <a href="/" class="nav-logo">Kay's Works</a>
+  <a href="/" class="nav-logo"><span style="font-weight:600">KAY'S</span>&nbsp; <span style="font-weight:500">WORKS</span></a>
   <div class="nav-right">
     <div class="nav-links">
       <a href="/">Home</a>
@@ -1130,16 +1793,154 @@ footer a:hover { color:var(--rust); }
   </div>
 </nav>
 
-<!-- Hero -->
+<!-- Hero — full-bleed cinematic -->
 <section class="shop-hero">
-  <p class="shop-hero-eyebrow">Kay's Works · The Shop</p>
-  <h1 class="shop-hero-title">Wear the work.<br><em>Own the story.</em></h1>
-  <p class="shop-hero-sub">Fine art prints, premium merch, and handcrafted notebooks — each piece rooted in the same care Kay puts into his paintings.</p>
-  <div class="divider-ornament"><span>· browse ·</span></div>
+  <div class="shop-hero-bg"></div>
+  <div class="shop-hero-bg-img"></div>
+  <div class="shop-hero-vignette"></div>
+  <div class="shop-hero-content">
+    <p class="shop-hero-eyebrow">Kay's Works · The Shop</p>
+    <h1 class="shop-hero-title">Wear the work.<br><em>Own the story.</em></h1>
+    <p class="shop-hero-sub">Fine art prints, premium merch, and handcrafted notebooks — each piece rooted in the same care Kay puts into his paintings.</p>
+    <div class="shop-hero-ctas">
+      <button class="hero-cta-primary" onclick="document.getElementById('shopGrid').scrollIntoView({behavior:'smooth'})">Browse the shop</button>
+      <a href="#collections" class="hero-cta-ghost">Shop by collection</a>
+    </div>
+  </div>
+  <div class="hero-scroll-hint">
+    <span>Scroll</span>
+    <div class="hero-scroll-line"></div>
+  </div>
+</section>
+
+<!-- Marquee strip -->
+<div class="marquee-strip" aria-hidden="true">
+  <div class="marquee-track">
+    <span class="marquee-item">Fine Art Prints</span>
+    <span class="marquee-item">Hand-Signed Editions</span>
+    <span class="marquee-item">Ships Worldwide</span>
+    <span class="marquee-item">Premium Merch</span>
+    <span class="marquee-item">Kaduna Made</span>
+    <span class="marquee-item">Handcrafted Notebooks</span>
+    <span class="marquee-item">Giclée on Cotton Rag</span>
+    <span class="marquee-item">Limited Editions</span>
+    <span class="marquee-item">Fine Art Prints</span>
+    <span class="marquee-item">Hand-Signed Editions</span>
+    <span class="marquee-item">Ships Worldwide</span>
+    <span class="marquee-item">Premium Merch</span>
+    <span class="marquee-item">Kaduna Made</span>
+    <span class="marquee-item">Handcrafted Notebooks</span>
+    <span class="marquee-item">Giclée on Cotton Rag</span>
+    <span class="marquee-item">Limited Editions</span>
+  </div>
+</div>
+
+<!-- Promo ticker — elegant single-line -->
+<div class="promo-ticker" aria-hidden="true">
+  <div class="promo-ticker-track">
+    <span class="promo-ticker-item">🚚 Free pickup in Kaduna</span>
+    <span class="promo-ticker-sep">✦</span>
+    <span class="promo-ticker-item">🌍 Worldwide shipping available</span>
+    <span class="promo-ticker-sep">✦</span>
+    <span class="promo-ticker-item">✍ Hand-signed editions</span>
+    <span class="promo-ticker-sep">✦</span>
+    <span class="promo-ticker-item">💳 Pay with card, crypto or transfer</span>
+    <span class="promo-ticker-sep">✦</span>
+    <span class="promo-ticker-item">📦 Archival packaging on every order</span>
+    <span class="promo-ticker-sep">✦</span>
+    <span class="promo-ticker-item">🚚 Free pickup in Kaduna</span>
+    <span class="promo-ticker-sep">✦</span>
+    <span class="promo-ticker-item">🌍 Worldwide shipping available</span>
+    <span class="promo-ticker-sep">✦</span>
+    <span class="promo-ticker-item">✍ Hand-signed editions</span>
+    <span class="promo-ticker-sep">✦</span>
+    <span class="promo-ticker-item">💳 Pay with card, crypto or transfer</span>
+    <span class="promo-ticker-sep">✦</span>
+    <span class="promo-ticker-item">📦 Archival packaging on every order</span>
+    <span class="promo-ticker-sep">✦</span>
+  </div>
+</div>
+
+<!-- Collection tiles -->
+<section class="collections-section" id="collections">
+  <div class="collections-header">
+    <div>
+      <p class="collections-eyebrow">Shop by collection</p>
+      <h2 class="collections-heading">Browse by <em>category</em></h2>
+    </div>
+    <a href="#shopGrid" class="collections-browse-all">See everything</a>
+  </div>
+  <div class="collections-grid">
+    <!-- Prints tile — large -->
+    <div class="coll-tile" onclick="document.querySelector('[data-filter=prints]').click();document.getElementById('shopGrid').scrollIntoView({behavior:'smooth'})">
+      <div class="coll-tile-img" style="background-image:url('/images/seriesinvite.jpg')"></div>
+      <div class="coll-tile-overlay"></div>
+      <div class="coll-tile-body">
+        <p class="coll-tile-label">Fine art</p>
+        <h3 class="coll-tile-name">Prints &<br><em>Unique Works</em></h3>
+        <div class="coll-tile-chips">
+          <span class="coll-chip" onclick="event.stopPropagation();filterPrintEdition('one_of_one')">Unique Works</span>
+          <span class="coll-chip" onclick="event.stopPropagation();filterPrintEdition('limited')">Limited Editions</span>
+          <span class="coll-chip" onclick="event.stopPropagation();filterPrintEdition('open')">Open Editions</span>
+        </div>
+        <span class="coll-tile-arrow">Explore prints →</span>
+      </div>
+    </div>
+    <!-- Merch tile -->
+    <div class="coll-tile" onclick="document.querySelector('[data-filter=merch]').click();document.getElementById('shopGrid').scrollIntoView({behavior:'smooth'})">
+      <div class="coll-tile-img" style="background-image:url('/images/merch.png');background-position:center top"></div>
+      <div class="coll-tile-overlay"></div>
+      <div class="coll-tile-body">
+        <p class="coll-tile-label">Wearables & goods</p>
+        <h3 class="coll-tile-name">Merch,<br><em>Notebooks & More</em></h3>
+        <div class="coll-tile-chips">
+          <span class="coll-chip" onclick="event.stopPropagation();document.querySelector('[data-filter=merch]').click();document.getElementById('shopGrid').scrollIntoView({behavior:'smooth'})">Apparel</span>
+          <span class="coll-chip" onclick="event.stopPropagation();document.querySelector('[data-filter=notebooks]').click();document.getElementById('shopGrid').scrollIntoView({behavior:'smooth'})">Notebooks</span>
+          <span class="coll-chip" onclick="event.stopPropagation();document.querySelector('[data-filter=stickers]').click();document.getElementById('shopGrid').scrollIntoView({behavior:'smooth'})">Stickers</span>
+        </div>
+        <span class="coll-tile-arrow">Shop merch →</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Featured artwork spotlight -->
+<section class="featured-section">
+  <div class="featured-inner">
+    <div class="featured-img-col">
+      <div class="featured-img-frame">
+        <img src="/images/monostudy.png" alt="Featured artwork" class="featured-img" onerror="this.parentElement.style.background='var(--bg-alt)'"/>
+        <div class="featured-img-mat"></div>
+      </div>
+      <div class="featured-img-caption">Available as fine art prints · Multiple sizes</div>
+    </div>
+    <div class="featured-text-col">
+      <p class="featured-eyebrow">Featured this month</p>
+      <h2 class="featured-heading">Monochrome<br><em>Study</em></h2>
+      <p class="featured-body">A quiet study in form and restraint. Kay's monochrome explorations strip away colour to reveal the raw structure of his work — available as giclée prints on 100% cotton rag, hand-signed by the artist.</p>
+      <div class="featured-meta">
+        <div class="featured-meta-item">
+          <span class="featured-meta-label">Medium</span>
+          <span class="featured-meta-val">Giclée on cotton rag</span>
+        </div>
+        <div class="featured-meta-item">
+          <span class="featured-meta-label">Edition</span>
+          <span class="featured-meta-val">Open · Hand-signed</span>
+        </div>
+        <div class="featured-meta-item">
+          <span class="featured-meta-label">Sizes from</span>
+          <span class="featured-meta-val">4×4" to 18×24"</span>
+        </div>
+      </div>
+      <div class="featured-ctas">
+        <button class="hero-cta-primary" onclick="document.querySelector('[data-filter=prints]').click();document.getElementById('shopGrid').scrollIntoView({behavior:'smooth'})">Shop all prints</button>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- Filters -->
-<div class="shop-filters" id="filterBar">
+<div class="shop-filters" id="filterBar" role="navigation" aria-label="Shop categories">
   <button class="filter-btn active" data-filter="all">All</button>
   <button class="filter-btn" data-filter="prints">Prints</button>
   <button class="filter-btn" data-filter="merch">Merch</button>
@@ -1150,11 +1951,29 @@ footer a:hover { color:var(--rust); }
 <!-- Products -->
 <section class="shop-section" id="shopGrid">
 
-  <!-- PRINTS -->
-  <div class="section-label" data-category="prints">Fine Art Prints</div>
-  <div class="shop-grid" id="printsGrid">
-    <!-- dynamically populated / admin editable -->
+  <!-- PRINTS — three sub-sections -->
+  <div class="section-label" data-category="prints" id="printsLabel">Fine Art Prints</div>
+
+  <div class="edition-sublabel" id="sublabel-one_of_one" style="display:none">
+    <span class="edition-sublabel-text">Unique Works</span>
+    <span class="edition-sublabel-desc">Printed or made once. No two are the same.</span>
   </div>
+  <div class="shop-grid edition-grid" id="grid-one_of_one"></div>
+
+  <div class="edition-sublabel" id="sublabel-limited" style="display:none">
+    <span class="edition-sublabel-text">Limited Editions</span>
+    <span class="edition-sublabel-desc">Fixed print runs. Hand-numbered and signed.</span>
+  </div>
+  <div class="shop-grid edition-grid" id="grid-limited"></div>
+
+  <div class="edition-sublabel" id="sublabel-open" style="display:none">
+    <span class="edition-sublabel-text">Open Editions</span>
+    <span class="edition-sublabel-desc">Available in multiple sizes and formats.</span>
+  </div>
+  <div class="shop-grid edition-grid" id="grid-open"></div>
+
+  <!-- Legacy fallback grid for prints with no edition type set -->
+  <div class="shop-grid" id="printsGrid"></div>
 
   <!-- MERCH -->
   <div class="section-label" style="margin-top:3.5rem" data-category="merch">Merch</div>
@@ -1169,6 +1988,17 @@ footer a:hover { color:var(--rust); }
   <div class="shop-grid" id="stickersGrid"></div>
 
 </section>
+
+<!-- Editorial image break — above FAQ -->
+<div class="shop-editorial-break">
+  <div class="shop-editorial-img" style="background-image:url('/images/seriesinvite.jpg')"></div>
+  <div class="shop-editorial-overlay"></div>
+  <div class="shop-editorial-content">
+    <p class="shop-editorial-eyebrow">Àpótí Ọlọ́wẹ̀ Series · 2026</p>
+    <h3 class="shop-editorial-title">The story lives<br>in every <em>print</em></h3>
+    <a href="/apoti-olowe" class="shop-editorial-link">Explore the full series →</a>
+  </div>
+</div>
 
 <!-- FAQ -->
 <section class="faq-section" id="faq">
@@ -1224,6 +2054,31 @@ footer a:hover { color:var(--rust); }
     </div></div>
   </div>
 </section>
+
+<!-- Interest form — for 1/1 originals without a set price -->
+<div class="interest-overlay" id="interestOverlay">
+  <div class="interest-modal" role="dialog" aria-modal="true">
+    <div class="interest-head">
+      <div>
+        <div class="interest-title">Acquire this work</div>
+        <div class="interest-piece" id="interestPieceName">in this work</div>
+      </div>
+      <button class="interest-close" id="interestClose" aria-label="Close">✕</button>
+    </div>
+    <div id="interestFormBody">
+      <p class="interest-body-text">This work exists as a single print — made once, owned by one person. Leave your details and Kay will be in touch with availability, pricing, and how to make it yours.</p>
+      <div class="interest-field"><label>Your name</label><input type="text" id="interestName" placeholder="Full name" autocomplete="name"/></div>
+      <div class="interest-field"><label>Email</label><input type="email" id="interestEmail" placeholder="your@email.com" autocomplete="email"/></div>
+      <div class="interest-field"><label>Message <span style="color:var(--text-muted);font-size:0.8em">(optional)</span></label><textarea id="interestMsg" placeholder="Any questions or context you'd like Kay to know…"></textarea></div>
+      <button class="interest-send" id="interestSend">Send enquiry →</button>
+    </div>
+    <div class="interest-done" id="interestDone" style="display:none">
+      <div class="interest-done-icon">✦</div>
+      <p style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--text);margin-bottom:0.5rem">Message sent.</p>
+      <p style="font-family:'Crimson Pro',serif;color:var(--text-muted);line-height:1.6">Kay will be in touch within 24 hours.</p>
+    </div>
+  </div>
+</div>
 
 <!-- Enquiry widget -->
 <button class="enquire-fab" id="enquireFab" aria-label="Ask a question">
@@ -1442,7 +2297,7 @@ footer a:hover { color:var(--rust); }
           </div>
 
           <!-- Live delivery estimate -->
-          <div id="deliveryEstimate" style="display:none;margin-bottom:1.2rem;padding:0.9rem 1rem;background:var(--bg-alt);border:1px solid var(--border);border-radius:2px">
+          <div id="deliveryEstimate" style="display:none;margin-bottom:1.2rem;padding:0.9rem 1rem;background:var(--bg-alt);border:1px solid var(--border);border-radius: 10px">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <div>
                 <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem">Estimated delivery fee</div>
@@ -1457,7 +2312,7 @@ footer a:hover { color:var(--rust); }
         </div>
 
         <div id="pickupFields">
-          <div style="padding:0.9rem 1rem;background:var(--bg-alt);border:1px solid rgba(107,124,92,0.3);border-radius:2px;margin-bottom:1rem">
+          <div style="padding:0.9rem 1rem;background:var(--bg-alt);border:1px solid rgba(107,124,92,0.3);border-radius: 10px;margin-bottom:1rem">
             <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:#6b7c5c;margin-bottom:0.3rem">Collection · Kaduna</div>
             <div style="font-size:0.88rem;color:var(--text-muted);line-height:1.6">Kay will contact you with pickup details after your order is confirmed. No delivery fee.</div>
           </div>
@@ -1487,7 +2342,7 @@ footer a:hover { color:var(--rust); }
               <div class="crypto-address" id="ethToAddr">—</div>
               <button class="copy-btn" id="ethCopyBtn" style="border-color:rgba(139,156,247,0.3);color:#8b9cf7">Copy address</button>
             </div>
-            <div id="ethLockBox" style="display:none;margin-bottom:1rem;padding:0.7rem 0.9rem;background:var(--bg-alt);border:1px solid rgba(139,156,247,0.22);border-radius:3px;font-family:'Montserrat',sans-serif">
+            <div id="ethLockBox" style="display:none;margin-bottom:1rem;padding:0.7rem 0.9rem;background:var(--bg-alt);border:1px solid rgba(139,156,247,0.22);border-radius: 12px;font-family:'Montserrat',sans-serif">
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.35rem">
                 <span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Locked amount</span>
                 <span id="ethLockAmt" style="font-size:0.82rem;color:#8b9cf7;font-weight:600">— ETH</span>
@@ -1525,7 +2380,7 @@ footer a:hover { color:var(--rust); }
             </div>
             <!-- Connected wallet row -->
             <div id="ethWalletInfo" style="margin-bottom:1rem;display:none">
-              <div style="display:flex;align-items:center;gap:0.6rem;padding:0.7rem 1rem;background:var(--bg-alt);border:1px solid rgba(139,156,247,0.2);border-radius:2px">
+              <div style="display:flex;align-items:center;gap:0.6rem;padding:0.7rem 1rem;background:var(--bg-alt);border:1px solid rgba(139,156,247,0.2);border-radius: 10px">
                 <span style="width:8px;height:8px;border-radius:50%;background:#8b9cf7;flex-shrink:0"></span>
                 <span id="ethWalletAddr" style="font-family:'Montserrat',sans-serif;font-size:0.62rem;color:#8b9cf7;word-break:break-all"></span>
                 <button id="ethDisconnectBtn" style="margin-left:auto;background:none;border:none;font-size:0.65rem;color:var(--text-muted);font-family:'Cinzel',sans-serif;letter-spacing:0.1em;white-space:nowrap">Disconnect</button>
@@ -1553,7 +2408,7 @@ footer a:hover { color:var(--rust); }
               <div class="crypto-address" id="tezosToAddr">—</div>
               <button class="copy-btn" id="tezosCopyBtn" style="border-color:rgba(90,192,245,0.3);color:#5ac0f5">Copy address</button>
             </div>
-            <div id="tezosLockBox" style="display:none;margin-bottom:1rem;padding:0.7rem 0.9rem;background:var(--bg-alt);border:1px solid rgba(90,192,245,0.22);border-radius:3px;font-family:'Montserrat',sans-serif">
+            <div id="tezosLockBox" style="display:none;margin-bottom:1rem;padding:0.7rem 0.9rem;background:var(--bg-alt);border:1px solid rgba(90,192,245,0.22);border-radius: 12px;font-family:'Montserrat',sans-serif">
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.35rem">
                 <span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted)">Locked amount</span>
                 <span id="tezosLockAmt" style="font-size:0.82rem;color:#5ac0f5;font-weight:600">— XTZ</span>
@@ -1569,7 +2424,7 @@ footer a:hover { color:var(--rust); }
               <div style="font-size:0.58rem;color:var(--text-muted);margin-top:0.4rem;line-height:1.4">Save your order hash. If anything interrupts the payment, you can confirm later using it.</div>
             </div>
             <div id="tezosWalletInfo" style="margin-bottom:1rem;display:none">
-              <div style="display:flex;align-items:center;gap:0.6rem;padding:0.7rem 1rem;background:var(--bg-alt);border:1px solid rgba(90,192,245,0.2);border-radius:2px">
+              <div style="display:flex;align-items:center;gap:0.6rem;padding:0.7rem 1rem;background:var(--bg-alt);border:1px solid rgba(90,192,245,0.2);border-radius: 10px">
                 <span style="width:8px;height:8px;border-radius:50%;background:#5ac0f5;flex-shrink:0"></span>
                 <span id="tezosWalletAddr" style="font-family:'Montserrat',sans-serif;font-size:0.62rem;color:#5ac0f5;word-break:break-all"></span>
                 <button id="tezosDisconnectBtn" style="margin-left:auto;background:none;border:none;font-size:0.65rem;color:var(--text-muted);font-family:'Cinzel',sans-serif;letter-spacing:0.1em;white-space:nowrap">Disconnect</button>
@@ -1704,8 +2559,8 @@ footer a:hover { color:var(--rust); }
   </div>
 </div>
 
-<!-- Admin FAB -->
-<div class="admin-bar" id="adminBar" style="display:block;position:fixed;bottom:1.5rem;right:1.5rem;z-index:150">
+<!-- Admin FAB — hidden from public view, triggered by Ctrl+Shift+A -->
+<div class="admin-bar" id="adminBar" style="display:none;position:fixed;bottom:1.5rem;left:1.5rem;z-index:150">
   <button class="admin-fab" id="adminFab" title="Admin panel">⚙</button>
 </div>
 
@@ -1779,7 +2634,7 @@ footer a:hover { color:var(--rust); }
         </div>
 
         <!-- Print page editor — hidden until a print is selected -->
-        <div id="printPageEditor" style="display:none;border:1px solid var(--border);border-radius:3px;padding:1.2rem;margin-top:0.4rem;background:var(--bg-alt)">
+        <div id="printPageEditor" style="display:none;border:1px solid var(--border);border-radius: 12px;padding:1.2rem;margin-top:0.4rem;background:var(--bg-alt)">
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">
             <div class="form-row" style="margin:0">
@@ -1861,7 +2716,7 @@ footer a:hover { color:var(--rust); }
           </div>
 
           <!-- Slug preview -->
-          <div style="padding:0.7rem 0.9rem;background:var(--bg);border:1px solid var(--border);border-radius:2px;margin-bottom:1.2rem">
+          <div style="padding:0.7rem 0.9rem;background:var(--bg);border:1px solid var(--border);border-radius: 10px;margin-bottom:1.2rem">
             <span style="font-family:'Cinzel',serif;font-size:0.46rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted)">Page URL preview · </span>
             <span id="ppUrlPreview" style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--clay)">kaysworks.com/shop/</span>
           </div>
@@ -1880,7 +2735,71 @@ footer a:hover { color:var(--rust); }
 
 <!-- Footer -->
 <footer>
-  <p>© 2026 Kay's Works · <a href="mailto:oyeniyikayode4@gmail.com">oyeniyikayode4@gmail.com</a></p>
+  <div class="footer-top">
+
+    <!-- Brand col -->
+    <div class="footer-brand-col">
+      <p class="footer-brand">Kay's Works</p>
+      <p class="footer-tagline">Original art, prints & commissions — thoughtfully made in Kaduna, Nigeria.</p>
+      <div class="footer-social">
+        <a href="https://twitter.com/kaysworks" class="footer-social-link" target="_blank" rel="noopener" aria-label="Twitter/X">𝕏</a>
+        <a href="https://instagram.com/kaysworks" class="footer-social-link" target="_blank" rel="noopener" aria-label="Instagram">◎</a>
+        <a href="mailto:oyeniyikayode4@gmail.com" class="footer-social-link" aria-label="Email">✉</a>
+      </div>
+    </div>
+
+    <!-- Shop links -->
+    <div>
+      <p class="footer-col-title">Shop</p>
+      <ul class="footer-links-list">
+        <li><a href="/shop">All Products</a></li>
+        <li><a href="/shop" onclick="setTimeout(()=>document.querySelector('[data-filter=prints]')?.click(),300)">Fine Art Prints</a></li>
+        <li><a href="/shop" onclick="setTimeout(()=>document.querySelector('[data-filter=merch]')?.click(),300)">Merch & Apparel</a></li>
+        <li><a href="/shop" onclick="setTimeout(()=>document.querySelector('[data-filter=notebooks]')?.click(),300)">Notebooks</a></li>
+        <li><a href="/shop-orders">My Orders</a></li>
+      </ul>
+    </div>
+
+    <!-- Studio links -->
+    <div>
+      <p class="footer-col-title">Studio</p>
+      <ul class="footer-links-list">
+        <li><a href="/">Home</a></li>
+        <li><a href="/apoti-olowe">Àpótí Ọlọ́wẹ̀ Series</a></li>
+        <li><a href="/auction">Live Auction</a></li>
+        <li><a href="/#commissions">Commissions</a></li>
+        <li><a href="/#about">About Kay</a></li>
+      </ul>
+    </div>
+
+    <!-- Newsletter -->
+    <div class="footer-newsletter-col">
+      <p class="footer-col-title">Stay in the loop</p>
+      <p class="footer-newsletter-text">Be the first to hear about new drops, series releases, and collector rewards from the studio.</p>
+      <div class="footer-newsletter-form">
+        <input class="footer-newsletter-input" type="email" id="footerEmailInput" placeholder="your@email.com" autocomplete="email"/>
+        <button class="footer-newsletter-btn" id="footerSubBtn">Subscribe</button>
+      </div>
+      <p id="footerSubMsg" style="display:none;font-size:0.85rem;color:var(--gold);margin-top:0.5rem">✦ You're in — welcome to the studio.</p>
+    </div>
+
+  </div>
+
+  <!-- Gold ornament -->
+  <div class="footer-ornament">
+    <span class="footer-ornament-text">✦ &nbsp; Àpótí Ọlọ́wẹ̀ &nbsp; · &nbsp; Kaysworks &nbsp; · &nbsp; 2026 &nbsp; ✦</span>
+  </div>
+
+  <!-- Bottom bar -->
+  <div class="footer-bottom">
+    <p class="footer-copy">© 2026 Kay's Works · Made with care by <a href="mailto:oyeniyikayode4@gmail.com">Oyeniyi Kayode</a></p>
+    <nav class="footer-legal">
+      <a href="/shop">Shop</a>
+      <a href="/auction">Auction</a>
+      <a href="/#commissions">Commission</a>
+      <a href="mailto:oyeniyikayode4@gmail.com">Contact</a>
+    </nav>
+  </div>
 </footer>
 
 <!-- Paystack SDK -->
@@ -2303,6 +3222,18 @@ function buildBadgeStack(p) {
   return tags.length ? `<div class="card-badge-stack">${tags.join('')}</div>` : '';
 }
 
+function buildSoldOverlay(p) {
+  if (!p.is_sold) return '';
+  return `<div class="card-sold-overlay"><span class="card-sold-stamp">Collected</span></div>`;
+}
+
+function buildEditionBadge(p) {
+  if (p.category !== 'prints') return '';
+  if (p.print_edition === 'one_of_one') return `<p class="card-edition-badge one-of-one">Unique Work · Printed Once</p>`;
+  if (p.print_edition === 'limited')    return `<p class="card-edition-badge limited">Limited Edition</p>`;
+  return '';
+}
+
 // Quiet secondary action that leads to the full product page. Only shown when
 // the product has a slug to link to.
 function detailsLink(p) {
@@ -2346,7 +3277,7 @@ function buildCard(p) {
   card.dataset.pid = p.id;
   card.dataset.category = p.category;
   card.innerHTML = `
-    <div class="card-img">${imgHtml}${badgeHtml}</div>
+    <div class="card-img">${imgHtml}${badgeHtml}<div class="card-img-hover"><span class="card-img-hover-label">Quick view</span></div></div>
     <div class="card-body">
       <p class="card-category">${p.category}</p>
       <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
@@ -2381,8 +3312,9 @@ function buildPrintCard(p) {
 
   if (!options.length) {
     card.innerHTML = `
-      <div class="card-img">${imgHtml}${badgeHtml}</div>
+      <div class="card-img">${imgHtml}${badgeHtml}${buildSoldOverlay(p)}<div class="card-img-hover"><span class="card-img-hover-label">View print</span></div></div>
       <div class="card-body">
+        ${buildEditionBadge(p)}
         <p class="card-category">${p.category}</p>
         <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
         <p class="card-desc">${p.desc}</p>
@@ -2417,25 +3349,41 @@ function buildPrintCard(p) {
   const usd = productPrice(p, defaultKey, 'usd');
   const stock = stockForChoice(p, defaultKey);
 
+  // 1/1 with no price: show interest button instead of add to bag
+  const isOneOfOne = p.print_edition === 'one_of_one';
+  const hasNoPrice = !ngn && !usd;
+  const isSold = p.is_sold;
+
+  let actionHtml;
+  if (isSold) {
+    actionHtml = `<button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold</button>`;
+  } else if (isOneOfOne && hasNoPrice) {
+    actionHtml = `<button class="interest-btn" data-pid="${p.id}" data-pname="${escapeAttr(p.name)}" onclick="openInterestForm('${escapeAttr(p.id)}','${escapeAttr(p.name)}')">Acquire this work →</button>`;
+  } else {
+    actionHtml = `<button class="add-btn" data-pid="${p.id}" ${!defaultKey || stock===0?'disabled style="opacity:0.4;cursor:not-allowed"':''}>
+          ${!defaultKey ? 'Unavailable' : stock===0 ? 'Sold out' : 'Add to bag'}
+        </button>`;
+  }
+
   card.innerHTML = `
-    <div class="card-img">${imgHtml}${badgeHtml}</div>
+    <div class="card-img">${imgHtml}${badgeHtml}${buildSoldOverlay(p)}<div class="card-img-hover"><span class="card-img-hover-label">View print</span></div></div>
     <div class="card-body">
+      ${buildEditionBadge(p)}
       <p class="card-category">${p.category}</p>
       <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
       <p class="card-desc" id="pdesc-${p.id}">${active.desc || p.desc}</p>
-      <div class="print-type-wrap">${typeSelectHtml}</div>
-      <div class="card-variants" id="variants-${p.id}">${sizeChipsHtml}</div>
+      ${ !isOneOfOne || !hasNoPrice ? `<div class="print-type-wrap">${typeSelectHtml}</div><div class="card-variants" id="variants-${p.id}">${sizeChipsHtml}</div>` : '' }
       <div class="card-footer">
         <div class="card-price">
-          <span class="price-ngn" id="pngn-${p.id}">${fmt(ngn)}</span>
-          <span class="price-usd" id="pusd-${p.id}">${fmtUsd(usd)} USD</span>
+          ${ !isOneOfOne || !hasNoPrice
+            ? `<span class="price-ngn" id="pngn-${p.id}">${fmt(ngn)}</span><span class="price-usd" id="pusd-${p.id}">${fmtUsd(usd)} USD</span>`
+            : `<span style="font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.14em;color:var(--text-muted)">Enquire for price</span>` }
         </div>
-        <button class="add-btn" data-pid="${p.id}" ${!defaultKey || stock===0?'disabled style="opacity:0.4;cursor:not-allowed"':''}>
-          ${!defaultKey ? 'Unavailable' : stock===0 ? 'Sold out' : 'Add to bag'}
-        </button>
+        ${actionHtml}
       </div>
       ${detailsLink(p)}
     </div>`;
+  if (isSold) card.classList.add('is-sold');
   return card;
 }
 
@@ -2534,10 +3482,31 @@ function renderProducts() {
     notebooks: document.getElementById('notebooksGrid'),
     stickers: document.getElementById('stickersGrid'),
   };
-  Object.values(grids).forEach(g => g.innerHTML = '');
+  const editionGrids = {
+    one_of_one: document.getElementById('grid-one_of_one'),
+    limited:    document.getElementById('grid-limited'),
+    open:       document.getElementById('grid-open'),
+  };
+  const sublabels = {
+    one_of_one: document.getElementById('sublabel-one_of_one'),
+    limited:    document.getElementById('sublabel-limited'),
+    open:       document.getElementById('sublabel-open'),
+  };
+  Object.values(grids).forEach(g => { if (g) g.innerHTML = ''; });
+  Object.values(editionGrids).forEach(g => { if (g) g.innerHTML = ''; });
+  Object.values(sublabels).forEach(l => { if (l) l.style.display = 'none'; });
+
   SHOP_CONFIG.products.forEach(p => {
-    const grid = grids[p.category];
-    if (grid) grid.appendChild(buildCard(p));
+    if (p.category === 'prints' && p.print_edition) {
+      const grid = editionGrids[p.print_edition] || grids.prints;
+      if (grid) grid.appendChild(buildCard(p));
+      // Show the sublabel for this edition type
+      const lbl = sublabels[p.print_edition];
+      if (lbl) lbl.style.display = '';
+    } else {
+      const grid = grids[p.category];
+      if (grid) grid.appendChild(buildCard(p));
+    }
   });
 
   // Variant / size chip clicks
@@ -2574,14 +3543,24 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     document.querySelectorAll('.product-card').forEach(c => {
       c.classList.toggle('hidden', f!=='all' && c.dataset.category!==f);
     });
-    // Hide empty section labels
+    // Hide empty section labels and edition sub-grids
     ['prints','merch','notebooks','stickers'].forEach(cat => {
       const label = document.querySelector(`.section-label[data-category="${cat}"]`);
       const grid = document.getElementById(cat+'Grid');
       if (!label || !grid) return;
       const visible = [...grid.querySelectorAll('.product-card')].some(c=>!c.classList.contains('hidden'));
-      label.style.display = (f==='all'||visible) ? '' : 'none';
-      grid.style.display = (f==='all'||visible) ? '' : 'none';
+      label.style.display = (f==='all'||visible||f===cat) ? '' : 'none';
+      grid.style.display = (f==='all'||visible||f===cat) ? '' : 'none';
+    });
+    // Edition sub-grids visibility
+    ['one_of_one','limited','open'].forEach(ed => {
+      const g = document.getElementById('grid-'+ed);
+      const l = document.getElementById('sublabel-'+ed);
+      if (!g) return;
+      const hasCards = g.innerHTML.trim() !== '';
+      const show = f === 'all' || f === 'prints';
+      if (g) g.style.display = (show && hasCards) ? '' : 'none';
+      if (l) l.style.display = (show && hasCards) ? '' : 'none';
     });
   });
 });
@@ -3818,6 +4797,27 @@ function renderAdminProducts() {
             <input class="form-input ap-badge" data-idx="${realIdx}" value="${p.badge||''}"/>
           </div>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.6rem">
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Edition type</label>
+            <select class="form-select ap-edition" data-idx="${realIdx}">
+              <option value="" ${!p.print_edition?'selected':''}>— unset —</option>
+              <option value="one_of_one" ${p.print_edition==='one_of_one'?'selected':''}>Unique Work (1/1)</option>
+              <option value="limited" ${p.print_edition==='limited'?'selected':''}>Limited Edition</option>
+              <option value="open" ${p.print_edition==='open'?'selected':''}>Open Edition</option>
+            </select>
+          </div>
+          <div class="form-row" style="margin:0;display:flex;flex-direction:column;justify-content:flex-end">
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-muted);font-family:'Montserrat',sans-serif;padding-bottom:0.5rem">
+              <input type="checkbox" class="ap-sold" data-idx="${realIdx}" ${p.is_sold?'checked':''} style="accent-color:var(--rust);width:15px;height:15px"/>
+              Mark as sold
+            </label>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Badge (optional)</label>
+            <input class="form-input ap-badge" data-idx="${realIdx}" value="${p.badge||''}"/>
+          </div>
+        </div>
         <div class="form-row" style="margin:0">
           <label class="form-label">Description</label>
           <input class="form-input ap-desc" data-idx="${realIdx}" value="${p.desc}"/>
@@ -3829,7 +4829,7 @@ function renderAdminProducts() {
         <label class="form-label" style="margin-top:0.4rem">Print option descriptions</label>
         <div>${optionDescHtml}</div>
         <label class="form-label" style="margin-top:0.4rem">Available print options, sizes &amp; prices</label>
-        <div style="border:1px solid var(--border);border-radius:2px;overflow:hidden" id="size-table-${realIdx}">
+        <div style="border:1px solid var(--border);border-radius: 10px;overflow:hidden" id="size-table-${realIdx}">
           <div style="display:grid;grid-template-columns:auto 1.2fr 1fr 1fr 1fr 0.9fr auto;gap:0;font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);padding:0.6rem 0.8rem;border-bottom:1px solid var(--border);background:var(--bg-alt)">
             <span style="min-width:20px"></span>
             <span>Print option</span><span>Size</span><span>NGN price</span><span>USD price</span><span>Run size</span><span></span>
@@ -4241,6 +5241,11 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
           sizes: [...o.sizes],
         }));
         p.availableVariants = nextAvailable;
+        // Edition type and sold status
+        const editionTypeEl = row.querySelector('.ap-edition');
+        const soldEl = row.querySelector('.ap-sold');
+        if (editionTypeEl) p.print_edition = editionTypeEl.value;
+        if (soldEl) p.is_sold = soldEl.checked;
       } else {
         const catEl      = row.querySelector('.ap-cat');
         const clothingEl = row.querySelector('.ap-clothing');
@@ -5122,6 +6127,8 @@ async function loadShopData() {
           is_new:             r.is_new || false,
           is_bestseller:      r.is_bestseller || false,
           order_count:        r.order_count || 0,
+          print_edition:      r.print_edition || r.edition_type || '',
+          is_sold:            r.is_sold || false,
         }));
       }
       // If API returned empty array, keep hardcoded defaults
@@ -5191,6 +6198,8 @@ async function apiSaveProduct(p, token) {
     edition_totals:     p.edition_totals || {},
     sort_order:         p.sort_order || 0,
     active:             p.active !== false,
+    print_edition:      p.print_edition || '',
+    is_sold:            p.is_sold || false,
   };
   const res = await fetch(url, {
     method,
@@ -5210,11 +6219,87 @@ async function apiDeleteProduct(id, token) {
   if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed'); }
 }
 
-/* ─── Show admin FAB always (protected by password on click) ─── */
-document.getElementById('adminBar').classList.add('visible');
+/* ─── Admin FAB — hidden from public, revealed by Ctrl+Shift+A ─── */
+// Not shown as a visible button; admin access via keyboard shortcut only
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.shiftKey && e.key === 'A') {
+    const bar = document.getElementById('adminBar');
+    bar.style.display = bar.style.display === 'none' ? 'block' : 'none';
+    if (bar.style.display === 'block') document.getElementById('adminPanel').classList.add('open');
+  }
+});
 
 /* ─── Init ─── */
-document.getElementById('adminBar').classList.add('visible');
+// Admin bar stays hidden on page load
+
+/* ─── Edition filter helper (called from collection tile chips) ─── */
+function filterPrintEdition(edition) {
+  // First activate the prints filter
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  const printsBtn = document.querySelector('.filter-btn[data-filter=prints]');
+  if (printsBtn) printsBtn.classList.add('active');
+  document.querySelectorAll('.product-card').forEach(c => {
+    c.classList.toggle('hidden', c.dataset.category !== 'prints');
+  });
+  // Then hide sub-grids that don't match
+  ['one_of_one','limited','open'].forEach(ed => {
+    const g = document.getElementById('grid-'+ed);
+    const l = document.getElementById('sublabel-'+ed);
+    const show = ed === edition;
+    if (g) g.style.display = show ? '' : 'none';
+    if (l) l.style.display = show ? '' : 'none';
+  });
+  document.getElementById('shopGrid').scrollIntoView({ behavior: 'smooth' });
+}
+
+/* ─── Interest form ─── */
+(function() {
+  const overlay = document.getElementById('interestOverlay');
+  const closeBtn = document.getElementById('interestClose');
+  if (!overlay) return;
+
+  window.openInterestForm = function(pid, name) {
+    const pieceEl = document.getElementById('interestPieceName');
+    if (pieceEl) pieceEl.textContent = '— ' + name;
+    overlay._pid = pid;
+    overlay._pname = name;
+    document.getElementById('interestFormBody').style.display = '';
+    document.getElementById('interestDone').style.display = 'none';
+    document.getElementById('interestName').value = '';
+    document.getElementById('interestEmail').value = '';
+    document.getElementById('interestMsg').value = '';
+    overlay.classList.add('show');
+  };
+
+  function closeInterest() { overlay.classList.remove('show'); }
+  if (closeBtn) closeBtn.addEventListener('click', closeInterest);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeInterest(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInterest(); });
+
+  const sendBtn = document.getElementById('interestSend');
+  if (sendBtn) sendBtn.addEventListener('click', async () => {
+    const name  = document.getElementById('interestName').value.trim();
+    const email = document.getElementById('interestEmail').value.trim();
+    const msg   = document.getElementById('interestMsg').value.trim();
+    if (!name)  { showToast('Please enter your name'); return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Please enter a valid email'); return; }
+    sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
+    try {
+      await fetch('/api/site-form', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          form_type: 'interest-1of1',
+          name, email,
+          artwork: overlay._pname,
+          message: msg,
+        }),
+      });
+    } catch(_) {}
+    document.getElementById('interestFormBody').style.display = 'none';
+    document.getElementById('interestDone').style.display = '';
+    sendBtn.disabled = false; sendBtn.textContent = 'Send interest →';
+  });
+})();
 
 /* ─── FAQ accordion ─── */
 document.querySelectorAll('.faq-q').forEach(q => {
@@ -5279,6 +6364,44 @@ function closeEnquire() { document.getElementById('enquireOverlay').classList.re
   });
 })();
 
+/* ─── Custom cursor ─── */
+(function() {
+  const cursorEl = document.getElementById('cursor');
+  const ring = document.getElementById('cursorRing');
+  const dot  = document.getElementById('cursorDot');
+  if (!cursorEl) return;
+  if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
+    cursorEl.style.display = 'none';
+    const s = document.createElement('style');
+    s.textContent = 'html, body, * { cursor: auto !important; }';
+    document.head.appendChild(s);
+    return;
+  }
+  let mx = 0, my = 0, rx = 0, ry = 0;
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    cursorEl.style.opacity = '1';
+    dot.style.left = mx + 'px'; dot.style.top = my + 'px';
+  });
+  (function animRing() {
+    rx += (mx - rx) * 0.12; ry += (my - ry) * 0.12;
+    ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
+    requestAnimationFrame(animRing);
+  })();
+  document.querySelectorAll('a, button, .product-card, .coll-tile, .filter-btn, .variant-chip').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      ring.style.width = '52px'; ring.style.height = '52px';
+      if (el.tagName === 'BUTTON' || el.classList.contains('add-btn') || el.classList.contains('hero-cta-primary')) {
+        dot.classList.add('gold'); ring.classList.add('gold');
+      }
+    });
+    el.addEventListener('mouseleave', () => {
+      ring.style.width = '36px'; ring.style.height = '36px';
+      dot.classList.remove('gold'); ring.classList.remove('gold');
+    });
+  });
+})();
+
 loadCart();
 updateCartUI();
 
@@ -5316,6 +6439,31 @@ loadShopData()
   .then(maybeOpenCheckoutFromHash)
   .catch(maybeOpenCheckoutFromHash);
 finalizeReturnedGatewayCheckout();
+
+/* ─── Footer newsletter subscribe ─── */
+(function(){
+  const btn = document.getElementById('footerSubBtn');
+  const inp = document.getElementById('footerEmailInput');
+  const msg = document.getElementById('footerSubMsg');
+  if (!btn || !inp) return;
+  btn.addEventListener('click', async () => {
+    const email = inp.value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showToast('Please enter a valid email address'); return;
+    }
+    btn.disabled = true; btn.textContent = 'Subscribing…';
+    try {
+      // Route through site-form endpoint
+      await fetch('/api/site-form', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ form_type: 'newsletter', email, name: 'Shop subscriber' }),
+      });
+    } catch(_) {}
+    btn.style.display = 'none';
+    inp.style.display = 'none';
+    if (msg) msg.style.display = 'block';
+  });
+})();
 </script>
 <!-- ════════ SHOP LOADING BAR ════════ -->
 <div id="shopLoadBar" style="position:fixed;top:0;left:0;height:3px;width:0;z-index:100001;background:linear-gradient(90deg,#c4845a,#c9993a);box-shadow:0 0 8px rgba(201,153,58,0.6);opacity:0;transition:width 0.25s ease,opacity 0.3s ease;pointer-events:none;"></div>
@@ -5354,7 +6502,7 @@ finalizeReturnedGatewayCheckout();
   <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#9e4f2e;color:#fff;position:sticky;top:0;">
     <strong>SHOP DIAGNOSTIC</strong>
     <span>
-      <button id="shopDiagCopy" style="margin-right:6px;font-size:11px;padding:3px 8px;background:#e8d5b0;color:#3a2418;border:none;border-radius:3px;">Copy</button>
-      <button id="shopDiagClose" style="font-size:11px;padding:3px 8px;background:#3a2418;color:#e8d5b0;border:none;border-radius:3px;">Hide</button>
+      <button id="shopDiagCopy" style="margin-right:6px;font-size:11px;padding:3px 8px;background:#e8d5b0;color:#3a2418;border:none;border-radius: 12px;">Copy</button>
+      <button id="shopDiagClose" style="font-size:11px;padding:3px 8px;background:#3a2418;color:#e8d5b0;border:none;border-radius: 12px;">Hide</button>
     </span>
   </div>
