@@ -4445,7 +4445,7 @@ function fallbackDeliveryZoneFromAddress() {
   return '';
 }
 function resolveDeliveryState(options = {}) {
-  const allowConservativeFallback = options.allowConservativeFallback !== false;
+  const allowConservativeFallback = options.allowConservativeFallback === true;
   const el = document.getElementById('ckCountry');
   const selectedOption = el && el.selectedIndex >= 0 ? el.options[el.selectedIndex] : null;
   const selectedText = selectedOption ? (selectedOption.text || '') : '';
@@ -4464,6 +4464,22 @@ function syncDeliveryZoneFromForm(options = {}) {
   }
   return _deliveryZone;
 }
+function isDeliveryAddressComplete(customer = null) {
+  const zone = customer?.deliveryZone || resolveDeliveryState({ allowConservativeFallback: false }).zone;
+  if (!zone) return false;
+  if (zone.startsWith('NG-')) {
+    return !!(fieldValue('ckGigCity') && fieldValue('ckGigStreet').length >= 4);
+  }
+  return !!(
+    fieldValue('ckUpsLine1').length >= 4 &&
+    fieldValue('ckUpsCity') &&
+    fieldValue('ckUpsState') &&
+    fieldValue('ckUpsPostal')
+  );
+}
+function paymentQuotePendingMessage() {
+  return 'Complete delivery address to calculate final payment quote';
+}
 function refreshDeliveryState() {
   syncDeliveryZoneFromForm({ allowConservativeFallback: false });
   updateShippingFieldGroups();
@@ -4472,6 +4488,9 @@ function refreshDeliveryState() {
   const activeCryptoTab = document.querySelector('.pay-tab.active')?.dataset.pay;
   if ((activeCryptoTab === 'eth' || activeCryptoTab === 'tezos') && checkoutQuoteReady(getFormData(), true)) {
     startLock(activeCryptoTab);
+  } else if (window.__activeLock && !isDeliveryAddressComplete()) {
+    window.__activeLock = null;
+    renderLockUI(activeCryptoTab || 'eth');
   }
 }
 function normalizedSizeLabel(value) {
@@ -4852,7 +4871,7 @@ function gv(id) { const el = document.getElementById(id); return el ? el.value.t
 // Assemble a single human-readable address string from the carrier-specific
 // fields, plus structured pieces for the order record.
 function buildShippingAddress() {
-  const zone = syncDeliveryZoneFromForm();
+  const zone = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
   if (zone && zone.startsWith('NG-')) {
     // Derive state label from the selected option text in the country dropdown
     const countryEl = document.getElementById('ckCountry');
@@ -4870,7 +4889,7 @@ function buildShippingAddress() {
 
 function getFormData() {
   const countryEl = document.getElementById('ckCountry');
-  const deliveryState = resolveDeliveryState({ allowConservativeFallback: true });
+  const deliveryState = resolveDeliveryState({ allowConservativeFallback: false });
   _deliveryZone = deliveryState.zone;
   if (!_deliveryCarrier) _deliveryCarrier = preferredCarrier(_deliveryZone);
   const shipping = buildShippingAddress();
@@ -4891,7 +4910,7 @@ function getFormData() {
 }
 function validateForm() {
   const d = getFormData();
-  // Contact details — always required so the carrier and Kay can reach the buyer.
+  // Contact details: always required so the carrier and Kay can reach the buyer.
   if (!d.name || d.name.length < 2) { showToast('Please enter your full name'); return false; }
   if (!d.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) { showToast('Please enter a valid email address'); return false; }
   const phoneDigits = (d.phone || '').replace(/[^\d]/g, '');
@@ -4924,7 +4943,7 @@ function checkoutPayload(customer, method, extra = {}) {
       qty: c.qty,
     })),
     delivery_method:  customer.deliveryMethod,
-    delivery_zone:    customer.deliveryZone || resolveDeliveryState({ allowConservativeFallback: true }).zone,
+    delivery_zone:    customer.deliveryZone || '',
     delivery_carrier: customer.deliveryCarrier || '',
     order_note:       customer.orderNote || '',
     payment_method:   method,
@@ -4934,7 +4953,7 @@ function checkoutPayload(customer, method, extra = {}) {
 
 async function postShopJson(url, payload) {
   if (window.__shopLoadStart) window.__shopLoadStart();
-  // ── DIAGNOSTIC CAPTURE (remove with the diagnostic panel once stable) ──
+  // DIAGNOSTIC CAPTURE (remove with the diagnostic panel once stable)
   window.__shopDiag = window.__shopDiag || [];
   let res, data;
   try {
@@ -4953,28 +4972,28 @@ async function postShopJson(url, payload) {
   window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url, status: res.status, body: JSON.stringify(data) });
   if (window.__shopDiag.length > 8) window.__shopDiag.length = 8;
   if (window.__renderShopDiag) window.__renderShopDiag();
-  // ── END DIAGNOSTIC CAPTURE ──
+  // END DIAGNOSTIC CAPTURE
   if (window.__shopLoadDone) window.__shopLoadDone();
   if (!res.ok) {
-    const friendly = data.error || (url.includes('/api/shop/quote') ? 'Select your delivery country before confirming payment' : `${url} failed`);
+    const friendly = data.error || (url.includes('/api/shop/quote') ? paymentQuotePendingMessage() : `${url} failed`);
     throw new Error(friendly);
   }
   return data;
 }
 
 function checkoutQuoteReady(customer, silent = false) {
-  const zone = customer?.deliveryZone || resolveDeliveryState({ allowConservativeFallback: true }).zone;
-  if (!zone) {
-    if (!silent) showToast('Select your delivery country before confirming payment');
+  const zone = customer?.deliveryZone || resolveDeliveryState({ allowConservativeFallback: false }).zone;
+  if (customer && !customer.deliveryZone) customer.deliveryZone = zone;
+  if (!isDeliveryAddressComplete(customer)) {
+    if (!silent) showToast(paymentQuotePendingMessage());
     return false;
   }
-  if (customer && !customer.deliveryZone) customer.deliveryZone = zone;
   return true;
 }
 
 async function getServerCheckoutQuote(customer, method, extra = {}) {
   if (!checkoutQuoteReady(customer, true)) {
-    throw new Error('Select your delivery country before confirming payment');
+    throw new Error(paymentQuotePendingMessage());
   }
   return postShopJson('/api/shop/quote', checkoutPayload(customer, method, extra));
 }
@@ -5136,7 +5155,7 @@ document.getElementById('ethManualCancel')?.addEventListener('click', () => {
   cancelManualCrypto('eth');
 });
 
-// ── PENDING-FIRST ORDER HELPERS ───────────────────────────────────────────────
+// Pending-first order helpers
 // Create a pending order on the server BEFORE payment. Returns { order_ref, ... }.
 
 function chainWaitLabel(method) {
@@ -5249,11 +5268,11 @@ function clearPendingOrder(orderRef) {
   if (window.__pendingOrders) delete window.__pendingOrders[orderRef];
 }
 
-// ── PRICE-LOCK ENGINE ─────────────────────────────────────────────────────────
+// Price-lock engine
 // When a crypto panel opens, we immediately lock a price by fetching a signed
 // quote AND creating a pending order. The customer is shown the locked amount,
 // the order hash (order_ref), and a 5-minute countdown. On expiry — or when the
-// cart changes — we silently re-lock: new quote, new pending order, new hash.
+// we silently re-lock: new quote, new pending order, new hash.
 // The send paths reuse this locked order instead of creating another.
 const LOCK_MS = 5 * 60 * 1000; // 5 minutes
 window.__activeLock = null;    // { method, order_ref, quote, expires, payerAddress }
@@ -5296,7 +5315,7 @@ function updateLockCountdown() {
   const timerEl = document.getElementById(lock.method === 'tezos' ? 'tezosLockTimer' : 'ethLockTimer');
   if (timerEl) timerEl.textContent = mm + ':' + ss;
   if (remaining <= 0) {
-    // Expired — silently re-lock with a fresh quote/order/hash.
+    // Expired: silently re-lock with a fresh quote/order/hash.
     refreshLock(lock.method, true);
   }
 }
@@ -5305,9 +5324,9 @@ function updateLockCountdown() {
 async function refreshLock(method, silent) {
   const seq = ++_lockSeq;
   const d = getFormData();
-  // Don't lock until the form is minimally valid — otherwise the pending order
+  // Do not lock until the form is complete; otherwise the pending order
   // would be missing customer details. Quiet return; lock starts once valid.
-  if (!d.name || !d.email) { window.__activeLock = null; renderLockUI(method); return; }
+  if (!d.name || !d.email || !checkoutQuoteReady(d, silent)) { window.__activeLock = null; renderLockUI(method); return; }
   try {
     const payer = lockPayerAddress(method);
     const q = await getServerCheckoutQuote(d, method, payer ? { payer_address: payer } : {});
@@ -5327,7 +5346,7 @@ async function refreshLock(method, silent) {
     if (method === 'tezos' && typeof renderTezosPanel === 'function') renderTezosPanel();
     if (method === 'eth' && typeof renderEthPanel === 'function') renderEthPanel();
   } catch (e) {
-    if (!silent) showToast(e.message || 'Could not lock price — retrying');
+    if (!silent) showToast(e.message || 'Could not lock price - retrying');
     // leave any previous lock in place; countdown will retry on next expiry
   }
 }
@@ -5349,7 +5368,7 @@ function stopLockTimer() {
   if (_lockTimer) { clearInterval(_lockTimer); _lockTimer = null; }
 }
 
-// Called when the cart changes — invalidate and re-lock the active crypto panel.
+// Called when the cart changes: invalidate and re-lock the active crypto panel.
 function relockOnCartChange() {
   const lock = window.__activeLock;
   if (lock && window.__manualCryptoMode === lock.method) return;
@@ -5368,7 +5387,7 @@ async function notifyOrder(customer, ref, method, checkoutQuote = null) {
   const carrierInfo = customer.deliveryCarrier ? `${carrierLabel(customer.deliveryCarrier)}; ` : '';
   const deliveryInfo = `${carrierInfo}Ship to: ${customer.address}, ${customer.country}, Fee: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}${cartHasLargePrint() ? ' (tube)' : ''}`;
 
-  // 1. Record order in Supabase — decrements stock.
+  // 1. Record order in Supabase; decrements stock.
   //    Crypto verification can race ahead of chain indexing (tzkt / ETH RPC
   //    haven't seen the just-broadcast tx yet), which the server reports as a
   //    409 "not confirmed yet". Retry a few times with a delay before giving up.
@@ -5417,7 +5436,7 @@ async function notifyOrder(customer, ref, method, checkoutQuote = null) {
         name:            customer.name,
         email:           customer.email,
         commission_type: 'shop-order',
-        message: `Shop order — ${method.toUpperCase()} · Ref: ${ref}\n${checkoutQuote?.payer_address ? `Sender wallet: ${checkoutQuote.payer_address}\n` : ''}\nDelivery: ${deliveryInfo}\nPhone: ${customer.phone||'—'}${customer.orderNote ? `\nOrder note: ${customer.orderNote}` : ''}\n\nItems:\n${cart.map(c=>`${c.name} (${c.variant}) × ${c.qty}`).join('\n')}\n\nSubtotal: ${fmt(quotedSubtotalNgn)} / $${quotedSubtotalUsd}\nDelivery: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}\nGrand total: ${fmt(quotedTotalNgn)} / $${quotedTotalUsd}`,
+        message: `Shop order -— ${method.toUpperCase()} · Ref: ${ref}\n${checkoutQuote?.payer_address ? `Sender wallet: ${checkoutQuote.payer_address}\n` : ''}\nDelivery: ${deliveryInfo}\nPhone: ${customer.phone||'—'}${customer.orderNote ? `\nOrder note: ${customer.orderNote}` : ''}\n\nItems:\n${cart.map(c=>`${c.name} (${c.variant}) × ${c.qty}`).join('\n')}\n\nSubtotal: ${fmt(quotedSubtotalNgn)} / $${quotedSubtotalUsd}\nDelivery: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}\nGrand total: ${fmt(quotedTotalNgn)} / $${quotedTotalUsd}`,
       }),
     });
   } catch(_) {}
@@ -6294,7 +6313,7 @@ function ethEthAmount() {
   return (grandTotalUsd() / price).toFixed(5);
 }
 
-/* ── Render ETH panel ── */
+/* Render ETH panel */
 function renderEthPanel() {
   const addr     = SHOP_CONFIG.ethAddress;
   const ethAmt   = ethEthAmount();
@@ -6325,7 +6344,7 @@ function renderEthPanel() {
   if (ethCopy) {
     ethCopy.onclick = () => {
       navigator.clipboard.writeText(addr).then(() => {
-        ethCopy.textContent = 'Copied \u2713';
+        ethCopy.textContent = 'Copied\u2713';
         setTimeout(() => { ethCopy.textContent = 'Copy address'; }, 2000);
       });
     };
@@ -6334,7 +6353,7 @@ function renderEthPanel() {
   document.querySelectorAll('.ethStableCopy').forEach(btn => {
     btn.onclick = () => {
       navigator.clipboard.writeText(addr).then(() => {
-        btn.textContent = 'Copied \u2713';
+        btn.textContent = 'Copied';
         setTimeout(() => { btn.textContent = 'Copy address'; }, 2000);
       });
     };
@@ -6345,7 +6364,7 @@ function renderEthPanel() {
   if (sendAmt) sendAmt.textContent = ethAmt !== null ? ethAmt + ' ETH' : '\u2026';
 
   // Wallet connection state
-  const rateReady = addr && ethAmt !== null;
+  const rateReady = addr && ethAmt !== null && checkoutQuoteReady(getFormData(), true);
   if (_ethConnectedAddr) {
     document.getElementById('ethWalletInfo').style.display   = '';
     document.getElementById('ethWalletAddr').textContent     = ethShortAddr(_ethConnectedAddr);
@@ -6362,7 +6381,7 @@ function renderEthPanel() {
   }
 }
 
-/* ── Connect ETH wallet ── */
+/* Connect ETH wallet */
 async function ethConnectWallet() {
   if (_ethConnectedAddr || _ethConnecting) return;
 
@@ -6404,7 +6423,7 @@ async function ethConnectWallet() {
   }
 }
 
-/* ── Send ETH via connected wallet ── */
+/* Send ETH via connected wallet */
 document.getElementById('ethConnectBtn').addEventListener('click', ethConnectWallet);
 
 document.getElementById('ethDisconnectBtn').addEventListener('click', () => {
@@ -6466,7 +6485,7 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
   }
 });
 
-/* ── Send ERC-20 (USDC / USDT) via connected wallet ── */
+/* Send ERC-20 (USDC / USDT) via connected wallet */
 async function sendErc20(token) {
   if (!validateForm()) return;
   const toAddr = SHOP_CONFIG.ethAddress;
@@ -6871,7 +6890,7 @@ async function tezosConnectWallet() {
   }
 }
 
-/* ── Render the Tezos panel ── */
+/* Render the Tezos panel */
 function renderTezosPanel() {
   const addr = SHOP_CONFIG.tezosAddress;
   const lockedQuote = window.__activeLock?.method === 'tezos'
@@ -6898,7 +6917,7 @@ function renderTezosPanel() {
   if (copyBtn) {
     copyBtn.onclick = () => {
       navigator.clipboard.writeText(addr).then(() => {
-        copyBtn.textContent = 'Copied ✓';
+        copyBtn.textContent = 'Copied✓';
         setTimeout(() => { copyBtn.textContent = 'Copy address'; }, 2000);
       });
     };
@@ -6910,7 +6929,7 @@ function renderTezosPanel() {
     document.getElementById('tezosWalletAddr').textContent = tezosShortAddr(_tezosConnectedAddr);
     document.getElementById('tezosConnectBtn').style.display = 'none';
     // Only show Send button once the rate is known
-    document.getElementById('tezosSendBtn').style.display = (addr && xtz !== null) ? '' : 'none';
+    document.getElementById('tezosSendBtn').style.display = (addr && xtz !== null && checkoutQuoteReady(getFormData(), true)) ? '' : 'none';
   } else {
     document.getElementById('tezosWalletInfo').style.display = 'none';
     document.getElementById('tezosConnectBtn').style.display = '';
@@ -6954,9 +6973,9 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
       await refreshLock('tezos', true);
       lock = window.__activeLock;
     }
-    if (!lock || !lock.order_ref) { showToast('XTZ quote unavailable — try again in a moment'); return; }
+    if (!lock || !lock.order_ref) { showToast('XTZ quote unavailable - try again in a moment'); return; }
     const xtzAmt = lock.quote?.crypto_amount;
-    if (!xtzAmt) { showToast('XTZ quote unavailable — try again in a moment'); return; }
+    if (!xtzAmt) { showToast('XTZ quote unavailable - try again in a moment'); return; }
     const orderRef = lock.order_ref;
 
     const mutez = String(Math.round(parseFloat(xtzAmt) * 1_000_000));
@@ -6982,7 +7001,7 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
     if (/reject|cancel|denied|aborted/i.test(msg)) {
       showToast('Transaction cancelled');
     } else {
-      showToast('Transaction sent — confirming. If this doesn\u2019t complete, use “confirm manually” with your transaction hash.');
+      showToast('Transaction sent - confirming. If this does not complete, use confirm manually with your transaction hash.');
       console.error('[Tezos] send error:', e);
     }
   } finally {
@@ -6993,7 +7012,7 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
   }
 });
 
-// Manual confirm (fallback — user sent from wallet app directly)
+// Manual confirm fallback: user sent from wallet app directly.
 document.getElementById('tezosManualBtn').addEventListener('click', () => {
   submitManualCrypto('tezos');
 });
