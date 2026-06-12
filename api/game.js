@@ -760,7 +760,6 @@ async function applyProductTags(products, supabase) {
 // CHECKOUT COMPUTATION (server-authoritative)
 // Delivery rates and carrier rules mirror the checkout in shop.html.
 const SERVER_DELIVERY_RATES = {
-  pickup:     { label: 'Kaduna pickup',            small: { ngn: 0,    usd: 0 }, large: { ngn: 0,     usd: 0 } },
   'NG-KD':     { label: 'Kaduna State',             small: { ngn: 2500, usd: 0 }, large: { ngn: 3800,  usd: 0 } },
   'NG-ABJ':    { label: 'FCT - Abuja',              small: { ngn: 3800, usd: 0 }, large: { ngn: 5500,  usd: 0 } },
   'NG-NORTH2': { label: 'North / North-West',       small: { ngn: 4200, usd: 0 }, large: { ngn: 6000,  usd: 0 } },
@@ -1001,8 +1000,13 @@ async function computeShopCheckout(body, supabase) {
     });
   }
 
-  const zone = String(body.delivery_zone || 'pickup');
-  const method = String(body.delivery_method || 'pickup');
+  const method = String(body.delivery_method || 'ship');
+  const zone = String(body.delivery_zone || '');
+  if (method === 'ship' && !zone) {
+    const err = new Error('Delivery country / region is required');
+    err.statusCode = 400;
+    throw err;
+  }
   const shippingProfile = serverShippingProfile(trustedItems, productCache);
   hasLarge = hasLarge || shippingProfile.tube;
   const deliveryCarrier = method === 'ship' ? serverIntlCarrierTier(zone, subtotalUsd, body.delivery_carrier) : '';
@@ -1536,7 +1540,6 @@ function isUuidTextOperatorError(error) {
 }
 
 async function adjustVariantStockDirect(supabase, item, qtyDelta) {
-  const vkey = item.variantKey || item.variant;
   const { data: product, error: loadErr } = await supabase
     .from('shop_products')
     .select('id, name, stock, stock_by_variant')
@@ -1557,11 +1560,15 @@ async function adjustVariantStockDirect(supabase, item, qtyDelta) {
   const stockByVariant = product.stock_by_variant && typeof product.stock_by_variant === 'object'
     ? { ...product.stock_by_variant }
     : null;
-  if (stockByVariant && stockByVariant[vkey] !== undefined) {
-    const current = Number(stockByVariant[vkey]);
+  const variantCandidates = stockVariantKeyCandidates(item, stockByVariant);
+  const stockKey = stockByVariant
+    ? variantCandidates.find(key => stockByVariant[key] !== undefined)
+    : null;
+  if (stockByVariant && stockKey !== null && stockKey !== undefined) {
+    const current = Number(stockByVariant[stockKey]);
     const next = current + qtyDelta;
     if (qtyDelta < 0 && next < 0) return { ok: false };
-    stockByVariant[vkey] = next;
+    stockByVariant[stockKey] = next;
     patch.stock_by_variant = stockByVariant;
   }
 
@@ -1582,44 +1589,88 @@ async function adjustVariantStockDirect(supabase, item, qtyDelta) {
     e.statusCode = 500;
     throw e;
   }
-  return { ok: true };
+  return { ok: true, stockKey: stockKey || null };
+}
+
+function stockKeyFingerprint(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[“”"]/g, '')
+    .replace(/\s+/g, '')
+    .replace(/[×*]/g, 'x');
+}
+
+function stockVariantKeyCandidates(item, stockByVariant = null) {
+  const raw = [item._claimedStockKey, item.variantKey, item.variant].filter(Boolean).map(String);
+  for (const value of [...raw]) {
+    if (value.includes('|')) raw.push(value.split('|').pop());
+  }
+  const seen = new Set();
+  const candidates = raw.filter(value => {
+    const key = String(value);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (stockByVariant && typeof stockByVariant === 'object') {
+    const fingerprints = new Set(candidates.map(stockKeyFingerprint));
+    for (const key of Object.keys(stockByVariant)) {
+      if (fingerprints.has(stockKeyFingerprint(key))) candidates.push(key);
+    }
+  }
+  return candidates;
 }
 
 async function claimVariantStock(supabase, item) {
-  const vkey = item.variantKey || item.variant;
-  const { data, error } = await supabase.rpc('decrement_variant_stock', {
-    p_id: item.id,
-    p_variant_key: vkey,
-    p_qty: item.qty,
-  });
-  if (error) {
-    if (isUuidTextOperatorError(error)) {
-      return adjustVariantStockDirect(supabase, item, -Math.abs(Number(item.qty) || 1));
-    }
-    const e = new Error(`Stock claim failed for ${item.name || item.id}: ${error.message}`);
-    e.statusCode = 500;
-    throw e;
-  }
-  return { ok: data === true };
-}
-
-async function releaseVariantStock(supabase, item) {
-  const vkey = item.variantKey || item.variant;
-  try {
-    const { error } = await supabase.rpc('decrement_variant_stock', {
+  const qty = Math.abs(Number(item.qty) || 1);
+  const candidates = stockVariantKeyCandidates(item);
+  let lastError = null;
+  for (const vkey of candidates) {
+    const { data, error } = await supabase.rpc('decrement_variant_stock', {
       p_id: item.id,
       p_variant_key: vkey,
-      p_qty: -item.qty,
+      p_qty: qty,
     });
     if (error) {
       if (isUuidTextOperatorError(error)) {
-        await adjustVariantStockDirect(supabase, item, Math.abs(Number(item.qty) || 1));
+        return adjustVariantStockDirect(supabase, item, -qty);
+      }
+      lastError = error;
+      break;
+    }
+    if (data === true) return { ok: true, stockKey: vkey };
+  }
+  if (lastError) {
+    const e = new Error(`Stock claim failed for ${item.name || item.id}: ${lastError.message}`);
+    e.statusCode = 500;
+    throw e;
+  }
+  return adjustVariantStockDirect(supabase, item, -qty);
+}
+
+async function releaseVariantStock(supabase, item) {
+  const qty = Math.abs(Number(item.qty) || 1);
+  const candidates = stockVariantKeyCandidates(item);
+  try {
+    for (const vkey of candidates) {
+      const { data, error } = await supabase.rpc('decrement_variant_stock', {
+        p_id: item.id,
+        p_variant_key: vkey,
+        p_qty: -qty,
+      });
+      if (error) {
+        if (isUuidTextOperatorError(error)) {
+          await adjustVariantStockDirect(supabase, item, qty);
+          return;
+        }
+        console.error('[shop-order] stock release failed:', item.id, vkey, error.message);
         return;
       }
-      console.error('[shop-order] stock release failed:', item.id, vkey, error.message);
+      if (data === true) return;
     }
+    await adjustVariantStockDirect(supabase, item, qty);
   } catch (e) {
-    console.error('[shop-order] stock release threw:', item.id, vkey, e.message);
+    console.error('[shop-order] stock release threw:', item.id, item._claimedStockKey || item.variantKey || item.variant, e.message);
   }
 }
 
@@ -1649,9 +1700,7 @@ async function sendShopSellerNotification({ order, orderRef, checkout, paymentMe
     process.env.FORM_ALERT_FROM_EMAIL ||
     "Kay's Works Queue <auction@mail.kaysworks.com>";
   const customerName = order.customer_name || 'Shop customer';
-  const delivery = checkout.method === 'pickup'
-    ? 'Kaduna pickup (free)'
-    : `Ship to: ${order.address || 'No address saved'}; zone: ${checkout.zone}; delivery: NGN ${Number(checkout.deliveryNgn || 0).toLocaleString('en-NG')}`;
+  const delivery = `Ship to: ${order.address || 'No address saved'}; zone: ${checkout.zone}; delivery: NGN ${Number(checkout.deliveryNgn || 0).toLocaleString('en-NG')}`;
   const itemsHtml = checkout.trustedItems.map(item => `
     <tr>
       <td style="padding:8px 0;border-bottom:1px solid #eee">${shopEscapeHtml(item.name)}<br><span style="color:#777">${shopEscapeHtml(item.variant)}</span></td>
@@ -1726,9 +1775,7 @@ async function sendShopCustomerReceipt({ order, orderRef, checkout, paymentMetho
   const customerName = order.customer_name || 'there';
   const shopUrl = process.env.SHOP_URL || 'https://www.kaysworks.com/shop';
   const logoUrl = process.env.SHOP_LOGO_URL || 'https://www.kaysworks.com/images/kaysworkslogo.svg';
-  const delivery = checkout.method === 'pickup'
-    ? 'Kaduna pickup. Kay will contact you with pickup details.'
-    : `Ship to: ${order.address || 'the address on your order'}.`;
+  const delivery = `Ship to: ${order.address || 'the address on your order'}.`;
   const deliveryFeeLabel = Number(checkout.deliveryNgn || 0) > 0
     ? `Delivery fee: NGN ${Number(checkout.deliveryNgn || 0).toLocaleString('en-NG')}`
     : 'Delivery fee: Free';
@@ -1970,8 +2017,8 @@ async function handleShopOrderConfirm(req, res, supabase) {
       totalNgn: Number(order.total_ngn) || 0,
       totalUsd: Number(order.total_usd) || 0,
       deliveryNgn: Number(order.delivery_fee_ngn) || 0,
-      method: order.delivery_method || 'pickup',
-      zone: order.delivery_zone || 'pickup',
+      method: order.delivery_method || 'ship',
+      zone: order.delivery_zone || '',
     };
     let sellerNotification = { sent: false };
     try {
@@ -2041,8 +2088,8 @@ async function handleShopOrderConfirm(req, res, supabase) {
     totalNgn: Number(order.total_ngn) || 0,
     totalUsd: Number(order.total_usd) || 0,
     deliveryNgn: Number(order.delivery_fee_ngn) || 0,
-    method: order.delivery_method || 'pickup',
-    zone: order.delivery_zone || 'pickup',
+    method: order.delivery_method || 'ship',
+    zone: order.delivery_zone || '',
   };
 
   // Verify payment BEFORE touching stock.
@@ -2112,7 +2159,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
         sold_out: true,
       });
     }
-    claimed.push(item);
+    claimed.push({ ...item, _claimedStockKey: result.stockKey || item.variantKey || item.variant });
   }
 
   // Flip the order to paid. For crypto, fold the payment details back into the
@@ -2275,7 +2322,7 @@ async function handleShopOrder(req, res, supabase) {
         sold_out: true,
       });
     }
-    claimed.push(item);
+    claimed.push({ ...item, _claimedStockKey: result.stockKey || item.variantKey || item.variant });
   }
 
   const { data: order, error: orderError } = await supabase
