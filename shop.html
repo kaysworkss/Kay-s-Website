@@ -1586,6 +1586,33 @@ body.dark .cart-note-toggle { color: var(--sand); }
 body.dark .toast { background:#2a1c14; }
 .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
+.chain-wait-overlay {
+  position: fixed; inset: 0; z-index: 620;
+  display: none; align-items: center; justify-content: center;
+  padding: 1.2rem; background: rgba(20,16,16,0.58);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.chain-wait-overlay.open { display: flex; }
+.chain-wait-modal {
+  width: min(440px, 100%); background: var(--bg-card); color: var(--text);
+  border: 1px solid var(--border-hover); border-radius: 10px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.28); padding: 1.4rem;
+}
+.chain-wait-icon {
+  width: 42px; height: 42px; border-radius: 50%; margin-bottom: 1rem;
+  border: 2px solid rgba(196,132,90,0.22); border-top-color: var(--clay);
+  animation: chainWaitSpin 1s linear infinite;
+}
+@keyframes chainWaitSpin { to { transform: rotate(360deg); } }
+.chain-wait-kicker { font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:0.45rem; }
+.chain-wait-title { font-family:'Cormorant Garamond',serif; font-size:1.55rem; line-height:1.1; margin-bottom:0.65rem; }
+.chain-wait-copy { font-size:0.9rem; line-height:1.65; color:var(--text-muted); margin-bottom:1rem; }
+.chain-wait-meta { display:grid; gap:0.55rem; padding:0.85rem; background:var(--bg-alt); border:1px solid var(--border); border-radius:8px; font-family:'Montserrat',sans-serif; font-size:0.68rem; }
+.chain-wait-row { display:flex; justify-content:space-between; gap:1rem; }
+.chain-wait-row span:last-child { color:var(--text); text-align:right; word-break:break-all; }
+.chain-wait-note { margin-top:0.85rem; font-size:0.72rem; line-height:1.55; color:var(--text-muted); }
+
+
 /* ── Footer ── */
 /* ══ Footer ══ */
 footer {
@@ -3040,6 +3067,22 @@ footer {
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
+
+<div class="chain-wait-overlay" id="chainWaitOverlay" role="status" aria-live="polite" aria-modal="true">
+  <div class="chain-wait-modal">
+    <div class="chain-wait-icon" aria-hidden="true"></div>
+    <div class="chain-wait-kicker">Blockchain confirmation</div>
+    <div class="chain-wait-title" id="chainWaitTitle">Waiting for confirmation</div>
+    <div class="chain-wait-copy" id="chainWaitCopy">Your transaction has been submitted. We are waiting for the blockchain to confirm it before finalising your order.</div>
+    <div class="chain-wait-meta">
+      <div class="chain-wait-row"><strong>Network</strong><span id="chainWaitNetwork">-</span></div>
+      <div class="chain-wait-row"><strong>Status</strong><span id="chainWaitStatus">Preparing check...</span></div>
+      <div class="chain-wait-row"><strong>Attempt</strong><span id="chainWaitAttempt">-</span></div>
+      <div class="chain-wait-row"><strong>Tx hash</strong><span id="chainWaitTx">-</span></div>
+    </div>
+    <div class="chain-wait-note">Please keep this tab open. This can take a few minutes when the network or indexers are still catching up.</div>
+  </div>
+</div>
 
 <!-- Footer -->
 <footer>
@@ -5016,6 +5059,35 @@ document.getElementById('ethManualCancel')?.addEventListener('click', () => {
 
 // ── PENDING-FIRST ORDER HELPERS ───────────────────────────────────────────────
 // Create a pending order on the server BEFORE payment. Returns { order_ref, ... }.
+
+function chainWaitLabel(method) {
+  if (method === 'tezos') return 'Tezos';
+  if (method === 'usdc') return 'Ethereum / USDC';
+  if (method === 'usdt') return 'Ethereum / USDT';
+  return 'Ethereum';
+}
+function shortHash(value) {
+  const valueText = String(value || '');
+  return valueText.length > 22 ? valueText.slice(0, 12) + '...' + valueText.slice(-8) : (valueText || '-');
+}
+function openChainWaitModal(meta = {}) {
+  const overlay = document.getElementById('chainWaitOverlay');
+  if (!overlay) return;
+  overlay.classList.add('open');
+  document.getElementById('chainWaitNetwork').textContent = chainWaitLabel(meta.method || meta.payment_method || 'eth');
+  document.getElementById('chainWaitTx').textContent = shortHash(meta.payment_ref || meta.txHash || '');
+  updateChainWaitModal('Broadcast received. Waiting before the first confirmation check...', 0, meta.maxAttempts || 0);
+}
+function updateChainWaitModal(status, attempt, maxAttempts) {
+  const statusEl = document.getElementById('chainWaitStatus');
+  const attemptEl = document.getElementById('chainWaitAttempt');
+  if (statusEl) statusEl.textContent = status || 'Checking blockchain...';
+  if (attemptEl) attemptEl.textContent = attempt ? (attempt + ' of ' + maxAttempts) : 'Starting';
+}
+function closeChainWaitModal() {
+  document.getElementById('chainWaitOverlay')?.classList.remove('open');
+}
+
 async function createPendingOrder(customer, method, checkoutQuote) {
   return postShopJson('/api/shop/order-create', checkoutPayload(customer, method, {
     checkout_quote: checkoutQuote,
@@ -5026,45 +5098,65 @@ async function createPendingOrder(customer, method, checkoutQuote) {
 // while the chain is still indexing (server returns 409 "not confirmed yet").
 async function confirmPendingOrder(orderRef, opts) {
   const payload = Object.assign({ order_ref: orderRef, order_hash: orderRef }, opts);
-  // Tezos/ETH indexers can lag behind a just-broadcast tx. Keep each server call
-  // short, but let the browser retry for about three minutes before giving up.
-  const maxAttempts = 120;
+  const method = String(opts?.payment_method || '').toLowerCase();
+  const isCryptoConfirm = ['eth', 'tezos', 'usdc', 'usdt'].includes(method);
+  const maxAttempts = isCryptoConfirm ? 120 : 1;
   const RETRY_MS = 5000;
+  const INITIAL_WAIT_MS = isCryptoConfirm ? 12000 : 0;
   let lastErr = null;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const res = await fetch('/api/shop/order-confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const rawText = await res.text().catch(() => '');
-      let data;
-      try { data = rawText ? JSON.parse(rawText) : {}; } catch (_) { data = { raw: rawText }; }
-      // diagnostic capture
-      window.__shopDiag = window.__shopDiag || [];
-      const diagBody = Object.keys(data || {}).length ? JSON.stringify(data) : (rawText || '(empty response body)');
-      window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url: '/api/shop/order-confirm', status: res.status, body: diagBody });
-      if (window.__shopDiag.length > 8) window.__shopDiag.length = 8;
-      if (window.__renderShopDiag) window.__renderShopDiag();
-      if (res.ok) return data;
-      if (res.status === 409 && /confirm|not confirmed|waiting|found/i.test(data.error || '') && attempt < maxAttempts) {
-        lastErr = new Error(data.error || 'Awaiting on-chain confirmation');
-        if (typeof showToast === 'function' && attempt === 1) showToast('Payment found - waiting for blockchain confirmations...');
-        await new Promise(r => setTimeout(r, RETRY_MS));
-        continue;
-      }
-      const err = new Error(data.error || rawText || `Order confirmation failed with HTTP ${res.status}`);
-      err.nonRetryable = true;
-      throw err;
-    } catch (e) {
-      lastErr = e;
-      if (e && e.nonRetryable) throw e;
-      if (attempt < maxAttempts) { await new Promise(r => setTimeout(r, RETRY_MS)); continue; }
-      throw e;
-    }
+
+  if (isCryptoConfirm) {
+    openChainWaitModal({ method, payment_ref: opts?.payment_ref, maxAttempts });
+    await new Promise(r => setTimeout(r, INITIAL_WAIT_MS));
   }
-  if (lastErr) throw lastErr;
+
+  try {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (isCryptoConfirm) updateChainWaitModal('Checking blockchain confirmation...', attempt, maxAttempts);
+      try {
+        const res = await fetch('/api/shop/order-confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const rawText = await res.text().catch(() => '');
+        let data;
+        try { data = rawText ? JSON.parse(rawText) : {}; } catch (_) { data = { raw: rawText }; }
+        window.__shopDiag = window.__shopDiag || [];
+        const diagBody = Object.keys(data || {}).length ? JSON.stringify(data) : (rawText || '(empty response body)');
+        window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url: '/api/shop/order-confirm', status: res.status, body: diagBody });
+        if (window.__shopDiag.length > 8) window.__shopDiag.length = 8;
+        if (window.__renderShopDiag) window.__renderShopDiag();
+        if (res.ok) {
+          if (isCryptoConfirm) updateChainWaitModal('Confirmed. Finalising your order...', attempt, maxAttempts);
+          return data;
+        }
+        const errText = data.error || rawText || '';
+        const stillWaiting = res.status === 409 && /confirm|not confirmed|waiting|found|index|receipt|pending/i.test(errText);
+        if (isCryptoConfirm && stillWaiting && attempt < maxAttempts) {
+          lastErr = new Error(errText || 'Awaiting on-chain confirmation');
+          updateChainWaitModal(errText || 'Still waiting for blockchain confirmation...', attempt, maxAttempts);
+          await new Promise(r => setTimeout(r, RETRY_MS));
+          continue;
+        }
+        const err = new Error(errText || ('Order confirmation failed with HTTP ' + res.status));
+        err.nonRetryable = true;
+        throw err;
+      } catch (e) {
+        lastErr = e;
+        if (e && e.nonRetryable) throw e;
+        if (isCryptoConfirm && attempt < maxAttempts) {
+          updateChainWaitModal('Network is slow. Retrying confirmation check...', attempt, maxAttempts);
+          await new Promise(r => setTimeout(r, RETRY_MS));
+          continue;
+        }
+        throw e;
+      }
+    }
+    if (lastErr) throw lastErr;
+  } finally {
+    if (isCryptoConfirm) closeChainWaitModal();
+  }
 }
 
 // Local safety net: remember an unconfirmed order so a returning customer (or
