@@ -1252,13 +1252,25 @@ async function ethRpc(method, params = []) {
     err.statusCode = 503;
     throw err;
   }
-  const r = await fetch(rpcUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
-  });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok || data.error) throw new Error(data.error?.message || `Ethereum RPC ${method} failed`);
+  let r, data;
+  try {
+    r = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
+    });
+    data = await r.json().catch(() => ({}));
+  } catch (networkErr) {
+    // RPC unreachable — treat as "not confirmed yet" so browser keeps retrying
+    const e = new Error('Transaction is not confirmed yet — RPC temporarily unreachable');
+    e.statusCode = 409;
+    throw e;
+  }
+  if (!r.ok || data.error) {
+    const e = new Error('Transaction is not confirmed yet — RPC error: ' + (data.error?.message || r.status));
+    e.statusCode = 409;
+    throw e;
+  }
   return data.result;
 }
 
@@ -1361,15 +1373,17 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
     }
     const data = await r.json().catch(() => null);
     if (!r.ok) {
-      const e = new Error(`Could not reach TzKT operation lookup: HTTP ${r.status}`);
-      e.statusCode = 502;
+      // Indexer error — treat as "not yet confirmed" so browser keeps retrying
+      const e = new Error('Transaction is not confirmed yet — indexer temporarily unavailable');
+      e.statusCode = 409;
       throw e;
     }
     list = operationRows(data);
   } catch (err) {
     if (err.statusCode) throw err;
-    const e = new Error(`Could not reach TzKT operation lookup: ${err.message || err}`);
-    e.statusCode = 502;
+    // Network error or abort (timeout waiting for indexer) — keep retrying
+    const e = new Error('Transaction is not confirmed yet — waiting for indexer');
+    e.statusCode = 409;
     throw e;
   } finally {
     clearTimeout(timer);
