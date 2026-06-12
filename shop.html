@@ -1832,24 +1832,23 @@ footer {
       <a href="/auction">Auction</a>
       <a href="/shop" class="active">Shop</a>
     </div>
-    <button class="theme-btn" id="themeBtn" aria-label="Toggle theme">☀</button>
-    <button class="nav-cart" id="cartBtn" aria-label="Open cart">
-      &#x2715;&#xFE0E;
+    <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle theme">&#x2600;&#xFE0E;</button>
+    <button class="nav-cart" id="cartBtn" type="button" aria-label="Open cart">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:inline-block;vertical-align:middle"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
       <span class="cart-badge" id="cartBadge">0</span>
     </button>
   </div>
 </nav>
 
-<!-- Hero — full-bleed cinematic -->
+<!-- Hero - full-bleed cinematic -->
 <section class="shop-hero">
   <div class="shop-hero-bg"></div>
   <div class="shop-hero-bg-img"></div>
   <div class="shop-hero-vignette"></div>
   <div class="shop-hero-content">
-    <p class="shop-hero-eyebrow">Kay's Works · The Shop</p>
+    <p class="shop-hero-eyebrow">Kay's Works &middot; The Shop</p>
     <h1 class="shop-hero-title">Own the story.<br><em>Wear the work.</em></h1>
-    <p class="shop-hero-sub">Fine art prints, premium merch, and handcrafted notebooks — each piece rooted in the same care Kay puts into his paintings.</p>
+    <p class="shop-hero-sub">Fine art prints, premium merch, and handcrafted notebooks - each piece rooted in the same care Kay puts into his paintings.</p>
     <div class="shop-hero-ctas">
       <button class="hero-cta-primary" onclick="document.getElementById('shopGrid').scrollIntoView({behavior:'smooth'})">Browse the shop</button>
       <a href="#collections" class="hero-cta-ghost">Shop by collection</a>
@@ -2163,9 +2162,9 @@ footer {
       <button class="enquire-send" id="enquireSend">Send message</button>
     </div>
     <div class="enquire-done" id="enquireDone" style="display:none">
-      <div class="enquire-done-icon">✦</div>
+      <div class="enquire-done-icon">*</div>
       <p style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--text);margin-bottom:0.5rem">Message sent.</p>
-      <p style="font-family:'Crimson Pro',serif;color:var(--text-muted);line-height:1.6">Thank you — we'll reply by email within 24 hours.</p>
+      <p style="font-family:'Crimson Pro',serif;color:var(--text-muted);line-height:1.6">Thank you - we'll reply by email within 24 hours.</p>
     </div>
   </div>
 </div>
@@ -2175,11 +2174,11 @@ footer {
 <aside class="cart-drawer" id="cartDrawer">
   <div class="cart-head">
     <span class="cart-head-title">Your Bag</span>
-    <button class="cart-close" id="cartClose">✕</button>
+    <button class="cart-close" id="cartClose" type="button" aria-label="Close cart">&times;</button>
   </div>
   <div class="cart-items" id="cartItems">
     <div class="cart-empty">
-      <div class="cart-empty-icon">&#x2715;&#xFE0E;</div>
+      <div class="cart-empty-icon">&empty;</div>
       <p class="cart-empty-text">Your bag is empty.</p>
     </div>
   </div>
@@ -2200,7 +2199,7 @@ footer {
 <div class="checkout-loading" id="checkoutLoading" role="status" aria-live="polite">
   <div class="checkout-loading-ring"></div>
   <div class="checkout-loading-bar"></div>
-  <div class="checkout-loading-text">Loading your checkout…</div>
+  <div class="checkout-loading-text">Loading your checkout...</div>
 </div>
 
 <!-- Checkout Modal -->
@@ -3680,6 +3679,7 @@ function addToCart(p, variant) {
 }
 
 function recommendedCartProducts(limit = 3) {
+  const recommendationThresholdUsd = 60;
   const inCart = new Set(cart.map(c => c.id));
   const cartCats = new Set(cart.map(c => {
     const p = SHOP_CONFIG.products.find(x => x.id === c.id);
@@ -3696,7 +3696,7 @@ function recommendedCartProducts(limit = 3) {
       let score = 0;
       if (p.category === 'stickers' || p.category === 'notebooks') score += 5;
       if (cartCats.has('prints') && (p.category === 'prints' || p.category === 'stickers')) score += 4;
-      if (cartUsdTotal() < HIGH_CART_USD && priceUsd > 0 && priceUsd <= 25) score += 4;
+      if (cartUsdTotal() < recommendationThresholdUsd && priceUsd > 0 && priceUsd <= 25) score += 4;
       if (p.is_bestseller || p.is_new) score += 2;
       return { p, choice: first, priceNgn, priceUsd, score };
     })
@@ -3857,7 +3857,7 @@ function updateCartUI() {
     if (ethPanel && ethPanel.classList.contains('active') && typeof renderEthPanel === 'function') renderEthPanel();
     const xtzPanel = document.getElementById('panel-tezos');
     if (xtzPanel && xtzPanel.classList.contains('active') && typeof renderTezosPanel === 'function') renderTezosPanel();
-    // The cart changed → the locked price/order no longer matches. Re-lock so the
+    // The cart changed, so the locked price/order no longer matches. Re-lock so the
     // shown amount, order hash, and pending order reflect the new cart.
     if (typeof relockOnCartChange === 'function') relockOnCartChange();
   } catch (e) { /* panels not present yet — ignore */ }
@@ -3873,7 +3873,11 @@ function closeCart() {
   document.getElementById('cartDrawer').classList.remove('open');
   document.getElementById('cartOverlay').classList.remove('open');
 }
-document.getElementById('cartBtn').addEventListener('click', openCart);
+document.getElementById('cartBtn').addEventListener('click', event => {
+  event.preventDefault();
+  event.stopPropagation();
+  openCart();
+}, true);
 document.getElementById('cartClose').addEventListener('click', closeCart);
 document.getElementById('cartOverlay').addEventListener('click', closeCart);
 
@@ -3886,7 +3890,7 @@ document.getElementById('cartOrderNote')?.addEventListener('input', e => {
   localStorage.setItem('kwCartOrderNote', cartOrderNote);
 });
 
-/* ─── Checkout modal ─── */
+/* Checkout modal */
 /* ─── Size guide engine ─── */
 const SIZE_DATA = {
   tee: {
@@ -4767,7 +4771,7 @@ function renderLockUI(method) {
   box.style.display = 'block';
   const amtEl = document.getElementById(ids.amt);
   const refEl = document.getElementById(ids.ref);
-  if (amtEl) amtEl.textContent = (lock.quote?.crypto_amount ?? '—') + ' ' + lockMethodToAsset(method);
+  if (amtEl) amtEl.textContent = (lock.quote?.crypto_amount - '—') + ' ' + lockMethodToAsset(method);
   if (refEl) refEl.textContent = lock.order_ref || '—';
 }
 
@@ -4838,12 +4842,12 @@ function relockOnCartChange() {
 
 // Notify via site-form API (reuse existing backend)
 async function notifyOrder(customer, ref, method, checkoutQuote = null) {
-  const quotedSubtotalNgn = checkoutQuote?.subtotal_ngn ?? cartNgnTotal();
-  const quotedSubtotalUsd = checkoutQuote?.subtotal_usd ?? cartUsdTotal();
-  const quotedDeliveryNgn = checkoutQuote?.delivery_fee_ngn ?? customer.deliveryFeeNgn;
-  const quotedDeliveryUsd = checkoutQuote?.delivery_fee_usd ?? customer.deliveryFeeUsd;
-  const quotedTotalNgn = checkoutQuote?.total_ngn ?? grandTotalNgn();
-  const quotedTotalUsd = checkoutQuote?.total_usd ?? grandTotalUsd();
+  const quotedSubtotalNgn = checkoutQuote?.subtotal_ngn - cartNgnTotal();
+  const quotedSubtotalUsd = checkoutQuote?.subtotal_usd - cartUsdTotal();
+  const quotedDeliveryNgn = checkoutQuote?.delivery_fee_ngn - customer.deliveryFeeNgn;
+  const quotedDeliveryUsd = checkoutQuote?.delivery_fee_usd - customer.deliveryFeeUsd;
+  const quotedTotalNgn = checkoutQuote?.total_ngn - grandTotalNgn();
+  const quotedTotalUsd = checkoutQuote?.total_usd - grandTotalUsd();
   const carrierInfo = customer.deliveryCarrier ? `${carrierLabel(customer.deliveryCarrier)}; ` : '';
   const deliveryInfo = customer.deliveryMethod === 'pickup'
     ? 'Collection (arrange with Kay)'
@@ -5208,7 +5212,7 @@ function renderAdminProducts() {
               <input class="form-input ap-size-ngn" data-idx="${realIdx}" data-v="${escapeAttr(key)}" value="${productPrice(p, key, 'ngn')||''}" placeholder="NGN" style="padding:0.35rem 0.5rem;font-size:0.78rem;margin:0 0.4rem 0 0"/>
               <input class="form-input ap-size-usd" data-idx="${realIdx}" data-v="${escapeAttr(key)}" value="${productPrice(p, key, 'usd')||''}" placeholder="$" style="padding:0.35rem 0.5rem"/>
               <div style="padding:0 0.4rem">
-                <input class="form-input ap-size-edition" data-idx="${realIdx}" data-v="${escapeAttr(key)}" type="number" min="0" value="${total ?? ''}" placeholder="-" ${opt.limited ? '' : 'disabled'} title="${opt.limited ? 'Total editions in this run' : 'Mark the option as limited edition to set a run size'}" style="padding:0.35rem 0.5rem;font-size:0.78rem;${opt.limited ? '' : 'opacity:0.4'}"/>
+                <input class="form-input ap-size-edition" data-idx="${realIdx}" data-v="${escapeAttr(key)}" type="number" min="0" value="${total - ''}" placeholder="-" ${opt.limited ? '' : 'disabled'} title="${opt.limited ? 'Total editions in this run' : 'Mark the option as limited edition to set a run size'}" style="padding:0.35rem 0.5rem;font-size:0.78rem;${opt.limited ? '' : 'opacity:0.4'}"/>
                 ${remainingHint}
               </div>
               <input class="form-input ap-size-weight" data-idx="${realIdx}" data-v="${escapeAttr(key)}" value="${ship.weight_kg || ''}" placeholder="auto" type="number" step="0.01" min="0" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
@@ -5280,7 +5284,7 @@ function renderAdminProducts() {
           <input class="form-input ap-v-label" value="${escapeAttr(v)}" placeholder="Variant" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <input class="form-input ap-v-ngn" value="${productPrice(p, v, 'ngn') || ''}" placeholder="NGN" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <input class="form-input ap-v-usd" value="${productPrice(p, v, 'usd') || ''}" placeholder="USD" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
-          <input class="form-input ap-v-stock" value="${p.stock_by_variant?.[v] ?? ''}" placeholder="Stock" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+          <input class="form-input ap-v-stock" value="${p.stock_by_variant?.[v] - ''}" placeholder="Stock" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <button class="ap-remove-variant" type="button" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem" title="Remove">x</button>
         </div>`).join('');
       html += `<div class="admin-product-row" data-idx="${realIdx}" style="grid-template-columns:1fr;gap:0.7rem">
@@ -5313,7 +5317,7 @@ function renderAdminProducts() {
           </div>
           <div class="form-row" style="margin:0">
             <label class="form-label">Overall stock</label>
-            <input class="form-input ap-stock" data-idx="${realIdx}" value="${p.stock ?? ''}" type="number" placeholder="Optional"/>
+            <input class="form-input ap-stock" data-idx="${realIdx}" value="${p.stock - ''}" type="number" placeholder="Optional"/>
           </div>
         </div>
         <div class="form-row" style="margin:0">
@@ -5620,8 +5624,8 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         });
         p.variants = getPrintOptions(p).map(o => ({
           type: o.type,
-          desc: descByType[o.type] ?? o.desc ?? '',
-          limited: limitedByType[o.type] ?? o.limited ?? false,
+          desc: descByType[o.type] - o.desc - '',
+          limited: limitedByType[o.type] - o.limited - false,
           sizes: [...o.sizes],
           shipping_meta: shippingByType[o.type] || {},
         }));
@@ -6504,7 +6508,7 @@ async function loadShopData() {
           is_large_print:     r.is_large_print || false,
           clothing:           r.clothing || false,
           clothing_type:      r.clothing_type || '',
-          stock:              r.stock ?? null,
+          stock:              r.stock - null,
           stock_by_variant:   r.stock_by_variant || {},
           edition_totals:     r.edition_totals || {},
           active:             r.active !== false,
@@ -6578,7 +6582,7 @@ async function apiSaveProduct(p, token) {
     is_large_print:     p.is_large_print || false,
     clothing:           p.clothing || false,
     clothing_type:      p.clothing_type || '',
-    stock:              p.stock ?? null,
+    stock:              p.stock - null,
     stock_by_variant:   p.stock_by_variant || {},
     edition_totals:     p.edition_totals || {},
     sort_order:         p.sort_order || 0,
