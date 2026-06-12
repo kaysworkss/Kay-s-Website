@@ -2094,51 +2094,25 @@ async function handleShopOrderConfirm(req, res, supabase) {
   }
 
   // Decrement stock now that payment is confirmed.
-  // ── Idempotency guard ────────────────────────────────────────────────────
-  // Atomically flip status from 'pending' → 'confirming' before touching stock.
-  // If a previous attempt already moved the order to 'confirming' or 'paid'
-  // (e.g. Vercel timed out after stock was claimed but before status update),
-  // we skip stock decrement entirely to avoid a double-decrement that would
-  // make the product appear sold out on the next retry.
-  const alreadyConfirming = order.status === 'confirming';
-  if (!alreadyConfirming) {
-    const { error: lockErr } = await supabase
-      .from('shop_orders')
-      .update({ status: 'confirming', updated_at: new Date().toISOString() })
-      .eq('order_ref', orderRef)
-      .eq('status', 'pending'); // only succeeds if still pending
-    // If lockErr it means concurrent request grabbed it — that's fine, continue
-  }
-
   const claimed = [];
-  if (!alreadyConfirming) {
-    // Only claim stock if this is the first confirm attempt for this order
-    for (const item of checkout.trustedItems) {
-      let result;
-      try {
-        result = await claimVariantStock(supabase, item);
-      } catch (e) {
-        // Release whatever we claimed, reset order back to pending, re-throw
-        for (const c of claimed) await releaseVariantStock(supabase, c);
-        await supabase.from('shop_orders')
-          .update({ status: 'pending', updated_at: new Date().toISOString() })
-          .eq('order_ref', orderRef);
-        return jsonError(e);
-      }
-      if (!result.ok) {
-        for (const c of claimed) await releaseVariantStock(supabase, c);
-        await supabase.from('shop_orders')
-          .update({ status: 'pending', updated_at: new Date().toISOString() })
-          .eq('order_ref', orderRef);
-        return json(409, {
-          error: `Sold out: ${item.name} · ${item.variant} is no longer available`,
-          product_id: item.id,
-          variant: item.variant,
-          sold_out: true,
-        });
-      }
-      claimed.push(item);
+  for (const item of checkout.trustedItems) {
+    let result;
+    try {
+      result = await claimVariantStock(supabase, item);
+    } catch (e) {
+      for (const c of claimed) await releaseVariantStock(supabase, c);
+      return jsonError(e);
     }
+    if (!result.ok) {
+      for (const c of claimed) await releaseVariantStock(supabase, c);
+      return json(409, {
+        error: `Sold out: ${item.name} · ${item.variant} is no longer available`,
+        product_id: item.id,
+        variant: item.variant,
+        sold_out: true,
+      });
+    }
+    claimed.push(item);
   }
 
   // Flip the order to paid. For crypto, fold the payment details back into the
