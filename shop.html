@@ -4420,29 +4420,59 @@ function isInternationalZone(zone) {
 function zoneFromCountryText(text) {
   const value = String(text || '').toLowerCase();
   if (!value || value.includes('select')) return '';
-  if (value.includes('nigeria') || value.includes('kaduna') || value.includes('abuja') || value.includes('lagos')) return _deliveryZone || 'NG-KD';
+  if (value.includes('kaduna')) return 'NG-KD';
+  if (value.includes('abuja') || value.includes('fct')) return 'NG-ABJ';
+  if (/(kano|katsina|niger|plateau|nasarawa|kebbi|sokoto|zamfara)/i.test(value)) return 'NG-NORTH2';
+  if (/(adamawa|bauchi|benue|borno|gombe|jigawa|kogi|kwara|taraba|yobe)/i.test(value)) return 'NG-NORTH3';
+  if (/(ekiti|lagos|ogun|ondo|osun|oyo)/i.test(value)) return 'NG-SW';
+  if (/(abia|akwa|anambra|bayelsa|cross river|delta|ebonyi|edo|enugu|imo|rivers)/i.test(value)) return 'NG-SS';
+  if (value.includes('nigeria')) return 'NG-KD';
   if (/(united states|canada)/i.test(value)) return 'NA';
   if (/(ghana|benin|togo|senegal|ivory|ivoire|niger|cameroon)/i.test(value)) return 'WA';
   if (/(united kingdom|germany|france|netherlands|italy|spain|sweden|norway|denmark|switzerland|belgium|austria|poland|portugal|ireland)/i.test(value)) return 'EU';
   if (/(australia|new zealand|japan|korea|singapore|india|china|emirates|uae)/i.test(value)) return 'AO';
   return 'ROW';
 }
+function fieldValue(id) {
+  const el = document.getElementById(id);
+  return el ? String(el.value || '').trim() : '';
+}
 function fallbackDeliveryZoneFromAddress() {
-  const hasIntlAddress = ['ckUpsLine1','ckUpsCity','ckUpsState','ckUpsPostal'].some(id => gv(id));
+  const hasIntlAddress = ['ckUpsLine1','ckUpsCity','ckUpsState','ckUpsPostal'].some(id => fieldValue(id));
   if (hasIntlAddress) return 'ROW';
-  const hasNigeriaAddress = ['ckGigCity','ckGigStreet'].some(id => gv(id));
+  const hasNigeriaAddress = ['ckGigCity','ckGigStreet'].some(id => fieldValue(id));
   if (hasNigeriaAddress) return 'NG-KD';
   return '';
 }
-function syncDeliveryZoneFromForm() {
+function resolveDeliveryState(options = {}) {
+  const allowConservativeFallback = options.allowConservativeFallback !== false;
   const el = document.getElementById('ckCountry');
-  const selectedText = el ? (el.options[el.selectedIndex]?.text || '') : '';
-  const zone = el?.value || el?.selectedOptions?.[0]?.value || zoneFromCountryText(selectedText) || _deliveryZone || fallbackDeliveryZoneFromAddress();
-  if (zone !== _deliveryZone) {
-    _deliveryZone = zone;
+  const selectedOption = el && el.selectedIndex >= 0 ? el.options[el.selectedIndex] : null;
+  const selectedText = selectedOption ? (selectedOption.text || '') : '';
+  let zone = (el && String(el.value || '').trim()) || (selectedOption && String(selectedOption.value || '').trim()) || zoneFromCountryText(selectedText) || fallbackDeliveryZoneFromAddress();
+  if (!zone && allowConservativeFallback) zone = 'ROW';
+  const country = selectedText && !selectedText.toLowerCase().includes('select')
+    ? selectedText
+    : (zone ? (DELIVERY_RATES[zone]?.label || 'Rest of world') : '');
+  return { zone, country };
+}
+function syncDeliveryZoneFromForm(options = {}) {
+  const state = resolveDeliveryState(options);
+  if (state.zone !== _deliveryZone) {
+    _deliveryZone = state.zone;
     _deliveryCarrier = preferredCarrier(_deliveryZone);
   }
   return _deliveryZone;
+}
+function refreshDeliveryState() {
+  syncDeliveryZoneFromForm({ allowConservativeFallback: false });
+  updateShippingFieldGroups();
+  updateDeliveryEstimate();
+  if (typeof buildOrderSummary === 'function') buildOrderSummary();
+  const activeCryptoTab = document.querySelector('.pay-tab.active')?.dataset.pay;
+  if ((activeCryptoTab === 'eth' || activeCryptoTab === 'tezos') && checkoutQuoteReady(getFormData(), true)) {
+    startLock(activeCryptoTab);
+  }
 }
 function normalizedSizeLabel(value) {
   return String(value || '').replace(/[xX?]/g, 'x');
@@ -4580,7 +4610,7 @@ function intlRate(zone, isLarge, carrier = selectedIntlCarrier(zone)) {
   return rateForBillableWeight(zone, carrier);
 }
 function deliveryFeeNgn() {
-  const zone = syncDeliveryZoneFromForm();
+  const zone = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
   if (!zone) return 0;
   if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 0;
   const r = DELIVERY_RATES[zone];
@@ -4590,7 +4620,7 @@ function deliveryFeeNgn() {
   return Math.round(intlRate(zone, isLarge) * 1600);
 }
 function deliveryFeeUsd() {
-  const zone = syncDeliveryZoneFromForm();
+  const zone = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
   if (!zone) return 0;
   if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 0;
   const r = DELIVERY_RATES[zone];
@@ -4602,8 +4632,8 @@ function deliveryFeeUsd() {
   }
   return intlRate(zone, isLarge);
 }
-function deliveryFeeDisplay(carrier = selectedIntlCarrier(syncDeliveryZoneFromForm())) {
-  const zone = syncDeliveryZoneFromForm();
+function deliveryFeeDisplay(carrier = selectedIntlCarrier(syncDeliveryZoneFromForm({ allowConservativeFallback: false }))) {
+  const zone = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
   if (!zone) return 'TBD';
   const r = DELIVERY_RATES[zone];
   if (!r) return 'TBD';
@@ -4615,7 +4645,7 @@ function deliveryFeeDisplay(carrier = selectedIntlCarrier(syncDeliveryZoneFromFo
 }
 function carrierLabel(carrier) { return carrier === 'dhl' ? 'DHL Express' : 'UPS'; }
 function deliveryFeeForCarrier(carrier) {
-  const usd = intlRate(syncDeliveryZoneFromForm(), cartHasLargePrint(), carrier);
+  const usd = intlRate(syncDeliveryZoneFromForm({ allowConservativeFallback: false }), cartHasLargePrint(), carrier);
   return '$' + usd.toFixed(0) + ' USD';
 }
 
@@ -4623,8 +4653,7 @@ function setDeliveryMethod(method) {
   _deliveryMethod = 'ship';
   const shippingFields = document.getElementById('shippingFields');
   if (shippingFields) shippingFields.style.display = '';
-  _deliveryZone = document.getElementById('ckCountry')?.value || '';
-  if (!_deliveryCarrier) _deliveryCarrier = preferredCarrier(_deliveryZone);
+  syncDeliveryZoneFromForm({ allowConservativeFallback: false });
   updateShippingFieldGroups();
   updateDeliveryEstimate();
   buildOrderSummary();
@@ -4632,7 +4661,7 @@ function setDeliveryMethod(method) {
 
 function updateDeliveryEstimate() {
   const el    = document.getElementById('deliveryEstimate');
-  const zone  = syncDeliveryZoneFromForm();
+  const zone  = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
   if (!zone) {
     el.style.display = 'none';
     return;
@@ -4696,26 +4725,18 @@ function updateDeliveryEstimate() {
 function updateShippingFieldGroups() {
   const gig = document.getElementById('gigFields');
   const ups = document.getElementById('upsFields');
-  const zone = syncDeliveryZoneFromForm();
+  const zone = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
   const isNigeria = zone && zone.startsWith('NG-');
   const isIntl = zone && !isNigeria;
   if (gig) gig.style.display = isNigeria ? '' : 'none';
   if (ups) ups.style.display = isIntl ? '' : 'none';
 }
 
-// Wire up country selector
-document.addEventListener('DOMContentLoaded', () => {});
-// Country change
-document.getElementById('ckCountry') && document.getElementById('ckCountry').addEventListener('change', function() {
-  _deliveryZone = this.value || '';
-  _deliveryCarrier = preferredCarrier(_deliveryZone);
-  updateShippingFieldGroups();
-  updateDeliveryEstimate();
-  buildOrderSummary();
-  const activeCryptoTab = document.querySelector('.pay-tab.active')?.dataset.pay;
-  if ((activeCryptoTab === 'eth' || activeCryptoTab === 'tezos') && checkoutQuoteReady(getFormData(), true)) {
-    startLock(activeCryptoTab);
-  }
+// Wire up shipping fields so quote/payment state never goes stale.
+['ckCountry','ckGigCity','ckGigStreet','ckUpsLine1','ckUpsLine2','ckUpsCity','ckUpsState','ckUpsPostal'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  ['change','input','blur'].forEach(evt => el.addEventListener(evt, refreshDeliveryState));
 });
 
 // Delivery is now the only checkout flow.
@@ -4849,7 +4870,9 @@ function buildShippingAddress() {
 
 function getFormData() {
   const countryEl = document.getElementById('ckCountry');
-  const zone = syncDeliveryZoneFromForm();
+  const deliveryState = resolveDeliveryState({ allowConservativeFallback: true });
+  _deliveryZone = deliveryState.zone;
+  if (!_deliveryCarrier) _deliveryCarrier = preferredCarrier(_deliveryZone);
   const shipping = buildShippingAddress();
   return {
     name:           gv('ckName'),
@@ -4857,10 +4880,10 @@ function getFormData() {
     phone:          gv('ckPhone'),
     address:        shipping.address,
     addressParts:   shipping.parts,
-    country:        countryEl ? (countryEl.options[countryEl.selectedIndex]?.text || '') : '',
+    country:        deliveryState.country || (countryEl ? (countryEl.options[countryEl.selectedIndex]?.text || '') : ''),
     deliveryMethod: 'ship',
-    deliveryZone:   zone,
-    deliveryCarrier: isInternationalZone(zone) ? selectedIntlCarrier(zone) : '',
+    deliveryZone:   deliveryState.zone,
+    deliveryCarrier: isInternationalZone(deliveryState.zone) ? selectedIntlCarrier(deliveryState.zone) : '',
     orderNote:      cartOrderNote,
     deliveryFeeNgn: deliveryFeeNgn(),
     deliveryFeeUsd: deliveryFeeUsd(),
@@ -4873,7 +4896,7 @@ function validateForm() {
   if (!d.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) { showToast('Please enter a valid email address'); return false; }
   const phoneDigits = (d.phone || '').replace(/[^\d]/g, '');
   if (phoneDigits.length < 7) { showToast('Please enter a phone number we can reach you on'); return false; }
-  const zone = syncDeliveryZoneFromForm();
+  const zone = syncDeliveryZoneFromForm({ allowConservativeFallback: false });
   if (!zone) { showToast('Please select your country'); return false; }
   if (zone.startsWith('NG-')) {
     if (!document.getElementById('ckCountry')?.value) { showToast('Please select your state / region'); return false; }
@@ -4901,7 +4924,7 @@ function checkoutPayload(customer, method, extra = {}) {
       qty: c.qty,
     })),
     delivery_method:  customer.deliveryMethod,
-    delivery_zone:    customer.deliveryZone || syncDeliveryZoneFromForm(),
+    delivery_zone:    customer.deliveryZone || resolveDeliveryState({ allowConservativeFallback: true }).zone,
     delivery_carrier: customer.deliveryCarrier || '',
     order_note:       customer.orderNote || '',
     payment_method:   method,
@@ -4940,7 +4963,7 @@ async function postShopJson(url, payload) {
 }
 
 function checkoutQuoteReady(customer, silent = false) {
-  const zone = customer?.deliveryZone || syncDeliveryZoneFromForm();
+  const zone = customer?.deliveryZone || resolveDeliveryState({ allowConservativeFallback: true }).zone;
   if (!zone) {
     if (!silent) showToast('Select your delivery country before confirming payment');
     return false;
