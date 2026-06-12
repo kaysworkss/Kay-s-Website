@@ -3266,6 +3266,11 @@ let SHOP_CONFIG = {
 };
 
 const SHOP_DEFAULT_PRODUCTS = SHOP_CONFIG.products.map(p => JSON.parse(JSON.stringify(p)));
+const SHOP_FALLBACK_PRODUCT_IDS = new Set(SHOP_DEFAULT_PRODUCTS.map(p => String(p.id || '')));
+let shopProductsLoadedFromApi = false;
+function isFallbackProduct(p) {
+  return !!(p && (p._isSample || SHOP_FALLBACK_PRODUCT_IDS.has(String(p.id || ''))));
+}
 
 /* ─── Cart state ─── */
 let cart = [];
@@ -3363,7 +3368,7 @@ function ensureExampleSections() {
     );
     // Drop any leftover samples for this category before re-deciding.
     SHOP_CONFIG.products = SHOP_CONFIG.products.filter(p =>
-      !(p._isSample && (p.category || '') === cat));
+      !((p._isSample || SHOP_FALLBACK_PRODUCT_IDS.has(String(p.id || ''))) && (p.category || '') === cat));
     if (hasReal) return; // category has real items — show no samples
 
     const examples = SHOP_DEFAULT_PRODUCTS.filter(p => p.category === cat);
@@ -6245,10 +6250,13 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
     });
 
     // Save all products to API and replace temporary/sample ids with real
-    // Supabase UUIDs. Sample/placeholder products (_isSample) are never saved.
+    // Supabase UUIDs. Fallback/sample products are never saved.
+    if (!shopProductsLoadedFromApi) {
+      throw new Error('Product list did not load from Supabase. Save blocked to protect your existing products. Refresh and try again.');
+    }
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     await Promise.all(SHOP_CONFIG.products.map(async p => {
-      if (p._isSample) return null;
+      if (isFallbackProduct(p)) return null;
       const saved = await apiSaveProduct(p, token);
       if (saved?.id && !UUID_RE.test(String(p.id))) p.id = saved.id;
       return saved;
@@ -7051,6 +7059,7 @@ async function loadShopData() {
     if (productsRes.ok) {
       const rows = await productsRes.json();
       if (Array.isArray(rows) && rows.length) {
+        shopProductsLoadedFromApi = true;
         SHOP_CONFIG.products = rows.map(r => ({
           id:                 r.id,
           category:           r.category,
