@@ -681,7 +681,7 @@ async function handleShopProducts(req, res, supabase) {
       .from('shop_products')
       .select('*')
       .eq('slug', slug)
-      .eq('active', true)
+      .or('active.is.null,active.eq.true')
       .single();
     if (error) return json(error.code === 'PGRST116' ? 404 : 500, { error: error.message });
     const [tagged] = await applyProductTags([data], supabase);
@@ -693,7 +693,7 @@ async function handleShopProducts(req, res, supabase) {
       .from('shop_products')
       .select('*')
       .eq('series_slug', series)
-      .eq('active', true)
+      .or('active.is.null,active.eq.true')
       .order('sort_order', { ascending: true });
     if (error) return json(500, { error: error.message });
     return json(200, data || []);
@@ -702,7 +702,7 @@ async function handleShopProducts(req, res, supabase) {
   const { data, error } = await supabase
     .from('shop_products')
     .select('*')
-    .eq('active', true)
+    .or('active.is.null,active.eq.true')
     .order('sort_order', { ascending: true });
   if (error) return json(500, { error: error.message });
 
