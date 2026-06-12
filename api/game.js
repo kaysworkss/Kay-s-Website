@@ -1090,8 +1090,7 @@ async function fetchServerCryptoPrice(asset) {
   const symbol = asset === 'xtz' ? 'XTZUSDT' : 'ETHUSDT';
   const coingeckoId = asset === 'xtz' ? 'tezos' : 'ethereum';
   const coinbasePair = asset === 'xtz' ? 'XTZ-USD' : 'ETH-USD';
-  const TIMEOUT_MS = 7000; // raised from 3500 — Netlify cold starts + slow upstreams
-  const errors = [];
+  const TIMEOUT_MS = 5000;
 
   async function withTimeout(promise, ms) {
     return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
@@ -1121,13 +1120,29 @@ async function fetchServerCryptoPrice(asset) {
     return price;
   }
 
-  // Try each source; collect errors so a total failure is diagnosable in logs.
-  const sources = [['binance', binance], ['coingecko', coingecko], ['coinbase', coinbase]];
-  const settled = await Promise.allSettled(sources.map(([, fn]) => fn()));
-  for (let i = 0; i < settled.length; i++) {
-    if (settled[i].status === 'fulfilled' && settled[i].value > 0) return settled[i].value;
-    errors.push(`${sources[i][0]}: ${settled[i].reason?.message || settled[i].reason}`);
-  }
+  // Race all three — return whichever responds first with a valid price.
+  // This means quotes arrive in ~1-2s instead of waiting for all sources.
+  const errors = [];
+  const result = await Promise.race(
+    [
+      ['binance', binance],
+      ['coingecko', coingecko],
+      ['coinbase', coinbase],
+    ].map(([name, fn]) =>
+      fn().catch(e => {
+        errors.push(`${name}: ${e?.message}`);
+        return null;
+      })
+    ).concat([
+      // Fallback: if the fastest source errors immediately, wait for any success
+      Promise.allSettled([binance(), coingecko(), coinbase()]).then(results => {
+        for (const r of results) if (r.status === 'fulfilled' && r.value > 0) return r.value;
+        return null;
+      }),
+    ])
+  );
+
+  if (result && result > 0) return result;
   console.error(`[shop-quote] all crypto price sources failed for ${asset}:`, errors.join(' | '));
   return null;
 }
@@ -1614,7 +1629,14 @@ async function claimVariantStock(supabase, item) {
     e.statusCode = 500;
     throw e;
   }
-  return { ok: data === true };
+  // The RPC returns true = stock decremented OK.
+  // It returns false when no stock_by_variant row exists for this variant key,
+  // which means the product has no per-variant stock limit (open edition /
+  // unlimited). Treat false as ok=true — not sold out, just untracked.
+  if (data === false) {
+    return adjustVariantStockDirect(supabase, item, -Math.abs(Number(item.qty) || 1));
+  }
+  return { ok: true };
 }
 
 async function releaseVariantStock(supabase, item) {
