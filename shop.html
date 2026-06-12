@@ -5007,13 +5007,15 @@ async function createPendingOrder(customer, method, checkoutQuote) {
 // while the chain is still indexing (server returns 409 "not confirmed yet").
 async function confirmPendingOrder(orderRef, opts) {
   const payload = Object.assign({ order_ref: orderRef, order_hash: orderRef }, opts);
-  // ETH/Tezos indexers can lag 30–90s behind a just-broadcast tx.
-  // Retry for up to 6 minutes (72 × 5 s) before giving up.
+  // ETH/Tezos indexers can lag 30–90s after broadcast. Retry every 5s for
+  // up to 6 minutes (72 attempts). The server uses status='confirming' as an
+  // idempotency lock so retries never double-decrement stock.
   const maxAttempts = 72;
-  const RETRY_MS = 5000;
-  // Errors that definitively mean "stop retrying immediately"
-  const FATAL_RE = /sold.out|order.not.found|invalid.*quote|payment.method.*match|hash.*does.not.match|payer.*required/i;
+  const RETRY_MS   = 5000;
+  // Only these indicate a genuine business-logic failure — stop retrying
+  const FATAL_RE = /sold.out|order.not.found|hash.*does.not.match|payment.method.*match|payer.*required|invalid.*quote|transaction.failed.on-chain|amount.is.below/i;
   let lastErr = null;
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const res = await fetch('/api/shop/order-confirm', {
@@ -5024,44 +5026,52 @@ async function confirmPendingOrder(orderRef, opts) {
       const rawText = await res.text().catch(() => '');
       let data;
       try { data = rawText ? JSON.parse(rawText) : {}; } catch (_) { data = { raw: rawText }; }
-      // diagnostic capture
+
+      // Diagnostic log
       window.__shopDiag = window.__shopDiag || [];
-      const diagBody = Object.keys(data || {}).length ? JSON.stringify(data) : (rawText || '(empty response body)');
-      window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url: '/api/shop/order-confirm', status: res.status, body: diagBody });
-      if (window.__shopDiag.length > 8) window.__shopDiag.length = 8;
+      window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url: '/api/shop/order-confirm', status: res.status, body: JSON.stringify(data).slice(0, 200) });
+      if (window.__shopDiag.length > 10) window.__shopDiag.length = 10;
       if (window.__renderShopDiag) window.__renderShopDiag();
 
       if (res.ok) return data;
 
       const errMsg = data.error || rawText || `HTTP ${res.status}`;
 
-      // Definitely stop — these won't resolve with more retries
+      // Genuine hard failures — payment is wrong, not a timing issue
       if (data.sold_out || FATAL_RE.test(errMsg)) {
         const e = new Error(errMsg);
         e.nonRetryable = true;
         throw e;
       }
 
-      // 404 = order not in DB yet (race on first attempt) — retry briefly
-      // 409 = tx not indexed yet — keep retrying
-      // 4xx other = likely a transient issue — retry with backoff
-      // 5xx = server error — retry
+      // Everything else (404 order not indexed yet, 409 tx not confirmed,
+      // 502 indexer unreachable, 5xx server errors) — keep retrying
       lastErr = new Error(errMsg);
-      if (attempt === 1) showToast('Payment sent — confirming on-chain, please wait…');
-      if (attempt % 6 === 0) {
-        const mins = Math.floor((attempt * RETRY_MS) / 60000);
-        showToast(`Still confirming… (${mins}m elapsed). Keep this page open.`);
+      if (attempt === 1) {
+        showToast('Confirming on-chain — keep this page open…');
+      } else if (attempt % 6 === 0) {
+        const mins = Math.round((attempt * RETRY_MS) / 60000);
+        showToast(`Still confirming… (${mins} min elapsed). Keep this page open.`);
       }
       await new Promise(r => setTimeout(r, RETRY_MS));
 
     } catch (e) {
       lastErr = e;
       if (e && e.nonRetryable) throw e;
-      if (attempt < maxAttempts) { await new Promise(r => setTimeout(r, RETRY_MS)); continue; }
+      if (attempt < maxAttempts) {
+        await new Promise(r => setTimeout(r, RETRY_MS));
+        continue;
+      }
       throw e;
     }
   }
-  if (lastErr) throw lastErr;
+  // All attempts exhausted — surface the last error with a clear message
+  const finalErr = new Error(
+    (lastErr?.message || 'Confirmation timed out') +
+    ' — your transaction was sent. Use "I\'ve sent manually" with your transaction hash to confirm.'
+  );
+  finalErr.timedOut = true;
+  throw finalErr;
 }
 
 // Local safety net: remember an unconfirmed order so a returning customer (or
@@ -6261,6 +6271,12 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
       value: ethers.utils.parseEther(String(ethAmt)),
     });
 
+    // Transaction is broadcast — now wait for chain indexing before confirming.
+    // ETH nodes typically need 15–60s to mine and index. We show a clear status
+    // and let confirmPendingOrder retry for up to 6 minutes.
+    btn.textContent = 'Transaction sent — waiting for block confirmation…';
+    showToast('Transaction sent — waiting for the blockchain to confirm. Keep this page open.');
+
     // Confirm against the locked pending order (raw 0x tx hash).
     await confirmPendingOrder(orderRef, {
       payment_method: 'eth',
@@ -6276,13 +6292,30 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
     if (/rejected|denied|cancel|user denied/i.test(msg)) {
       showToast('Transaction cancelled');
     } else {
-      showToast('Transaction sent \u2014 confirming. If this doesn\u2019t complete, use “confirm manually” with your transaction hash.');
-      console.error('[ETH] send error:', e);
+      // Transaction was sent but confirmation timed out — auto-fill manual fields
+      const txHash = (typeof tx !== 'undefined') ? tx?.hash : null;
+      if (txHash) {
+        const refInput    = document.getElementById('ethManualRef');
+        const senderInput = document.getElementById('ethManualSender');
+        const txInput     = document.getElementById('ethManualTx');
+        if (refInput    && !refInput.value)    refInput.value    = orderRef || '';
+        if (senderInput && !senderInput.value) senderInput.value = _ethConnectedAddr || '';
+        if (txInput     && !txInput.value)     txInput.value     = txHash;
+        const fields = document.getElementById('ethManualFields');
+        if (fields) { fields.dataset.revealed = '1'; fields.style.display = ''; }
+        window.__manualCryptoMode = 'eth';
+        const manualBtn = document.getElementById('cryptoConfirmBtn');
+        if (manualBtn) { manualBtn.style.display = ''; manualBtn.textContent = 'Confirm manual payment'; }
+        showToast('Transaction sent but still confirming — press “Confirm manual payment” to finish.');
+      } else {
+        showToast('Transaction sent. Use “I’ve sent manually” with your transaction hash if this doesn’t confirm automatically.');
+      }
+      console.error('[ETH] send/confirm error:', e);
     }
   } finally {
     btn.disabled = false;
     const amt = ethEthAmount();
-    btn.textContent = 'Send ' + (amt || '\u2026') + ' ETH';
+    btn.textContent = 'Send ' + (amt || '…') + ' ETH';
   }
 });
 
@@ -6787,6 +6820,11 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
     }]);
     if (!opHash) throw new Error('Wallet did not return an operation hash');
 
+    // Operation is injected — TzKT typically indexes within 30–90s.
+    // Show a clear status and let confirmPendingOrder retry for up to 6 minutes.
+    btn.textContent = 'Operation sent — waiting for TzKT to index…';
+    showToast('Transaction sent — waiting for the blockchain to confirm. Keep this page open.');
+
     // Confirm payment against the locked pending order (raw op hash).
     await confirmPendingOrder(orderRef, {
       payment_method: 'tezos',
@@ -6802,8 +6840,25 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
     if (/reject|cancel|denied|aborted/i.test(msg)) {
       showToast('Transaction cancelled');
     } else {
-      showToast('Transaction sent — confirming. If this doesn\u2019t complete, use “confirm manually” with your transaction hash.');
-      console.error('[Tezos] send error:', e);
+      // Operation was injected but confirmation timed out — auto-fill manual fields
+      const opH = (typeof opHash !== 'undefined') ? opHash : null;
+      if (opH) {
+        const refInput    = document.getElementById('tezosManualRef');
+        const senderInput = document.getElementById('tezosManualSender');
+        const txInput     = document.getElementById('tezosManualTx');
+        if (refInput    && !refInput.value)    refInput.value    = orderRef || '';
+        if (senderInput && !senderInput.value) senderInput.value = _tezosConnectedAddr || '';
+        if (txInput     && !txInput.value)     txInput.value     = opH;
+        const fields = document.getElementById('tezosManualFields');
+        if (fields) { fields.dataset.revealed = '1'; fields.style.display = ''; }
+        window.__manualCryptoMode = 'tezos';
+        const manualBtn = document.getElementById('tezosManualBtn');
+        if (manualBtn) { manualBtn.style.display = ''; manualBtn.textContent = 'Confirm manual payment'; }
+        showToast('Operation sent but still confirming — press “Confirm manual payment” to finish.');
+      } else {
+        showToast('Transaction sent. Use “I’ve sent manually” with your operation hash if this doesn’t confirm automatically.');
+      }
+      console.error('[Tezos] send/confirm error:', e);
     }
   } finally {
     const sendAmt = window.__activeLock?.method === 'tezos'
