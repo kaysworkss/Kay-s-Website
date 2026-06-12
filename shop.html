@@ -2299,7 +2299,7 @@ footer {
   <div class="faq-item">
     <button class="faq-q">Do you deliver within Nigeria?<span class="faq-icon">+</span></button>
     <div class="faq-a"><div class="faq-a-inner">
-      Yes. Nigerian orders ship via <strong>GIG Logistics</strong> to any state, or you can collect <strong>free in Kaduna</strong> — choose your option at checkout. If you'd prefer pickup at a nearby GIG station rather than your door, note it in the address field.
+      Yes. Nigerian orders ship via <strong>GIG Logistics</strong> to any state. If you'd prefer terminal pickup at a nearby GIG station rather than door delivery, note your preferred station in the street address field.
     </div></div>
   </div>
 
@@ -2448,18 +2448,7 @@ footer {
           <input class="form-input" id="ckPhone" type="tel" placeholder="+234 …"/>
         </div>
 
-        <!-- Delivery -->
-        <p class="ck-section-title">Delivery</p>
-        <div class="ck-delivery-btns">
-          <button class="ck-delivery-btn active" id="pickupBtn" onclick="setDeliveryMethod('pickup')">
-            <span class="ck-radio"></span>Collect in person
-          </button>
-          <button class="ck-delivery-btn" id="shipBtn" onclick="setDeliveryMethod('ship')">
-            <span class="ck-radio"></span>Ship to me
-          </button>
-        </div>
-
-        <div id="shippingFields" style="display:none">
+        <div id="shippingFields">
           <div class="form-row">
             <label class="form-label">Country / region</label>
             <select class="form-select" id="ckCountry">
@@ -2601,13 +2590,6 @@ footer {
             </div>
             <div id="deliveryCarrierOptions" style="display:none;margin-top:0.9rem;border-top:1px solid var(--border);padding-top:0.8rem"></div>
             <div id="shippingValuePrompt" style="display:none;margin-top:0.8rem;padding:0.75rem 0.8rem;border:1px solid rgba(196,132,90,0.35);background:rgba(196,132,90,0.08);border-radius:8px;font-size:0.76rem;line-height:1.55;color:var(--text-muted)"></div>
-          </div>
-        </div>
-
-        <div id="pickupFields">
-          <div style="padding:0.9rem 1rem;background:var(--bg-alt);border:1px solid rgba(107,124,92,0.3);border-radius:8px;margin-bottom:1rem">
-            <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:#6b7c5c;margin-bottom:0.3rem">Collection · Arrange with Kay</div>
-            <div style="font-size:0.88rem;color:var(--text-muted);line-height:1.6">Kay will contact you with pickup details after your order is confirmed. No delivery fee.</div>
           </div>
         </div>
 
@@ -4385,8 +4367,8 @@ const COMPLIMENTARY_SHIPPING_USD = 500;
 const SHIPPING_DIM_DIVISOR = 5000;
 const SHIPPING_BUFFER = 1.2;
 const LARGE_PRINT_VARIANTS = ['12x16"','12x18"','18x24"','24x36"'];
-let _deliveryMethod = 'pickup';
-let _deliveryZone = 'pickup';
+let _deliveryMethod = 'ship';
+let _deliveryZone = '';
 let _deliveryCarrier = '';
 
 function isInternationalZone(zone) {
@@ -4528,7 +4510,7 @@ function intlRate(zone, isLarge, carrier = selectedIntlCarrier(zone)) {
   return rateForBillableWeight(zone, carrier);
 }
 function deliveryFeeNgn() {
-  if (_deliveryMethod === 'pickup' || !_deliveryZone) return 0;
+  if (!_deliveryZone) return 0;
   if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 0;
   const r = DELIVERY_RATES[_deliveryZone];
   if (!r) return 0;
@@ -4537,7 +4519,7 @@ function deliveryFeeNgn() {
   return Math.round(intlRate(_deliveryZone, isLarge) * 1600);
 }
 function deliveryFeeUsd() {
-  if (_deliveryMethod === 'pickup' || !_deliveryZone) return 0;
+  if (!_deliveryZone) return 0;
   if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 0;
   const r = DELIVERY_RATES[_deliveryZone];
   if (!r) return 0;
@@ -4552,7 +4534,7 @@ function deliveryFeeDisplay(carrier = selectedIntlCarrier(_deliveryZone)) {
   if (!_deliveryZone) return 'TBD';
   const r = DELIVERY_RATES[_deliveryZone];
   if (!r) return 'TBD';
-  if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD && _deliveryMethod === 'ship') return 'Complimentary';
+  if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 'Complimentary';
   const isLarge = cartHasLargePrint();
   if (r.small !== undefined) return fmt((isLarge ? r.large : r.small).ngn);
   const usd = intlRate(_deliveryZone, isLarge, carrier);
@@ -4565,18 +4547,11 @@ function deliveryFeeForCarrier(carrier) {
 }
 
 function setDeliveryMethod(method) {
-  _deliveryMethod = method;
-  document.getElementById('pickupBtn').classList.toggle('active', method === 'pickup');
-  document.getElementById('shipBtn').classList.toggle('active', method === 'ship');
-  document.getElementById('shippingFields').style.display = method === 'ship'   ? '' : 'none';
-  document.getElementById('pickupFields').style.display   = method === 'pickup' ? '' : 'none';
-  if (method === 'pickup') {
-    _deliveryZone = '';
-    _deliveryCarrier = '';
-  } else {
-    _deliveryZone = document.getElementById('ckCountry').value || '';
-    if (!_deliveryCarrier) _deliveryCarrier = preferredCarrier(_deliveryZone);
-  }
+  _deliveryMethod = 'ship';
+  const shippingFields = document.getElementById('shippingFields');
+  if (shippingFields) shippingFields.style.display = '';
+  _deliveryZone = document.getElementById('ckCountry')?.value || '';
+  if (!_deliveryCarrier) _deliveryCarrier = preferredCarrier(_deliveryZone);
   updateShippingFieldGroups();
   updateDeliveryEstimate();
   buildOrderSummary();
@@ -4585,7 +4560,7 @@ function setDeliveryMethod(method) {
 function updateDeliveryEstimate() {
   const el    = document.getElementById('deliveryEstimate');
   const zone  = _deliveryZone;
-  if (!zone || _deliveryMethod === 'pickup') {
+  if (!zone) {
     el.style.display = 'none';
     return;
   }
@@ -4649,9 +4624,9 @@ function updateShippingFieldGroups() {
   const gig = document.getElementById('gigFields');
   const ups = document.getElementById('upsFields');
   const isNigeria = _deliveryZone && _deliveryZone.startsWith('NG-');
-  const isIntl = _deliveryZone && _deliveryZone !== 'pickup' && !isNigeria;
-  if (gig) gig.style.display = (_deliveryMethod === 'ship' && isNigeria) ? '' : 'none';
-  if (ups) ups.style.display = (_deliveryMethod === 'ship' && isIntl)   ? '' : 'none';
+  const isIntl = _deliveryZone && !isNigeria;
+  if (gig) gig.style.display = isNigeria ? '' : 'none';
+  if (ups) ups.style.display = isIntl ? '' : 'none';
 }
 
 // Wire up country selector
@@ -4665,8 +4640,8 @@ document.getElementById('ckCountry') && document.getElementById('ckCountry').add
   buildOrderSummary();
 });
 
-// Init pickup as default active
-setDeliveryMethod('pickup');
+// Delivery is now the only checkout flow.
+setDeliveryMethod('ship');
 
 /* ─── Updated total helpers (include delivery) ─── */
 function cartNgnTotal() { return cart.reduce((a,c)=>a+c.priceNgn*c.qty, 0); }
@@ -4708,12 +4683,12 @@ function buildOrderSummary() {
     </div>`;
   }).join('');
 
-  const deliveryLine = _deliveryZone && _deliveryZone !== 'pickup' && _deliveryMethod === 'ship'
+  const deliveryLine = _deliveryZone
     ? `<div class="order-line">
         <span>Delivery${isInternationalZone(_deliveryZone) ? ` - ${carrierLabel(selectedIntlCarrier(_deliveryZone))}` : ''}${cartHasLargePrint() ? ' (tube)' : ''}</span>
         <span>${deliveryFeeDisplay()}</span>
        </div>`
-    : `<div class="order-line"><span>Delivery</span><span style="color:#6b7c5c">Free — Kaduna pickup</span></div>`;
+    : `<div class="order-line"><span>Delivery</span><span style="color:#6b7c5c">Select country / region</span></div>`;
 
   const totalsHtml = `
     ${deliveryLine}
@@ -4777,7 +4752,6 @@ function gv(id) { const el = document.getElementById(id); return el ? el.value.t
 // Assemble a single human-readable address string from the carrier-specific
 // fields, plus structured pieces for the order record.
 function buildShippingAddress() {
-  if (_deliveryMethod === 'pickup') return { address: 'Collection — arrange with Kay', parts: {} };
   if (_deliveryZone && _deliveryZone.startsWith('NG-')) {
     // Derive state label from the selected option text in the country dropdown
     const countryEl = document.getElementById('ckCountry');
@@ -4802,8 +4776,8 @@ function getFormData() {
     phone:          gv('ckPhone'),
     address:        shipping.address,
     addressParts:   shipping.parts,
-    country:        _deliveryMethod === 'pickup' ? 'Nigeria (Kaduna pickup)' : (countryEl ? (countryEl.options[countryEl.selectedIndex]?.text || '') : ''),
-    deliveryMethod: _deliveryMethod,
+    country:        countryEl ? (countryEl.options[countryEl.selectedIndex]?.text || '') : '',
+    deliveryMethod: 'ship',
     deliveryZone:   _deliveryZone,
     deliveryCarrier: isInternationalZone(_deliveryZone) ? selectedIntlCarrier(_deliveryZone) : '',
     orderNote:      cartOrderNote,
@@ -4818,21 +4792,16 @@ function validateForm() {
   if (!d.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) { showToast('Please enter a valid email address'); return false; }
   const phoneDigits = (d.phone || '').replace(/[^\d]/g, '');
   if (phoneDigits.length < 7) { showToast('Please enter a phone number we can reach you on'); return false; }
-
-  if (_deliveryMethod === 'ship') {
-    if (!_deliveryZone) { showToast('Please select your country'); return false; }
-    if (_deliveryZone.startsWith('NG-')) {
-      // GIG Logistics required fields.
-      if (!document.getElementById('ckCountry')?.value) { showToast('Please select your state / region'); return false; }
-      if (!gv('ckGigCity'))  { showToast('Please enter your city or town'); return false; }
-      if (gv('ckGigStreet').length < 4) { showToast('Please enter your full street address'); return false; }
-    } else {
-      // UPS required fields (international).
-      if (gv('ckUpsLine1').length < 4) { showToast('Please enter your street address'); return false; }
-      if (!gv('ckUpsCity'))  { showToast('Please enter your city'); return false; }
-      if (!gv('ckUpsState')) { showToast('Please enter your state or province'); return false; }
-      if (!gv('ckUpsPostal')) { showToast('Please enter your postal / ZIP code'); return false; }
-    }
+  if (!_deliveryZone) { showToast('Please select your country'); return false; }
+  if (_deliveryZone.startsWith('NG-')) {
+    if (!document.getElementById('ckCountry')?.value) { showToast('Please select your state / region'); return false; }
+    if (!gv('ckGigCity'))  { showToast('Please enter your city or town'); return false; }
+    if (gv('ckGigStreet').length < 4) { showToast('Please enter your full street address'); return false; }
+  } else {
+    if (gv('ckUpsLine1').length < 4) { showToast('Please enter your street address'); return false; }
+    if (!gv('ckUpsCity'))  { showToast('Please enter your city'); return false; }
+    if (!gv('ckUpsState')) { showToast('Please enter your state or province'); return false; }
+    if (!gv('ckUpsPostal')) { showToast('Please enter your postal / ZIP code'); return false; }
   }
   return true;
 }
@@ -5059,7 +5028,7 @@ async function confirmPendingOrder(orderRef, opts) {
   const payload = Object.assign({ order_ref: orderRef, order_hash: orderRef }, opts);
   // Tezos/ETH indexers can lag behind a just-broadcast tx. Keep each server call
   // short, but let the browser retry for about three minutes before giving up.
-  const maxAttempts = 36;
+  const maxAttempts = 120;
   const RETRY_MS = 5000;
   let lastErr = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -5081,7 +5050,7 @@ async function confirmPendingOrder(orderRef, opts) {
       if (res.ok) return data;
       if (res.status === 409 && /confirm|not confirmed|waiting|found/i.test(data.error || '') && attempt < maxAttempts) {
         lastErr = new Error(data.error || 'Awaiting on-chain confirmation');
-        if (typeof showToast === 'function' && attempt === 1) showToast('Payment sent - confirming on-chain, please wait...');
+        if (typeof showToast === 'function' && attempt === 1) showToast('Payment found - waiting for blockchain confirmations...');
         await new Promise(r => setTimeout(r, RETRY_MS));
         continue;
       }
@@ -5142,7 +5111,7 @@ function renderLockUI(method) {
   box.style.display = 'block';
   const amtEl = document.getElementById(ids.amt);
   const refEl = document.getElementById(ids.ref);
-  if (amtEl) amtEl.textContent = (lock.quote?.crypto_amount - '—') + ' ' + lockMethodToAsset(method);
+  if (amtEl) amtEl.textContent = (lock.quote?.crypto_amount || '-') + ' ' + lockMethodToAsset(method);
   if (refEl) refEl.textContent = lock.order_ref || '—';
 }
 
@@ -5220,9 +5189,7 @@ async function notifyOrder(customer, ref, method, checkoutQuote = null) {
   const quotedTotalNgn = checkoutQuote?.total_ngn - grandTotalNgn();
   const quotedTotalUsd = checkoutQuote?.total_usd - grandTotalUsd();
   const carrierInfo = customer.deliveryCarrier ? `${carrierLabel(customer.deliveryCarrier)}; ` : '';
-  const deliveryInfo = customer.deliveryMethod === 'pickup'
-    ? 'Collection (arrange with Kay)'
-    : `${carrierInfo}Ship to: ${customer.address}, ${customer.country}, Fee: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}${cartHasLargePrint() ? ' (tube)' : ''}`;
+  const deliveryInfo = `${carrierInfo}Ship to: ${customer.address}, ${customer.country}, Fee: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}${cartHasLargePrint() ? ' (tube)' : ''}`;
 
   // 1. Record order in Supabase — decrements stock.
   //    Crypto verification can race ahead of chain indexing (tzkt / ETH RPC
