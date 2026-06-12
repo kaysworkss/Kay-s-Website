@@ -283,9 +283,72 @@ body.dark .toast{background:#2a1c14;}
 .empty-icon{font-size:2.5rem;opacity:0.3;margin-bottom:1rem;}
 .empty-text{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-style:italic;}
 
+/* Delivery details send panel */
+.delivery-panel {
+  margin-top: 1.6rem;
+  background: var(--bg-alt);
+  border: 1px solid rgba(201,153,58,0.25);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.delivery-panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.9rem 1.2rem;
+  border-bottom: 1px solid rgba(201,153,58,0.15);
+  background: rgba(201,153,58,0.06);
+  cursor: pointer;
+}
+.delivery-panel-title {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold);
+}
+.delivery-panel-toggle {
+  font-size: 0.9rem; color: var(--gold); transition: transform 0.2s;
+}
+.delivery-panel-body {
+  padding: 1.2rem;
+  display: none;
+}
+.delivery-panel-body.open { display: block; }
+.delivery-field { margin-bottom: 0.9rem; }
+.delivery-field label {
+  display: block; font-family: 'Cinzel', serif; font-size: 0.46rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 0.35rem;
+}
+.delivery-field input, .delivery-field select, .delivery-field textarea {
+  width: 100%; padding: 0.6rem 0.8rem;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); font-family: 'Crimson Pro', serif; font-size: 0.95rem;
+  outline: none; transition: border-color 0.2s; appearance: none;
+}
+.delivery-field textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+.delivery-field input:focus, .delivery-field select:focus, .delivery-field textarea:focus {
+  border-color: var(--gold);
+}
+.delivery-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+.send-delivery-btn {
+  width: 100%;
+  font-family: 'Cinzel', serif; font-size: 0.56rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  padding: 0.85rem; border: none; border-radius: 10px;
+  background: var(--gold); color: var(--bark);
+  font-weight: 600; cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+.send-delivery-btn:hover { background: var(--clay); transform: translateY(-1px); }
+.send-delivery-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.delivery-sent-badge {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-family: 'Cinzel', serif; font-size: 0.46rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--moss); margin-top: 0.7rem;
+}
+
 @media(max-width:600px){
   .stats-row{grid-template-columns:1fr 1fr;}
   .status-select-row{grid-template-columns:1fr;}
+  .delivery-row-2{grid-template-columns:1fr;}
   .orders-table th:nth-child(4),.orders-table td:nth-child(4),
   .orders-table th:nth-child(5),.orders-table td:nth-child(5){display:none;}
 }
@@ -443,6 +506,11 @@ function short(str, n=30) {
   const s = String(str || '');
   return s.length > n ? s.slice(0, n) + '...' : s;
 }
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
+}
 function paymentMeta(o) {
   if (!o || !o.payment_metadata) return null;
   if (typeof o.payment_metadata === 'string') {
@@ -453,6 +521,19 @@ function paymentMeta(o) {
 function orderRef(o) {
   const meta = paymentMeta(o) || {};
   return o.order_ref || meta.order_hash || o.payment_ref || o.id || '';
+}
+function inferredCarrier(o) {
+  if (o.tracking_carrier) return o.tracking_carrier;
+  const meta = paymentMeta(o) || {};
+  const quotedCarrier = String(meta.quote?.delivery_carrier || meta.delivery_carrier || '').toLowerCase();
+  if (quotedCarrier === 'ups') return 'UPS';
+  if (quotedCarrier === 'dhl') return 'DHL';
+  if (o.delivery_method === 'pickup') return '';
+  const zone = String(o.delivery_zone || '');
+  if (zone.startsWith('NG-')) return 'GIG Logistics';
+  if (zone === 'NA') return 'UPS';
+  const subtotalUsd = Number(o.total_usd || 0) - Number(o.delivery_fee_usd || 0);
+  return subtotalUsd >= 60 ? 'DHL' : 'UPS';
 }
 function orderAgeLabel(o) {
   const created = o && o.created_at ? new Date(o.created_at).getTime() : 0;
@@ -627,6 +708,10 @@ function openDetail(id) {
   document.getElementById('detailRef').textContent = orderRef(o);
   const items = Array.isArray(o.items) ? o.items : [];
   const meta = paymentMeta(o);
+  const isIntl = o.delivery_zone && !o.delivery_zone.startsWith('NG-') && o.delivery_method !== 'pickup';
+  const alreadySent = !!o.delivery_details_sent_at;
+  const suggestedCarrier = inferredCarrier(o);
+  const orderNote = meta?.order_note || '';
 
   document.getElementById('detailBody').innerHTML = `
     <div class="detail-section">
@@ -641,17 +726,17 @@ function openDetail(id) {
           </select>
         </div>
         <div>
-          <label class="detail-form-label">Carrier</label>
+          <label class="detail-form-label">Carrier (internal)</label>
           <select class="detail-select" id="dCarrier">
-            ${['-','GIG Logistics','UPS','DHL','FedEx','Other'].map(c=>
-              `<option value="${c}"${(o.tracking_carrier||'-')===c?' selected':''}>${c}</option>`
+            ${['-','GIG Logistics','UPS','DHL','Other'].map(c=>
+              `<option value="${c}"${(suggestedCarrier||'-')===c?' selected':''}>${c}</option>`
             ).join('')}
           </select>
         </div>
       </div>
       <div class="detail-form-row">
-        <label class="detail-form-label">Tracking number</label>
-        <input class="detail-input" id="dTracking" type="text" value="${o.tracking_number||''}" placeholder="e.g. GIG123456789"/>
+        <label class="detail-form-label">Tracking number (internal)</label>
+        <input class="detail-input" id="dTracking" type="text" value="${o.tracking_number||''}" placeholder="e.g. 1Z999AA10123456784"/>
       </div>
       <div class="detail-form-row">
         <label class="detail-form-label">Admin note (internal)</label>
@@ -660,13 +745,56 @@ function openDetail(id) {
       <button class="action-btn primary" onclick="saveOrderDetail('${o.id}')">Save changes</button>
     </div>
 
-    <div class="detail-section">
+    <!-- ── Send delivery details to customer ── -->
+    <div class="delivery-panel">
+      <div class="delivery-panel-head" onclick="toggleDeliveryPanel()">
+        <span class="delivery-panel-title">
+          ${alreadySent ? '✓ Delivery details sent — send again' : '✦ Send delivery details to customer'}
+        </span>
+        <span class="delivery-panel-toggle" id="deliveryToggleIcon">▾</span>
+      </div>
+      <div class="delivery-panel-body" id="deliveryPanelBody">
+        <div class="delivery-row-2">
+          <div class="delivery-field">
+            <label>Carrier</label>
+            <select id="ddCarrier">
+              <option value="">— Select carrier —</option>
+              <option value="GIG Logistics"${suggestedCarrier==='GIG Logistics'?' selected':''}>GIG Logistics</option>
+              <option value="UPS"${suggestedCarrier==='UPS'?' selected':''}>UPS</option>
+              <option value="DHL"${suggestedCarrier==='DHL'?' selected':''}>DHL Express</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="delivery-field">
+            <label>Tracking number</label>
+            <input type="text" id="ddTracking" value="${o.tracking_number||''}" placeholder="e.g. 1Z999AA10123456784"/>
+          </div>
+        </div>
+        <div class="delivery-field">
+          <label>Tracking URL <span style="color:var(--text-muted);font-size:0.8em">(optional — pre-fills from carrier)</span></label>
+          <input type="url" id="ddTrackingUrl" placeholder="https://…"/>
+        </div>
+        <div class="delivery-field">
+          <label>Estimated delivery</label>
+          <input type="text" id="ddEta" placeholder="e.g. 3–5 business days / Fri 20 Jun"/>
+        </div>
+        <div class="delivery-field">
+          <label>Message to customer <span style="color:var(--text-muted);font-size:0.8em">(optional — appears below the shipping details)</span></label>
+          <textarea id="ddMessage" placeholder="e.g. Your order has been carefully packaged and is on its way. Please allow 24hrs for tracking to activate…"></textarea>
+        </div>
+        ${alreadySent ? `<div class="delivery-sent-badge" style="margin-bottom:0.8rem">✓ Previously sent ${o.delivery_details_sent_at ? new Date(o.delivery_details_sent_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : ''}</div>` : ''}
+        <button class="send-delivery-btn" id="sendDeliveryBtn" onclick="sendDeliveryDetails('${o.id}')">Send to ${o.email||'customer'}</button>
+      </div>
+    </div>
+
+    <div class="detail-section" style="margin-top:1.6rem">
       <div class="detail-section-label">Customer</div>
       <div class="detail-row"><span class="detail-row-label">Name</span><span class="detail-row-val">${o.customer_name||'-'}</span></div>
       <div class="detail-row"><span class="detail-row-label">Email</span><span class="detail-row-val"><a href="mailto:${o.email}" style="color:var(--clay)">${o.email||'-'}</a></span></div>
       <div class="detail-row"><span class="detail-row-label">Phone</span><span class="detail-row-val">${o.phone||'-'}</span></div>
       <div class="detail-row"><span class="detail-row-label">Address</span><span class="detail-row-val">${o.address||'-'}</span></div>
-      <div class="detail-row"><span class="detail-row-label">Delivery</span><span class="detail-row-val">${o.delivery_method==='pickup'?'Pickup - Kaduna':(o.delivery_zone||'-')}</span></div>
+      <div class="detail-row"><span class="detail-row-label">Delivery</span><span class="detail-row-val">${o.delivery_method==='pickup'?'Collection — arrange with Kay':(o.delivery_zone||'-')}</span></div>
+      ${orderNote ? `<div class="detail-row"><span class="detail-row-label">Order note</span><span class="detail-row-val">${escapeHtml(orderNote)}</span></div>` : ''}
     </div>
 
     <div class="detail-section">
@@ -691,13 +819,116 @@ function openDetail(id) {
       ${meta?.payer_address ? `<div class="detail-row"><span class="detail-row-label">Wallet</span><span class="detail-row-val" style="font-family:'Montserrat',sans-serif;font-size:0.72rem">${meta.payer_address}</span></div>` : ''}
       ${meta?.crypto_amount ? `<div class="detail-row"><span class="detail-row-label">Locked amount</span><span class="detail-row-val">${meta.crypto_amount} ${(meta.crypto_symbol || o.payment_method || '').toUpperCase()}</span></div>` : ''}
       <div class="detail-row"><span class="detail-row-label">Subtotal</span><span class="detail-row-val">${fmt(o.total_ngn - (o.delivery_fee_ngn||0))}</span></div>
-      <div class="detail-row"><span class="detail-row-label">Delivery fee</span><span class="detail-row-val">${o.delivery_fee_ngn ? fmt(o.delivery_fee_ngn) : 'Free'}</span></div>
+      <div class="detail-row"><span class="detail-row-label">Delivery fee</span><span class="detail-row-val">${o.delivery_fee_ngn ? fmt(o.delivery_fee_ngn) : '—'}</span></div>
       <div class="detail-row" style="font-weight:600"><span class="detail-row-label">Total</span><span class="detail-row-val" style="color:var(--text);font-family:'Cormorant Garamond',serif;font-size:1.1rem">${fmt(o.total_ngn)} / ${fmtUsd(o.total_usd)}</span></div>
       <div class="detail-row"><span class="detail-row-label">Ordered</span><span class="detail-row-val">${formatDate(o.created_at)} ${formatTime(o.created_at)}</span></div>
       ${o.fulfilled_at ? `<div class="detail-row"><span class="detail-row-label">Fulfilled</span><span class="detail-row-val" style="color:var(--moss)">${formatDate(o.fulfilled_at)} ${formatTime(o.fulfilled_at)}</span></div>` : ''}
     </div>`;
 
+  // Auto-fill tracking URL from carrier
+  document.getElementById('ddCarrier').addEventListener('change', function() {
+    const urls = {
+      'UPS': 'https://www.ups.com/track?tracknum=',
+      'DHL': 'https://www.dhl.com/en/express/tracking.html?AWB=',
+      'GIG Logistics': 'https://giglogistics.com/track/',
+    };
+    const tracking = document.getElementById('ddTracking').value.trim();
+    const base = urls[this.value] || '';
+    document.getElementById('ddTrackingUrl').value = base && tracking ? base + tracking : base;
+  });
+  document.getElementById('ddTracking').addEventListener('input', function() {
+    const carrier = document.getElementById('ddCarrier').value;
+    const urls = {
+      'UPS': 'https://www.ups.com/track?tracknum=',
+      'DHL': 'https://www.dhl.com/en/express/tracking.html?AWB=',
+      'GIG Logistics': 'https://giglogistics.com/track/',
+    };
+    const base = urls[carrier];
+    if (base) document.getElementById('ddTrackingUrl').value = base + this.value;
+  });
+
   document.getElementById('detailOverlay').classList.add('open');
+}
+
+function toggleDeliveryPanel() {
+  const body = document.getElementById('deliveryPanelBody');
+  const icon = document.getElementById('deliveryToggleIcon');
+  const open = body.classList.toggle('open');
+  icon.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+async function sendDeliveryDetails(orderId) {
+  const carrier     = document.getElementById('ddCarrier').value;
+  const tracking    = document.getElementById('ddTracking').value.trim();
+  const trackingUrl = document.getElementById('ddTrackingUrl').value.trim();
+  const eta         = document.getElementById('ddEta').value.trim();
+  const message     = document.getElementById('ddMessage').value.trim();
+
+  if (!carrier) { showToast('Please select a carrier'); return; }
+  if (!tracking) { showToast('Please enter a tracking number'); return; }
+
+  const o = _orders.find(x => x.id === orderId);
+  if (!o) { showToast('Order not found'); return; }
+
+  const btn = document.getElementById('sendDeliveryBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+
+  // Build a brief items summary for the email
+  const items = Array.isArray(o.items) ? o.items : [];
+  const itemsSummary = items.map(i => `${i.name}${i.variant ? ' · ' + i.variant : ''} ×${i.qty}`).join(', ');
+
+  try {
+    // 1. Save carrier/tracking to the order record and update status
+    const patchRes = await fetch(`/api/admin/shop-order/${orderId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': _token },
+      body: JSON.stringify({
+        status: 'shipped',
+        tracking_number: tracking,
+        tracking_carrier: carrier,
+        delivery_details_sent_at: new Date().toISOString(),
+      }),
+    });
+    if (!patchRes.ok) {
+      if (handleAdminAuthFailure(patchRes)) return;
+      const msg = await readError(patchRes);
+      showToast(`Save failed: ${msg}`, 6000);
+      return;
+    }
+
+    // 2. Send the customer email via site-form
+    const emailRes = await fetch('/api/site-form', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        form_type:       'delivery-details',
+        customer_name:   o.customer_name || '',
+        customer_email:  o.email,
+        email:           o.email,  // fallback field
+        order_ref:       orderRef(o),
+        carrier,
+        tracking,
+        tracking_url:    trackingUrl,
+        eta,
+        message,
+        items_summary:   itemsSummary,
+      }),
+    });
+    const emailData = await emailRes.json().catch(() => ({}));
+    if (!emailRes.ok || !emailData.ok) {
+      showToast('Order updated but email failed — check Resend config', 6000);
+      closeDetail(); loadOrders();
+      return;
+    }
+
+    showToast('Delivery details sent to ' + o.email + ' ✦');
+    closeDetail();
+    loadOrders();
+  } catch(e) {
+    showToast('Network error: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send to customer'; }
+  }
 }
 
 async function saveOrderDetail(id) {
