@@ -5007,10 +5007,14 @@ async function createPendingOrder(customer, method, checkoutQuote) {
 // while the chain is still indexing (server returns 409 "not confirmed yet").
 async function confirmPendingOrder(orderRef, opts) {
   const payload = Object.assign({ order_ref: orderRef, order_hash: orderRef }, opts);
-  // Tezos/ETH indexers can lag behind a just-broadcast tx. Keep each server call
-  // short, but let the browser retry for up to 6 minutes before giving up.
-  const maxAttempts = 72;   // 72 × 5s = 6 minutes (was 36 = 3 min)
+  // Chain indexers (TzKT, ETH RPC) can lag 30-120s after broadcast.
+  // Retry every 5s for up to 6 minutes. The server returns 409 for ALL
+  // "not yet" states so we only stop on genuine hard business failures.
+  const maxAttempts = 72;   // 72 × 5s = 6 minutes
   const RETRY_MS = 5000;
+  const isHardFail = (data, errMsg) =>
+    data.sold_out ||
+    /sold.out|amount.*below|failed.on-chain|sender.*mismatch|does.not.match|invalid.*hash|invalid.*operation/i.test(errMsg);
   let lastErr = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -5029,19 +5033,18 @@ async function confirmPendingOrder(orderRef, opts) {
       if (window.__shopDiag.length > 8) window.__shopDiag.length = 8;
       if (window.__renderShopDiag) window.__renderShopDiag();
       if (res.ok) return data;
-      // 409 = tx not indexed yet — keep retrying unless it's a hard business failure
-      const errMsg = data.error || '';
-      const isHardFail = data.sold_out || /sold.out|amount.*below|failed.on-chain|sender.*mismatch|does.not.match/i.test(errMsg);
-      if (res.status === 409 && !isHardFail && attempt < maxAttempts) {
-        lastErr = new Error(errMsg || 'Awaiting on-chain confirmation');
-        if (attempt === 1) showToast('Payment sent — confirming on-chain, please wait…');
-        if (attempt % 6 === 0) showToast(`Still confirming… (${Math.round(attempt * RETRY_MS / 60000)} min). Keep this page open.`);
-        await new Promise(r => setTimeout(r, RETRY_MS));
-        continue;
+      const errMsg = data.error || rawText || '';
+      // Hard failure — stop immediately
+      if (isHardFail(data, errMsg)) {
+        const e = new Error(errMsg || `Order confirmation failed (${res.status})`);
+        e.nonRetryable = true;
+        throw e;
       }
-      const err = new Error(errMsg || rawText || `Order confirmation failed with HTTP ${res.status}`);
-      err.nonRetryable = true;
-      throw err;
+      // Everything else — 409 not indexed yet, 502 indexer down, 5xx — keep retrying
+      lastErr = new Error(errMsg || `HTTP ${res.status}`);
+      if (attempt === 1) showToast('Payment sent — confirming on-chain, please wait…');
+      if (attempt % 6 === 0) showToast(`Still confirming… (${Math.round(attempt * RETRY_MS / 60000)} min). Keep this page open.`);
+      await new Promise(r => setTimeout(r, RETRY_MS));
     } catch (e) {
       lastErr = e;
       if (e && e.nonRetryable) throw e;
@@ -5051,6 +5054,7 @@ async function confirmPendingOrder(orderRef, opts) {
   }
   if (lastErr) throw lastErr;
 }
+
 
 // Local safety net: remember an unconfirmed order so a returning customer (or
 // you) can still confirm it even after a browser refresh. Stored in memory +
