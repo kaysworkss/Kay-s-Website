@@ -1016,8 +1016,21 @@ async function computeShopCheckout(body, supabase) {
   const deliveryCarrier = method === 'ship' ? serverIntlCarrierTier(zone, subtotalUsd, body.delivery_carrier) : '';
   const deliveryNgn = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'ngn', subtotalUsd, deliveryCarrier, shippingProfile) : 0;
   const deliveryUsd = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'usd', subtotalUsd, deliveryCarrier, shippingProfile) : 0;
-  const totalNgn = subtotalNgn + deliveryNgn;
-  const totalUsd = +(subtotalUsd + deliveryUsd).toFixed(2);
+
+  // ── Discount code ────────────────────────────────────────────────────────
+  // Resolve and apply a discount code (if provided). The discount is computed
+  // server-side from the authoritative subtotal/delivery so it can't be forged.
+  const discount = await resolveShopDiscount(body.discount_code, supabase, {
+    subtotalNgn, subtotalUsd, deliveryNgn, deliveryUsd,
+  });
+
+  const discountedSubtotalNgn = +(subtotalNgn - discount.amountNgn.products).toFixed(2);
+  const discountedSubtotalUsd = +(subtotalUsd - discount.amountUsd.products).toFixed(2);
+  const discountedDeliveryNgn = +(deliveryNgn - discount.amountNgn.shipping).toFixed(2);
+  const discountedDeliveryUsd = +(deliveryUsd - discount.amountUsd.shipping).toFixed(2);
+
+  const totalNgn = Math.max(0, +(discountedSubtotalNgn + discountedDeliveryNgn).toFixed(2));
+  const totalUsd = Math.max(0, +(discountedSubtotalUsd + discountedDeliveryUsd).toFixed(2));
 
   return {
     productCache,
@@ -1031,8 +1044,72 @@ async function computeShopCheckout(body, supabase) {
     subtotalUsd: +subtotalUsd.toFixed(2),
     deliveryNgn,
     deliveryUsd,
+    discountCode: discount.code,
+    discountPercent: discount.percent,
+    discountScope: discount.scope,
+    discountNgn: +(discount.amountNgn.products + discount.amountNgn.shipping).toFixed(2),
+    discountUsd: +(discount.amountUsd.products + discount.amountUsd.shipping).toFixed(2),
     totalNgn,
     totalUsd,
+    isFree: totalNgn <= 0 && totalUsd <= 0,
+  };
+}
+
+// ── DISCOUNT CODES ────────────────────────────────────────────────────────────
+// Codes live in shop_config.discount_codes as an array of:
+//   { code, percent (10|20|50|100), scope ('products'|'shipping'|'all'), active, note }
+// A code with scope 'all' at 100% (the dev/test code) zeroes the entire order,
+// including shipping, so it can be validated and marked paid without a gateway.
+async function resolveShopDiscount(rawCode, supabase, amounts) {
+  const empty = {
+    code: '', percent: 0, scope: '',
+    amountNgn: { products: 0, shipping: 0 },
+    amountUsd: { products: 0, shipping: 0 },
+  };
+  const code = String(rawCode || '').trim().toUpperCase().slice(0, 40);
+  if (!code) return empty;
+
+  let codes = [];
+  try {
+    const { data } = await supabase
+      .from('shop_config')
+      .select('discount_codes')
+      .order('id', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    codes = Array.isArray(data?.discount_codes) ? data.discount_codes : [];
+  } catch (_) { codes = []; }
+
+  const match = codes.find(c =>
+    c && c.active !== false &&
+    String(c.code || '').trim().toUpperCase() === code
+  );
+  if (!match) {
+    const e = new Error('That discount code is not valid');
+    e.statusCode = 422;
+    e.invalid_code = true;
+    throw e;
+  }
+
+  const percent = Math.max(0, Math.min(100, Number(match.percent) || 0));
+  const scope = ['products', 'shipping', 'all'].includes(match.scope) ? match.scope : 'products';
+  const f = percent / 100;
+
+  const applyProducts = scope === 'products' || scope === 'all';
+  const applyShipping = scope === 'shipping' || scope === 'all';
+
+  return {
+    code,
+    percent,
+    scope,
+    amountNgn: {
+      products: applyProducts ? +(amounts.subtotalNgn * f).toFixed(2) : 0,
+      shipping: applyShipping ? +(amounts.deliveryNgn * f).toFixed(2) : 0,
+    },
+    amountUsd: {
+      products: applyProducts ? +(amounts.subtotalUsd * f).toFixed(2) : 0,
+      shipping: applyShipping ? +(amounts.deliveryUsd * f).toFixed(2) : 0,
+    },
   };
 }
 
@@ -1063,6 +1140,11 @@ function makeShopQuote(checkout, extra = {}) {
     subtotal_usd: checkout.subtotalUsd,
     delivery_fee_ngn: checkout.deliveryNgn,
     delivery_fee_usd: checkout.deliveryUsd,
+    discount_code: checkout.discountCode || '',
+    discount_percent: checkout.discountPercent || 0,
+    discount_scope: checkout.discountScope || '',
+    discount_ngn: checkout.discountNgn || 0,
+    discount_usd: checkout.discountUsd || 0,
     total_ngn: checkout.totalNgn,
     total_usd: checkout.totalUsd,
     ...extra,
@@ -1080,6 +1162,8 @@ function verifyShopQuote(quote, checkout, expected = {}) {
   if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return false;
   if (Number(payload.total_ngn) !== checkout.totalNgn) return false;
   if (Number(payload.total_usd) !== checkout.totalUsd) return false;
+  if (String(payload.discount_code || '') !== String(checkout.discountCode || '')) return false;
+  if (Number(payload.discount_percent || 0) !== Number(checkout.discountPercent || 0)) return false;
   if (String(payload.delivery_method) !== checkout.method) return false;
   if (String(payload.delivery_zone) !== checkout.zone) return false;
   if (String(payload.delivery_carrier || '') !== String(checkout.deliveryCarrier || '')) return false;
@@ -1166,6 +1250,36 @@ async function handleShopQuote(req, res, supabase) {
     }
     const quote = makeShopQuote(checkout, extra);
     return json(200, { ok: true, quote, checkout });
+  } catch (e) {
+    return jsonError(e);
+  }
+}
+
+// Validate a discount code against the current cart and return the discounted
+// totals. Used for live feedback in the checkout before the customer pays.
+async function handleShopDiscount(req, res, supabase) {
+  if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
+  try {
+    const body = req.body || {};
+    const checkout = await computeShopCheckout(body, supabase);
+    if (!checkout.discountCode) {
+      return json(422, { error: 'That discount code is not valid', invalid_code: true });
+    }
+    return json(200, {
+      ok: true,
+      discount_code: checkout.discountCode,
+      discount_percent: checkout.discountPercent,
+      discount_scope: checkout.discountScope,
+      discount_ngn: checkout.discountNgn,
+      discount_usd: checkout.discountUsd,
+      subtotal_ngn: checkout.subtotalNgn,
+      subtotal_usd: checkout.subtotalUsd,
+      delivery_fee_ngn: checkout.deliveryNgn,
+      delivery_fee_usd: checkout.deliveryUsd,
+      total_ngn: checkout.totalNgn,
+      total_usd: checkout.totalUsd,
+      is_free: checkout.isFree,
+    });
   } catch (e) {
     return jsonError(e);
   }
@@ -2274,6 +2388,102 @@ async function handleShopOrderConfirm(req, res, supabase) {
 }
 
 // ── ORDER (legacy single-shot — kept for backward compatibility) ──────────────
+// Record a zero-total order (100%-off discount) as paid without any gateway.
+async function finalizeFreeOrder(req, res, supabase, body, checkout) {
+  const claimed = [];
+  for (const item of checkout.trustedItems) {
+    let result;
+    try {
+      result = await claimVariantStock(supabase, item);
+    } catch (e) {
+      for (const c of claimed) await releaseVariantStock(supabase, c);
+      return jsonError(e);
+    }
+    if (!result.ok) {
+      for (const c of claimed) await releaseVariantStock(supabase, c);
+      return json(409, {
+        error: `Sold out: ${item.name} · ${item.variant} is no longer available`,
+        product_id: item.id, variant: item.variant, sold_out: true,
+      });
+    }
+    claimed.push(item);
+  }
+
+  const freeRef = makeOrderRef();
+  const { data: order, error: orderError } = await supabase
+    .from('shop_orders')
+    .insert({
+      order_ref:        freeRef,
+      customer_name:    String(body.name    || '').slice(0, 200),
+      email:            String(body.email   || '').slice(0, 320),
+      phone:            String(body.phone   || '').slice(0, 60),
+      address:          String(body.address || '').slice(0, 500),
+      items:            checkout.trustedItems,
+      total_ngn:        checkout.totalNgn,
+      total_usd:        checkout.totalUsd,
+      delivery_fee_ngn: checkout.deliveryNgn,
+      delivery_method:  checkout.method.slice(0, 40),
+      delivery_zone:    checkout.zone.slice(0, 40),
+      payment_method:   checkout.discountPercent >= 100 ? 'discount-100' : 'discount',
+      payment_ref:      `DISCOUNT-${checkout.discountCode}`,
+      payment_metadata: {
+        discount_code: checkout.discountCode,
+        discount_percent: checkout.discountPercent,
+        discount_scope: checkout.discountScope,
+        discount_ngn: checkout.discountNgn,
+        discount_usd: checkout.discountUsd,
+        free_order: true,
+        paid_at: new Date().toISOString(),
+      },
+      status: 'paid',
+    })
+    .select('id, order_ref')
+    .single();
+  if (orderError) {
+    for (const c of claimed) await releaseVariantStock(supabase, c);
+    return json(500, { error: orderError.message });
+  }
+
+  const emailOrder = {
+    id: order.id, order_ref: order.order_ref,
+    customer_name: String(body.name || ''), email: String(body.email || ''),
+    phone: String(body.phone || ''), address: String(body.address || ''),
+    items: checkout.trustedItems, total_ngn: checkout.totalNgn, total_usd: checkout.totalUsd,
+    delivery_fee_ngn: checkout.deliveryNgn, delivery_method: checkout.method, delivery_zone: checkout.zone,
+    payment_method: 'discount', payment_ref: `DISCOUNT-${checkout.discountCode}`,
+  };
+  let sellerNotification = { sent: false }, customerNotification = { sent: false };
+  try {
+    const r = await sendShopSellerNotification({
+      order: emailOrder, orderRef: order.order_ref, checkout,
+      paymentMethod: `Discount ${checkout.discountPercent}% (${checkout.discountCode})`,
+      paymentRef: `DISCOUNT-${checkout.discountCode}`, payerAddress: '',
+      chainVerification: null, cardVerification: null,
+    });
+    sellerNotification = { sent: true, id: r?.id || null };
+  } catch (e) { sellerNotification = { sent: false, error: e.message }; }
+  try {
+    const r = await sendShopCustomerReceipt({
+      order: emailOrder, orderRef: order.order_ref, checkout,
+      paymentMethod: 'discount', paymentRef: `DISCOUNT-${checkout.discountCode}`,
+    });
+    customerNotification = { sent: true, id: r?.id || null };
+  } catch (e) { customerNotification = { sent: false, error: e.message }; }
+
+  return json(200, {
+    ok: true,
+    free_order: true,
+    order_id: order.id,
+    order_ref: order.order_ref,
+    total_ngn: checkout.totalNgn,
+    total_usd: checkout.totalUsd,
+    discount_code: checkout.discountCode,
+    discount_percent: checkout.discountPercent,
+    seller_notification: sellerNotification,
+    customer_notification: customerNotification,
+  });
+}
+
 async function handleShopOrder(req, res, supabase) {
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
   const body = req.body || {};
@@ -2287,6 +2497,18 @@ async function handleShopOrder(req, res, supabase) {
   const paymentMethod = String(body.payment_method || '').slice(0, 40);
   const paymentRef = String(body.payment_ref || '').slice(0, 200);
   const payerAddress = String(body.payer_address || '').slice(0, 120);
+
+  // ── Free order (100%-off discount) ───────────────────────────────────────
+  // When a discount zeroes the total, there is nothing to charge. Skip all
+  // gateway/chain verification and record the order as paid directly. The
+  // discount is baked into the signed quote, so it can't be forged.
+  if (checkout.isFree) {
+    if (!verifyShopQuote(body.checkout_quote, checkout, {})) {
+      return json(400, { error: 'Invalid or expired server checkout quote' });
+    }
+    return finalizeFreeOrder(req, res, supabase, body, checkout);
+  }
+
   const quoteRequired = ['paystack','flutterwave','eth','tezos','usdc','usdt'].includes(paymentMethod);
   if (quoteRequired && !verifyShopQuote(body.checkout_quote, checkout, {
     payment_method: paymentMethod,
@@ -2466,7 +2688,11 @@ async function handleShopConfig(req, res, supabase) {
     .limit(1)
     .single();
   if (error && error.code !== 'PGRST116') return json(500, { error: error.message });
-  return json(200, data || {});
+  // Never expose discount codes to the public storefront — they're validated
+  // server-side only. Strip them from the public config response.
+  const safe = { ...(data || {}) };
+  delete safe.discount_codes;
+  return json(200, safe);
 }
 
 // ── Netlify entry point ───────────────────────────────────────────────────────
@@ -2507,6 +2733,7 @@ module.exports = async (req, res) => {
       else if (urlPath.includes('/shop-config') || urlPath.includes('/shop/config')) action = 'shop-config';
       else if (urlPath.includes('/shop-payment-init') || urlPath.includes('/shop/payment-init')) action = 'shop-payment-init';
       else if (urlPath.includes('/shop-quote') || urlPath.includes('/shop/quote')) action = 'shop-quote';
+      else if (urlPath.includes('/shop-discount') || urlPath.includes('/shop/discount')) action = 'shop-discount';
       else if (urlPath.includes('/shop-order-create') || urlPath.includes('/shop/order-create')) action = 'shop-order-create';
       else if (urlPath.includes('/shop-order-confirm') || urlPath.includes('/shop/order-confirm')) action = 'shop-order-confirm';
       else if (urlPath.includes('/shop-order') || urlPath.includes('/shop/order')) action = 'shop-order';
@@ -2530,6 +2757,7 @@ module.exports = async (req, res) => {
       case 'shop-products':      return handleShopProducts(req, res, supabase);
       case 'shop-config':        return handleShopConfig(req, res, supabase);
       case 'shop-quote':         return handleShopQuote(req, res, supabase);
+      case 'shop-discount':      return handleShopDiscount(req, res, supabase);
       case 'shop-payment-init':  return handleShopPaymentInit(req, res, supabase);
       case 'shop-order-create':  return handleShopOrderCreate(req, res, supabase);
       case 'shop-order-confirm': return handleShopOrderConfirm(req, res, supabase);

@@ -328,6 +328,23 @@ async function handleShopConfig(req, res, supabase) {
       announcement:   String(body.announcement  || '').slice(0, 500),
       updated_at:     new Date().toISOString(),
     };
+    if (body.featured_product_id !== undefined) {
+      patch.featured_product_id = String(body.featured_product_id || '').slice(0, 80) || null;
+    }
+    if (body.discount_codes !== undefined) {
+      // Sanitize each code: uppercase code string, clamp percent, validate scope.
+      const codes = Array.isArray(body.discount_codes) ? body.discount_codes : [];
+      patch.discount_codes = codes
+        .filter(c => c && String(c.code || '').trim())
+        .slice(0, 50)
+        .map(c => ({
+          code:    String(c.code).trim().toUpperCase().slice(0, 40),
+          percent: Math.max(0, Math.min(100, Number(c.percent) || 0)),
+          scope:   ['products', 'shipping', 'all'].includes(c.scope) ? c.scope : 'products',
+          active:  c.active !== false,
+          note:    String(c.note || '').slice(0, 120),
+        }));
+    }
     const { error } = await supabase
       .from('shop_config')
       .upsert({ id: 1, ...patch }, { onConflict: 'id' });
@@ -402,9 +419,19 @@ async function handleShopOrderUpdate(req, res, supabase) {
   if (body.tracking_number !== undefined) patch.tracking_number = String(body.tracking_number).slice(0, 200);
   if (body.tracking_carrier !== undefined) patch.tracking_carrier = String(body.tracking_carrier).slice(0, 100);
   if (body.admin_note !== undefined) patch.admin_note = String(body.admin_note).slice(0, 1000);
+  if (body.delivery_details_sent_at !== undefined) patch.delivery_details_sent_at = String(body.delivery_details_sent_at).slice(0, 40);
 
   const { error } = await supabase.from('shop_orders').update(patch).eq('id', id);
-  if (error) return json(500, { error: error.message });
+  if (error) {
+    const msg = String(error.message || '').toLowerCase();
+    if (patch.delivery_details_sent_at && msg.includes('delivery_details_sent_at')) {
+      delete patch.delivery_details_sent_at;
+      const retry = await supabase.from('shop_orders').update(patch).eq('id', id);
+      if (retry.error) return json(500, { error: retry.error.message });
+      return json(200, { ok: true, warning: 'delivery_details_sent_at column missing' });
+    }
+    return json(500, { error: error.message });
+  }
   return json(200, { ok: true });
 }
 
