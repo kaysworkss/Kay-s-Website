@@ -76,6 +76,47 @@ function buildRow(payload) {
     return { bot: true };
   }
 
+  if (formType === 'delivery-details' || formType === 'shipping') {
+    const row = {
+      form_type:       'delivery-details',
+      status:          'pending',
+      name:            clean(payload.customer_name || payload.name, 180),
+      email:           clean(payload.customer_email || payload.email, 320),
+      order_ref:       clean(payload.order_ref, 200),
+      carrier:         clean(payload.carrier, 80),
+      tracking:        clean(payload.tracking, 200),
+      tracking_url:    clean(payload.tracking_url, 500),
+      eta:             clean(payload.eta, 200),
+      message:         clean(payload.message, 4000),
+      items_summary:   clean(payload.items_summary, 2000),
+      payload,
+    };
+    if (!row.email || !isEmail(row.email)) {
+      return { error: 'Customer email is required.' };
+    }
+    if (!row.carrier || !row.tracking) {
+      return { error: 'Carrier and tracking number are required.' };
+    }
+    return row;
+  }
+
+  if (formType === 'interest-1of1' || formType === 'acquisition') {
+    const row = {
+      form_type:       'interest-1of1',
+      status:          'pending',
+      name:            clean(payload.name, 180),
+      email:           clean(payload.email, 320),
+      commission_type: 'interest-1of1',
+      artwork:         clean(payload.artwork || payload.commission_type?.replace('interest-1of1','').trim() || '', 200),
+      message:         clean(payload.message, 4000),
+      payload,
+    };
+    if (!row.name || !isEmail(row.email)) {
+      return { error: 'Please complete all required fields.' };
+    }
+    return row;
+  }
+
   if (formType === 'private-offer' || formType === 'offer') {
     const row = {
       form_type:      'private-offer',
@@ -134,7 +175,84 @@ function buildRow(payload) {
 function alertLabel(formType) {
   if (formType === 'matching-token') return 'matching token request';
   if (formType === 'private-offer')  return 'private offer';
+  if (formType === 'interest-1of1')  return 'acquisition enquiry';
+  if (formType === 'delivery-details') return 'delivery notification sent';
   return 'commission request';
+}
+
+// ── Customer shipping notification ────────────────────────────────────────────
+async function sendShippingNotification(row, id) {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) throw new Error('RESEND_API_KEY missing');
+
+  const name       = row.name       || 'Collector';
+  const orderRef   = row.order_ref  || id || '—';
+  const carrier    = row.carrier;
+  const tracking   = row.tracking;
+  const trackingUrl = row.tracking_url || '';
+  const eta        = row.eta        || '';
+  const extraMsg   = row.message    || '';
+  const items      = row.items_summary || '';
+  const subject    = `Your order is on its way — ${orderRef}`;
+
+  const trackingBlock = trackingUrl
+    ? `<a href="${trackingUrl}" style="display:inline-block;background:linear-gradient(90deg,#b8821e 0%,#e8c45a 35%,#f5d878 55%,#d4a030 80%,#b8821e 100%);color:#2d1508;text-decoration:none;font-family:Arial,sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:12px 28px;border-radius:999px">Track your order</a>`
+    : `<p style="margin:0;font-family:'Courier New',monospace;font-size:13px;color:#5c3e2e;background:rgba(196,132,90,0.08);padding:10px 14px;border-radius:6px;letter-spacing:0.06em">${tracking}</p>`;
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px;font-size:16px;color:#2d211b;font-family:Georgia,serif;line-height:1.6">
+      Great news, ${name} — your order is packed and on its way.
+    </p>
+    ${items ? `<p style="margin:0 0 14px;font-size:13px;color:#7a5a40;font-family:Georgia,serif;font-style:italic;line-height:1.6">${items}</p>` : ''}
+    ${extraMsg ? `<p style="margin:0 0 14px;font-size:13px;color:#5c3e2e;font-family:Georgia,serif;line-height:1.65">${extraMsg}</p>` : ''}`;
+
+  const detailRows = [
+    ['Order ref',  orderRef,  '#9e4f2e'],
+    ['Carrier',    carrier,   null     ],
+    ['Tracking',   tracking,  '#5c3e2e'],
+    eta ? ['Estimated delivery', eta, '#6b7c5c'] : null,
+  ].filter(Boolean);
+
+  const html = _siteEmailShell({
+    eyebrow:   "Kay\u2019s Works \u00b7 Your Order",
+    heroTitle: "Your order is on its way \u2728",
+    bodyHtml,
+    rows: detailRows,
+    ctaHref:   trackingUrl || 'https://kaysworks.com/shop-orders',
+    ctaText:   trackingUrl ? 'Track your order' : 'View your orders',
+    ctaSub:    eta ? `Expected delivery: ${eta}` : 'Tracking may take up to 24 hours to activate.',
+    logoUrl:   process.env.SHOP_LOGO_URL || 'https://www.kaysworks.com/images/kaysworkslogo.svg',
+  });
+
+  const text = [
+    `Your order is on its way — ${orderRef}`,
+    '',
+    `Great news, ${name} — your order is packed and heading to you.`,
+    '',
+    extraMsg || '',
+    '',
+    `Order ref: ${orderRef}`,
+    `Carrier: ${carrier}`,
+    `Tracking: ${tracking}`,
+    trackingUrl ? `Track here: ${trackingUrl}` : '',
+    eta ? `Estimated delivery: ${eta}` : '',
+    '',
+    'Questions? Reply to this email or message Kay on WhatsApp.',
+  ].filter(l => l !== undefined).join('\n');
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: ALERT_FROM_EMAIL, to: [row.email],
+      reply_to: ALERT_TO_EMAIL, subject, text, html,
+    }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || `Resend shipping notification failed ${response.status}`);
+  }
+  return response.json().catch(() => ({}));
 }
 
 function isSchemaMismatch(error) {
@@ -185,10 +303,43 @@ function minimalRow(row) {
   return row;
 }
 
+function compactDeliveryRow(row) {
+  // Minimal shape that only uses columns guaranteed to exist on the
+  // site_form_submissions table. Shipping-specific fields are folded into
+  // the message + payload so the insert can't fail on a missing column.
+  const summary = [
+    row.order_ref ? `Order: ${row.order_ref}` : '',
+    row.carrier ? `Carrier: ${row.carrier}` : '',
+    row.tracking ? `Tracking: ${row.tracking}` : '',
+    row.tracking_url ? `Tracking URL: ${row.tracking_url}` : '',
+    row.eta ? `ETA: ${row.eta}` : '',
+    row.items_summary ? `Items: ${row.items_summary}` : '',
+    row.message ? `\n${row.message}` : '',
+  ].filter(Boolean).join('\n').slice(0, 4000);
+  return {
+    form_type: 'delivery-details',
+    status: row.status || 'pending',
+    name: row.name,
+    email: row.email,
+    message: summary,
+    payload: row.payload || row,
+  };
+}
+
 async function insertSubmission(row) {
   const attempts = [row];
   if (row.form_type === 'private-offer') {
     attempts.push(compactRow(row), minimalRow(row));
+  } else if (row.form_type === 'delivery-details') {
+    // If the full shipping row fails on a missing column, fall back to a
+    // compact row, then a minimal one — the email must still go out.
+    attempts.push(compactDeliveryRow(row), {
+      form_type: 'delivery-details',
+      status: row.status || 'pending',
+      name: row.name,
+      email: row.email,
+      message: row.message || '',
+    });
   }
 
   let lastError;
@@ -201,8 +352,9 @@ async function insertSubmission(row) {
       });
     } catch (error) {
       lastError = error;
-      if (row.form_type !== 'private-offer' || !isSchemaMismatch(error)) throw error;
-      console.warn('Private offer insert shape failed, retrying with compact schema:', error.message);
+      const hasFallback = (row.form_type === 'private-offer' || row.form_type === 'delivery-details');
+      if (!hasFallback || !isSchemaMismatch(error)) throw error;
+      console.warn(`${row.form_type} insert shape failed, retrying with compact schema:`, error.message);
     }
   }
   throw lastError;
@@ -335,6 +487,69 @@ async function sendOfferConfirmation(row, id) {
   return response.json().catch(() => ({}));
 }
 
+// ── Client confirmation — acquisition enquiry (unique / 1-of-1 works) ────────
+async function sendAcquisitionConfirmation(row, id) {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) throw new Error('RESEND_API_KEY missing');
+
+  const name    = row.name    || 'Collector';
+  const artwork = row.artwork || 'this work';
+  const subject = `Your enquiry has been received \u2014 \u201c${artwork}\u201d`;
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px;font-size:16px;color:#2d211b;font-family:Georgia,serif;line-height:1.6">
+      Thank you, ${name}.
+    </p>
+    <p style="margin:0 0 10px;font-size:13px;color:#5c3e2e;font-style:italic;font-family:Georgia,serif;line-height:1.65">
+      Your interest in this work means a great deal. I\u2019ve received your enquiry and will be in touch personally within a few days to discuss the piece, availability, and next steps.
+    </p>
+    <p style="margin:0;font-size:13px;color:#7a5a40;font-family:Georgia,serif;line-height:1.65">
+      In the meantime, feel free to explore the full collection or reach out directly if you have questions.
+    </p>`;
+
+  const rows = [
+    ['Work enquired about', artwork,       '#9e4f2e'],
+    ['Reference',           id || '\u2014', '#b09070'],
+  ];
+
+  const html = _siteEmailShell({
+    eyebrow:   "Kay\u2019s Works \u00b7 Acquisition Enquiry",
+    heroTitle: "Enquiry received",
+    bodyHtml,
+    rows,
+    ctaHref:   'https://kaysworks.com/shop',
+    ctaText:   'Explore the collection',
+    ctaSub:    'More unique works and limited editions are available in the shop.',
+    logoUrl:   process.env.SHOP_LOGO_URL || 'https://www.kaysworks.com/images/kaysworkslogo.svg',
+  });
+
+  const text = [
+    `Enquiry received \u2014 ${artwork}`,
+    '',
+    `Thank you, ${name}.`,
+    `Your interest means a great deal. I\u2019ve received your enquiry and will be in touch personally within a few days.`,
+    '',
+    `Work: ${artwork}`,
+    `Reference: ${id || '\u2014'}`,
+    '',
+    'Explore the collection: https://kaysworks.com/shop',
+  ].join('\n');
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: ALERT_FROM_EMAIL, to: [row.email],
+      reply_to: ALERT_TO_EMAIL, subject, text, html,
+    }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || `Resend acquisition confirmation failed ${response.status}`);
+  }
+  return response.json().catch(() => ({}));
+}
+
 // ── Admin alert ───────────────────────────────────────────────────────────────
 async function sendMinimalAlert(row, id) {
   const resendKey = process.env.RESEND_API_KEY;
@@ -353,6 +568,9 @@ async function sendMinimalAlert(row, id) {
     if (row.offer_amount) rows.push(['Offer',   `${row.offer_amount} ${row.offer_currency || ''}`.trim(), null]);
     if (row.artwork)      rows.push(['Artwork',  row.artwork,   '#9e4f2e']);
     if (row.chain)        rows.push(['Chain',    row.chain,     '#7a5a40']);
+  }
+  if (row.form_type === 'interest-1of1' && row.artwork) {
+    rows.push(['Work', row.artwork, '#9e4f2e']);
   }
   rows.push(['Collector', row.name || row.collector_name || '\u2014', null]);
   rows.push(['Email',     row.email || '\u2014',    '#7a5a40']);
@@ -406,8 +624,15 @@ async function handleCreate(req, res) {
   if (row.bot) return res.status(200).json({ ok: true });
   if (row.error) return res.status(422).json({ error: row.error });
 
-  const inserted = await insertSubmission(row);
-  const id = inserted && inserted[0] && inserted[0].id;
+  // Record the submission, but never let a DB/schema issue block the email —
+  // the customer-facing notification matters more than the audit row.
+  let id = null;
+  try {
+    const inserted = await insertSubmission(row);
+    id = inserted && inserted[0] && inserted[0].id;
+  } catch (error) {
+    console.error('Submission insert failed (continuing to email):', error.message);
+  }
   let alert = { sent: false };
   try {
     const alertData = await sendMinimalAlert(row, id);
@@ -424,6 +649,26 @@ async function handleCreate(req, res) {
       confirmation = { sent: true, id: confData && confData.id };
     } catch (error) {
       console.error('Offer confirmation email failed:', error.message);
+      confirmation = { sent: false, error: error.message };
+    }
+  }
+  // Client-facing confirmation email for acquisition enquiries (unique / 1-of-1 works)
+  if (row.form_type === 'interest-1of1') {
+    try {
+      const confData = await sendAcquisitionConfirmation(row, id);
+      confirmation = { sent: true, id: confData && confData.id };
+    } catch (error) {
+      console.error('Acquisition confirmation email failed:', error.message);
+      confirmation = { sent: false, error: error.message };
+    }
+  }
+  // Client-facing shipping notification email
+  if (row.form_type === 'delivery-details') {
+    try {
+      const confData = await sendShippingNotification(row, id);
+      confirmation = { sent: true, id: confData && confData.id };
+    } catch (error) {
+      console.error('Shipping notification email failed:', error.message);
       confirmation = { sent: false, error: error.message };
     }
   }
