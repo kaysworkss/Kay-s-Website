@@ -2900,7 +2900,7 @@ footer {
         <!-- Products -->
         <p class="admin-section-title" style="margin-top:1.4rem">Products</p>
         <div id="adminProducts"></div>
-        <button class="admin-add-btn" id="addProductBtn">+ Add print artwork</button>
+        <button class="admin-add-btn" id="addProductBtn" style="display:none">+ Add print artwork</button>
 
         <button class="admin-save-btn" id="saveConfigBtn">Save configuration</button>
 
@@ -3838,6 +3838,8 @@ function renderFeaturedSection() {
 
 function renderProducts() {
   SHOP_CONFIG.products = (SHOP_CONFIG.products || []).filter(p => p && p.active !== false).map(normalizeProduct);
+  // Respect the admin-defined display order within each category.
+  SHOP_CONFIG.products.sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
   renderFeaturedSection();
   const grids = {
     prints: document.getElementById('printsGrid'),
@@ -4998,8 +5000,14 @@ document.getElementById('ethManualCancel')?.addEventListener('click', () => {
 // ── PENDING-FIRST ORDER HELPERS ───────────────────────────────────────────────
 // Create a pending order on the server BEFORE payment. Returns { order_ref, ... }.
 async function createPendingOrder(customer, method, checkoutQuote) {
+  // Reuse the current lock's pending order if one exists for this method, so
+  // repeated price-lock refreshes don't litter the DB with orphan pending rows.
+  const existingRef = (window.__activeLock && window.__activeLock.method === method)
+    ? window.__activeLock.order_ref
+    : null;
   return postShopJson('/api/shop/order-create', checkoutPayload(customer, method, {
     checkout_quote: checkoutQuote,
+    reuse_order_ref: existingRef || '',
   }));
 }
 
@@ -5228,20 +5236,9 @@ async function notifyOrder(customer, ref, method, checkoutQuote = null) {
   }
   if (lastErr) throw lastErr;
 
-  // 2. Email alert to Kay
-  try {
-    await fetch('/api/site-form', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        form_type:       'commission',
-        name:            customer.name,
-        email:           customer.email,
-        commission_type: 'shop-order',
-        message: `Shop order — ${method.toUpperCase()} · Ref: ${ref}\n${checkoutQuote?.payer_address ? `Sender wallet: ${checkoutQuote.payer_address}\n` : ''}\nDelivery: ${deliveryInfo}\nPhone: ${customer.phone||'—'}${customer.orderNote ? `\nOrder note: ${customer.orderNote}` : ''}\n\nItems:\n${cart.map(c=>`${c.name} (${c.variant}) × ${c.qty}`).join('\n')}\n\nSubtotal: ${fmt(quotedSubtotalNgn)} / $${quotedSubtotalUsd}\nDelivery: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}\nGrand total: ${fmt(quotedTotalNgn)} / $${quotedTotalUsd}`,
-      }),
-    });
-  } catch(_) {}
+  // The /api/shop/order endpoint now sends proper "Paid shop order" emails to
+  // both Kay and the customer (sendShopSellerNotification + sendShopCustomerReceipt),
+  // so no separate commission-form alert is needed here.
 }
 
 document.getElementById('continueShopping').addEventListener('click', ()=>{
@@ -5254,14 +5251,34 @@ async function finalizeReturnedGatewayCheckout() {
   if (!gatewayRef) return;
   let pending = null;
   try { pending = JSON.parse(sessionStorage.getItem('kwPendingCheckout') || 'null'); } catch (_) {}
-  if (!pending || !pending.customer || !pending.method || !pending.quote) return;
+  if (!pending || !pending.customer || !pending.method || !pending.quote) {
+    // No pending context (e.g. opened in a new tab). Still acknowledge the
+    // payment so the customer isn't left wondering.
+    showConfirmation('paystack', gatewayRef);
+    history.replaceState(null, '', location.pathname + location.hash);
+    return;
+  }
   const ref = pending.ref || gatewayRef;
   try {
     await notifyOrder(pending.customer, ref, pending.method, pending.quote);
     sessionStorage.removeItem('kwPendingCheckout');
+    cart = [];
+    saveCart();
+    if (typeof updateCartUI === 'function') updateCartUI();
     showConfirmation(pending.method, ref);
     history.replaceState(null, '', location.pathname + location.hash);
   } catch (e) {
+    const msg = (e.message || '').toLowerCase();
+    // If the order was already recorded on a previous attempt, treat as success.
+    if (/already been recorded|already.*submitted|duplicate/i.test(msg)) {
+      sessionStorage.removeItem('kwPendingCheckout');
+      cart = [];
+      saveCart();
+      if (typeof updateCartUI === 'function') updateCartUI();
+      showConfirmation(pending.method, ref);
+      history.replaceState(null, '', location.pathname + location.hash);
+      return;
+    }
     showToast('Payment received, but order recording needs review: ' + (e.message || 'unknown error'), 6000);
   }
 }
@@ -5487,12 +5504,75 @@ document.getElementById('savePrintPageBtn').addEventListener('click', async () =
   }
 });
 
+// Insert a new print artwork at the top of the prints section and scroll to it.
+function addPrintArtwork() {
+  const defaults = defaultPrintOptionData();
+  const prints = SHOP_CONFIG.products.filter(p => p.category === 'prints');
+  const minOrder = prints.length ? Math.min(...prints.map(x => Number(x.sort_order) || 0)) : 0;
+  SHOP_CONFIG.products.unshift({
+    id: 'prod-' + uid(), category: 'prints', name: 'New Artwork',
+    desc: 'Choose the print format and size for this artwork.', emoji: '🖼',
+    variants: defaults.variants.map(o => ({ ...o, sizes: [...o.sizes] })),
+    availableVariants: Object.fromEntries(Object.entries(defaults.availableVariants).map(([type, sizes]) => [type, [...sizes]])),
+    priceNgn: { ...defaults.priceNgn },
+    priceUsd: { ...defaults.priceUsd },
+    badge: '', image: '',
+    sort_order: minOrder - 1,
+    _justAdded: true,
+  });
+  renderAdminProducts();
+  scrollToJustAdded();
+}
+
+// Move a product up or down within its own category, persisting via sort_order.
+function moveProductInCategory(cat, realIdx, dir) {
+  const moving = SHOP_CONFIG.products[realIdx];
+  if (!moving) return;
+  // Build the ordered list of this category as currently displayed.
+  const sameCat = SHOP_CONFIG.products
+    .map((p, i) => ({ p, i }))
+    .filter(x => x.p.category === cat);
+  const pos = sameCat.findIndex(x => x.i === realIdx);
+  const swapWith = sameCat[pos + dir];
+  if (!swapWith) return;
+  // Swap their sort_order values (assign sequential orders if unset).
+  sameCat.forEach((x, k) => { if (x.p.sort_order === undefined || x.p.sort_order === null) x.p.sort_order = k; });
+  const a = moving.sort_order;
+  moving.sort_order = swapWith.p.sort_order;
+  swapWith.p.sort_order = a;
+  // Reorder the underlying array so the UI reflects it immediately.
+  SHOP_CONFIG.products.sort((m, n) => {
+    if (m.category !== n.category) return 0;
+    return (Number(m.sort_order) || 0) - (Number(n.sort_order) || 0);
+  });
+  moving._justAdded = true; // reuse highlight/scroll
+  renderAdminProducts();
+  scrollToJustAdded();
+}
+
+// Scroll the admin panel to the most recently added/moved product row.
+function scrollToJustAdded() {
+  setTimeout(() => {
+    const idx = SHOP_CONFIG.products.findIndex(p => p._justAdded);
+    if (idx < 0) return;
+    SHOP_CONFIG.products.forEach(p => { delete p._justAdded; });
+    const row = document.querySelector(`.admin-product-row[data-idx="${idx}"]`);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.style.transition = 'background 0.3s';
+      row.style.background = 'rgba(196,132,90,0.12)';
+      setTimeout(() => { row.style.background = ''; }, 1500);
+    }
+  }, 60);
+}
+
 function renderAdminProducts() {
   const el = document.getElementById('adminProducts');
 
-  // Separate prints from other products for dedicated sections
-  const prints = SHOP_CONFIG.products.filter(p => p.category === 'prints');
-  const others = SHOP_CONFIG.products.filter(p => p.category !== 'prints');
+  // Separate prints from other products for dedicated sections, sorted by sort_order
+  const byOrder = (a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+  const prints = SHOP_CONFIG.products.filter(p => p.category === 'prints').sort(byOrder);
+  const others = SHOP_CONFIG.products.filter(p => p.category !== 'prints').sort(byOrder);
 
   let html = '';
 
@@ -5517,7 +5597,13 @@ function renderAdminProducts() {
         </div>`).join('');
       html += `<div class="admin-product-row" data-idx="${realIdx}" style="grid-template-columns:1fr;gap:0.6rem">
         <button class="admin-del-btn" data-idx="${realIdx}" title="Remove">x</button>
-        <div class="admin-prod-name">${p.name}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem">
+          <div class="admin-prod-name">${p.name}</div>
+          <div style="display:flex;gap:0.3rem;flex-shrink:0">
+            <button class="ap-move-up" data-cat="prints" data-idx="${realIdx}" title="Move up" ${pi === 0 ? 'disabled' : ''} style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;width:26px;height:26px;color:var(--text);font-size:0.8rem;${pi === 0 ? 'opacity:0.3' : ''}">▲</button>
+            <button class="ap-move-down" data-cat="prints" data-idx="${realIdx}" title="Move down" ${pi === prints.length - 1 ? 'disabled' : ''} style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;width:26px;height:26px;color:var(--text);font-size:0.8rem;${pi === prints.length - 1 ? 'opacity:0.3' : ''}">▼</button>
+          </div>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem">
           <div class="form-row" style="margin:0">
             <label class="form-label">Print name</label>
@@ -5613,6 +5699,12 @@ function renderAdminProducts() {
         </div>
       </div>`;
     });
+    // Add-print button at the END of the prints section (not per item)
+    html += `<div style="margin:0.6rem 0 0.4rem"><button class="admin-add-btn ap-add-print-inline">+ Add print artwork</button></div>`;
+  } else {
+    // No prints yet — still offer the add button
+    html += `<p class="admin-section-title" style="margin-top:0">Print options, sizes &amp; availability</p>
+    <div style="margin:0.6rem 0 0.4rem"><button class="admin-add-btn ap-add-print-inline">+ Add print artwork</button></div>`;
   }
 
   // ── Other products ────────────────────────────────────────────────────
@@ -5632,7 +5724,7 @@ function renderAdminProducts() {
     if (!items.length) {
       html += `<p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.8rem">No ${cat} products yet.</p>`;
     }
-    items.forEach(raw => {
+    items.forEach((raw, ci) => {
       const p = normalizeProduct(raw);
       const realIdx = SHOP_CONFIG.products.indexOf(raw);
       const apparelAdminHtml = cat === 'merch' ? `
@@ -5658,7 +5750,13 @@ function renderAdminProducts() {
         </div>`).join('');
       html += `<div class="admin-product-row" data-idx="${realIdx}" style="grid-template-columns:1fr;gap:0.7rem">
         <button class="admin-del-btn" data-idx="${realIdx}" title="Remove">x</button>
-        <div class="admin-prod-name">${escapeText(p.name)}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem">
+          <div class="admin-prod-name">${escapeText(p.name)}</div>
+          <div style="display:flex;gap:0.3rem;flex-shrink:0">
+            <button class="ap-move-up" data-cat="${cat}" data-idx="${realIdx}" title="Move up" ${ci === 0 ? 'disabled' : ''} style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;width:26px;height:26px;color:var(--text);font-size:0.8rem;${ci === 0 ? 'opacity:0.3' : ''}">▲</button>
+            <button class="ap-move-down" data-cat="${cat}" data-idx="${realIdx}" title="Move down" ${ci === items.length - 1 ? 'disabled' : ''} style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;width:26px;height:26px;color:var(--text);font-size:0.8rem;${ci === items.length - 1 ? 'opacity:0.3' : ''}">▼</button>
+          </div>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem">
           <div class="form-row" style="margin:0">
             <label class="form-label">Name</label>
@@ -5729,11 +5827,36 @@ function renderAdminProducts() {
     });
   });
 
-  // Add merch / notebook / sticker products
+  // Add merch / notebook / sticker products — insert at TOP of its section
   el.querySelectorAll('.ap-add-product').forEach(btn => {
     btn.addEventListener('click', () => {
-      SHOP_CONFIG.products.push(defaultProduct(btn.dataset.category || 'merch'));
+      const cat = btn.dataset.category || 'merch';
+      const np = defaultProduct(cat);
+      // Give it a sort_order below the current minimum so it sorts to the top.
+      const catItems = SHOP_CONFIG.products.filter(x => x.category === cat);
+      const minOrder = catItems.length ? Math.min(...catItems.map(x => Number(x.sort_order) || 0)) : 0;
+      np.sort_order = minOrder - 1;
+      np._justAdded = true;
+      SHOP_CONFIG.products.unshift(np);
       renderAdminProducts();
+      scrollToJustAdded();
+    });
+  });
+
+  // Add print artwork — insert at TOP of the prints section
+  el.querySelectorAll('.ap-add-print-inline').forEach(btn => {
+    btn.addEventListener('click', () => {
+      addPrintArtwork();
+    });
+  });
+
+  // Reorder products within their section
+  el.querySelectorAll('.ap-move-up, .ap-move-down').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cat = btn.dataset.cat;
+      const realIdx = Number(btn.dataset.idx);
+      const dir = btn.classList.contains('ap-move-up') ? -1 : 1;
+      moveProductInCategory(cat, realIdx, dir);
     });
   });
 
@@ -5868,19 +5991,7 @@ function renderAdminProducts() {
 
 } // end renderAdminProducts
 
-document.getElementById('addProductBtn').addEventListener('click', ()=>{
-  const defaults = defaultPrintOptionData();
-  SHOP_CONFIG.products.push({
-    id: 'prod-'+uid(), category: 'prints', name: 'New Artwork',
-    desc: 'Choose the print format and size for this artwork.', emoji: '🖼',
-    variants: defaults.variants.map(o => ({ ...o, sizes: [...o.sizes] })),
-    availableVariants: Object.fromEntries(Object.entries(defaults.availableVariants).map(([type, sizes]) => [type, [...sizes]])),
-    priceNgn: { ...defaults.priceNgn },
-    priceUsd: { ...defaults.priceUsd },
-    badge: '', image: '',
-  });
-  renderAdminProducts();
-});
+document.getElementById('addProductBtn').addEventListener('click', addPrintArtwork);
 
 document.getElementById('saveConfigBtn').addEventListener('click', async () => {
   const token = localStorage.getItem('kaysworks-admin-token');
@@ -6044,6 +6155,15 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         p.priceUsd = nextUsd;
         p.stock_by_variant = nextStock;
       }
+    });
+
+    // Normalize sort_order to clean sequential values within each category so
+    // the admin-defined order persists predictably across reloads.
+    ['prints', 'merch', 'notebooks', 'stickers'].forEach(cat => {
+      SHOP_CONFIG.products
+        .filter(p => p.category === cat)
+        .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0))
+        .forEach((p, i) => { p.sort_order = i; });
     });
 
     // Save all products to API and replace temporary/sample ids with real
@@ -7206,8 +7326,8 @@ function maybeOpenCheckoutFromHash() {
 
 loadShopData()
   .then(maybeOpenCheckoutFromHash)
-  .catch(maybeOpenCheckoutFromHash);
-finalizeReturnedGatewayCheckout();
+  .catch(maybeOpenCheckoutFromHash)
+  .finally(finalizeReturnedGatewayCheckout);
 
 /* ─── Footer newsletter subscribe ─── */
 (function(){
