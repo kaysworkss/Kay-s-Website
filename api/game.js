@@ -1652,6 +1652,34 @@ function shopMoney(ngn, usd) {
   return `NGN ${n} / USD ${u}`;
 }
 
+// Shared Resend email sender used by all shop notification functions.
+// Returns { id } on success, throws on failure (callers wrap in try/catch).
+async function _sendEmail({ from, to, subject, html, text, reply_to }) {
+  const RESEND_KEY = process.env.RESEND_API_KEY;
+  if (!RESEND_KEY) {
+    throw new Error('Missing RESEND_API_KEY — cannot send email');
+  }
+  const body = {
+    from,
+    to: Array.isArray(to) ? to : [to],
+    subject,
+    html,
+  };
+  if (text) body.text = text;
+  if (reply_to) body.reply_to = reply_to;
+
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    throw new Error(data.message || data.error || `Resend error ${r.status}`);
+  }
+  return { id: data.id };
+}
+
 async function sendShopSellerNotification({ order, orderRef, checkout, paymentMethod, paymentRef, payerAddress, chainVerification, cardVerification }) {
   const to = process.env.SHOP_ORDER_EMAIL ||
     process.env.FORM_ALERT_TO_EMAIL ||
@@ -1916,6 +1944,53 @@ async function handleShopOrderCreate(req, res, supabase) {
   // Verify the signed quote so a pending order can't be created with tampered totals.
   if (quoteRequired && !verifyShopQuote(body.checkout_quote, checkout, { payment_method: paymentMethod })) {
     return json(400, { error: 'Invalid or expired server checkout quote' });
+  }
+
+  const reuseRef = String(body.reuse_order_ref || '').trim().slice(0, 80);
+  const cryptoLockReuse = reuseRef ? cryptoOrderLockFromQuote(reuseRef, paymentMethod, body.checkout_quote) : null;
+
+  // If the client passed an existing pending order to reuse (from a price-lock
+  // refresh), update it in place instead of inserting a duplicate. This keeps
+  // one pending row per checkout session rather than one per lock refresh.
+  if (reuseRef) {
+    const { data: existing } = await supabase
+      .from('shop_orders')
+      .select('id, status')
+      .eq('order_ref', reuseRef)
+      .maybeSingle();
+    if (existing && existing.status === 'pending') {
+      const { data: updated, error: updErr } = await supabase
+        .from('shop_orders')
+        .update({
+          customer_name:    String(body.name    || '').slice(0, 200),
+          email:            String(body.email   || '').slice(0, 320),
+          phone:            String(body.phone   || '').slice(0, 60),
+          address:          String(body.address || '').slice(0, 500),
+          items:            checkout.trustedItems,
+          total_ngn:        checkout.totalNgn,
+          total_usd:        checkout.totalUsd,
+          delivery_fee_ngn: checkout.deliveryNgn,
+          delivery_method:  checkout.method.slice(0, 40),
+          delivery_zone:    checkout.zone.slice(0, 40),
+          payment_method:   paymentMethod,
+          payment_metadata: shopOrderMetadata(body, checkout, cryptoLockReuse),
+          updated_at:       new Date().toISOString(),
+        })
+        .eq('order_ref', reuseRef)
+        .select('id, order_ref')
+        .single();
+      if (!updErr && updated) {
+        return json(200, {
+          ok: true,
+          order_ref: updated.order_ref,
+          order_id: updated.id,
+          total_ngn: checkout.totalNgn,
+          total_usd: checkout.totalUsd,
+          crypto_amount: cryptoLockReuse?.crypto_amount ?? null,
+          crypto_asset: cryptoLockReuse?.crypto_asset ?? null,
+        });
+      }
+    }
   }
 
   const orderRef = makeOrderRef();
@@ -2316,14 +2391,68 @@ async function handleShopOrder(req, res, supabase) {
     return json(500, { error: orderError.message });
   }
 
+  // Resolve the order reference for the emails (order_ref column, falling back
+  // to the payment ref or row id).
+  const { data: savedOrder } = await supabase
+    .from('shop_orders')
+    .select('*')
+    .eq('id', order.id)
+    .maybeSingle();
+  const emailOrder = savedOrder || {
+    id: order.id,
+    customer_name: String(body.name || ''),
+    email: String(body.email || ''),
+    phone: String(body.phone || ''),
+    address: String(body.address || ''),
+    items: checkout.trustedItems,
+    total_ngn: checkout.totalNgn,
+    total_usd: checkout.totalUsd,
+    delivery_fee_ngn: checkout.deliveryNgn,
+    delivery_method: checkout.method,
+    delivery_zone: checkout.zone,
+    payment_method: paymentMethod,
+    payment_ref: paymentRef,
+  };
+  const emailRef = emailOrder.order_ref || paymentRef || String(order.id);
+
+  // Fire seller + customer emails (only for confirmed payments).
+  let sellerNotification = { sent: false };
+  let customerNotification = { sent: false };
+  if (paymentConfirmed) {
+    try {
+      const r = await sendShopSellerNotification({
+        order: emailOrder, orderRef: emailRef, checkout,
+        paymentMethod, paymentRef, payerAddress,
+        chainVerification, cardVerification,
+      });
+      sellerNotification = { sent: true, id: r?.id || null };
+    } catch (e) {
+      sellerNotification = { sent: false, error: e.message || String(e) };
+      console.error('[shop-order] seller notification failed:', emailRef, sellerNotification.error);
+    }
+    try {
+      const r = await sendShopCustomerReceipt({
+        order: emailOrder, orderRef: emailRef, checkout,
+        paymentMethod, paymentRef,
+      });
+      customerNotification = { sent: true, id: r?.id || null };
+    } catch (e) {
+      customerNotification = { sent: false, error: e.message || String(e) };
+      console.error('[shop-order] customer receipt failed:', emailRef, customerNotification.error);
+    }
+  }
+
   return json(200, {
     ok: true,
     order_id: order.id,
+    order_ref: emailRef,
     total_ngn: checkout.totalNgn,
     total_usd: checkout.totalUsd,
     delivery_fee_ngn: checkout.deliveryNgn,
     chain_verification: chainVerification,
     card_verification: cardVerification,
+    seller_notification: sellerNotification,
+    customer_notification: customerNotification,
   });
 }
 
