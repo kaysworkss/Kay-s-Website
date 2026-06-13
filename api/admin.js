@@ -379,6 +379,21 @@ async function handleShopOrders(req, res, supabase) {
 // ── shop-order (PATCH / DELETE) ───────────────────────────────────────────────
 async function handleShopOrderUpdate(req, res, supabase) {
   const id = req.query.id;
+
+  // Bulk cleanup: DELETE /api/admin/shop-order/clear-pending?older_than_hours=24
+  // Removes abandoned 'pending' (unpaid) orders so they stop reappearing.
+  if (req.method === 'DELETE' && (id === 'clear-pending' || req.query.clear_pending === '1')) {
+    const hours = Math.max(0, Number(req.query.older_than_hours) || 0);
+    let q = supabase.from('shop_orders').delete().eq('status', 'pending');
+    if (hours > 0) {
+      const cutoff = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+      q = q.lt('created_at', cutoff);
+    }
+    const { data: cleared, error } = await q.select('id');
+    if (error) return json(500, { error: error.message });
+    return json(200, { ok: true, cleared: cleared ? cleared.length : 0 });
+  }
+
   if (!id) return json(400, { error: 'id required' });
 
   if (req.method === 'DELETE') {
@@ -401,9 +416,16 @@ async function handleShopOrderUpdate(req, res, supabase) {
         if (stockErr) return json(500, { error: `Could not restock ${item.name || item.id}: ${stockErr.message}` });
       }
     }
-    const { error } = await supabase.from('shop_orders').delete().eq('id', id);
+    const { data: deleted, error } = await supabase
+      .from('shop_orders')
+      .delete()
+      .eq('id', id)
+      .select('id');
     if (error) return json(500, { error: error.message });
-    return json(200, { ok: true, restocked: shouldRestock });
+    if (!deleted || deleted.length === 0) {
+      return json(404, { error: 'Order not found (already deleted or id mismatch)', deleted: 0 });
+    }
+    return json(200, { ok: true, restocked: shouldRestock, deleted: deleted.length });
   }
 
   if (req.method !== 'PATCH') return json(405, { error: 'Method not allowed' });
