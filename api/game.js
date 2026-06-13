@@ -950,19 +950,27 @@ async function computeShopCheckout(body, supabase) {
   for (const item of items) {
     if (!item.id || !item.variant || !item.qty) continue;
     const vkey = item.variantKey || item.variant;
+    const sizeKey = String(vkey || '').split('|').pop();
     const product = productCache[item.id];
     if (!product) continue;
 
     const stockByVariant = product.stock_by_variant || {};
-    const sv = stockByVariant[vkey] !== undefined ? stockByVariant[vkey] : stockByVariant[item.variant];
-    if (sv !== undefined && sv < item.qty) {
+    // Resolve stock with the same fallback the client uses: full key → size → none
+    let sv;
+    if (stockByVariant[vkey] !== undefined)         sv = stockByVariant[vkey];
+    else if (stockByVariant[sizeKey] !== undefined) sv = stockByVariant[sizeKey];
+    else if (stockByVariant[item.variant] !== undefined) sv = stockByVariant[item.variant];
+
+    if (sv !== undefined && Number(sv) < item.qty) {
       const err = new Error(`Only ${sv} left in stock for ${product.name} · ${item.variant}`);
       err.statusCode = 409;
       err.product_id = item.id;
       err.variant = item.variant;
       throw err;
     }
-    if (sv === undefined && product.stock !== null && product.stock !== undefined && product.stock < item.qty) {
+    // Only apply product-level stock when there's NO per-variant tracking at all
+    if (sv === undefined && Object.keys(stockByVariant).length === 0 &&
+        product.stock !== null && product.stock !== undefined && Number(product.stock) < item.qty) {
       const err = new Error(`Only ${product.stock} left in stock for ${product.name}`);
       err.statusCode = 409;
       err.product_id = item.id;
@@ -1252,13 +1260,24 @@ async function ethRpc(method, params = []) {
     err.statusCode = 503;
     throw err;
   }
-  const r = await fetch(rpcUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
-  });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok || data.error) throw new Error(data.error?.message || `Ethereum RPC ${method} failed`);
+  let r, data;
+  try {
+    r = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
+    });
+    data = await r.json().catch(() => ({}));
+  } catch (networkErr) {
+    const e = new Error('Transaction is not confirmed yet — RPC temporarily unreachable');
+    e.statusCode = 409;
+    throw e;
+  }
+  if (!r.ok || data.error) {
+    const e = new Error('Transaction is not confirmed yet — RPC error: ' + (data.error?.message || r.status));
+    e.statusCode = 409;
+    throw e;
+  }
   return data.result;
 }
 
@@ -1348,7 +1367,7 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
   );
   let list = [];
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4500);
+  const timer = setTimeout(() => controller.abort(), 12000);
   try {
     const r = await fetch(`${api}/v1/operations/${encodeURIComponent(opHash)}`, {
       headers: { Accept: 'application/json' },
@@ -1361,15 +1380,17 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
     }
     const data = await r.json().catch(() => null);
     if (!r.ok) {
-      const e = new Error(`Could not reach TzKT operation lookup: HTTP ${r.status}`);
-      e.statusCode = 502;
+      // Indexer error — treat as "not yet confirmed" so the browser keeps retrying
+      const e = new Error('Transaction is not confirmed yet — indexer temporarily unavailable');
+      e.statusCode = 409;
       throw e;
     }
     list = operationRows(data);
   } catch (err) {
     if (err.statusCode) throw err;
-    const e = new Error(`Could not reach TzKT operation lookup: ${err.message || err}`);
-    e.statusCode = 502;
+    // Network error or abort (timeout) — the op may simply not be indexed yet
+    const e = new Error('Transaction is not confirmed yet — waiting for indexer');
+    e.statusCode = 409;
     throw e;
   } finally {
     clearTimeout(timer);
@@ -1537,6 +1558,7 @@ function isUuidTextOperatorError(error) {
 
 async function adjustVariantStockDirect(supabase, item, qtyDelta) {
   const vkey = item.variantKey || item.variant;
+  const sizeKey = String(vkey || '').split('|').pop(); // "mini|4×4" → "4×4"
   const { data: product, error: loadErr } = await supabase
     .from('shop_products')
     .select('id, name, stock, stock_by_variant')
@@ -1557,20 +1579,32 @@ async function adjustVariantStockDirect(supabase, item, qtyDelta) {
   const stockByVariant = product.stock_by_variant && typeof product.stock_by_variant === 'object'
     ? { ...product.stock_by_variant }
     : null;
-  if (stockByVariant && stockByVariant[vkey] !== undefined) {
-    const current = Number(stockByVariant[vkey]);
-    const next = current + qtyDelta;
-    if (qtyDelta < 0 && next < 0) return { ok: false };
-    stockByVariant[vkey] = next;
-    patch.stock_by_variant = stockByVariant;
+
+  // Resolve the variant's stock entry using the same key fallback as the
+  // client: try the full variant key first ("mini|4×4"), then the size-only
+  // key ("4×4"). This is the fix for false "sold out" errors caused by the
+  // admin storing stock under the size while the cart sends the full key.
+  let trackedKey = null;
+  if (stockByVariant) {
+    if (stockByVariant[vkey] !== undefined)         trackedKey = vkey;
+    else if (stockByVariant[sizeKey] !== undefined) trackedKey = sizeKey;
   }
 
-  if (product.stock !== null && product.stock !== undefined) {
+  if (trackedKey !== null) {
+    // This variant has an explicit per-variant stock count — it governs.
+    const current = Number(stockByVariant[trackedKey]);
+    const next = current + qtyDelta;
+    if (qtyDelta < 0 && next < 0) return { ok: false };
+    stockByVariant[trackedKey] = next;
+    patch.stock_by_variant = stockByVariant;
+  } else if (product.stock !== null && product.stock !== undefined) {
+    // No per-variant tracking — fall back to the product-level stock counter.
     const current = Number(product.stock);
     const next = current + qtyDelta;
     if (qtyDelta < 0 && next < 0) return { ok: false };
     patch.stock = next;
   }
+  // If neither is tracked, the product is unlimited (open edition) → ok.
 
   if (!Object.keys(patch).length) return { ok: true };
   const { error: updErr } = await supabase
@@ -1586,46 +1620,17 @@ async function adjustVariantStockDirect(supabase, item, qtyDelta) {
 }
 
 async function claimVariantStock(supabase, item) {
-  const vkey = item.variantKey || item.variant;
-  const { data, error } = await supabase.rpc('decrement_variant_stock', {
-    p_id: item.id,
-    p_variant_key: vkey,
-    p_qty: item.qty,
-  });
-  if (error) {
-    if (isUuidTextOperatorError(error)) {
-      return adjustVariantStockDirect(supabase, item, -Math.abs(Number(item.qty) || 1));
-    }
-    const e = new Error(`Stock claim failed for ${item.name || item.id}: ${error.message}`);
-    e.statusCode = 500;
-    throw e;
-  }
-  // RPC returns true  → stock decremented successfully.
-  // RPC returns false → no stock_by_variant row exists for this variant key,
-  //                     meaning the product has no per-variant stock limit
-  //                     (open edition). Use adjustVariantStockDirect which
-  //                     returns { ok: true } when stock fields are null/absent.
-  if (data === false) {
-    return adjustVariantStockDirect(supabase, item, -Math.abs(Number(item.qty) || 1));
-  }
-  return { ok: true };
+  // Use the direct method exclusively — it resolves the variant key the same
+  // way the client does (full key → size-only → unlimited), avoiding the
+  // RPC's inconsistent keying that caused false "sold out" errors.
+  return adjustVariantStockDirect(supabase, item, -Math.abs(Number(item.qty) || 1));
 }
 
 async function releaseVariantStock(supabase, item) {
   const vkey = item.variantKey || item.variant;
   try {
-    const { error } = await supabase.rpc('decrement_variant_stock', {
-      p_id: item.id,
-      p_variant_key: vkey,
-      p_qty: -item.qty,
-    });
-    if (error) {
-      if (isUuidTextOperatorError(error)) {
-        await adjustVariantStockDirect(supabase, item, Math.abs(Number(item.qty) || 1));
-        return;
-      }
-      console.error('[shop-order] stock release failed:', item.id, vkey, error.message);
-    }
+    // Mirror claimVariantStock — use the direct method so release keys match.
+    await adjustVariantStockDirect(supabase, item, Math.abs(Number(item.qty) || 1));
   } catch (e) {
     console.error('[shop-order] stock release threw:', item.id, vkey, e.message);
   }
