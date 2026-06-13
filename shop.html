@@ -4415,6 +4415,9 @@ const SHIPPING_BUFFER = 1.2;
 const LARGE_PRINT_VARIANTS = ['12x16"','12x18"','18x24"','24x36"'];
 let _deliveryMethod = 'ship';
 let _deliveryZone = '';
+// Applied discount (validated server-side). null = none.
+// { code, percent, scope, ngn, usd, isFree }
+let _appliedDiscount = null;
 let _deliveryCarrier = '';
 
 function isInternationalZone(zone) {
@@ -4701,10 +4704,6 @@ setDeliveryMethod('ship');
 /* ─── Updated total helpers (include delivery) ─── */
 function cartNgnTotal() { return cart.reduce((a,c)=>a+c.priceNgn*c.qty, 0); }
 function cartUsdTotal() { return cart.reduce((a,c)=>a+c.priceUsd*c.qty, 0); }
-
-// Applied discount (validated server-side). null = none.
-// { code, percent, scope, ngn, usd, isFree }
-let _appliedDiscount = null;
 
 function discountNgn() {
   if (!_appliedDiscount) return 0;
