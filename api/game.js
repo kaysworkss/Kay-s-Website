@@ -353,7 +353,7 @@ async function handleNotifyOutbid(req, res) {
   );
 
   try {
-    const data = await _sendEmail({ from: '\u00c0p\u00f3t\u00ed \u1ecdl\u1d52w\u1eb9\u0300 Auction <auction@mail.kaysworks.com>', to: [email], subject, html });
+    const data = await _sendEmail({ from: '\u00c0p\u00f3t\u00ed \u1ecdl\u1d52w\u1eb9\u0300 Auction <auction@mail.kaysworks.com>', to: [email], reply_to: (process.env.AUCTION_REPLY_TO_EMAIL || process.env.CONTACT_EMAIL || 'oyeniyikayode4@gmail.com'), subject, html });
     return res.status(200).json({ sent: true, id: data.id });
   } catch (e) { return res.status(500).json({ error: 'Email send failed: ' + e.message }); }
 }
@@ -400,7 +400,7 @@ async function handleNotifyBidConfirm(req, res) {
   );
 
   try {
-    const data = await _sendEmail({ from: '\u00c0p\u00f3t\u00ed \u1ecdl\u1d52w\u1eb9\u0300 Auction <auction@mail.kaysworks.com>', to: [email], subject, html });
+    const data = await _sendEmail({ from: '\u00c0p\u00f3t\u00ed \u1ecdl\u1d52w\u1eb9\u0300 Auction <auction@mail.kaysworks.com>', to: [email], reply_to: (process.env.AUCTION_REPLY_TO_EMAIL || process.env.CONTACT_EMAIL || 'oyeniyikayode4@gmail.com'), subject, html });
     return res.status(200).json({ sent: true, id: data.id });
   } catch (e) { return res.status(500).json({ error: 'Email send failed: ' + e.message }); }
 }
@@ -440,7 +440,7 @@ async function handleNotifyWinner(req, res) {
   );
 
   try {
-    const data = await _sendEmail({ from: '\u00c0p\u00f3t\u00ed \u1ecdl\u1d52w\u1eb9\u0300 Auction <auction@mail.kaysworks.com>', to: [email], subject, html });
+    const data = await _sendEmail({ from: '\u00c0p\u00f3t\u00ed \u1ecdl\u1d52w\u1eb9\u0300 Auction <auction@mail.kaysworks.com>', to: [email], reply_to: (process.env.AUCTION_REPLY_TO_EMAIL || process.env.CONTACT_EMAIL || 'oyeniyikayode4@gmail.com'), subject, html });
     return res.status(200).json({ sent: true, id: data.id });
   } catch (e) { return res.status(500).json({ error: 'Email send failed: ' + e.message }); }
 }
@@ -469,7 +469,7 @@ async function handleNotifyBid(req, res) {
 
   const emailBody = {
     from:    'Àpótí Ọlọ́wọ̀ Auction <auction@mail.kaysworks.com>',
-    to:      ['oyeniyikayode4@gmail.com'],
+    to:      [process.env.AUCTION_ALERT_EMAIL || process.env.CONTACT_EMAIL || 'oyeniyikayode4@gmail.com'],
     subject: `New bid — ${amount} on ${title}`,
     html: `<!DOCTYPE html>
 <html lang="en">
@@ -1812,7 +1812,12 @@ async function sendShopSellerNotification({ order, orderRef, checkout, paymentMe
     'oyeniyikayode4@gmail.com';
   const from = process.env.SHOP_ORDER_FROM_EMAIL ||
     process.env.FORM_ALERT_FROM_EMAIL ||
-    "Kay's Works Queue <auction@mail.kaysworks.com>";
+    "Kay's Works Orders <orders@mail.kaysworks.com>";
+  // Reply-to is the CUSTOMER's email, so replying to the order alert reaches
+  // the buyer directly. Falls back to the monitored inbox if no customer email.
+  const sellerReplyTo = (order.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(order.email))
+    ? order.email
+    : to;
   const customerName = order.customer_name || 'Shop customer';
   const delivery = checkout.method === 'pickup'
     ? 'Kaduna pickup (free)'
@@ -1871,6 +1876,7 @@ async function sendShopSellerNotification({ order, orderRef, checkout, paymentMe
   return _sendEmail({
     from,
     to: [to],
+    reply_to: sellerReplyTo,
     subject: `Paid shop order ${orderRef} - ${customerName}`,
     html,
     text,
@@ -1887,7 +1893,14 @@ async function sendShopCustomerReceipt({ order, orderRef, checkout, paymentMetho
   }
   const from = process.env.SHOP_ORDER_FROM_EMAIL ||
     process.env.FORM_ALERT_FROM_EMAIL ||
-    "Kay's Works Queue <auction@mail.kaysworks.com>";
+    "Kay's Works Orders <orders@mail.kaysworks.com>";
+  // Reply-to is Kay's monitored inbox, so a customer who replies reaches a
+  // real person (Resend can't receive mail, so this routes replies away from it).
+  const customerReplyTo = process.env.SHOP_REPLY_TO_EMAIL ||
+    process.env.SHOP_ORDER_EMAIL ||
+    process.env.FORM_ALERT_TO_EMAIL ||
+    process.env.CONTACT_EMAIL ||
+    'oyeniyikayode4@gmail.com';
   const customerName = order.customer_name || 'there';
   const shopUrl = process.env.SHOP_URL || 'https://www.kaysworks.com/shop';
   const logoUrl = process.env.SHOP_LOGO_URL || 'https://www.kaysworks.com/images/kaysworkslogo.svg';
@@ -1994,6 +2007,7 @@ async function sendShopCustomerReceipt({ order, orderRef, checkout, paymentMetho
   return _sendEmail({
     from,
     to: [to],
+    reply_to: customerReplyTo,
     subject: `Your Kay's Works order ${orderRef}`,
     html,
     text,
