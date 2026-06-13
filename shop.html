@@ -2734,6 +2734,34 @@ footer {
           </div>
           <div id="discountMsg" style="font-size:0.72rem;margin-top:0.4rem;display:none"></div>
         </div>
+        <!-- Tip -->
+        <div id="tipBlock" style="margin:0.9rem 0;padding-top:0.8rem;border-top:1px solid var(--border)">
+          <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.7rem;cursor:pointer">
+            <input type="checkbox" id="tipToggle" style="accent-color:var(--rust);width:16px;height:16px"/>
+            <span class="form-label" style="margin:0">Add a tip to support Kay</span>
+          </label>
+          <div id="tipOptions" style="display:none">
+            <div style="display:flex;gap:0.4rem;margin-bottom:0.6rem" id="tipPresets">
+              <button type="button" class="tip-preset" data-pct="10" style="flex:1;padding:0.6rem 0.3rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);text-align:center;line-height:1.3">
+                <div style="font-family:'Cinzel',serif;font-size:0.8rem">10%</div>
+                <div class="tip-preset-amt" style="font-size:0.62rem;color:var(--text-muted)"></div>
+              </button>
+              <button type="button" class="tip-preset" data-pct="15" style="flex:1;padding:0.6rem 0.3rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);text-align:center;line-height:1.3">
+                <div style="font-family:'Cinzel',serif;font-size:0.8rem">15%</div>
+                <div class="tip-preset-amt" style="font-size:0.62rem;color:var(--text-muted)"></div>
+              </button>
+              <button type="button" class="tip-preset" data-pct="20" style="flex:1;padding:0.6rem 0.3rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);text-align:center;line-height:1.3">
+                <div style="font-family:'Cinzel',serif;font-size:0.8rem">20%</div>
+                <div class="tip-preset-amt" style="font-size:0.62rem;color:var(--text-muted)"></div>
+              </button>
+            </div>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+              <input class="form-input" id="tipCustomInput" type="number" min="0" step="100" placeholder="Custom tip (₦)" style="flex:1"/>
+              <button type="button" id="tipClearBtn" class="ck-delivery-btn" style="flex:0 0 auto;padding:0.6rem 0.9rem;border-color:var(--border);color:var(--text-muted)">Clear</button>
+            </div>
+            <p style="font-size:0.72rem;color:var(--text-muted);margin-top:0.5rem">Thank you, we appreciate it.</p>
+          </div>
+        </div>
         <div id="orderSummaryTotals" style="padding-top:0.8rem;margin-top:0.4rem"></div>
         <!-- Mobile inline summary (hidden on desktop) -->
         <div class="order-summary" id="orderSummary" style="display:none"></div>
@@ -4418,6 +4446,8 @@ let _deliveryZone = '';
 // Applied discount (validated server-side). null = none.
 // { code, percent, scope, ngn, usd, isFree }
 let _appliedDiscount = null;
+// Optional tip: { percent: 10|15|20|null, customNgn: number|null }
+let _tip = { percent: null, customNgn: null };
 let _deliveryCarrier = '';
 
 function isInternationalZone(zone) {
@@ -4701,6 +4731,57 @@ setDeliveryMethod('ship');
   });
 })();
 
+// Tip wiring
+function refreshTipUI() {
+  const presetAmts = document.querySelectorAll('#tipPresets .tip-preset');
+  presetAmts.forEach(b => {
+    const pct = Number(b.dataset.pct);
+    const amtEl = b.querySelector('.tip-preset-amt');
+    const base = Math.max(0, cartNgnTotal() - (_appliedDiscount && (_appliedDiscount.scope === 'products' || _appliedDiscount.scope === 'all') ? cartNgnTotal() * (_appliedDiscount.percent / 100) : 0));
+    if (amtEl) amtEl.textContent = fmt(+(base * pct / 100).toFixed(2));
+    // Highlight active preset
+    const active = _tip.percent === pct && _tip.customNgn == null;
+    b.style.borderColor = active ? 'var(--rust)' : 'var(--border)';
+    b.style.background = active ? 'rgba(158,79,46,0.07)' : 'transparent';
+    b.style.color = active ? 'var(--rust)' : 'var(--text)';
+  });
+}
+(function() {
+  const toggle = document.getElementById('tipToggle');
+  const options = document.getElementById('tipOptions');
+  const custom = document.getElementById('tipCustomInput');
+  const clearBtn = document.getElementById('tipClearBtn');
+  if (toggle) toggle.addEventListener('change', () => {
+    if (options) options.style.display = toggle.checked ? '' : 'none';
+    if (!toggle.checked) { _tip = { percent: null, customNgn: null }; }
+    else if (_tip.percent == null && _tip.customNgn == null) { _tip.percent = 10; }
+    buildOrderSummary();
+    refreshTipUI();
+  });
+  document.querySelectorAll('#tipPresets .tip-preset').forEach(b => {
+    b.addEventListener('click', () => {
+      _tip = { percent: Number(b.dataset.pct), customNgn: null };
+      if (custom) custom.value = '';
+      buildOrderSummary();
+      refreshTipUI();
+    });
+  });
+  if (custom) custom.addEventListener('input', () => {
+    const v = parseFloat(custom.value);
+    _tip = { percent: null, customNgn: (v > 0 ? v : null) };
+    buildOrderSummary();
+    refreshTipUI();
+  });
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    _tip = { percent: null, customNgn: null };
+    if (custom) custom.value = '';
+    if (toggle) toggle.checked = false;
+    if (options) options.style.display = 'none';
+    buildOrderSummary();
+    refreshTipUI();
+  });
+})();
+
 /* ─── Updated total helpers (include delivery) ─── */
 function cartNgnTotal() { return cart.reduce((a,c)=>a+c.priceNgn*c.qty, 0); }
 function cartUsdTotal() { return cart.reduce((a,c)=>a+c.priceUsd*c.qty, 0); }
@@ -4721,8 +4802,34 @@ function discountUsd() {
   if (_appliedDiscount.scope === 'shipping' || _appliedDiscount.scope === 'all') amt += deliveryFeeUsd() * f;
   return +amt.toFixed(2);
 }
-function grandTotalNgn() { return Math.max(0, +(cartNgnTotal() + deliveryFeeNgn() - discountNgn()).toFixed(2)); }
-function grandTotalUsd() { return Math.max(0, +(cartUsdTotal() + deliveryFeeUsd() - discountUsd()).toFixed(2)); }
+// Tip is calculated on the post-discount product subtotal (matches the
+// reference UI). A custom tip overrides the percentage.
+function tipNgn() {
+  if (_tip.customNgn != null && _tip.customNgn > 0) return +(_tip.customNgn).toFixed(2);
+  if (_tip.percent) {
+    const base = Math.max(0, cartNgnTotal() - (_appliedDiscount && (_appliedDiscount.scope === 'products' || _appliedDiscount.scope === 'all')
+      ? cartNgnTotal() * (_appliedDiscount.percent / 100) : 0));
+    return +(base * _tip.percent / 100).toFixed(2);
+  }
+  return 0;
+}
+function tipUsd() {
+  // Convert the NGN tip using the cart's implied rate, or compute on USD subtotal.
+  if (_tip.customNgn != null && _tip.customNgn > 0) {
+    const ngnTotal = cartNgnTotal() || 1;
+    const usdTotal = cartUsdTotal() || 0;
+    return +((_tip.customNgn) * (usdTotal / ngnTotal)).toFixed(2);
+  }
+  if (_tip.percent) {
+    const base = Math.max(0, cartUsdTotal() - (_appliedDiscount && (_appliedDiscount.scope === 'products' || _appliedDiscount.scope === 'all')
+      ? cartUsdTotal() * (_appliedDiscount.percent / 100) : 0));
+    return +(base * _tip.percent / 100).toFixed(2);
+  }
+  return 0;
+}
+function grandTotalNgn() { return Math.max(0, +(cartNgnTotal() + deliveryFeeNgn() - discountNgn() + tipNgn()).toFixed(2)); }
+function grandTotalUsd() { return Math.max(0, +(cartUsdTotal() + deliveryFeeUsd() - discountUsd() + tipUsd()).toFixed(2)); }
+// An order is only "free" when there's nothing to pay AND no tip was added.
 function orderIsFree() { return grandTotalNgn() <= 0 && grandTotalUsd() <= 0; }
 
 
@@ -4899,10 +5006,18 @@ function buildOrderSummary() {
     ? `<div class="order-line" style="color:var(--rust);font-style:italic"><span>This order is fully covered</span><span>FREE</span></div>`
     : '';
 
+  const tipLine = (tipNgn() > 0)
+    ? `<div class="order-line" style="color:var(--clay)">
+        <span>Tip${_tip.percent ? ' (' + _tip.percent + '%)' : ''}</span>
+        <span>+ ${fmt(tipNgn())}</span>
+       </div>`
+    : '';
+
   const totalsHtml = `
     ${subtotalLine}
     ${deliveryLine}
     ${discountLine}
+    ${tipLine}
     ${freeBadge}
     <div class="order-total">
       <span class="order-total-label">Total</span>
@@ -4927,6 +5042,7 @@ function buildOrderSummary() {
     });
   });
   if (typeof updateFreeOrderUI === 'function') updateFreeOrderUI();
+  if (typeof refreshTipUI === 'function') refreshTipUI();
 }
 
 /* renderEthPanel is defined below in the ETH wallet section */
@@ -5040,6 +5156,8 @@ function checkoutPayload(customer, method, extra = {}) {
     order_note:       customer.orderNote || '',
     payment_method:   method,
     discount_code:    _appliedDiscount?.code || '',
+    tip_ngn:          tipNgn(),
+    tip_usd:          tipUsd(),
     ...extra,
   };
 }
@@ -5083,6 +5201,9 @@ async function initServerPayment(customer, provider) {
 }
 
 function showConfirmation(method, ref) {
+  // Ensure the checkout overlay is open — after a gateway redirect it's closed,
+  // so the confirmation screen would otherwise be invisible.
+  document.getElementById('checkoutOverlay').classList.add('open');
   document.getElementById('formScreen').style.display='none';
   const screen = document.getElementById('confirmScreen');
   screen.classList.add('active');
@@ -5440,6 +5561,7 @@ async function notifyOrder(customer, ref, method, checkoutQuote = null) {
   const isCrypto = ['tezos', 'eth', 'usdc', 'usdt'].includes(method);
   const maxAttempts = isCrypto ? 6 : 1;
   let lastErr = null;
+  let serverOrderRef = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const orderRes = await fetch('/api/shop/order', {
@@ -5451,7 +5573,12 @@ async function notifyOrder(customer, ref, method, checkoutQuote = null) {
           checkout_quote: checkoutQuote,
         })),
       });
-      if (orderRes.ok) { lastErr = null; break; }
+      if (orderRes.ok) {
+        const okData = await orderRes.json().catch(() => ({}));
+        serverOrderRef = okData.order_ref || null;
+        lastErr = null;
+        break;
+      }
       const ed = await orderRes.json().catch(() => ({}));
       // 409 = payment not yet confirmed on-chain → wait and retry.
       if (orderRes.status === 409 && /confirm|not confirmed|waiting|found/i.test(ed.error || '') && attempt < maxAttempts) {
@@ -5475,6 +5602,7 @@ async function notifyOrder(customer, ref, method, checkoutQuote = null) {
   // The /api/shop/order endpoint now sends proper "Paid shop order" emails to
   // both Kay and the customer (sendShopSellerNotification + sendShopCustomerReceipt),
   // so no separate commission-form alert is needed here.
+  return { order_ref: serverOrderRef };
 }
 
 document.getElementById('continueShopping').addEventListener('click', ()=>{
@@ -5496,12 +5624,13 @@ async function finalizeReturnedGatewayCheckout() {
   }
   const ref = pending.ref || gatewayRef;
   try {
-    await notifyOrder(pending.customer, ref, pending.method, pending.quote);
+    const result = await notifyOrder(pending.customer, ref, pending.method, pending.quote);
     sessionStorage.removeItem('kwPendingCheckout');
     cart = [];
     saveCart();
     if (typeof updateCartUI === 'function') updateCartUI();
-    showConfirmation(pending.method, ref);
+    // Show the human-friendly ORD-… order number, not the Paystack ref.
+    showConfirmation(pending.method, result?.order_ref || ref);
     history.replaceState(null, '', location.pathname + location.hash);
   } catch (e) {
     const msg = (e.message || '').toLowerCase();
