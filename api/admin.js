@@ -411,7 +411,8 @@ async function handleShopOrderUpdate(req, res, supabase) {
   const patch = { updated_at: new Date().toISOString() };
 
   if (body.status !== undefined) {
-    if (!['pending', 'paid', 'processing', 'shipped', 'fulfilled', 'cancelled'].includes(body.status))
+    const ALLOWED = ['pending', 'pending_payment', 'confirming', 'paid', 'paid_unshipped', 'processing', 'shipped', 'fulfilled', 'cancelled', 'refunded'];
+    if (!ALLOWED.includes(body.status))
       return json(422, { error: 'Invalid status' });
     patch.status = body.status;
     if (body.status === 'fulfilled') patch.fulfilled_at = new Date().toISOString();
