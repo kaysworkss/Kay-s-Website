@@ -4752,6 +4752,7 @@ function updateFreeOrderUI() {
   let freeBtn = document.getElementById('freeOrderBtn');
   if (free) {
     if (payMethods) payMethods.style.display = 'none';
+    // Hide all payment panels via inline style while free
     panels.forEach(p => p.style.display = 'none');
     if (!freeBtn) {
       freeBtn = document.createElement('button');
@@ -4767,9 +4768,10 @@ function updateFreeOrderUI() {
   } else {
     if (payMethods) payMethods.style.display = '';
     if (freeBtn) freeBtn.style.display = 'none';
-    // Re-show the active panel
-    const active = document.querySelector('.ck-pay-method.active')?.dataset.pay || 'paystack';
-    panels.forEach(p => p.style.display = (p.id === 'panel-' + active) ? 'block' : 'none');
+    // Clear the inline display overrides so the CSS .active class controls
+    // visibility again (switchPayTab toggles .active; inline styles would win
+    // over the stylesheet and freeze the panel, so we must remove them).
+    panels.forEach(p => { p.style.removeProperty('display'); });
   }
 }
 
