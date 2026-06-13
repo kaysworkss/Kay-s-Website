@@ -1029,8 +1029,12 @@ async function computeShopCheckout(body, supabase) {
   const discountedDeliveryNgn = +(deliveryNgn - discount.amountNgn.shipping).toFixed(2);
   const discountedDeliveryUsd = +(deliveryUsd - discount.amountUsd.shipping).toFixed(2);
 
-  const totalNgn = Math.max(0, +(discountedSubtotalNgn + discountedDeliveryNgn).toFixed(2));
-  const totalUsd = Math.max(0, +(discountedSubtotalUsd + discountedDeliveryUsd).toFixed(2));
+  // Optional tip (client-supplied, clamped to >= 0). Added on top of the total.
+  const tipNgn = Math.max(0, +(Number(body.tip_ngn) || 0).toFixed(2));
+  const tipUsd = Math.max(0, +(Number(body.tip_usd) || 0).toFixed(2));
+
+  const totalNgn = Math.max(0, +(discountedSubtotalNgn + discountedDeliveryNgn + tipNgn).toFixed(2));
+  const totalUsd = Math.max(0, +(discountedSubtotalUsd + discountedDeliveryUsd + tipUsd).toFixed(2));
 
   return {
     productCache,
@@ -1049,8 +1053,11 @@ async function computeShopCheckout(body, supabase) {
     discountScope: discount.scope,
     discountNgn: +(discount.amountNgn.products + discount.amountNgn.shipping).toFixed(2),
     discountUsd: +(discount.amountUsd.products + discount.amountUsd.shipping).toFixed(2),
+    tipNgn,
+    tipUsd,
     totalNgn,
     totalUsd,
+    // An order is only free when there's truly nothing to pay (incl. no tip).
     isFree: totalNgn <= 0 && totalUsd <= 0,
   };
 }
@@ -1145,6 +1152,8 @@ function makeShopQuote(checkout, extra = {}) {
     discount_scope: checkout.discountScope || '',
     discount_ngn: checkout.discountNgn || 0,
     discount_usd: checkout.discountUsd || 0,
+    tip_ngn: checkout.tipNgn || 0,
+    tip_usd: checkout.tipUsd || 0,
     total_ngn: checkout.totalNgn,
     total_usd: checkout.totalUsd,
     ...extra,
@@ -1164,6 +1173,7 @@ function verifyShopQuote(quote, checkout, expected = {}) {
   if (Number(payload.total_usd) !== checkout.totalUsd) return false;
   if (String(payload.discount_code || '') !== String(checkout.discountCode || '')) return false;
   if (Number(payload.discount_percent || 0) !== Number(checkout.discountPercent || 0)) return false;
+  if (Number(payload.tip_ngn || 0) !== Number(checkout.tipNgn || 0)) return false;
   if (String(payload.delivery_method) !== checkout.method) return false;
   if (String(payload.delivery_zone) !== checkout.zone) return false;
   if (String(payload.delivery_carrier || '') !== String(checkout.deliveryCarrier || '')) return false;
@@ -2588,9 +2598,11 @@ async function handleShopOrder(req, res, supabase) {
     claimed.push(item);
   }
 
+  const newOrderRef = makeOrderRef();
   const { data: order, error: orderError } = await supabase
     .from('shop_orders')
     .insert({
+      order_ref:       newOrderRef,
       customer_name:   String(body.name    || '').slice(0, 200),
       email:           String(body.email   || '').slice(0, 320),
       phone:           String(body.phone   || '').slice(0, 60),
@@ -2606,7 +2618,7 @@ async function handleShopOrder(req, res, supabase) {
       payment_metadata: shopOrderMetadata(body, checkout),
       status: paymentConfirmed ? 'paid' : 'pending',
     })
-    .select('id')
+    .select('id, order_ref')
     .single();
   if (orderError) {
     for (const c of claimed) await releaseVariantStock(supabase, c);
