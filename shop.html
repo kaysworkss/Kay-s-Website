@@ -5100,7 +5100,10 @@ function renderLockUI(method) {
   box.style.display = 'block';
   const amtEl = document.getElementById(ids.amt);
   const refEl = document.getElementById(ids.ref);
-  if (amtEl) amtEl.textContent = (lock.quote?.crypto_amount - '—') + ' ' + lockMethodToAsset(method);
+  if (amtEl) {
+    const amt = lock.quote?.crypto_amount;
+    amtEl.textContent = (amt !== undefined && amt !== null && !isNaN(amt) ? amt : '—') + ' ' + lockMethodToAsset(method);
+  }
   if (refEl) refEl.textContent = lock.order_ref || '—';
 }
 
@@ -5153,6 +5156,12 @@ async function refreshLock(method, silent) {
 // Start the lock lifecycle for a panel (called when the crypto tab opens).
 function startLock(method) {
   stopLockTimer();
+  // Clear any lock from a different method so we never confirm an ETH payment
+  // against a Tezos pending order (or vice-versa).
+  if (window.__activeLock && window.__activeLock.method !== method) {
+    window.__activeLock = null;
+    renderLockUI(window.__activeLock?.method);
+  }
   refreshLock(method, false);
   _lockTimer = setInterval(updateLockCountdown, 1000);
 }
@@ -5171,12 +5180,12 @@ function relockOnCartChange() {
 
 // Notify via site-form API (reuse existing backend)
 async function notifyOrder(customer, ref, method, checkoutQuote = null) {
-  const quotedSubtotalNgn = checkoutQuote?.subtotal_ngn - cartNgnTotal();
-  const quotedSubtotalUsd = checkoutQuote?.subtotal_usd - cartUsdTotal();
-  const quotedDeliveryNgn = checkoutQuote?.delivery_fee_ngn - customer.deliveryFeeNgn;
-  const quotedDeliveryUsd = checkoutQuote?.delivery_fee_usd - customer.deliveryFeeUsd;
-  const quotedTotalNgn = checkoutQuote?.total_ngn - grandTotalNgn();
-  const quotedTotalUsd = checkoutQuote?.total_usd - grandTotalUsd();
+  const quotedSubtotalNgn = checkoutQuote?.subtotal_ngn ?? cartNgnTotal();
+  const quotedSubtotalUsd = checkoutQuote?.subtotal_usd ?? cartUsdTotal();
+  const quotedDeliveryNgn = checkoutQuote?.delivery_fee_ngn ?? customer.deliveryFeeNgn;
+  const quotedDeliveryUsd = checkoutQuote?.delivery_fee_usd ?? customer.deliveryFeeUsd;
+  const quotedTotalNgn = checkoutQuote?.total_ngn ?? grandTotalNgn();
+  const quotedTotalUsd = checkoutQuote?.total_usd ?? grandTotalUsd();
   const carrierInfo = customer.deliveryCarrier ? `${carrierLabel(customer.deliveryCarrier)}; ` : '';
   const deliveryInfo = `${carrierInfo}Ship to: ${customer.address}, ${customer.country}, Fee: ${fmt(quotedDeliveryNgn)} / $${quotedDeliveryUsd}${cartHasLargePrint() ? ' (tube)' : ''}`;
 
@@ -5572,7 +5581,7 @@ function renderAdminProducts() {
               <input class="form-input ap-size-ngn" data-idx="${realIdx}" data-v="${escapeAttr(key)}" value="${productPrice(p, key, 'ngn')||''}" placeholder="NGN" style="padding:0.35rem 0.5rem;font-size:0.78rem;margin:0 0.4rem 0 0"/>
               <input class="form-input ap-size-usd" data-idx="${realIdx}" data-v="${escapeAttr(key)}" value="${productPrice(p, key, 'usd')||''}" placeholder="$" style="padding:0.35rem 0.5rem"/>
               <div style="padding:0 0.4rem">
-                <input class="form-input ap-size-edition" data-idx="${realIdx}" data-v="${escapeAttr(key)}" type="number" min="0" value="${total - ''}" placeholder="-" ${opt.limited ? '' : 'disabled'} title="${opt.limited ? 'Total editions in this run' : 'Mark the option as limited edition to set a run size'}" style="padding:0.35rem 0.5rem;font-size:0.78rem;${opt.limited ? '' : 'opacity:0.4'}"/>
+                <input class="form-input ap-size-edition" data-idx="${realIdx}" data-v="${escapeAttr(key)}" type="number" min="0" value="${total ?? ''}" placeholder="-" ${opt.limited ? '' : 'disabled'} title="${opt.limited ? 'Total editions in this run' : 'Mark the option as limited edition to set a run size'}" style="padding:0.35rem 0.5rem;font-size:0.78rem;${opt.limited ? '' : 'opacity:0.4'}"/>
                 ${remainingHint}
               </div>
               <input class="form-input ap-size-weight" data-idx="${realIdx}" data-v="${escapeAttr(key)}" value="${ship.weight_kg || ''}" placeholder="auto" type="number" step="0.01" min="0" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
@@ -5644,7 +5653,7 @@ function renderAdminProducts() {
           <input class="form-input ap-v-label" value="${escapeAttr(v)}" placeholder="Variant" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <input class="form-input ap-v-ngn" value="${productPrice(p, v, 'ngn') || ''}" placeholder="NGN" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <input class="form-input ap-v-usd" value="${productPrice(p, v, 'usd') || ''}" placeholder="USD" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
-          <input class="form-input ap-v-stock" value="${p.stock_by_variant?.[v] - ''}" placeholder="Stock" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+          <input class="form-input ap-v-stock" value="${p.stock_by_variant?.[v] ?? ''}" placeholder="Stock" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <button class="ap-remove-variant" type="button" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem" title="Remove">x</button>
         </div>`).join('');
       html += `<div class="admin-product-row" data-idx="${realIdx}" style="grid-template-columns:1fr;gap:0.7rem">
@@ -5677,7 +5686,7 @@ function renderAdminProducts() {
           </div>
           <div class="form-row" style="margin:0">
             <label class="form-label">Overall stock</label>
-            <input class="form-input ap-stock" data-idx="${realIdx}" value="${p.stock - ''}" type="number" placeholder="Optional"/>
+            <input class="form-input ap-stock" data-idx="${realIdx}" value="${p.stock ?? ''}" type="number" placeholder="Optional"/>
           </div>
         </div>
         <div class="form-row" style="margin:0">
@@ -5988,8 +5997,8 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         });
         p.variants = getPrintOptions(p).map(o => ({
           type: o.type,
-          desc: descByType[o.type] - o.desc - '',
-          limited: limitedByType[o.type] - o.limited - false,
+          desc: descByType[o.type] || o.desc || '',
+          limited: limitedByType[o.type] ?? o.limited ?? false,
           sizes: [...o.sizes],
           shipping_meta: shippingByType[o.type] || {},
         }));
@@ -6878,7 +6887,7 @@ async function loadShopData() {
           is_large_print:     r.is_large_print || false,
           clothing:           r.clothing || false,
           clothing_type:      r.clothing_type || '',
-          stock:              r.stock - null,
+          stock:              r.stock ?? null,
           stock_by_variant:   r.stock_by_variant || {},
           edition_totals:     r.edition_totals || {},
           active:             r.active !== false,
@@ -6953,7 +6962,7 @@ async function apiSaveProduct(p, token) {
     is_large_print:     p.is_large_print || false,
     clothing:           p.clothing || false,
     clothing_type:      p.clothing_type || '',
-    stock:              p.stock - null,
+    stock:              p.stock ?? null,
     stock_by_variant:   p.stock_by_variant || {},
     edition_totals:     p.edition_totals || {},
     sort_order:         p.sort_order || 0,
