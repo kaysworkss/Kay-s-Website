@@ -666,7 +666,7 @@ function renderOrders() {
     const itemsSummary = items.slice(0,2).map(i=>`${short(i.name,20)} - ${i.variant}`).join('<br/>');
     const moreItems = items.length > 2 ? `<span style="color:var(--text-muted);font-size:0.78rem">+${items.length-2} more</span>` : '';
     return `<tr>
-      <td><div class="order-ref" title="${orderRef(o)}">${short(orderRef(o),18)}</div><div style="font-size:0.68rem;color:var(--text-muted);margin-top:0.2rem">${o.status==='pending' ? orderAgeLabel(o) : ''}</div></td>
+      <td><div class="order-ref">${short(orderRef(o),18)}</div><div style="font-size:0.68rem;color:var(--text-muted);margin-top:0.2rem">${o.status==='pending' ? orderAgeLabel(o) : ''}</div></td>
       <td>
         <div class="order-customer">${o.customer_name||'-'}</div>
         <div class="order-email">${o.email||''}</div>
@@ -917,6 +917,13 @@ async function sendDeliveryDetails(orderId) {
     const emailData = await emailRes.json().catch(() => ({}));
     if (!emailRes.ok || !emailData.ok) {
       showToast('Order updated but email failed — check Resend config', 6000);
+      closeDetail(); loadOrders();
+      return;
+    }
+    // The endpoint returns { ok, confirmation: { sent, error } } — verify the
+    // email actually went out, not just that the request succeeded.
+    if (emailData.confirmation && emailData.confirmation.sent === false) {
+      showToast('Order updated, but the email did not send: ' + (emailData.confirmation.error || 'check Resend config'), 7000);
       closeDetail(); loadOrders();
       return;
     }
