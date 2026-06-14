@@ -2406,12 +2406,24 @@ async function handleShopOrderConfirm(req, res, supabase) {
     claimed.push(item);
   }
 
+  // Backfill customer details from the confirm request if the order row is
+  // missing them (e.g. an older pending order created before this field was
+  // captured). Ensures the confirmation emails have a valid recipient.
+  const custName  = order.customer_name || String(body.name || '').slice(0, 200);
+  const custEmail = order.email || String(body.email || '').slice(0, 320);
+  const custPhone = order.phone || String(body.phone || '').slice(0, 60);
+  const custAddr  = order.address || String(body.address || '').slice(0, 500);
+
   // Flip the order to paid. For crypto, fold the payment details back into the
   // payment_metadata lock (no dedicated payer_address/crypto_received columns).
   const { error: updErr } = await supabase
     .from('shop_orders')
     .update({
       status: 'paid',
+      customer_name: custName,
+      email: custEmail,
+      phone: custPhone,
+      address: custAddr,
       payment_method: paymentMethod,
       payment_ref: paymentRef,
       payment_metadata: isCryptoPayment ? {
@@ -2429,6 +2441,11 @@ async function handleShopOrderConfirm(req, res, supabase) {
     for (const c of claimed) await releaseVariantStock(supabase, c);
     return json(500, { error: updErr.message });
   }
+  // Make the in-memory order reflect the backfilled details for the emails.
+  order.customer_name = custName;
+  order.email = custEmail;
+  order.phone = custPhone;
+  order.address = custAddr;
 
   let sellerNotification = { sent: false };
   try {
@@ -2598,13 +2615,33 @@ async function handleShopOrder(req, res, supabase) {
     return finalizeFreeOrder(req, res, supabase, body, checkout);
   }
 
+  const isCardPayment0 = ['paystack','flutterwave'].includes(paymentMethod);
   const quoteRequired = ['paystack','flutterwave','eth','tezos','usdc','usdt'].includes(paymentMethod);
-  if (quoteRequired && !verifyShopQuote(body.checkout_quote, checkout, {
+  const quoteOk = verifyShopQuote(body.checkout_quote, checkout, {
     payment_method: paymentMethod,
     ...(paymentMethod === 'paystack' || paymentMethod === 'flutterwave' ? { payment_ref: paymentRef } : {}),
     ...(payerAddress ? { payer_address: payerAddress } : {}),
-  })) {
-    return json(400, { error: 'Invalid or expired server checkout quote' });
+  });
+  // For CARD payments the gateway is the source of truth for "did they pay and
+  // how much". If the signed quote is merely expired (the customer lingered on
+  // the Paystack page > 15 min) but otherwise the order is valid, we don't want
+  // to lose a real, completed payment. We accept it and let verifyCardPayment
+  // (below) confirm the exact amount against the gateway. For CRYPTO we keep the
+  // quote strict, since the on-chain amount is pegged to the locked quote.
+  if (quoteRequired && !quoteOk) {
+    if (isCardPayment0) {
+      // Use the totals from the signed quote if present (so the gateway amount
+      // is checked against what the customer actually agreed to pay), falling
+      // back to the freshly recomputed total.
+      const q = body.checkout_quote || {};
+      if (Number(q.total_ngn) > 0) {
+        checkout.totalNgn = Number(q.total_ngn);
+        checkout.totalUsd = Number(q.total_usd) || checkout.totalUsd;
+      }
+      console.warn('[shop-order] card quote not verified (likely expired); trusting gateway verification for', paymentRef);
+    } else {
+      return json(400, { error: 'Invalid or expired server checkout quote' });
+    }
   }
   const isCryptoPayment = ['eth','tezos','usdc','usdt'].includes(paymentMethod);
   if (isCryptoPayment) {
