@@ -1258,8 +1258,13 @@ async function handleShopQuote(req, res, supabase) {
       extra.crypto_asset = method;
       extra.crypto_amount = +checkout.totalUsd.toFixed(2);
     }
+    // Bake an order reference into the signed quote. This becomes the durable
+    // order handle WITHOUT writing a DB row — the pending order is only created
+    // when the customer actually initiates payment, so abandoned checkouts
+    // leave no rows behind. The ref is signed, so it can't be forged.
+    extra.order_ref = String(body.reuse_order_ref || '').trim() || makeOrderRef();
     const quote = makeShopQuote(checkout, extra);
-    return json(200, { ok: true, quote, checkout });
+    return json(200, { ok: true, quote, checkout, order_ref: extra.order_ref });
   } catch (e) {
     return jsonError(e);
   }
@@ -2131,7 +2136,11 @@ async function handleShopOrderCreate(req, res, supabase) {
     }
   }
 
-  const orderRef = makeOrderRef();
+  // The order_ref is carried in the signed quote (set at quote/lock time). Use
+  // it so the ref the customer sees matches the one stored — and reuse takes
+  // priority for in-place updates.
+  const quoteOrderRef = (body.checkout_quote && body.checkout_quote.order_ref) || '';
+  const orderRef = String(reuseRef || quoteOrderRef || makeOrderRef()).slice(0, 80);
   // For crypto orders, store the exact locked amount + full signed quote in
   // payment_metadata (JSONB) — matches the live schema, no extra columns needed.
   const cryptoLock = cryptoOrderLockFromQuote(orderRef, paymentMethod, body.checkout_quote);
@@ -2179,12 +2188,68 @@ async function handleShopOrderConfirm(req, res, supabase) {
   if (!orderRef) return json(400, { error: 'order_ref is required' });
 
   // Load the pending order. This is the source of truth for what was bought.
-  const { data: order, error: loadErr } = await supabase
+  let { data: order, error: loadErr } = await supabase
     .from('shop_orders')
     .select('*')
     .eq('order_ref', orderRef)
     .maybeSingle();
   if (loadErr && loadErr.code !== 'PGRST116') return json(500, { error: loadErr.message });
+
+  // No pending row exists (we no longer pre-create them at price-lock time).
+  // Create it now from the signed quote, which carries the trusted items and
+  // totals. The quote's signature is verified, so this can't be forged.
+  if (!order) {
+    const quote = body.checkout_quote;
+    if (!quote || !quote.order_ref || String(quote.order_ref) !== orderRef) {
+      return json(404, { error: 'Order not found and no valid quote to create it from' });
+    }
+    let checkout;
+    try {
+      checkout = await computeShopCheckout({
+        items: (quote.items || []).map(i => ({ id: i.id, variant: i.variantKey, variantKey: i.variantKey, qty: i.qty })),
+        delivery_method: quote.delivery_method,
+        delivery_zone: quote.delivery_zone,
+        delivery_carrier: quote.delivery_carrier,
+        discount_code: quote.discount_code || '',
+        tip_ngn: quote.tip_ngn || 0,
+        tip_usd: quote.tip_usd || 0,
+        name: body.name, email: body.email, phone: body.phone, address: body.address,
+      }, supabase);
+    } catch (e) { return jsonError(e); }
+    const cpm = String(body.payment_method || '').slice(0, 40);
+    if (!verifyShopQuote(quote, checkout, {})) {
+      return json(400, { error: 'Invalid or expired checkout quote' });
+    }
+    const lockMeta = cryptoOrderLockFromQuote(orderRef, cpm, quote);
+    const { data: created, error: createErr } = await supabase
+      .from('shop_orders')
+      .insert({
+        order_ref:        orderRef,
+        customer_name:    String(body.name    || '').slice(0, 200),
+        email:            String(body.email   || '').slice(0, 320),
+        phone:            String(body.phone   || '').slice(0, 60),
+        address:          String(body.address || '').slice(0, 500),
+        items:            checkout.trustedItems,
+        total_ngn:        checkout.totalNgn,
+        total_usd:        checkout.totalUsd,
+        delivery_fee_ngn: checkout.deliveryNgn,
+        delivery_method:  checkout.method.slice(0, 40),
+        delivery_zone:    checkout.zone.slice(0, 40),
+        payment_method:   cpm,
+        payment_metadata: shopOrderMetadata(body, checkout, lockMeta),
+        status:           'pending',
+      })
+      .select('*')
+      .single();
+    if (createErr) {
+      // A concurrent confirm may have created it — re-read before giving up.
+      const reread = await supabase.from('shop_orders').select('*').eq('order_ref', orderRef).maybeSingle();
+      if (reread.data) { order = reread.data; }
+      else return json(500, { error: createErr.message });
+    } else {
+      order = created;
+    }
+  }
   if (!order) return json(404, { error: 'Order not found for that reference' });
   const paymentMethod = String(body.payment_method || order.payment_method || '').slice(0, 40);
   const paymentRef = String(body.payment_ref || order.payment_ref || '').trim().slice(0, 200);
