@@ -779,6 +779,12 @@ const SERVER_HIGH_CART_USD = 60;
 const SERVER_COMPLIMENTARY_SHIPPING_USD = 500;
 const SERVER_SHIPPING_DIM_DIVISOR = 5000;
 const SERVER_SHIPPING_BUFFER = 1.2;
+// Domestic (Nigeria) weight scaling, modelled on GIG Logistics: the small/large
+// base rate already covers the first couple of kg, then each additional kg adds
+// a per-kg surcharge. GIG examples: Lagos→Ibadan 1kg ≈ ₦5,000, 5kg ≈ ₦9,500
+// (~₦1,100/kg over the base); Lagos→Abuja 10kg ≈ ₦14,500.
+const SERVER_DOMESTIC_INCLUDED_KG = 2;      // kg covered by the base rate
+const SERVER_DOMESTIC_PER_KG_NGN = 1000;    // surcharge per extra kg above that
 
 function serverVariantPrice(product, variantKey, variant, currency) {
   const prices = currency === 'usd' ? (product.prices_usd || {}) : (product.prices_ngn || {});
@@ -918,7 +924,17 @@ function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd = 0, requestedC
     }, 0);
     tier = { usd, ngn: 0 };
   } else {
-    tier = hasLarge ? z.large : z.small;
+    // Domestic: base small/large rate + GIG-style per-kg surcharge for weight
+    // above the included allowance. billableKg already accounts for the 1.2×
+    // buffer and volumetric weight, so heavier carts now scale realistically.
+    const base = hasLarge ? z.large : z.small;
+    const billableKg = Number(shippingProfile?.billableKg) || (hasLarge ? 1.5 : 0.7);
+    const extraKg = Math.max(0, Math.ceil(billableKg - SERVER_DOMESTIC_INCLUDED_KG));
+    const surchargeNgn = extraKg * SERVER_DOMESTIC_PER_KG_NGN;
+    tier = {
+      ngn: (base.ngn || 0) + surchargeNgn,
+      usd: base.usd || 0,
+    };
   }
   if (currency === 'usd') {
     if (tier.usd > 0) return tier.usd;
@@ -1938,7 +1954,7 @@ async function sendShopCustomerReceipt({ order, orderRef, checkout, paymentMetho
             <img src="${shopEscapeHtml(logoUrl)}" alt="Kay's Works" width="132" style="display:block;width:132px;max-width:46%;height:auto;margin:0 auto 24px">
             <div style="width:58px;height:58px;background:rgba(245,237,224,0.12);border-radius:50%;text-align:center;line-height:58px;font-family:Arial,sans-serif;font-size:30px;color:#f5ede0;margin:0 auto 22px">&#10003;</div>
             <h1 style="margin:0 0 14px;font-size:34px;font-weight:400;line-height:1.12;color:#f5ede0">Thanks for your purchase</h1>
-            <p style="margin:0 auto;line-height:1.7;color:#e8d5b0;font-size:16px;max-width:500px">Hi ${shopEscapeHtml(customerName)}, welcome to the Kay's Works collector circle. Your payment is confirmed, and your order is now being prepared with care.</p>
+            <p style="margin:0 auto;line-height:1.7;color:#e8d5b0;font-size:16px;max-width:500px">Hi ${shopEscapeHtml(customerName)}, welcome to the Kay's Works collector circle. Your payment is confirmed. Kay will be in touch about shipping, with the details sent to this email.</p>
           </td>
         </tr>
         <tr>
@@ -1994,7 +2010,7 @@ async function sendShopCustomerReceipt({ order, orderRef, checkout, paymentMetho
 </body></html>`;
   const text = [
     `Hi ${customerName}, your order has been received and your payment is confirmed.`,
-    "Thank you for collecting from Kay's Works. Kay will review the details, prepare your pieces with care, and follow up with fulfilment updates.",
+    "Thank you for your order. Kay will be in touch about shipping, with the details sent to this email.",
     '',
     `Order: ${orderRef}`,
     `Payment: ${String(paymentMethod || '').toUpperCase()}`,
