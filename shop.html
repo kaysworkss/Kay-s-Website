@@ -1032,12 +1032,34 @@ body.dark .cart-note-toggle { color: var(--sand); }
   }
 }
 @media(max-width: 719px) {
-  #ckFormCol { padding: 1.5rem 1.2rem; }
+  /* Stripe-style mobile order: summary (items + discount + total) on top,
+     then the form and Pay button below it. */
+  #formScreen { flex-direction: column; }
   #orderSummaryCol {
-    padding: 1.5rem 1.2rem;
-    border-top: 1px solid var(--border);
+    order: 1;
+    padding: 1.25rem 1.2rem;
+    border-bottom: 1px solid var(--border);
     background: var(--bg-alt);
   }
+  #ckFormCol {
+    order: 2;
+    padding: 1.5rem 1.2rem;
+  }
+  /* On mobile the summary collapses to keep the form + Pay button reachable. */
+  #ckSummaryChevron { display: inline-block !important; }
+  #ckSummaryHeadTotal { display: inline-block !important; }
+  #ckSummaryCollapsible {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+  #orderSummaryCol.expanded #ckSummaryCollapsible { max-height: 2000px; }
+  #orderSummaryCol.expanded #ckSummaryChevron { transform: rotate(180deg); }
+  #ckSummaryToggle { margin-bottom: 0.4rem; }
+}
+@media(min-width: 720px) {
+  /* Desktop: always expanded, no toggle affordance. */
+  #ckSummaryCollapsible { max-height: none !important; }
+  #ckSummaryToggle { cursor: default; pointer-events: none; }
 }
 
 /* Remove old modal-head — we'll use per-column branding */
@@ -2704,12 +2726,25 @@ body.dark { --text-muted: #b3a392; }
             <button class="submit-pay-btn" id="ethConnectBtn" style="background:#2a2a5e;margin-bottom:0.7rem">Connect ETH Wallet</button>
             <button class="submit-pay-btn" id="ethSendBtn" style="display:none;background:#3d3d8f">Send <span id="ethSendAmt"></span> ETH</button>
             <div id="ethManualFields" style="display:none;margin-top:0.8rem;padding:0.8rem;border:1px solid rgba(139,156,247,0.18);background:var(--bg-alt)">
-              <input class="form-input" id="ethManualRef" type="text" placeholder="Order hash (ORD-…)" style="margin-bottom:0.5rem;font-size:0.78rem"/>
+              <p style="font-size:0.72rem;color:var(--text-muted);margin:0 0 0.6rem;line-height:1.5">After sending the exact amount above to the address, paste your transaction hash to confirm this order.</p>
+              <input class="form-input" id="ethManualRef" type="text" placeholder="Order reference (auto-filled)" readonly style="margin-bottom:0.5rem;font-size:0.78rem;opacity:0.7"/>
               <input class="form-input" id="ethManualSender" type="text" placeholder="Sending wallet address" style="margin-bottom:0.5rem;font-size:0.78rem"/>
               <input class="form-input" id="ethManualTx" type="text" placeholder="Transaction hash / ID" style="font-size:0.78rem"/>
-              <button type="button" id="ethManualCancel" style="margin-top:0.65rem;background:none;border:none;color:var(--text-muted);font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase">Cancel manual confirmation</button>
+              <button type="button" id="ethManualCancel" style="margin-top:0.65rem;background:none;border:none;color:var(--text-muted);font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase">Cancel</button>
             </div>
             <button class="submit-pay-btn" id="cryptoConfirmBtn" style="display:none;background:transparent;border:1px solid rgba(139,156,247,0.3);color:#8b9cf7;margin-top:0.5rem">I've sent manually — confirm</button>
+            <!-- Recovery: confirm a payment already made (no new order/ref created) -->
+            <div style="margin-top:1rem;text-align:center">
+              <button type="button" class="crypto-recover-link" data-chain="eth" style="background:none;border:none;color:var(--text-muted);font-size:0.72rem;text-decoration:underline;cursor:pointer">Already paid? Confirm a previous transaction</button>
+            </div>
+            <div id="ethRecoverBox" style="display:none;margin-top:0.8rem;padding:0.9rem;border:1px solid rgba(139,156,247,0.25);border-radius:10px;background:var(--bg-alt)">
+              <p style="font-size:0.74rem;color:var(--text-muted);line-height:1.5;margin:0 0 0.7rem">Confirm a payment you already sent. Enter the order reference from your receipt (or the box above) and the transaction hash — we'll verify it on-chain. No new order is created.</p>
+              <input class="form-input" id="ethRecoverRef" type="text" placeholder="Order reference (ORD-…)" style="margin-bottom:0.5rem;font-size:0.78rem"/>
+              <input class="form-input" id="ethRecoverSender" type="text" placeholder="Sending wallet address" style="margin-bottom:0.5rem;font-size:0.78rem"/>
+              <input class="form-input" id="ethRecoverTx" type="text" placeholder="Transaction hash / ID" style="margin-bottom:0.7rem;font-size:0.78rem"/>
+              <button type="button" class="submit-pay-btn crypto-recover-submit" data-chain="eth" style="background:#3d3d8f;margin:0">Confirm this payment</button>
+              <button type="button" class="crypto-recover-cancel" data-chain="eth" style="display:block;margin:0.6rem auto 0;background:none;border:none;color:var(--text-muted);font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;cursor:pointer">Cancel</button>
+            </div>
           </div>
         </div>
 
@@ -2743,12 +2778,25 @@ body.dark { --text-muted: #b3a392; }
             <button class="submit-pay-btn" id="tezosConnectBtn" style="background:#1a4a6e;margin-bottom:0.7rem">Connect Tezos Wallet</button>
             <button class="submit-pay-btn" id="tezosSendBtn" style="display:none">Send <span id="tezosSendAmt"></span> XTZ</button>
             <div id="tezosManualFields" style="display:none;margin-top:0.8rem;padding:0.8rem;border:1px solid rgba(90,192,245,0.18);background:var(--bg-alt)">
-              <input class="form-input" id="tezosManualRef" type="text" placeholder="Order hash (ORD-…)" style="margin-bottom:0.5rem;font-size:0.78rem"/>
+              <p style="font-size:0.72rem;color:var(--text-muted);margin:0 0 0.6rem;line-height:1.5">After sending the exact amount above to the address, paste your operation hash to confirm this order.</p>
+              <input class="form-input" id="tezosManualRef" type="text" placeholder="Order reference (auto-filled)" readonly style="margin-bottom:0.5rem;font-size:0.78rem;opacity:0.7"/>
               <input class="form-input" id="tezosManualSender" type="text" placeholder="Sending Tezos wallet address" style="margin-bottom:0.5rem;font-size:0.78rem"/>
               <input class="form-input" id="tezosManualTx" type="text" placeholder="Operation hash" style="font-size:0.78rem"/>
-              <button type="button" id="tezosManualCancel" style="margin-top:0.65rem;background:none;border:none;color:var(--text-muted);font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase">Cancel manual confirmation</button>
+              <button type="button" id="tezosManualCancel" style="margin-top:0.65rem;background:none;border:none;color:var(--text-muted);font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase">Cancel</button>
             </div>
             <button class="submit-pay-btn" id="tezosManualBtn" style="display:none;background:transparent;border:1px solid rgba(90,192,245,0.3);color:#5ac0f5;margin-top:0.5rem">I've sent manually — confirm</button>
+            <!-- Recovery: confirm a payment already made (no new order/ref created) -->
+            <div style="margin-top:1rem;text-align:center">
+              <button type="button" class="crypto-recover-link" data-chain="tezos" style="background:none;border:none;color:var(--text-muted);font-size:0.72rem;text-decoration:underline;cursor:pointer">Already paid? Confirm a previous transaction</button>
+            </div>
+            <div id="tezosRecoverBox" style="display:none;margin-top:0.8rem;padding:0.9rem;border:1px solid rgba(90,192,245,0.25);border-radius:10px;background:var(--bg-alt)">
+              <p style="font-size:0.74rem;color:var(--text-muted);line-height:1.5;margin:0 0 0.7rem">Confirm a payment you already sent. Enter the order reference from your receipt (or the box above) and the operation hash — we'll verify it on-chain. No new order is created.</p>
+              <input class="form-input" id="tezosRecoverRef" type="text" placeholder="Order reference (ORD-…)" style="margin-bottom:0.5rem;font-size:0.78rem"/>
+              <input class="form-input" id="tezosRecoverSender" type="text" placeholder="Sending Tezos wallet address" style="margin-bottom:0.5rem;font-size:0.78rem"/>
+              <input class="form-input" id="tezosRecoverTx" type="text" placeholder="Operation hash" style="margin-bottom:0.7rem;font-size:0.78rem"/>
+              <button type="button" class="submit-pay-btn crypto-recover-submit" data-chain="tezos" style="background:#1a4a6e;margin:0">Confirm this payment</button>
+              <button type="button" class="crypto-recover-cancel" data-chain="tezos" style="display:block;margin:0.6rem auto 0;background:none;border:none;color:var(--text-muted);font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;cursor:pointer">Cancel</button>
+            </div>
           </div>
         </div>
 
@@ -2756,7 +2804,11 @@ body.dark { --text-muted: #b3a392; }
 
       <!-- RIGHT: Order summary column -->
       <div id="orderSummaryCol">
-        <p class="ck-summary-title">Order summary</p>
+        <button type="button" id="ckSummaryToggle" class="ck-summary-title" style="width:100%;background:none;border:none;display:flex;align-items:center;justify-content:space-between;cursor:pointer;text-align:left">
+          <span style="display:flex;align-items:center;gap:0.5rem">Order summary <span id="ckSummaryChevron" style="display:none;transition:transform 0.2s">⌄</span></span>
+          <span id="ckSummaryHeadTotal" style="display:none;font-family:'Montserrat',sans-serif;font-size:0.85rem;letter-spacing:0;text-transform:none;color:var(--text);font-weight:600"></span>
+        </button>
+        <div id="ckSummaryCollapsible">
         <div id="orderSummaryItems"></div>
         <!-- Discount code -->
         <div style="margin:0.9rem 0;padding-top:0.8rem;border-top:1px solid var(--border)">
@@ -2795,6 +2847,7 @@ body.dark { --text-muted: #b3a392; }
             <p style="font-size:0.72rem;color:var(--text-muted);margin-top:0.5rem">Thank you, we appreciate it.</p>
           </div>
         </div>
+        </div><!-- /ckSummaryCollapsible -->
         <div id="orderSummaryTotals" style="padding-top:0.8rem;margin-top:0.4rem"></div>
         <!-- Mobile inline summary (hidden on desktop) -->
         <div class="order-summary" id="orderSummary" style="display:none"></div>
@@ -4768,6 +4821,16 @@ setDeliveryMethod('ship');
   });
 })();
 
+// Mobile order-summary collapse toggle (no effect on desktop — pointer-events
+// are disabled there via CSS so it stays permanently expanded).
+(function() {
+  const toggle = document.getElementById('ckSummaryToggle');
+  const col = document.getElementById('orderSummaryCol');
+  if (toggle && col) {
+    toggle.addEventListener('click', () => col.classList.toggle('expanded'));
+  }
+})();
+
 // Tip wiring
 function refreshTipUI() {
   const presetAmts = document.querySelectorAll('#tipPresets .tip-preset');
@@ -4880,6 +4943,11 @@ function openCheckout(defaultTab) {
   document.getElementById('formScreen').style.display='';
   document.getElementById('confirmScreen').classList.remove('active');
   document.getElementById('checkoutOverlay').classList.add('open');
+  // On mobile, start with the summary collapsed (total still visible in the
+  // header) so the form and Pay button are immediately reachable; on desktop
+  // CSS keeps it permanently expanded regardless of this class.
+  const sumCol = document.getElementById('orderSummaryCol');
+  if (sumCol) sumCol.classList.remove('expanded');
   if (defaultTab) switchPayTab(defaultTab);
   // Restore any applied discount into the input + refresh the free-order view
   const di = document.getElementById('discountInput');
@@ -4957,7 +5025,7 @@ async function applyDiscountCode() {
   const btn = document.getElementById('discountApplyBtn');
   if (!input) return;
   const code = input.value.trim().toUpperCase();
-  if (!code) { clearAppliedDiscount(); buildOrderSummary(); updateFreeOrderUI(); return; }
+  if (!code) { clearAppliedDiscount(); buildOrderSummary(); updateFreeOrderUI(); recalibrateCryptoForTotals(); return; }
 
   const showMsg = (text, color) => {
     if (!msg) return;
@@ -4980,6 +5048,7 @@ async function applyDiscountCode() {
       showMsg(data.error || 'That code is not valid', 'var(--rust)');
       buildOrderSummary();
       updateFreeOrderUI();
+      recalibrateCryptoForTotals();
       return;
     }
     _appliedDiscount = {
@@ -4995,11 +5064,27 @@ async function applyDiscountCode() {
     showMsg(`✓ ${data.discount_percent}% off ${scopeLabel} applied`, '#6b7c5c');
     buildOrderSummary();
     updateFreeOrderUI();
+    recalibrateCryptoForTotals();
   } catch (e) {
     showMsg('Could not validate code — try again', 'var(--rust)');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Apply'; }
   }
+}
+
+// Re-lock the crypto price and re-render the crypto panels so the displayed
+// ETH/XTZ amount reflects the current grand total (after discount/tip changes).
+// Without this, the panels keep showing the amount from the pre-discount lock.
+function recalibrateCryptoForTotals() {
+  const activeTab = document.querySelector('.ck-pay-method.active')?.dataset.pay
+    || document.querySelector('.pay-tab.active')?.dataset.pay;
+  if (activeTab === 'eth' || activeTab === 'tezos') {
+    // Re-lock with a fresh server quote (which bakes in the discount), then the
+    // refreshLock success path re-renders the panel with the new amount.
+    if (typeof refreshLock === 'function') refreshLock(activeTab, true);
+  }
+  if (typeof renderEthPanel === 'function') renderEthPanel();
+  if (typeof renderTezosPanel === 'function') renderTezosPanel();
 }
 
 function buildOrderSummary() {
@@ -5080,6 +5165,13 @@ function buildOrderSummary() {
   });
   if (typeof updateFreeOrderUI === 'function') updateFreeOrderUI();
   if (typeof refreshTipUI === 'function') refreshTipUI();
+
+  // Mobile collapsed-summary header total (shown next to the chevron).
+  const headTotal = document.getElementById('ckSummaryHeadTotal');
+  if (headTotal) {
+    const itemCount = cart.reduce((a, c) => a + c.qty, 0);
+    headTotal.textContent = `${fmt(grandTotalNgn())} · ${itemCount} item${itemCount === 1 ? '' : 's'}`;
+  }
 }
 
 /* renderEthPanel is defined below in the ETH wallet section */
@@ -5258,6 +5350,13 @@ function showConfirmation(method, ref) {
   cartOrderNote = '';
   localStorage.removeItem('kwCartOrderNote');
   updateCartUI();
+  // Refresh product data so the buyer immediately sees the decremented stock
+  // (their just-purchased limited edition) without a manual page reload.
+  if (typeof loadShopData === 'function') {
+    loadShopData().then(() => {
+      if (typeof renderProducts === 'function') renderProducts();
+    }).catch(() => {});
+  }
 }
 
 function getManualCryptoProof(chain) {
@@ -5361,10 +5460,14 @@ async function submitManualCrypto(chain) {
       orderRef = window.__activeLock.order_ref;
     }
     // Recovery: if the lock expired or the page was reloaded, fall back to the
-    // most recent remembered order for this method (persisted in localStorage).
-    if (!orderRef) {
+    // most recent remembered order for this method (persisted in localStorage),
+    // including its signed quote so the order can still be created + confirmed.
+    if (!orderRef || !quoteForConfirm) {
       const remembered = latestPendingOrder(method);
-      if (remembered) orderRef = remembered.ref;
+      if (remembered) {
+        if (!orderRef) orderRef = remembered.ref;
+        if (!quoteForConfirm && remembered.quote) quoteForConfirm = remembered.quote;
+      }
     }
     if (!orderRef) {
       showToast('Enter the order reference (ORD-…) from your payment — check your email receipt if needed');
@@ -5582,11 +5685,17 @@ function renderLockUI(method) {
 function updateLockCountdown() {
   const lock = window.__activeLock;
   if (!lock) return;
-  if (window.__manualCryptoMode === lock.method) return;
+  const timerEl = document.getElementById(lock.method === 'tezos' ? 'tezosLockTimer' : 'ethLockTimer');
+  // In manual mode the customer is pasting a hash for a payment they've already
+  // sent — the live countdown is irrelevant, so show a static label instead of
+  // a frozen ticking clock (which looked stuck).
+  if (window.__manualCryptoMode === lock.method) {
+    if (timerEl) timerEl.textContent = 'locked';
+    return;
+  }
   const remaining = Math.max(0, lock.expires - Date.now());
   const mm = String(Math.floor(remaining / 60000)).padStart(2, '0');
   const ss = String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0');
-  const timerEl = document.getElementById(lock.method === 'tezos' ? 'tezosLockTimer' : 'ethLockTimer');
   if (timerEl) timerEl.textContent = mm + ':' + ss;
   if (remaining <= 0) {
     // Expired — silently re-lock with a fresh quote/order/hash.
@@ -5594,34 +5703,39 @@ function updateLockCountdown() {
   }
 }
 
-// Create (or replace) the lock for a crypto method. `silent` suppresses toasts.
+// Create (or replace) the price lock for a crypto method. `silent` suppresses
+// toasts. IMPORTANT: this no longer writes a pending order to the database — it
+// just holds the signed quote (which carries a server-generated order_ref).
+// The pending order row is created only when the customer actually initiates
+// payment, so abandoned checkouts and price-lock refreshes leave no DB rows.
 async function refreshLock(method, silent) {
   const seq = ++_lockSeq;
   const d = getFormData();
-  // Don't lock until the form is minimally valid — otherwise the pending order
-  // would be missing customer details. Quiet return; lock starts once valid.
+  // Don't lock until the form is minimally valid.
   if (!d.name || !d.email) { window.__activeLock = null; renderLockUI(method); return; }
   try {
     const payer = lockPayerAddress(method);
-    const q = await getServerCheckoutQuote(d, method, payer ? { payer_address: payer } : {});
+    // Carry the previous order_ref so re-locks keep the same reference.
+    const prevRef = (window.__activeLock && window.__activeLock.method === method)
+      ? window.__activeLock.order_ref : '';
+    const extra = payer ? { payer_address: payer } : {};
+    if (prevRef) extra.reuse_order_ref = prevRef;
+    const q = await getServerCheckoutQuote(d, method, extra);
     if (seq !== _lockSeq) return; // a newer lock superseded this one
-    const pending = await createPendingOrder(d, method, q.quote);
-    if (seq !== _lockSeq) return;
+    const orderRef = q.order_ref || q.quote?.order_ref || prevRef || '';
     window.__activeLock = {
       method,
-      order_ref: pending.order_ref,
+      order_ref: orderRef,
       quote: q.quote,
       expires: Date.now() + LOCK_MS,
       payerAddress: payer,
     };
-    rememberPendingOrder(pending.order_ref, { method, payer_address: payer });
+    rememberPendingOrder(orderRef, { method, payer_address: payer, quote: q.quote });
     renderLockUI(method);
-    // refresh the headline amount in the existing panel too
     if (method === 'tezos' && typeof renderTezosPanel === 'function') renderTezosPanel();
     if (method === 'eth' && typeof renderEthPanel === 'function') renderEthPanel();
   } catch (e) {
     if (!silent) showToast(e.message || 'Could not lock price — retrying');
-    // leave any previous lock in place; countdown will retry on next expiry
   }
 }
 
@@ -6838,6 +6952,9 @@ window.__cryptoMode = window.__cryptoMode || { eth: 'connect', tezos: 'connect' 
 
 function setCryptoMode(chain, mode) {
   window.__cryptoMode[chain] = mode;
+  // Hide the recovery box on any mode switch — it's a separate, occasional flow.
+  const recoverBox = document.getElementById(chain === 'tezos' ? 'tezosRecoverBox' : 'ethRecoverBox');
+  if (recoverBox) recoverBox.style.display = 'none';
   // Toggle button active styling
   document.querySelectorAll(`.crypto-mode-btn[data-chain="${chain}"]`).forEach(b => {
     const on = b.dataset.mode === mode;
@@ -6850,6 +6967,9 @@ function setCryptoMode(chain, mode) {
   // switching back to connect, hide them and drop manual-confirm state.
   if (mode === 'manual') {
     window.__manualCryptoMode = chain;
+    // Show a static "locked" label on the countdown (it no longer ticks here).
+    const tEl = document.getElementById(chain === 'tezos' ? 'tezosLockTimer' : 'ethLockTimer');
+    if (tEl) tEl.textContent = 'locked';
     // Reveal the manual fields immediately and pre-fill the order ref/sender.
     const fields = document.getElementById(chain === 'tezos' ? 'tezosManualFields' : 'ethManualFields');
     if (fields && fields.dataset.revealed !== '1') {
@@ -6886,6 +7006,92 @@ function setCryptoMode(chain, mode) {
   });
 })();
 
+// Recovery flow: confirm a payment already made, WITHOUT generating a new
+// order/reference. Open/close the recovery box and submit against the existing
+// order_ref the customer provides (pre-filled from their saved order if any).
+(function wireCryptoRecovery() {
+  document.addEventListener('click', async e => {
+    const t = e.target;
+    if (!t) return;
+
+    // Open the recovery box
+    const openLink = t.closest && t.closest('.crypto-recover-link');
+    if (openLink) {
+      const chain = openLink.dataset.chain;
+      const box = document.getElementById(chain === 'tezos' ? 'tezosRecoverBox' : 'ethRecoverBox');
+      if (box) {
+        box.style.display = box.style.display === 'none' ? '' : 'none';
+        // Pre-fill the reference from the saved order / active lock if we have one.
+        if (box.style.display !== 'none') {
+          const refInput = document.getElementById(chain === 'tezos' ? 'tezosRecoverRef' : 'ethRecoverRef');
+          if (refInput && !refInput.value) {
+            const lock = window.__activeLock;
+            let ref = (lock && lock.method === chain) ? lock.order_ref : '';
+            if (!ref) { const r = latestPendingOrder(chain); if (r) ref = r.ref; }
+            if (ref) refInput.value = ref;
+          }
+        }
+      }
+      return;
+    }
+
+    // Cancel
+    const cancel = t.closest && t.closest('.crypto-recover-cancel');
+    if (cancel) {
+      const box = document.getElementById(cancel.dataset.chain === 'tezos' ? 'tezosRecoverBox' : 'ethRecoverBox');
+      if (box) box.style.display = 'none';
+      return;
+    }
+
+    // Submit recovery
+    const submit = t.closest && t.closest('.crypto-recover-submit');
+    if (submit) {
+      const chain = submit.dataset.chain;
+      await confirmExistingPayment(chain, submit);
+      return;
+    }
+  });
+})();
+
+// Confirm an existing payment by order_ref + tx hash. Never creates a new
+// order or reference — it only attaches proof to an order that already exists.
+async function confirmExistingPayment(chain, btn) {
+  const method = chain === 'tezos' ? 'tezos' : 'eth';
+  const refEl = document.getElementById(chain === 'tezos' ? 'tezosRecoverRef' : 'ethRecoverRef');
+  const senderEl = document.getElementById(chain === 'tezos' ? 'tezosRecoverSender' : 'ethRecoverSender');
+  const txEl = document.getElementById(chain === 'tezos' ? 'tezosRecoverTx' : 'ethRecoverTx');
+  const orderRef = (refEl?.value || '').trim();
+  const sender = (senderEl?.value || '').trim();
+  const txHash = (txEl?.value || '').trim();
+
+  if (!orderRef) { showToast('Enter the order reference from your receipt'); return; }
+  if (!sender)   { showToast('Enter the sending wallet address'); return; }
+  if (!txHash)   { showToast('Enter the transaction hash'); return; }
+  if (chain === 'eth' && !/^0x[a-fA-F0-9]{64}$/.test(txHash)) { showToast('Enter a valid Ethereum transaction hash'); return; }
+
+  // Pull the saved quote for this ref if we have it (needed only if the order
+  // row doesn't exist server-side yet — e.g. a send that never reached confirm).
+  const remembered = latestPendingOrder(chain);
+  const quote = (remembered && remembered.ref === orderRef) ? remembered.quote : (window.__activeLock?.order_ref === orderRef ? window.__activeLock.quote : null);
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Confirming…'; }
+  try {
+    await confirmPendingOrder(orderRef, {
+      payment_method: method,
+      payment_ref: txHash,
+      payer_address: sender,
+      checkout_quote: quote,
+    });
+    clearPendingOrder(orderRef);
+    stopLockTimer();
+    showConfirmation(method, (chain === 'tezos' ? 'KW-XTZ-' : 'KW-ETH-') + txHash);
+  } catch (e) {
+    showToast(e.message || 'Could not confirm that payment — double-check the reference and hash');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm this payment'; }
+  }
+}
+
 function renderEthPanel() {
   const mode     = (window.__cryptoMode && window.__cryptoMode.eth) || 'connect';
   const manual   = mode === 'manual';
@@ -6907,12 +7113,15 @@ function renderEthPanel() {
     if (_ethCopyEl) _ethCopyEl.style.display = manual ? '' : 'none';
     document.getElementById('ethToAddr').textContent    = addr;
     document.getElementById('ethEthAmount').textContent = ethAmt !== null ? ethAmt + ' ETH' : 'Fetching rate\u2026';
-    // USDC / USDT blocks — only relevant in manual mode
-    stables.style.display = manual ? '' : 'none';
+    // USDC / USDT are valid in BOTH modes. Connect: amount + send button only.
+    // Manual: address + copy, no send button.
+    stables.style.display = '';
     document.getElementById('ethUsdcAddr').textContent   = addr;
     document.getElementById('ethUsdcAmount').textContent = usdcAmt + ' USDC';
     document.getElementById('ethUsdtAddr').textContent   = addr;
     document.getElementById('ethUsdtAmount').textContent = usdcAmt + ' USDT';
+    document.querySelectorAll('#ethStableOptions .crypto-address').forEach(function(el){ el.style.display = manual ? '' : 'none'; });
+    document.querySelectorAll('#ethStableOptions .ethStableCopy').forEach(function(el){ el.style.display = manual ? '' : 'none'; });
   } else {
     amtBlock.style.display = 'none';
     stables.style.display  = 'none';
@@ -6957,7 +7166,8 @@ function renderEthPanel() {
   const rateReady = addr && ethAmt !== null;
 
   if (manual) {
-    // Manual mode: hide wallet connect/send, show the manual confirm button.
+    // Manual mode: hide wallet connect/send buttons, show the manual confirm.
+    // (Stablecoin addresses + copy are shown above; no send buttons here.)
     if (connectBtn) connectBtn.style.display = 'none';
     if (sendBtn)    sendBtn.style.display    = 'none';
     if (walletInfo) walletInfo.style.display = 'none';
@@ -6966,7 +7176,8 @@ function renderEthPanel() {
     if (manualBtn) manualBtn.style.display = '';
     if (manualFlds && manualFlds.dataset.revealed === '1') manualFlds.style.display = '';
   } else {
-    // Connect mode: hide manual confirm + fields, show wallet connect/send.
+    // Connect mode: hide manual confirm + fields, show wallet connect/send
+    // (including the USDC/USDT send buttons once a wallet is connected).
     if (manualBtn) manualBtn.style.display = 'none';
     if (manualFlds) { manualFlds.style.display = 'none'; }
     if (_ethConnectedAddr) {
@@ -6974,13 +7185,15 @@ function renderEthPanel() {
       document.getElementById('ethWalletAddr').textContent = ethShortAddr(_ethConnectedAddr);
       if (connectBtn) connectBtn.style.display = 'none';
       if (sendBtn)    sendBtn.style.display    = rateReady ? '' : 'none';
+      document.getElementById('ethSendUsdcBtn').style.display = rateReady ? '' : 'none';
+      document.getElementById('ethSendUsdtBtn').style.display = rateReady ? '' : 'none';
     } else {
       if (walletInfo) walletInfo.style.display = 'none';
       if (connectBtn) connectBtn.style.display = '';
       if (sendBtn)    sendBtn.style.display    = 'none';
+      document.getElementById('ethSendUsdcBtn').style.display = 'none';
+      document.getElementById('ethSendUsdtBtn').style.display = 'none';
     }
-    document.getElementById('ethSendUsdcBtn').style.display = 'none';
-    document.getElementById('ethSendUsdtBtn').style.display = 'none';
   }
 }
 
@@ -7112,7 +7325,7 @@ async function sendErc20(token) {
     // 1. Create the pending order before sending.
     const pending = await createPendingOrder(d, token, quoteData.quote);
     const orderRef = pending.order_ref;
-    rememberPendingOrder(orderRef, { method: token, payer_address: _ethConnectedAddr });
+    rememberPendingOrder(orderRef, { method: token, payer_address: _ethConnectedAddr, quote: quoteData.quote });
 
     const signer       = _ethProvider.getSigner();
     const contractAddr = ERC20_CONTRACTS[token];
