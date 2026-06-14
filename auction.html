@@ -11,56 +11,34 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <script src="https://unpkg.com/@taquito/taquito@20.1.0/dist/taquito.min.js"></script>
 <script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
-<!-- ETH mobile wallet connection — direct deep-link approach, no WC library needed -->
+<!-- ETH mobile wallet connection -->
 <script>
-// WalletConnect URI generation using the sign-client API directly
-// On mobile we deep-link; on desktop injected wallet works without this
 window._wcProviderPromise = null;
-window._wcUri = null;
 
-async function _loadWCProvider() {
-  // We don't need to load any library — we use the WalletConnect REST API
-  // to create a pairing URI, then deep-link into the wallet on mobile
-  return { init: _wcInitProvider };
+const _ETH_WC_PROVIDER_URL = "https://unpkg.com/@walletconnect/ethereum-provider@2.17.2/dist/index.umd.js";
+
+function _wcProviderCtor() {
+  const lib = window.EthereumProvider || window.WalletConnectEthereumProvider;
+  return lib?.EthereumProvider || lib?.default || lib;
 }
 
-async function _wcInitProvider(opts) {
-  // Return a minimal provider-like object that handles the connection
-  return {
-    _opts: opts,
-    _accounts: [],
-    _chainId: 1,
-    connect: async function() {
-      return new Promise(async (resolve, reject) => {
-        try {
-          // Use fetch to WalletConnect relay to create a pairing
-          const resp = await fetch(`https://relay.walletconnect.com/v1/?projectId=${opts.projectId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: Date.now(),
-              jsonrpc: '2.0',
-              method: 'wc_pairingCreate',
-              params: {}
-            })
-          });
-          const data = await resp.json();
-          if (data?.result?.uri) {
-            window._wcUri = data.result.uri;
-            this.emit && this.emit('display_uri', data.result.uri);
-            resolve();
-          } else {
-            reject(new Error('Could not create WalletConnect pairing'));
-          }
-        } catch(e) { reject(e); }
-      });
-    },
-    request: async function(args) { return null; },
-    disconnect: async function() {},
-    on: function(ev, fn) { this._listeners = this._listeners || {}; (this._listeners[ev] = this._listeners[ev] || []).push(fn); },
-    once: function(ev, fn) { this.on(ev, fn); },
-    emit: function(ev, data) { (this._listeners?.[ev] || []).forEach(fn => fn(data)); },
-  };
+async function _loadWCEthereumProvider() {
+  const existing = _wcProviderCtor();
+  if (existing?.init) return existing;
+  if (window._wcProviderPromise) return window._wcProviderPromise;
+
+  window._wcProviderPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = _ETH_WC_PROVIDER_URL;
+    s.async = true;
+    s.onload = () => {
+      const ctor = _wcProviderCtor();
+      ctor?.init ? resolve(ctor) : reject(new Error("WalletConnect provider failed to load"));
+    };
+    s.onerror = () => reject(new Error("Could not load WalletConnect provider"));
+    document.head.appendChild(s);
+  });
+  return window._wcProviderPromise;
 }
 </script>
 <style>
@@ -4573,6 +4551,14 @@ let _wcProvider = null;
 
 function connectWallet() { _wcOpenModal(); }
 
+function _htmlAttr(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function _wcOpenModal() {
   const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
   const overlay  = document.getElementById("wc-modal-overlay");
@@ -4583,6 +4569,12 @@ function _wcOpenModal() {
     if (isMobile) {
       body.innerHTML = `
         <div class="wc-wallet-list">
+          ${window.ethereum ? `
+          <button class="wc-wallet-btn" onclick="_wcConnectInjected()">
+            <span class="wc-wallet-icon-ph">&#x1F98A;</span>
+            <span class="wc-wallet-name">Browser wallet</span>
+            <span class="wc-wallet-tag">Connect here</span>
+          </button>` : ""}
           <button class="wc-wallet-btn" onclick="_wcConnectWC('metamask')">
             <span class="wc-wallet-icon-ph">&#x1F98A;</span>
             <span class="wc-wallet-name">MetaMask</span>
@@ -4655,16 +4647,22 @@ async function _wcConnectWC(walletHint) {
   const title    = document.getElementById("wc-modal-title");
   const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 
-  // ── Mobile: redirect into the wallet's in-app browser ─────────────────────
-  // The wallet's browser injects window.ethereum, so the user can then
-  // tap "Browser wallet" and connect normally.
+  if (isMobile && walletHint && window.ethereum) {
+    _walletConnecting = false;
+    return _wcConnectInjected();
+  }
+
+  // Mobile: redirect into the wallet's in-app browser.
+  // Once inside the wallet browser, window.ethereum is injected and the modal
+  // offers a direct "Browser wallet" connection.
   if (isMobile && walletHint) {
-    const dappUrl  = encodeURIComponent(window.location.href);
-    const hostname = window.location.hostname + window.location.pathname;
+    const currentUrl = window.location.href;
+    const dappUrl    = currentUrl.replace(/^https?:\/\//, "");
+    const encodedUrl = encodeURIComponent(currentUrl);
     const deepLinks = {
-      metamask: `https://metamask.app.link/dapp/${hostname}`,
-      rainbow:  `https://rnbwapp.com/dapp/${hostname}`,
-      coinbase: `https://go.cb-w.com/dapp?cb_url=${window.location.href}`,
+      metamask: `https://metamask.app.link/dapp/${dappUrl}`,
+      rainbow:  `https://rnbwapp.com/dapp/${dappUrl}`,
+      coinbase: `https://go.cb-w.com/dapp?cb_url=${encodedUrl}`,
     };
     const link = deepLinks[walletHint];
     if (link) {
@@ -4676,44 +4674,65 @@ async function _wcConnectWC(walletHint) {
     }
   }
 
-  // ── Desktop / generic WalletConnect: generate URI and show it ─────────────
-  if (body)  body.innerHTML = `<p style="color:var(--text-muted);font-family:'Crimson Pro',serif;font-size:0.9rem;text-align:center;padding:24px 0">Generating connection link&hellip;</p>`;
+  // Desktop / generic WalletConnect: create a real EIP-1193 provider.
+  if (body)  body.innerHTML = `<p style="color:var(--text-muted);font-family:'Crimson Pro',serif;font-size:0.9rem;text-align:center;padding:24px 0">Opening WalletConnect&hellip;</p>`;
   if (title) title.textContent = "WalletConnect";
 
   try {
-    // Call the WalletConnect relay directly to get a pairing URI
-    const relayRes = await fetch(
-      `https://relay.walletconnect.com/v1/?projectId=${_ETH_WC_PROJECT_ID}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: Date.now(), jsonrpc: "2.0", method: "wc_pairingCreate", params: {} })
-      }
-    );
-    const relayData = await relayRes.json();
-    const wcUri = relayData?.result?.uri;
-    if (!wcUri) throw new Error("Could not generate WalletConnect pairing link");
+    const EthereumProvider = await _loadWCEthereumProvider();
+    _wcProvider = await EthereumProvider.init({
+      projectId: _ETH_WC_PROJECT_ID,
+      chains: [1],
+      optionalChains: [1],
+      showQrModal: true,
+      metadata: {
+        name: "Kay's Works Auction",
+        description: "Kay's Works live auction",
+        url: window.location.origin,
+        icons: [`${window.location.origin}/images/kaysworkslogo.svg`],
+      },
+    });
 
-    if (body) body.innerHTML = `
-      <div style="text-align:center;padding:8px 0 4px">
-        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--linen);margin:0 0 14px">
-          Scan with your wallet app or copy the link below
-        </p>
-        <input id="wc-uri-input"
-          style="width:100%;box-sizing:border-box;font-size:0.6rem;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(196,132,90,0.2);border-radius:6px;color:var(--linen);font-family:monospace;cursor:pointer"
-          readonly value="${wcUri}" onclick="this.select();document.execCommand('copy');this.style.borderColor='var(--gold)'" title="Click to copy" />
-        <p style="font-family:'Crimson Pro',serif;font-size:0.72rem;color:var(--text-muted);font-style:italic;margin:8px 0 0">
-          Click the link above to copy, then paste in your wallet app
-        </p>
-      </div>
-      <button class="wc-cancel-btn" onclick="_wcCloseModal()" style="margin-top:16px">Cancel</button>`;
+    _wcProvider.on?.("display_uri", (uri) => {
+      if (!body) return;
+      body.innerHTML = `
+        <div style="text-align:center;padding:8px 0 4px">
+          <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--linen);margin:0 0 14px">
+            Scan the WalletConnect QR modal, or copy the link below.
+          </p>
+          <input id="wc-uri-input"
+            style="width:100%;box-sizing:border-box;font-size:0.6rem;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(196,132,90,0.2);border-radius:6px;color:var(--linen);font-family:monospace;cursor:pointer"
+            readonly value="${_htmlAttr(uri)}" onclick="this.select();document.execCommand('copy');this.style.borderColor='var(--gold)'" title="Click to copy" />
+          <p style="font-family:'Crimson Pro',serif;font-size:0.72rem;color:var(--text-muted);font-style:italic;margin:8px 0 0">
+            After approval, return here to sign the wallet verification message.
+          </p>
+        </div>
+        <button class="wc-cancel-btn" onclick="_wcDisconnectWC()" style="margin-top:16px">Cancel</button>`;
+    });
+
+    await _wcProvider.connect();
+    provider = new ethers.BrowserProvider(_wcProvider);
+    signer   = await provider.getSigner();
+    _wcCloseModal();
+    await _wcFinishConnect(await signer.getAddress(), "walletconnect");
+
+    _wcProvider.on?.("accountsChanged", () => location.reload());
+    _wcProvider.on?.("chainChanged",    () => location.reload());
+    _wcProvider.on?.("disconnect",      () => disconnectWallet());
   } catch(e) {
     _wcCloseModal();
     _wcHandleError(e);
   } finally {
     _walletConnecting = false;
-    setWalletUi("disconnected");
+    if (!signerAddress) setWalletUi("disconnected");
   }
+}
+
+async function _wcDisconnectWC() {
+  try { await _wcProvider?.disconnect?.(); } catch(_) {}
+  _wcCloseModal();
+  _walletConnecting = false;
+  if (!signerAddress) setWalletUi("disconnected");
 }
 
 async function _wcFinishConnect(addr, method) {
@@ -4968,6 +4987,9 @@ async function connectTezosWallet() {
 }
 
 function disconnectWallet() {
+  const wc = _wcProvider;
+  _wcProvider = null;
+  if (wc?.disconnect) wc.disconnect().catch(() => {});
   signer = null;
   signerAddress = null;
   tezosWallet = null;
