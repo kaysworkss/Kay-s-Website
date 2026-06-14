@@ -111,12 +111,13 @@ nav.scrolled {
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
 }
-/* Gradient shield: prevents ghost links from adjacent pages bleeding
-   through the transparent nav on the dark hero */
+/* Contrast scrim: a stronger top-down gradient so nav text stays readable over
+   ANY hero image — light or dark. Combined with light nav text + text-shadow
+   below, this guarantees legibility regardless of the photo behind it. */
 nav::before {
   content: '';
   position: absolute; inset: 0; z-index: -1;
-  background: linear-gradient(to bottom, rgba(20,12,8,0.5) 0%, transparent 100%);
+  background: linear-gradient(to bottom, rgba(20,12,8,0.72) 0%, rgba(20,12,8,0.34) 55%, transparent 100%);
   pointer-events: none;
   opacity: 1; transition: opacity 0.4s;
 }
@@ -124,36 +125,50 @@ nav.scrolled::before { opacity: 0; }
 .nav-logo {
   font-family: 'Montserrat', sans-serif;
   font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase;
-  color: var(--bark); text-decoration: none;
+  color: #f5ede0; text-decoration: none;
   display: flex; align-items: center;
   -webkit-tap-highlight-color: transparent;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+  transition: color 0.4s, text-shadow 0.4s;
 }
-body.dark .nav-logo { color: #e0c8a8; }
+/* When the nav has a solid background (scrolled), drop the shadow and use the
+   theme text color for clean contrast against the bar itself. */
+nav.scrolled .nav-logo { color: var(--bark); text-shadow: none; }
+body.dark nav.scrolled .nav-logo { color: #e0c8a8; }
 .nav-right { display: flex; align-items: center; gap: 1.4rem; }
 .nav-links { display: flex; gap: 1.4rem; }
 .nav-links a {
   font-family: 'Crimson Pro', serif; font-size: 0.92rem;
-  color: var(--text); opacity: 0.78;
-  transition: opacity 0.2s, color 0.2s;
+  color: #f5ede0; opacity: 0.92;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+  transition: opacity 0.2s, color 0.4s, text-shadow 0.4s;
 }
 .nav-links a:hover, .nav-links a.active { opacity: 1; color: var(--rust); }
+/* Scrolled (solid bar): theme text colour, no shadow. */
+nav.scrolled .nav-links a { color: var(--text); text-shadow: none; opacity: 0.82; }
+nav.scrolled .nav-links a:hover, nav.scrolled .nav-links a.active { color: var(--rust); opacity: 1; }
 .theme-btn {
   background: none; border: none;
   width: 32px; height: 32px;
   display: flex; align-items: center; justify-content: center;
   color: var(--gold); font-size: 1rem; border-radius: 50%;
-  transition: background 0.2s;
+  transition: background 0.2s, text-shadow 0.4s;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
 }
 .theme-btn:hover { background: rgba(201,153,58,0.1); }
+nav.scrolled .theme-btn { text-shadow: none; }
 .nav-cart {
   position: relative;
   background: none; border: none;
-  color: var(--text); font-size: 1.1rem;
+  color: #f5ede0; font-size: 1.1rem;
   display: flex; align-items: center; gap: 0.4rem;
   font-family: 'Crimson Pro', serif; font-size: 0.92rem;
-  opacity: 0.78; transition: opacity 0.2s, color 0.2s;
+  opacity: 0.92; transition: opacity 0.2s, color 0.4s, text-shadow 0.4s;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
 }
 .nav-cart:hover { opacity: 1; color: var(--rust); }
+nav.scrolled .nav-cart { color: var(--text); text-shadow: none; opacity: 0.82; }
+nav.scrolled .nav-cart:hover { color: var(--rust); opacity: 1; }
 .cart-badge {
   position: absolute; top: -5px; right: -8px;
   background: var(--rust); color: #fff;
@@ -2859,7 +2874,7 @@ body.dark { --text-muted: #b3a392; }
     <div class="confirm-screen" id="confirmScreen">
       <div class="confirm-icon">✦</div>
       <h2 class="confirm-title">Order received.</h2>
-      <p class="confirm-sub" id="confirmMsg">Thank you for your order. Kay will review and confirm fulfilment within 24 hours — check your email for details.</p>
+      <p class="confirm-sub" id="confirmMsg">Thank you for your order. Kay will be in touch about shipping, with the details sent to your email.</p>
       <p class="confirm-ref" id="confirmRef"></p>
       <button class="continue-btn" id="continueShopping">Continue shopping</button>
     </div>
@@ -4530,6 +4545,20 @@ const HIGH_CART_USD = 60;
 const COMPLIMENTARY_SHIPPING_USD = 500;
 const SHIPPING_DIM_DIVISOR = 5000;
 const SHIPPING_BUFFER = 1.2;
+// Domestic (Nigeria) weight scaling — must match the server (game.js) exactly,
+// modelled on GIG Logistics: base small/large rate covers the first 2kg, then
+// ₦1,000 per extra kg.
+const DOMESTIC_INCLUDED_KG = 2;
+const DOMESTIC_PER_KG_NGN = 1000;
+// Compute the domestic NGN delivery fee for a flat-tier zone, with the GIG-style
+// per-kg surcharge applied above the included weight.
+function domesticDeliveryNgn(rate, isLarge) {
+  const base = (isLarge ? rate.large : rate.small).ngn || 0;
+  const prof = cartShippingProfile();
+  const billableKg = Number(prof.billableKg) || (isLarge ? 1.5 : 0.7);
+  const extraKg = Math.max(0, Math.ceil(billableKg - DOMESTIC_INCLUDED_KG));
+  return base + extraKg * DOMESTIC_PER_KG_NGN;
+}
 const LARGE_PRINT_VARIANTS = ['12x16"','12x18"','18x24"','24x36"'];
 let _deliveryMethod = 'ship';
 let _deliveryZone = '';
@@ -4684,7 +4713,7 @@ function deliveryFeeNgn() {
   const r = DELIVERY_RATES[_deliveryZone];
   if (!r) return 0;
   const isLarge = cartHasLargePrint();
-  if (r.small !== undefined) return (isLarge ? r.large : r.small).ngn || 0;
+  if (r.small !== undefined) return domesticDeliveryNgn(r, isLarge);
   return Math.round(intlRate(_deliveryZone, isLarge) * 1600);
 }
 function deliveryFeeUsd() {
@@ -4694,8 +4723,8 @@ function deliveryFeeUsd() {
   if (!r) return 0;
   const isLarge = cartHasLargePrint();
   if (r.small !== undefined) {
-    const t = isLarge ? r.large : r.small;
-    return t.ngn ? +(t.ngn / 1600).toFixed(2) : 0;
+    const ngn = domesticDeliveryNgn(r, isLarge);
+    return ngn ? +(ngn / 1600).toFixed(2) : 0;
   }
   return intlRate(_deliveryZone, isLarge);
 }
@@ -4705,7 +4734,7 @@ function deliveryFeeDisplay(carrier = selectedIntlCarrier(_deliveryZone)) {
   if (!r) return 'TBD';
   if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 'Complimentary';
   const isLarge = cartHasLargePrint();
-  if (r.small !== undefined) return fmt((isLarge ? r.large : r.small).ngn);
+  if (r.small !== undefined) return fmt(domesticDeliveryNgn(r, isLarge));
   const usd = intlRate(_deliveryZone, isLarge, carrier);
   return '$' + usd.toFixed(0) + ' USD (~' + fmt(Math.round(usd * 1600)) + ')';
 }
@@ -4740,9 +4769,12 @@ function updateDeliveryEstimate() {
   document.getElementById('deliveryZoneLabel').textContent = info.label;
   document.getElementById('deliveryFeeDisplay').innerHTML = deliveryFeeDisplay();
   const profile = cartShippingProfile();
-  const packageNote = isLarge ? 'Protective tube / art packaging' : 'Flat-pack protective mailer';
-  document.getElementById('deliveryFeeNote').textContent =
-    `${packageNote} - ${profile.pieces.length || 1} package${profile.pieces.length === 1 ? '' : 's'}, billable ${profile.billableKg.toFixed(1)}kg`;
+  // Customer-facing note: describe the packaging reassuringly, without exposing
+  // billable weight or piece counts (internal shipping mechanics).
+  const packageNote = isLarge
+    ? 'Shipped in a protective tube with archival art packaging.'
+    : 'Shipped flat in a protective mailer.';
+  document.getElementById('deliveryFeeNote').textContent = packageNote;
 
   const carrierEl = document.getElementById('deliveryCarrierOptions');
   if (carrierEl) {
@@ -5341,10 +5373,10 @@ function showConfirmation(method, ref) {
   screen.classList.add('active');
   document.getElementById('confirmMsg').textContent =
     (method === 'eth' || method === 'tezos' || method === 'crypto')
-      ? 'Your crypto payment has been verified on-chain. Kay will review and prepare fulfilment.'
+      ? 'Your crypto payment has been verified on-chain. Kay will be in touch about shipping, with the details sent to your email.'
       : (method === 'discount')
-        ? 'Your order is fully covered by your discount — no payment was needed. Kay will review and prepare fulfilment.'
-        : 'Thank you for your order. Kay will confirm fulfilment within 24 hours — check your inbox for a receipt.';
+        ? 'Your order is fully covered by your discount — no payment needed. Kay will be in touch about shipping, with the details sent to your email.'
+        : 'Thank you for your order. Kay will be in touch about shipping, with the details sent to your email.';
   document.getElementById('confirmRef').textContent = ref ? 'Reference: ' + ref : '';
   cart = [];
   cartOrderNote = '';
