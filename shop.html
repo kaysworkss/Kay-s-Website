@@ -5532,7 +5532,23 @@ async function createPendingOrder(customer, method, checkoutQuote) {
 // Confirm payment against an existing pending order by its order_ref. Retries
 // while the chain is still indexing (server returns 409 "not confirmed yet").
 async function confirmPendingOrder(orderRef, opts) {
-  const payload = Object.assign({ order_ref: orderRef, order_hash: orderRef }, opts);
+  // Include the customer's details so that, in the create-from-quote-at-confirm
+  // flow, the order row (and the confirmation emails) have name/email/address.
+  // Without these the order would be created with an empty email and the
+  // customer receipt would fail to send.
+  let customer = {};
+  try { customer = getFormData() || {}; } catch (_) {}
+  const payload = Object.assign({
+    order_ref: orderRef,
+    order_hash: orderRef,
+    name: customer.name || '',
+    email: customer.email || '',
+    phone: customer.phone || '',
+    address: customer.address || '',
+    delivery_method: customer.deliveryMethod || _deliveryMethod || 'ship',
+    delivery_zone: customer.deliveryZone || _deliveryZone || '',
+    delivery_carrier: customer.deliveryCarrier || _deliveryCarrier || '',
+  }, opts);
   // Chain indexers (TzKT, ETH RPC) can lag 30-120s after broadcast.
   // Retry every 5s for up to 6 minutes. The server returns 409 for ALL
   // "not yet" states so we only stop on genuine hard business failures.
