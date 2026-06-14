@@ -1813,10 +1813,48 @@ footer {
 /* Gold divider ornament */
 .footer-links a { color: rgba(232,213,176,0.45); }
 
+/* ── Mobile hamburger menu ── */
+.nav-hamburger {
+  display: none; /* hidden on desktop */
+  background: none; border: none; padding: 0.4rem;
+  flex-direction: column; gap: 4px; cursor: pointer;
+  z-index: 210;
+}
+.nav-hamburger span {
+  display: block; width: 20px; height: 2px;
+  background: #f5ede0; border-radius: 2px;
+  transition: transform 0.3s, opacity 0.3s;
+}
+nav.scrolled .nav-hamburger span { background: var(--text); }
+/* X animation when open */
+.nav-hamburger.open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.nav-hamburger.open span:nth-child(2) { opacity: 0; }
+.nav-hamburger.open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+.nav-mobile-menu {
+  display: none;
+  position: fixed; top: 60px; left: 0; right: 0;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  padding: 1.5rem 2rem;
+  z-index: 199;
+  flex-direction: column; gap: 1.2rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+.nav-mobile-menu.open { display: flex; }
+.nav-mobile-menu a {
+  font-family: 'Crimson Pro', serif; font-size: 1.1rem;
+  color: var(--text); text-decoration: none;
+  padding: 0.4rem 0; border-bottom: 1px solid var(--border);
+  transition: color 0.2s;
+}
+.nav-mobile-menu a:last-child { border-bottom: none; }
+.nav-mobile-menu a:hover, .nav-mobile-menu a.active { color: var(--rust); }
+
 /* ── Responsive ── */
 @media(max-width:600px){
   .shop-grid { grid-template-columns:1fr 1fr; gap:1rem; }
   .nav-links { display:none; }
+  .nav-hamburger { display: flex; }
   .form-row-2 { grid-template-columns:1fr; }
   .pay-tabs { flex-wrap:wrap; }
   .pay-tab { flex:1 1 50%; }
@@ -2091,10 +2129,14 @@ body.dark { --text-muted: #b3a392; }
 <nav id="nav">
   <a href="/" class="nav-logo"><span style="font-weight:600">KAY'S</span>&nbsp; <span style="font-weight:500">WORKS</span></a>
   <div class="nav-right">
+    <button class="nav-hamburger" id="navHamburger" type="button" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </button>
     <div class="nav-links">
       <a href="/">Home</a>
       <a href="/auction">Auction</a>
-      <a href="/shop" class="active">Shop</a>
+      <a href="/#commissions">Commissions</a>
+      <a href="/#about">About the artist</a>
     </div>
     <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle theme">&#x2600;&#xFE0E;</button>
     <button class="nav-cart" id="cartBtn" type="button" aria-label="Open cart">
@@ -2103,6 +2145,14 @@ body.dark { --text-muted: #b3a392; }
     </button>
   </div>
 </nav>
+
+<!-- Mobile nav menu (hidden on desktop, toggled by hamburger) -->
+<div class="nav-mobile-menu" id="navMobileMenu">
+  <a href="/">Home</a>
+  <a href="/auction">Auction</a>
+  <a href="/#commissions">Commissions</a>
+  <a href="/#about">About the artist</a>
+</div>
 
 <!-- Hero - full-bleed cinematic -->
 <section class="shop-hero">
@@ -3689,6 +3739,31 @@ document.getElementById('themeBtn').addEventListener('click', () => {
   document.getElementById('themeBtn').textContent = isDark ? 'Light' : 'Dark';
 });
 initTheme();
+
+// Mobile hamburger menu toggle
+(function() {
+  const btn = document.getElementById('navHamburger');
+  const menu = document.getElementById('navMobileMenu');
+  if (!btn || !menu) return;
+  btn.addEventListener('click', () => {
+    btn.classList.toggle('open');
+    menu.classList.toggle('open');
+  });
+  // Close on link tap
+  menu.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => {
+      btn.classList.remove('open');
+      menu.classList.remove('open');
+    });
+  });
+  // Close on outside tap
+  document.addEventListener('click', e => {
+    if (!btn.contains(e.target) && !menu.contains(e.target)) {
+      btn.classList.remove('open');
+      menu.classList.remove('open');
+    }
+  });
+})();
 
 /* ─── Nav scroll ─── */
 const nav = document.getElementById('nav');
