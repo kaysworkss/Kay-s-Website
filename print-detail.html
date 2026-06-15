@@ -550,6 +550,23 @@ body.dark .cart-toast { background:#2a1c14; }
 .cart-toast-action:hover { border-color:var(--clay); color:var(--sand); }
 
 /* ── Related prints ── */
+
+/* ── Sizing guide ── */
+.sizing-guide { margin: 2rem 0; padding: 2rem 0; border-top: 1px solid var(--border); }
+.sizing-guide-title {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 1.2rem;
+}
+.sizing-svg-wrap {
+  display: flex; justify-content: center; padding: 1rem 0;
+  overflow-x: auto;
+}
+.sizing-svg-wrap svg { max-width: 100%; height: auto; }
+.sizing-note {
+  font-size: 0.82rem; color: var(--text-muted); line-height: 1.6;
+  margin-top: 1rem; text-align: center;
+}
 .related-section {
   padding: 4rem clamp(1.2rem,4vw,3rem) 5rem;
   border-top:1px solid var(--border);
@@ -1459,15 +1476,70 @@ function renderProduct(p) {
             <span class="price-usd" id="priceUsd">${fmtUsd(usd)} USD</span>
           </div>
           ${(() => {
-            const soldOut = isLimitedKey(p, _selectedVariant) && (editionRemaining(p, _selectedVariant) ?? 0) <= 0;
-            const disabled = !_selectedVariant || soldOut;
-            const label = soldOut ? 'Sold out' : (_selectedVariant ? 'Add to bag' : 'Unavailable');
-            return `<button class="add-to-cart-btn" id="addBtn" onclick="handleAddToCart()" ${disabled ? 'disabled' : ''}>${label}</button>`;
+            const isOneOfOne = p.print_edition === 'one_of_one';
+            const hasNoPrice = !ngn && !usd;
+            const isSoldOut = p.is_sold || (isLimitedKey(p, _selectedVariant) && (editionRemaining(p, _selectedVariant) ?? 0) <= 0);
+            if (isOneOfOne && hasNoPrice && !isSoldOut) {
+              return '<button class="add-to-cart-btn enquire-action" onclick="openEnquire(\'' + escapeAttr(p.name) + '\')">Enquire about this work →</button>';
+            }
+            if (isSoldOut) {
+              return '<button class="add-to-cart-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold out</button>';
+            }
+            const disabled = !_selectedVariant;
+            const label = _selectedVariant ? 'Add to bag' : 'Unavailable';
+            return '<button class="add-to-cart-btn" id="addBtn" onclick="handleAddToCart()" ' + (disabled ? 'disabled' : '') + '>' + label + '</button>';
           })()}
           <p class="shipping-note">
             Ships from Nigeria via GIG Logistics (domestic) or DHL / UPS (international).
             ${p.is_large_print ? ' This piece ships rolled in an archival tube.' : ' Ships flat in a rigid board mailer.'}
           </p>
+        </div>
+
+        <!-- Sizing guide: frame sizes relative to a person (prints only) -->
+        <div class="sizing-guide">
+          <p class="sizing-guide-title">Frame sizing guide</p>
+          <div class="sizing-svg-wrap">
+            <svg viewBox="0 0 600 340" width="600" xmlns="http://www.w3.org/2000/svg" style="font-family:'Montserrat',sans-serif">
+              <!-- Human silhouette (approx 170cm / 67in, scaled: 1in = 4px) -->
+              <g transform="translate(30,2)">
+                <line x1="24" y1="0" x2="24" y2="268" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>
+                <ellipse cx="24" cy="20" rx="12" ry="14" fill="none" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
+                <line x1="24" y1="34" x2="24" y2="160" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
+                <line x1="0" y1="70" x2="48" y2="70" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
+                <line x1="14" y1="160" x2="6" y2="268" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
+                <line x1="34" y1="160" x2="42" y2="268" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
+                <text x="24" y="288" text-anchor="middle" fill="var(--text-muted)" font-size="9" opacity="0.6">~170 cm</text>
+              </g>
+              <!-- Frames at eye level (~150cm from ground = y≈36) -->
+              <g>
+                <!-- 4×4 mini -->
+                <rect x="100" y="220" width="16" height="16" fill="none" stroke="var(--clay)" stroke-width="1.2" rx="1"/>
+                <text x="108" y="250" text-anchor="middle" fill="var(--text-muted)" font-size="8">4×4"</text>
+                <text x="108" y="260" text-anchor="middle" fill="var(--text-muted)" font-size="7" opacity="0.5">Mini</text>
+                <!-- 5×7 -->
+                <rect x="145" y="208" width="20" height="28" fill="none" stroke="var(--clay)" stroke-width="1.2" rx="1"/>
+                <text x="155" y="250" text-anchor="middle" fill="var(--text-muted)" font-size="8">5×7"</text>
+                <!-- 8×10 -->
+                <rect x="195" y="188" width="32" height="40" fill="none" stroke="var(--clay)" stroke-width="1.2" rx="1"/>
+                <text x="211" y="244" text-anchor="middle" fill="var(--text-muted)" font-size="8">8×10"</text>
+                <!-- 11×14 -->
+                <rect x="258" y="172" width="44" height="56" fill="none" stroke="var(--rust)" stroke-width="1.5" rx="1"/>
+                <text x="280" y="244" text-anchor="middle" fill="var(--rust)" font-size="9" font-weight="600">11×14"</text>
+                <text x="280" y="256" text-anchor="middle" fill="var(--text-muted)" font-size="7">Popular</text>
+                <!-- 18×24 -->
+                <rect x="335" y="132" width="72" height="96" fill="none" stroke="var(--clay)" stroke-width="1.5" rx="1"/>
+                <text x="371" y="244" text-anchor="middle" fill="var(--text-muted)" font-size="9">18×24"</text>
+                <text x="371" y="256" text-anchor="middle" fill="var(--text-muted)" font-size="7">Statement</text>
+                <!-- 24×36 -->
+                <rect x="440" y="92" width="96" height="144" fill="none" stroke="var(--clay)" stroke-width="1.5" rx="1"/>
+                <text x="488" y="252" text-anchor="middle" fill="var(--text-muted)" font-size="9">24×36"</text>
+                <text x="488" y="264" text-anchor="middle" fill="var(--text-muted)" font-size="7">Gallery</text>
+              </g>
+              <!-- Baseline -->
+              <line x1="20" y1="268" x2="580" y2="268" stroke="var(--border)" stroke-width="0.5"/>
+            </svg>
+          </div>
+          <p class="sizing-note">All sizes shown to scale relative to an average adult. Prints ship unframed.</p>
         </div>
       </div>
     </div>`;
@@ -1933,9 +2005,12 @@ function closeShare() {
 
 /* ─── Enquiry widget ─── */
 const KW_WHATSAPP = '2349055372963'; // Kay's WhatsApp (international format, digits only)
-function openEnquire() {
+function openEnquire(context) {
   document.getElementById('enquireBody').style.display = '';
   document.getElementById('enquireDone').style.display = 'none';
+  const titleEl = document.getElementById('enquireTitle');
+  if (titleEl) titleEl.textContent = context ? 'Ask about this piece' : 'Ask us anything';
+  document.getElementById('enquireOverlay')._context = context || '';
   document.getElementById('enquireOverlay').classList.add('show');
 }
 function closeEnquire() { document.getElementById('enquireOverlay').classList.remove('show'); }
