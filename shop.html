@@ -1859,15 +1859,17 @@ nav.scrolled .nav-hamburger span { background: var(--text); }
 .nav-mobile-menu a:last-child { border-bottom: none; }
 .nav-mobile-menu a:hover, .nav-mobile-menu a.active { color: var(--rust); }
 
-/* ── Mobile grid view toggle ── */
+/* ── Mobile grid view toggle (in nav bar) ── */
 .grid-toggle {
   display: none; /* hidden on desktop */
-  background: none; border: 1px solid var(--border); border-radius: 8px;
-  padding: 0.45rem; color: var(--text-muted); cursor: pointer;
-  transition: color 0.2s, border-color 0.2s;
-  flex-shrink: 0;
+  background: none; border: none; padding: 0.3rem;
+  color: #f5ede0; cursor: pointer;
+  transition: color 0.2s;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
 }
-.grid-toggle:hover { color: var(--clay); border-color: var(--clay); }
+.grid-toggle:hover { color: var(--clay); }
+nav.scrolled .grid-toggle { color: var(--text-muted); text-shadow: none; }
+nav.scrolled .grid-toggle:hover { color: var(--clay); }
 @media (max-width: 600px) {
   .grid-toggle { display: flex; align-items: center; justify-content: center; }
 }
@@ -2162,6 +2164,14 @@ body.dark { --text-muted: #b3a392; }
 </div>
 
 <!-- Nav -->
+<!-- Payment processing banner (shown while confirming a Paystack redirect) -->
+<div id="paymentLoadingBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(90deg,var(--rust),var(--clay));color:#fff;text-align:center;padding:0.7rem 1rem;font-family:'Montserrat',sans-serif;font-size:0.8rem;font-weight:500;letter-spacing:0.04em">
+  <span id="paymentLoadingText">Confirming your payment… please wait</span>
+  <div style="margin-top:0.4rem;height:3px;background:rgba(255,255,255,0.2);border-radius:2px;overflow:hidden">
+    <div id="paymentLoadingBar" style="height:100%;width:0%;background:#fff;border-radius:2px;transition:width 0.5s ease"></div>
+  </div>
+</div>
+
 <nav id="nav">
   <a href="/" class="nav-logo"><span style="font-weight:600">KAY'S</span>&nbsp; <span style="font-weight:500">WORKS</span></a>
   <div class="nav-right">
@@ -2175,6 +2185,12 @@ body.dark { --text-muted: #b3a392; }
       <a href="/#about">About the artist</a>
     </div>
     <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle theme">&#x2600;&#xFE0E;</button>
+    <button class="grid-toggle" id="gridToggle" type="button" aria-label="Toggle grid layout" title="Switch view">
+      <svg id="gridToggleIcon" width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+        <rect x="0" y="0" width="8" height="8" rx="1.5"/><rect x="10" y="0" width="8" height="8" rx="1.5"/>
+        <rect x="0" y="10" width="8" height="8" rx="1.5"/><rect x="10" y="10" width="8" height="8" rx="1.5"/>
+      </svg>
+    </button>
     <button class="nav-cart" id="cartBtn" type="button" aria-label="Open cart">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:inline-block;vertical-align:middle"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
       <span class="cart-badge" id="cartBadge">0</span>
@@ -2252,6 +2268,15 @@ body.dark { --text-muted: #b3a392; }
     <span class="promo-ticker-item">📦 Archival packaging on every order</span>
     <span class="promo-ticker-sep">✦</span>
   </div>
+</div>
+
+<!-- Filters — right below the hero -->
+<div class="shop-filters" id="filterBar" role="navigation" aria-label="Shop categories">
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="prints">Prints</button>
+  <button class="filter-btn" data-filter="merch">Merch</button>
+  <button class="filter-btn" data-filter="notebooks">Notebooks</button>
+  <button class="filter-btn" data-filter="stickers">Stickers</button>
 </div>
 
 <!-- Collection tiles -->
@@ -2335,22 +2360,6 @@ body.dark { --text-muted: #b3a392; }
     </div>
   </div>
 </section>
-
-<!-- Filters -->
-<div class="shop-filters" id="filterBar" role="navigation" aria-label="Shop categories">
-  <button class="filter-btn active" data-filter="all">All</button>
-  <button class="filter-btn" data-filter="prints">Prints</button>
-  <button class="filter-btn" data-filter="merch">Merch</button>
-  <button class="filter-btn" data-filter="notebooks">Notebooks</button>
-  <button class="filter-btn" data-filter="stickers">Stickers</button>
-  <!-- Mobile grid view toggle -->
-  <button class="grid-toggle" id="gridToggle" type="button" aria-label="Toggle grid layout" title="Switch view">
-    <svg id="gridToggleIcon" width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
-      <rect x="0" y="0" width="8" height="8" rx="1.5"/><rect x="10" y="0" width="8" height="8" rx="1.5"/>
-      <rect x="0" y="10" width="8" height="8" rx="1.5"/><rect x="10" y="10" width="8" height="8" rx="1.5"/>
-    </svg>
-  </button>
-</div>
 
 <!-- Products -->
 <section class="shop-section" id="shopGrid">
@@ -2736,6 +2745,12 @@ body.dark { --text-muted: #b3a392; }
             <div id="shippingValuePrompt" style="display:none;margin-top:0.8rem;padding:0.75rem 0.8rem;border:1px solid rgba(196,132,90,0.35);background:rgba(196,132,90,0.08);border-radius:8px;font-size:0.76rem;line-height:1.55;color:var(--text-muted)"></div>
           </div>
         </div>
+
+        <!-- Collector consent -->
+        <label style="display:flex;align-items:flex-start;gap:0.6rem;margin:1.2rem 0 1.6rem;cursor:pointer">
+          <input type="checkbox" id="ckCollectorConsent" checked style="accent-color:var(--clay);width:16px;height:16px;margin-top:2px;flex-shrink:0"/>
+          <span style="font-size:0.82rem;color:var(--text-muted);line-height:1.5">Join the collector circle — get early access to new drops, exclusive offers, and studio updates. You can unsubscribe anytime.</span>
+        </label>
 
         <!-- Payment -->
         <p class="ck-section-title">Payment</p>
@@ -5030,6 +5045,32 @@ setDeliveryMethod('ship');
   });
 })();
 
+// Abandoned cart capture: when the customer fills in their email and moves
+// away from the field, silently save their cart server-side. If they don't
+// complete the purchase, the cron job can send a gentle reminder later.
+(function() {
+  const emailField = document.getElementById('ckEmail');
+  if (!emailField) return;
+  let lastSaved = '';
+  emailField.addEventListener('blur', async () => {
+    const email = emailField.value.trim();
+    if (!email || !email.includes('@') || !cart.length) return;
+    if (email === lastSaved) return; // don't re-save the same email
+    lastSaved = email;
+    const name = (document.getElementById('ckName')?.value || '').trim();
+    try {
+      await fetch('/api/shop/abandoned-cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email, name,
+          cart: cart.map(c => ({ id: c.id, name: c.name, variant: c.variant, qty: c.qty, image: c.image })),
+        }),
+      });
+    } catch (_) {} // Silent — this is a background optimization
+  });
+})();
+
 // Mobile order-summary collapse toggle (no effect on desktop — pointer-events
 // are disabled there via CSS so it stays permanently expanded).
 (function() {
@@ -5499,6 +5540,7 @@ function checkoutPayload(customer, method, extra = {}) {
     discount_code:    _appliedDiscount?.code || '',
     tip_ngn:          tipNgn(),
     tip_usd:          tipUsd(),
+    collector_consent: document.getElementById('ckCollectorConsent')?.checked !== false,
     ...extra,
   };
 }
@@ -6059,13 +6101,36 @@ async function finalizeReturnedGatewayCheckout() {
   const params = new URLSearchParams(location.search);
   const gatewayRef = params.get('reference') || params.get('trxref') || params.get('tx_ref') || params.get('transaction_id');
   if (!gatewayRef) return;
+
+  // Show the processing banner so the customer knows something is happening
+  const banner = document.getElementById('paymentLoadingBanner');
+  const bar = document.getElementById('paymentLoadingBar');
+  const bannerText = document.getElementById('paymentLoadingText');
+  if (banner) {
+    banner.style.display = '';
+    // Animate the progress bar to ~80% over 8 seconds (the rest completes on success)
+    let progress = 0;
+    const tick = setInterval(() => {
+      progress = Math.min(progress + 2, 80);
+      if (bar) bar.style.width = progress + '%';
+    }, 200);
+    // Store the interval so we can clear it later
+    banner._tick = tick;
+  }
+  function hideBanner(success) {
+    if (!banner) return;
+    if (banner._tick) clearInterval(banner._tick);
+    if (bar) bar.style.width = '100%';
+    if (bannerText) bannerText.textContent = success ? 'Payment confirmed ✓' : 'Payment received — see details below';
+    setTimeout(() => { banner.style.display = 'none'; }, success ? 1500 : 3000);
+  }
+
   let pending = null;
   try { pending = JSON.parse(sessionStorage.getItem('kwPendingCheckout') || 'null'); } catch (_) {}
   if (!pending || !pending.customer || !pending.method || !pending.quote) {
-    // No pending context (e.g. opened in a new tab). Still acknowledge the
-    // payment so the customer isn't left wondering.
     showConfirmation('paystack', gatewayRef);
     history.replaceState(null, '', location.pathname + location.hash);
+    hideBanner(true);
     return;
   }
   const ref = pending.ref || gatewayRef;
@@ -6075,12 +6140,11 @@ async function finalizeReturnedGatewayCheckout() {
     cart = [];
     saveCart();
     if (typeof updateCartUI === 'function') updateCartUI();
-    // Show the human-friendly ORD-… order number, not the Paystack ref.
     showConfirmation(pending.method, result?.order_ref || ref);
     history.replaceState(null, '', location.pathname + location.hash);
+    hideBanner(true);
   } catch (e) {
     const msg = (e.message || '').toLowerCase();
-    // If the order was already recorded on a previous attempt, treat as success.
     if (/already been recorded|already.*submitted|duplicate/i.test(msg)) {
       sessionStorage.removeItem('kwPendingCheckout');
       cart = [];
@@ -6088,9 +6152,11 @@ async function finalizeReturnedGatewayCheckout() {
       if (typeof updateCartUI === 'function') updateCartUI();
       showConfirmation(pending.method, ref);
       history.replaceState(null, '', location.pathname + location.hash);
+      hideBanner(true);
       return;
     }
     showToast('Payment received, but order recording needs review: ' + (e.message || 'unknown error'), 6000);
+    hideBanner(false);
   }
 }
 /* ─── Admin ─── */
@@ -8490,6 +8556,15 @@ function maybeOpenCheckoutFromHash() {
   // Modal/drawer is now up — drop the loading veil.
   hideCheckoutLoading();
 }
+
+// Recover an abandoned cart from a reminder email link (?recover=TOKEN).
+(function recoverAbandonedCart() {
+  const params = new URLSearchParams(location.search);
+  const token = params.get('recover');
+  if (!token) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  fetch('/api/shop/abandoned-cart?token=' + encodeURIComponent(token), { method: 'DELETE' }).catch(() => {});
+})();
 
 loadShopData()
   .then(maybeOpenCheckoutFromHash)
