@@ -216,6 +216,20 @@ nav.scrolled .nav-cart:hover { color: var(--rust); opacity: 1; }
   padding: 0 clamp(1.4rem,6vw,5rem) clamp(4rem,8vw,7rem);
   max-width: 900px;
 }
+/* Frosted backdrop behind the text only — ensures readability on any image
+   without darkening the rest of the hero. No vignette needed. */
+.shop-hero-content::before {
+  content: '';
+  position: absolute;
+  inset: -1.5rem -2rem -2rem -2.5rem;
+  background: rgba(14,10,8,0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 20px;
+  z-index: -1;
+  mask-image: linear-gradient(to top, rgba(0,0,0,1) 40%, rgba(0,0,0,0.6) 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 40%, rgba(0,0,0,0.6) 70%, transparent 100%);
+}
 .shop-hero-eyebrow {
   font-family: 'Cinzel', serif; font-size: 0.75rem;
   letter-spacing: 0.35em; text-transform: uppercase;
@@ -514,11 +528,11 @@ body.dark .promo-ticker { background: #1a1210; }
   letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted);
 }
 .featured-eyebrow {
-  font-family: 'Cinzel', serif; font-size: 0.52rem;
-  letter-spacing: 0.35em; text-transform: uppercase; color: var(--clay);
+  font-family: 'Cinzel', serif; font-size: 0.68rem;
+  letter-spacing: 0.3em; text-transform: uppercase; color: var(--clay);
   margin-bottom: 0.9rem; display: flex; align-items: center; gap: 0.7rem;
 }
-.featured-eyebrow::before { content: '✦'; font-size: 0.38rem; }
+.featured-eyebrow::before { content: '✦'; font-size: 0.48rem; }
 .featured-heading {
   font-family: 'Cormorant Garamond', serif;
   font-size: clamp(2.4rem,5vw,4rem); font-weight: 300;
@@ -536,11 +550,11 @@ body.dark .promo-ticker { background: #1a1210; }
 }
 .featured-meta-item { display: flex; flex-direction: column; gap: 0.25rem; }
 .featured-meta-label {
-  font-family: 'Cinzel', serif; font-size: 0.44rem;
-  letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted);
 }
 .featured-meta-val {
-  font-family: 'Cormorant Garamond', serif; font-size: 1rem; color: var(--gold);
+  font-family: 'Cormorant Garamond', serif; font-size: 1.15rem; color: var(--gold);
 }
 .featured-ctas { display: flex; gap: 1rem; }
 
@@ -560,8 +574,8 @@ body.dark .promo-ticker { background: #1a1210; }
 
 /* ── Filters ── */
 .shop-filters {
-  display: flex; justify-content: center; flex-wrap: wrap; gap: 0.5rem;
-  padding: 2.5rem clamp(1.2rem,4vw,3rem) 2.5rem;
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 0.6rem;
+  padding: 2rem clamp(1.2rem,4vw,3rem);
   background: var(--bg);
   position: sticky; top: 60px; z-index: 50;
   border-bottom: 1px solid var(--border);
@@ -573,18 +587,28 @@ body.dark .shop-filters {
   background: rgba(20,16,16,0.92);
 }
 .filter-btn {
-  font-family: 'Cinzel', serif; font-size: 0.55rem;
-  letter-spacing: 0.22em; text-transform: uppercase;
-  padding: 0.6rem 1.5rem;
-  border: 1px solid var(--border);
-  background: transparent; color: var(--text-muted);
+  font-family: 'Montserrat', sans-serif; font-size: 0.72rem;
+  font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.65rem 1.6rem;
+  border: 2px solid var(--clay);
+  background: transparent; color: var(--clay);
   border-radius: 40px;
-  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
 }
-.filter-btn:hover { border-color: var(--clay); color: var(--clay); }
+.filter-btn:hover {
+  background: rgba(196,132,90,0.12);
+  color: var(--rust);
+  border-color: var(--rust);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(158,79,46,0.15);
+}
 .filter-btn.active {
   background: var(--rust); border-color: var(--rust);
-  color: var(--linen);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(158,79,46,0.3);
+  transform: translateY(-1px);
 }
 
 /* ── Grid ── */
@@ -2222,6 +2246,15 @@ body.dark { --text-muted: #b3a392; }
   </div>
 </section>
 
+<!-- Filter pills — immediately below the hero -->
+<div class="shop-filters" id="filterBar" role="navigation" aria-label="Shop categories">
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="prints">Prints</button>
+  <button class="filter-btn" data-filter="merch">Merch</button>
+  <button class="filter-btn" data-filter="notebooks">Notebooks</button>
+  <button class="filter-btn" data-filter="stickers">Stickers</button>
+</div>
+
 <!-- Marquee strip -->
 <div class="marquee-strip" aria-hidden="true">
   <div class="marquee-track">
@@ -2268,15 +2301,6 @@ body.dark { --text-muted: #b3a392; }
     <span class="promo-ticker-item">📦 Archival packaging on every order</span>
     <span class="promo-ticker-sep">✦</span>
   </div>
-</div>
-
-<!-- Filters — right below the hero -->
-<div class="shop-filters" id="filterBar" role="navigation" aria-label="Shop categories">
-  <button class="filter-btn active" data-filter="all">All</button>
-  <button class="filter-btn" data-filter="prints">Prints</button>
-  <button class="filter-btn" data-filter="merch">Merch</button>
-  <button class="filter-btn" data-filter="notebooks">Notebooks</button>
-  <button class="filter-btn" data-filter="stickers">Stickers</button>
 </div>
 
 <!-- Collection tiles -->
@@ -3946,7 +3970,7 @@ function buildPrintCard(p) {
     // 1-of-1 with no price/variants OR admin-flagged enquire-only
     const isOneOfOne = p.print_edition === 'one_of_one';
     const isSold = p.is_sold;
-    const isEnquire = p.enquire_only === true || isOneOfOne;
+    const isEnquire = p.enquire_only || isOneOfOne;
     let footerHtml;
     if (isSold) {
       footerHtml = `<div class="card-price"><span class="price-ngn" style="color:var(--text-muted)">Sold</span></div>
@@ -4002,7 +4026,7 @@ function buildPrintCard(p) {
   const isOneOfOne = p.print_edition === 'one_of_one';
   const hasNoPrice = !ngn && !usd;
   const isSold = p.is_sold;
-  const isEnquireOnly = p.enquire_only === true || (isOneOfOne && hasNoPrice);
+  const isEnquireOnly = p.enquire_only || (isOneOfOne && hasNoPrice);
 
   let actionHtml;
   if (isSold) {
@@ -6890,6 +6914,17 @@ function renderAdminProducts() {
         if (prod) this.value = slugify(prod.name || '');
       }
     });
+    // Auto-fill empty slugs on load so old products get slugs immediately.
+    // The admin just needs to review and hit Save.
+    if (!input.value.trim()) {
+      const prod = SHOP_CONFIG.products[idx];
+      if (prod && prod.name) {
+        input.value = slugify(prod.name);
+        input.style.borderColor = 'var(--clay)';
+        // Brief highlight so the admin notices which slugs were auto-filled
+        setTimeout(() => { input.style.borderColor = ''; }, 3000);
+      }
+    }
   });
 
   // Add and remove variant rows for non-print products
