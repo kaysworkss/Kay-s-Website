@@ -1875,6 +1875,16 @@ nav.scrolled .nav-hamburger span { background: var(--text); }
 .shop-grid.single-col {
   grid-template-columns: 1fr !important;
 }
+.show-more-btn {
+  display: block; margin: 1.5rem auto 0;
+  font-family: 'Cinzel', serif; font-size: 0.56rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  padding: 0.75rem 2.2rem; background: transparent;
+  border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text-muted); cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.show-more-btn:hover { border-color: var(--clay); color: var(--clay); }
 
 /* ── Responsive ── */
 @media(max-width:600px){
@@ -3918,6 +3928,20 @@ function buildPrintCard(p) {
     const viewHover = p.slug
       ? `<a class="card-img-hover" href="/shop/${p.slug}" rel="noopener" style="text-decoration:none"><span class="card-img-hover-label">View print</span></a>`
       : `<div class="card-img-hover"><span class="card-img-hover-label">View print</span></div>`;
+    // 1-of-1 with no price/variants: show "Enquire" instead of "Unavailable"
+    const isOneOfOne = p.print_edition === 'one_of_one';
+    const isSold = p.is_sold;
+    let footerHtml;
+    if (isSold) {
+      footerHtml = `<div class="card-price"><span class="price-ngn" style="color:var(--text-muted)">Sold</span></div>
+        <button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold</button>`;
+    } else if (isOneOfOne) {
+      footerHtml = `<div class="card-price"><span class="price-ngn">Unique work</span></div>
+        <button class="interest-btn" data-pid="${p.id}" data-pname="${escapeAttr(p.name)}" onclick="openInterestForm('${escapeAttr(p.id)}','${escapeAttr(p.name)}')">Acquire this work →</button>`;
+    } else {
+      footerHtml = `<div class="card-price"><span class="price-ngn">Unavailable</span></div>
+        <button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed">Unavailable</button>`;
+    }
     card.innerHTML = `
       <div class="card-img">${imgHtml}${badgeHtml}${buildSoldOverlay(p)}${viewHover}</div>
       <div class="card-body">
@@ -3925,16 +3949,18 @@ function buildPrintCard(p) {
         <p class="card-category">${p.category}</p>
         <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
         <p class="card-desc">${p.desc}</p>
-        <div class="card-footer">
-          <div class="card-price"><span class="price-ngn">Unavailable</span></div>
-          <button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed">Unavailable</button>
-        </div>
+        <div class="card-footer">${footerHtml}</div>
         ${detailsLink(p)}
       </div>`;
     return card;
   }
 
   const active = getActivePrintOption(p);
+  if (!active) {
+    // Shouldn't happen (options.length > 0 was checked), but defend gracefully.
+    card.innerHTML = `<div class="card-body"><p>Product configuration error</p></div>`;
+    return card;
+  }
   selectedTypes[p.id] = active.type;
   const sizes = optionDisplaySizes(active);
   const defaultSize = sizes[0] || '';
@@ -4177,15 +4203,19 @@ function renderProducts() {
   Object.values(sublabels).forEach(l => { if (l) l.style.display = 'none'; });
 
   SHOP_CONFIG.products.forEach(p => {
-    if (p.category === 'prints' && p.print_edition) {
-      const grid = editionGrids[p.print_edition] || grids.prints;
-      if (grid) grid.appendChild(buildCard(p));
-      // Show the sublabel for this edition type
-      const lbl = sublabels[p.print_edition];
-      if (lbl) lbl.style.display = '';
-    } else {
-      const grid = grids[p.category];
-      if (grid) grid.appendChild(buildCard(p));
+    try {
+      if (p.category === 'prints' && p.print_edition) {
+        const grid = editionGrids[p.print_edition] || grids.prints;
+        if (grid) grid.appendChild(buildCard(p));
+        const lbl = sublabels[p.print_edition];
+        if (lbl) lbl.style.display = '';
+      } else {
+        const grid = grids[p.category];
+        if (grid) grid.appendChild(buildCard(p));
+      }
+    } catch (e) {
+      console.error(`[shop] Failed to render product "${p.name || p.id}":`, e.message);
+      // Skip this product instead of crashing the entire shop.
     }
   });
 
@@ -4212,6 +4242,34 @@ function renderProducts() {
 
   // Reflect any stock already consumed by the saved cart on first paint.
   SHOP_CONFIG.products.forEach(p => syncCardStock(p.id, selectedVariants[p.id]));
+
+  // Paginate: show first batch, hide the rest with a "Show more" button.
+  applyShowMore();
+}
+
+/* ─── Show More pagination ─── */
+const PRODUCTS_PER_BATCH = 8;
+function applyShowMore() {
+  document.querySelectorAll('.shop-grid').forEach(grid => {
+    // Remove old show-more buttons
+    const oldBtn = grid.parentElement?.querySelector('.show-more-btn');
+    if (oldBtn) oldBtn.remove();
+    const cards = Array.from(grid.children);
+    if (cards.length <= PRODUCTS_PER_BATCH) { cards.forEach(c => c.style.display = ''); return; }
+    let shown = PRODUCTS_PER_BATCH;
+    cards.forEach((c, i) => { c.style.display = i < shown ? '' : 'none'; });
+    const btn = document.createElement('button');
+    btn.className = 'show-more-btn';
+    btn.textContent = 'Show more (' + (cards.length - shown) + ' remaining)';
+    btn.addEventListener('click', () => {
+      const next = shown + PRODUCTS_PER_BATCH;
+      cards.forEach((c, i) => { if (i < next) c.style.display = ''; });
+      shown = next;
+      if (shown >= cards.length) { btn.remove(); }
+      else { btn.textContent = 'Show more (' + (cards.length - shown) + ' remaining)'; }
+    });
+    grid.parentElement.insertBefore(btn, grid.nextSibling);
+  });
 }
 
 /* ─── Filter ─── */
@@ -6247,6 +6305,22 @@ function populatePrintPageSelector() {
 }
 
 // Auto-suggest slug from product name
+// Auto-generate print slug from product name in admin.
+document.addEventListener('input', function(e) {
+  if (!e.target.matches || !e.target.matches('.ap-name')) return;
+  const row = e.target.closest('.admin-product-row');
+  if (!row) return;
+  const slugInput = row.querySelector('.ap-slug');
+  if (!slugInput) return;
+  const current = slugInput.value.trim();
+  const idx = Number(e.target.dataset.idx);
+  const product = SHOP_CONFIG.products[idx];
+  const prevAuto = product ? slugify(product.name) : '';
+  if (!current || current === prevAuto) {
+    slugInput.value = slugify(e.target.value);
+  }
+});
+
 document.getElementById('printPageSelector').addEventListener('change', async function() {
   const id = this.value;
   const editor = document.getElementById('printPageEditor');
@@ -8285,6 +8359,8 @@ function openEnquire(context) {
   document.getElementById('enquireOverlay')._context = context || '';
   document.getElementById('enquireOverlay').classList.add('show');
 }
+// Alias for 1-of-1 "Acquire this work" buttons on product cards.
+function openInterestForm(pid, pname) { openEnquire(pname || ''); }
 function closeEnquire() { document.getElementById('enquireOverlay').classList.remove('show'); }
 (function(){
   const fab = document.getElementById('enquireFab');
