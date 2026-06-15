@@ -634,12 +634,17 @@ async function handleCreate(req, res) {
     console.error('Submission insert failed (continuing to email):', error.message);
   }
   let alert = { sent: false };
-  try {
-    const alertData = await sendMinimalAlert(row, id);
-    alert = { sent: true, id: alertData && alertData.id };
-  } catch (error) {
-    console.error('Queue alert failed:', error.message);
-    alert = { sent: false, error: error.message };
+  // Skip the admin self-alert for delivery-details — the admin already knows
+  // they sent shipping info (they clicked the button). Only alert for genuinely
+  // new inbound submissions (enquiries, commissions, bids, etc.).
+  if (row.form_type !== 'delivery-details') {
+    try {
+      const alertData = await sendMinimalAlert(row, id);
+      alert = { sent: true, id: alertData && alertData.id };
+    } catch (error) {
+      console.error('Queue alert failed:', error.message);
+      alert = { sent: false, error: error.message };
+    }
   }
   // Client-facing confirmation email for private offers
   let confirmation = { sent: false };
