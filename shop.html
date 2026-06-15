@@ -3928,14 +3928,15 @@ function buildPrintCard(p) {
     const viewHover = p.slug
       ? `<a class="card-img-hover" href="/shop/${p.slug}" rel="noopener" style="text-decoration:none"><span class="card-img-hover-label">View print</span></a>`
       : `<div class="card-img-hover"><span class="card-img-hover-label">View print</span></div>`;
-    // 1-of-1 with no price/variants: show "Enquire" instead of "Unavailable"
+    // 1-of-1 with no price/variants OR admin-flagged enquire-only
     const isOneOfOne = p.print_edition === 'one_of_one';
     const isSold = p.is_sold;
+    const isEnquire = p.enquire_only === true || isOneOfOne;
     let footerHtml;
     if (isSold) {
       footerHtml = `<div class="card-price"><span class="price-ngn" style="color:var(--text-muted)">Sold</span></div>
         <button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold</button>`;
-    } else if (isOneOfOne) {
+    } else if (isEnquire) {
       footerHtml = `<div class="card-price"><span class="price-ngn">Unique work</span></div>
         <button class="interest-btn" data-pid="${p.id}" data-pname="${escapeAttr(p.name)}" onclick="openInterestForm('${escapeAttr(p.id)}','${escapeAttr(p.name)}')">Acquire this work →</button>`;
     } else {
@@ -3982,15 +3983,16 @@ function buildPrintCard(p) {
   const usd = productPrice(p, defaultKey, 'usd');
   const stock = stockForChoice(p, defaultKey);
 
-  // 1/1 with no price: show interest button instead of add to bag
+  // 1/1 with no price OR admin-flagged enquire-only: show interest button
   const isOneOfOne = p.print_edition === 'one_of_one';
   const hasNoPrice = !ngn && !usd;
   const isSold = p.is_sold;
+  const isEnquireOnly = p.enquire_only === true || (isOneOfOne && hasNoPrice);
 
   let actionHtml;
   if (isSold) {
     actionHtml = `<button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold</button>`;
-  } else if (isOneOfOne && hasNoPrice) {
+  } else if (isEnquireOnly) {
     actionHtml = `<button class="interest-btn" data-pid="${p.id}" data-pname="${escapeAttr(p.name)}" onclick="openInterestForm('${escapeAttr(p.id)}','${escapeAttr(p.name)}')">Acquire this work →</button>`;
   } else {
     actionHtml = `<button class="add-btn" data-pid="${p.id}" ${!defaultKey || stock===0?'disabled style="opacity:0.4;cursor:not-allowed"':''}>
@@ -4005,10 +4007,10 @@ function buildPrintCard(p) {
       <p class="card-category">${p.category}</p>
       <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
       <p class="card-desc" id="pdesc-${p.id}">${active.desc || p.desc}</p>
-      ${ !isOneOfOne || !hasNoPrice ? `<div class="print-type-wrap">${typeSelectHtml}</div><div class="card-variants" id="variants-${p.id}">${sizeChipsHtml}</div>` : '' }
+      ${ !isEnquireOnly ? `<div class="print-type-wrap">${typeSelectHtml}</div><div class="card-variants" id="variants-${p.id}">${sizeChipsHtml}</div>` : '' }
       <div class="card-footer">
         <div class="card-price">
-          ${ !isOneOfOne || !hasNoPrice
+          ${ !isEnquireOnly
             ? `<span class="price-ngn" id="pngn-${p.id}">${fmt(ngn)}</span><span class="price-usd" id="pusd-${p.id}">${fmtUsd(usd)} USD</span>`
             : `<span style="font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.14em;color:var(--text-muted)">Enquire for price</span>` }
         </div>
@@ -6569,10 +6571,14 @@ function renderAdminProducts() {
               <option value="open" ${p.print_edition==='open'?'selected':''}>Open Edition</option>
             </select>
           </div>
-          <div class="form-row" style="margin:0;display:flex;flex-direction:column;justify-content:flex-end">
-            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-muted);font-family:'Montserrat',sans-serif;padding-bottom:0.5rem">
+          <div class="form-row" style="margin:0;display:flex;flex-direction:column;justify-content:flex-end;gap:0.3rem">
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-muted);font-family:'Montserrat',sans-serif">
               <input type="checkbox" class="ap-sold" data-idx="${realIdx}" ${p.is_sold?'checked':''} style="accent-color:var(--rust);width:15px;height:15px"/>
               Mark as sold
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-muted);font-family:'Montserrat',sans-serif" title="Show 'Enquire' instead of Add to bag — for unique works with no fixed price">
+              <input type="checkbox" class="ap-enquire-only" data-idx="${realIdx}" ${p.enquire_only?'checked':''} style="accent-color:var(--clay);width:15px;height:15px"/>
+              Enquire only
             </label>
           </div>
           <div class="form-row" style="margin:0">
@@ -7067,6 +7073,8 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         const soldEl = row.querySelector('.ap-sold');
         if (editionTypeEl) p.print_edition = editionTypeEl.value;
         if (soldEl) p.is_sold = soldEl.checked;
+        const enquireEl = row.querySelector('.ap-enquire-only');
+        if (enquireEl) p.enquire_only = enquireEl.checked;
       } else {
         const catEl      = row.querySelector('.ap-cat');
         const clothingEl = row.querySelector('.ap-clothing');
@@ -8172,6 +8180,7 @@ async function loadShopData() {
           order_count:        r.order_count || 0,
           print_edition:      r.print_edition || r.edition_type || '',
           is_sold:            r.is_sold || false,
+          enquire_only:       r.enquire_only || false,
         }));
       }
       // If API returned empty array, keep hardcoded defaults
@@ -8244,6 +8253,7 @@ async function apiSaveProduct(p, token) {
     active:             p.active !== false,
     print_edition:      p.print_edition || '',
     is_sold:            p.is_sold || false,
+    enquire_only:       p.enquire_only || false,
   };
   const res = await fetch(url, {
     method,
