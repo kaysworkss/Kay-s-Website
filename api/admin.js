@@ -249,6 +249,9 @@ async function handleShopProducts(req, res, supabase) {
         edition_totals:     body.edition_totals || {},
         sort_order:         Number(body.sort_order) || 0,
         active:             body.active !== false,
+        print_edition:      String(body.print_edition || '').slice(0, 40) || null,
+        is_sold:            Boolean(body.is_sold),
+        enquire_only:       Boolean(body.enquire_only),
       })
       .select('id')
       .single();
@@ -292,6 +295,9 @@ async function handleShopProducts(req, res, supabase) {
     if (body.signed             !== undefined) patch.signed             = Boolean(body.signed);
     if (body.is_large_print     !== undefined) patch.is_large_print     = Boolean(body.is_large_print);
     if (body.images             !== undefined) patch.images             = body.images;
+    if (body.print_edition      !== undefined) patch.print_edition      = String(body.print_edition).slice(0, 40) || null;
+    if (body.is_sold            !== undefined) patch.is_sold            = Boolean(body.is_sold);
+    if (body.enquire_only       !== undefined) patch.enquire_only       = Boolean(body.enquire_only);
     const { error } = await supabase.from('shop_products').update(patch).eq('id', id);
     if (error) return json(500, { error: error.message });
     return json(200, { ok: true });
