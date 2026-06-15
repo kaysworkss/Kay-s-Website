@@ -1464,6 +1464,21 @@ function renderProduct(p) {
         <table class="spec-table" id="specTable">${specRowsHtml}</table>
 
         <div class="purchase-block">
+          ${(() => {
+            const isOneOfOne = p.print_edition === 'one_of_one';
+            const hasNoPrice = !ngn && !usd;
+            const isEnquireOnly = p.enquire_only === true || (isOneOfOne && hasNoPrice);
+            const isSoldOut = p.is_sold;
+            if (isEnquireOnly) {
+              return `
+                <p style="font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--clay);margin-bottom:0.6rem">Unique work</p>
+                <p style="font-size:0.95rem;color:var(--text-muted);line-height:1.6;margin-bottom:1.2rem">This is a one-of-a-kind piece. Reach out to discuss availability, pricing, and details.</p>
+                ${isSoldOut
+                  ? '<button class="add-to-cart-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold</button>'
+                  : '<button class="add-to-cart-btn enquire-action" onclick="openEnquire(\'' + escapeAttr(p.name) + '\')">Enquire about this work →</button>'}
+              `;
+            }
+            return `
           <p class="purchase-label">Choose your print option</p>
           <div class="print-option-picker">${optionChips}</div>
           <p class="limited-pill" id="limitedPill" style="display:${printOptions[0]?.limited ? 'inline-block' : 'none'}">Limited edition</p>
@@ -1476,18 +1491,14 @@ function renderProduct(p) {
             <span class="price-usd" id="priceUsd">${fmtUsd(usd)} USD</span>
           </div>
           ${(() => {
-            const isOneOfOne = p.print_edition === 'one_of_one';
-            const hasNoPrice = !ngn && !usd;
-            const isSoldOut = p.is_sold || (isLimitedKey(p, _selectedVariant) && (editionRemaining(p, _selectedVariant) ?? 0) <= 0);
-            if (isOneOfOne && hasNoPrice && !isSoldOut) {
-              return '<button class="add-to-cart-btn enquire-action" onclick="openEnquire(\'' + escapeAttr(p.name) + '\')">Enquire about this work →</button>';
-            }
-            if (isSoldOut) {
+            const isSoldOut2 = p.is_sold || (isLimitedKey(p, _selectedVariant) && (editionRemaining(p, _selectedVariant) ?? 0) <= 0);
+            if (isSoldOut2) {
               return '<button class="add-to-cart-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold out</button>';
             }
             const disabled = !_selectedVariant;
             const label = _selectedVariant ? 'Add to bag' : 'Unavailable';
             return '<button class="add-to-cart-btn" id="addBtn" onclick="handleAddToCart()" ' + (disabled ? 'disabled' : '') + '>' + label + '</button>';
+          })()}`;
           })()}
           <p class="shipping-note">
             Ships from Nigeria via GIG Logistics (domestic) or DHL / UPS (international).
@@ -1822,12 +1833,13 @@ function switchImage(idx) {
 
 /* ─── Render related prints ─── */
 function renderRelated(prints) {
-  if (!prints || !prints.length) return;
-  const filtered = prints.filter(p => p.slug !== slug).slice(0, 4);
+  if (!Array.isArray(prints) || !prints.length) return;
+  const filtered = prints.filter(p => p && p.slug !== slug && p.name).slice(0, 4);
   if (!filtered.length) return;
 
   document.getElementById('relatedSection').style.display = '';
   document.getElementById('relatedGrid').innerHTML = filtered.map(p => {
+    try {
     let lowestPrice, firstAvail;
     if (p.category && p.category !== 'prints') {
       const labels = merchVariants(p);
@@ -1840,6 +1852,7 @@ function renderRelated(prints) {
       lowestPrice = prices.length ? Math.min(...prices) : 0;
       firstAvail  = choices[0]?.label || '';
     }
+    const isEnquireOnly = p.enquire_only || (p.print_edition === 'one_of_one' && !lowestPrice);
     return `
       <a href="/shop/${p.slug || slugify(p.name)}" class="related-card">
         <div class="related-card-img">
@@ -1847,10 +1860,14 @@ function renderRelated(prints) {
         </div>
         <div class="related-card-body">
           <div class="related-card-title">${p.name}</div>
-          <div class="related-card-price">From ${fmt(lowestPrice)} · ${firstAvail}</div>
+          <div class="related-card-price">${isEnquireOnly ? 'Enquire' : `From ${fmt(lowestPrice)} · ${firstAvail}`}</div>
         </div>
       </a>`;
-  }).join('');
+    } catch (e) {
+      console.error('[related] Failed to render:', p?.name, e.message);
+      return '';
+    }
+  }).filter(Boolean).join('');
 }
 
 /* ─── Load product ─── */
@@ -1868,12 +1885,15 @@ async function load() {
       fetch(`/api/shop/products?series=${encodeURIComponent(seriesSlug)}`)
         .then(r => r.ok ? r.json() : [])
         .then(renderRelated)
-        .catch(() => {});
+        .catch(e => console.error('[related] series fetch failed:', e.message));
     } else {
       fetch('/api/shop/products')
         .then(r => r.ok ? r.json() : [])
-        .then(all => renderRelated(all.filter(p => p.category === product.category)))
-        .catch(() => {});
+        .then(all => {
+          const sameCat = (all || []).filter(p => p.category === product.category);
+          renderRelated(sameCat.length > 1 ? sameCat : all);
+        })
+        .catch(e => console.error('[related] all-products fetch failed:', e.message));
     }
   } catch(e) {
     showError();
