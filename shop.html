@@ -217,11 +217,11 @@ nav.scrolled .nav-cart:hover { color: var(--rust); opacity: 1; }
   max-width: 900px;
 }
 .shop-hero-eyebrow {
-  font-family: 'Cinzel', serif; font-size: 0.65rem;
+  font-family: 'Cinzel', serif; font-size: 0.75rem;
   letter-spacing: 0.35em; text-transform: uppercase;
   color: #f0e4cc; margin-bottom: 1.2rem;
   display: flex; align-items: center; gap: 0.8rem;
-  text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
 }
 .shop-hero-eyebrow::before {
   content: ''; display: inline-block; width: 32px; height: 1px;
@@ -370,10 +370,10 @@ nav.scrolled .nav-cart:hover { color: var(--rust); opacity: 1; }
   position: absolute; inset: 0;
   background: linear-gradient(
     to top,
-    rgba(14,10,8,0.92) 0%,
-    rgba(14,10,8,0.75) 35%,
-    rgba(14,10,8,0.3) 65%,
-    rgba(14,10,8,0.05) 100%
+    rgba(14,10,8,0.95) 0%,
+    rgba(14,10,8,0.85) 40%,
+    rgba(14,10,8,0.45) 70%,
+    rgba(14,10,8,0.08) 100%
   );
 }
 .coll-tile-body {
@@ -1859,6 +1859,23 @@ nav.scrolled .nav-hamburger span { background: var(--text); }
 .nav-mobile-menu a:last-child { border-bottom: none; }
 .nav-mobile-menu a:hover, .nav-mobile-menu a.active { color: var(--rust); }
 
+/* ── Mobile grid view toggle ── */
+.grid-toggle {
+  display: none; /* hidden on desktop */
+  background: none; border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.45rem; color: var(--text-muted); cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+.grid-toggle:hover { color: var(--clay); border-color: var(--clay); }
+@media (max-width: 600px) {
+  .grid-toggle { display: flex; align-items: center; justify-content: center; }
+}
+/* Single-column mode (toggled via JS) */
+.shop-grid.single-col {
+  grid-template-columns: 1fr !important;
+}
+
 /* ── Responsive ── */
 @media(max-width:600px){
   .shop-grid { grid-template-columns:1fr 1fr; gap:1rem; }
@@ -2169,7 +2186,7 @@ body.dark { --text-muted: #b3a392; }
   <div class="shop-hero-bg-img"></div>
   <div class="shop-hero-vignette"></div>
   <div class="shop-hero-content">
-    <p class="shop-hero-eyebrow">Kay's Works &middot; The Shop</p>
+    <p class="shop-hero-eyebrow">The Shop</p>
     <h1 class="shop-hero-title">Own the story.<br><em>Wear the work.</em></h1>
     <p class="shop-hero-sub">Fine art and merch made with care.</p>
   </div>
@@ -2316,6 +2333,13 @@ body.dark { --text-muted: #b3a392; }
   <button class="filter-btn" data-filter="merch">Merch</button>
   <button class="filter-btn" data-filter="notebooks">Notebooks</button>
   <button class="filter-btn" data-filter="stickers">Stickers</button>
+  <!-- Mobile grid view toggle -->
+  <button class="grid-toggle" id="gridToggle" type="button" aria-label="Toggle grid layout" title="Switch view">
+    <svg id="gridToggleIcon" width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+      <rect x="0" y="0" width="8" height="8" rx="1.5"/><rect x="10" y="0" width="8" height="8" rx="1.5"/>
+      <rect x="0" y="10" width="8" height="8" rx="1.5"/><rect x="10" y="10" width="8" height="8" rx="1.5"/>
+    </svg>
+  </button>
 </div>
 
 <!-- Products -->
@@ -3768,6 +3792,24 @@ initTheme();
       menu.classList.remove('open');
     }
   });
+})();
+
+// Mobile grid view toggle (2-col ↔ 1-col)
+(function() {
+  const btn = document.getElementById('gridToggle');
+  if (!btn) return;
+  let single = false;
+  const gridIcon = '<rect x="0" y="0" width="8" height="8" rx="1.5"/><rect x="10" y="0" width="8" height="8" rx="1.5"/><rect x="0" y="10" width="8" height="8" rx="1.5"/><rect x="10" y="10" width="8" height="8" rx="1.5"/>';
+  const listIcon = '<rect x="0" y="0" width="18" height="7" rx="1.5"/><rect x="0" y="11" width="18" height="7" rx="1.5"/>';
+  btn.addEventListener('click', () => {
+    single = !single;
+    document.querySelectorAll('.shop-grid').forEach(g => g.classList.toggle('single-col', single));
+    const svg = btn.querySelector('svg');
+    if (svg) svg.innerHTML = single ? listIcon : gridIcon;
+    try { localStorage.setItem('kw-grid-mode', single ? 'single' : 'grid'); } catch(_){}
+  });
+  // Restore preference
+  try { if (localStorage.getItem('kw-grid-mode') === 'single') btn.click(); } catch(_){}
 })();
 
 /* ─── Nav scroll ─── */
