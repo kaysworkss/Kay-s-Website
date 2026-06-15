@@ -2592,6 +2592,10 @@ async function finalizeFreeOrder(req, res, supabase, body, checkout) {
     customerNotification = { sent: true, id: r?.id || null };
   } catch (e) { customerNotification = { sent: false, error: e.message }; }
 
+  // Post-purchase cleanup (free/discount order)
+  upsertCollector(supabase, order.email, order.customer_name).catch(() => {});
+  supabase.from('abandoned_carts').delete().eq('email', order.email).then(() => {}).catch(() => {});
+
   return json(200, {
     ok: true,
     free_order: true,
@@ -2808,6 +2812,9 @@ async function handleShopOrder(req, res, supabase) {
     }
   }
 
+  // Post-purchase: collector list + clear abandoned cart
+  _postPurchaseCleanup(supabase, order.email, order.customer_name);
+
   return json(200, {
     ok: true,
     order_id: order.id,
@@ -2845,6 +2852,213 @@ async function handleShopConfig(req, res, supabase) {
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ORDER STATUS — single order lookup by email + order_ref
+// ═══════════════════════════════════════════════════════════════════════════
+async function handleShopOrderStatus(req, res, supabase) {
+  if (req.method !== 'GET') return json(405, { error: 'GET only' });
+  const email = String(req.query.email || '').trim().toLowerCase();
+  const orderRef = String(req.query.order_ref || '').trim();
+  if (!email || !orderRef) return json(400, { error: 'email and order_ref required' });
+  const { data, error } = await supabase.from('shop_orders')
+    .select('order_ref, status, items, total_ngn, total_usd, delivery_method, delivery_zone, tracking_number, tracking_carrier, payment_method, payment_ref, payment_metadata, created_at, updated_at')
+    .eq('email', email).eq('order_ref', orderRef).maybeSingle();
+  if (error) return json(500, { error: error.message });
+  if (!data) return json(404, { error: 'No order found for that email and reference' });
+  return json(200, data);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ORDER HISTORY — magic link: POST to request link, GET to verify token
+// ═══════════════════════════════════════════════════════════════════════════
+async function handleShopOrderHistory(req, res, supabase) {
+  // POST: send a magic link email
+  if (req.method === 'POST') {
+    const body = req.body || {};
+    const email = String(body.email || '').trim().toLowerCase();
+    if (!email) return json(400, { error: 'email required' });
+    // Check if any orders exist for this email (don't reveal that to the client though)
+    const { count } = await supabase.from('shop_orders').select('id', { count: 'exact', head: true }).eq('email', email);
+    // Always respond the same way (prevents email enumeration)
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    await supabase.from('order_history_tokens').insert({ email, token, expires_at: expiresAt });
+    // Send the magic link email
+    if ((count || 0) > 0) {
+      const RESEND_KEY = process.env.RESEND_API_KEY;
+      const FROM_EMAIL = process.env.SHOP_FROM_EMAIL || 'shop@mail.kaysworks.com';
+      const siteUrl = process.env.SITE_URL || 'https://www.kaysworks.com';
+      if (RESEND_KEY) {
+        try {
+          await fetch('https://api.resend.com/emails', {
+            method: 'POST', headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              from: `Kay's Works <${FROM_EMAIL}>`,
+              to: [email],
+              subject: 'Your order history — Kay\'s Works',
+              html: `<div style="font-family:Georgia,serif;max-width:580px;margin:0 auto;padding:2rem;background:#1e1410;border-radius:12px;color:#e8d5b0">
+                <p style="font-size:18px;margin:0 0 16px">Hi there,</p>
+                <p style="margin:0 0 20px">Click the link below to view your order history. This link is valid for 24 hours.</p>
+                <a href="${siteUrl}/order-status?token=${token}" style="display:inline-block;padding:14px 28px;background:#9e4f2e;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold">View my orders</a>
+                <p style="margin:20px 0 0;font-size:13px;color:#8a7060">If you didn't request this, you can safely ignore it.</p>
+              </div>`,
+            }),
+          });
+        } catch (e) { console.error('[order-history] email send failed:', e.message); }
+      }
+    }
+    return json(200, { ok: true, message: 'If orders exist for that email, a link has been sent.' });
+  }
+  // GET: verify token and return orders
+  if (req.method === 'GET') {
+    const token = String(req.query.token || '').trim();
+    if (!token) return json(400, { error: 'token required' });
+    const { data: tok } = await supabase.from('order_history_tokens')
+      .select('email, expires_at').eq('token', token).maybeSingle();
+    if (!tok) return json(404, { error: 'Invalid or expired link. Request a new one.' });
+    if (new Date(tok.expires_at) < new Date()) {
+      await supabase.from('order_history_tokens').delete().eq('token', token);
+      return json(410, { error: 'This link has expired. Request a new one.' });
+    }
+    const { data: orders, error } = await supabase.from('shop_orders')
+      .select('order_ref, status, items, total_ngn, total_usd, delivery_method, delivery_zone, tracking_number, tracking_carrier, payment_method, payment_ref, payment_metadata, created_at, updated_at')
+      .eq('email', tok.email).order('created_at', { ascending: false });
+    if (error) return json(500, { error: error.message });
+    return json(200, { ok: true, email: tok.email, orders: orders || [] });
+  }
+  return json(405, { error: 'POST or GET only' });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ABANDONED CART — capture on email blur, clear on purchase
+// ═══════════════════════════════════════════════════════════════════════════
+async function handleShopAbandonedCart(req, res, supabase) {
+  // POST: save or update an abandoned cart
+  if (req.method === 'POST') {
+    const body = req.body || {};
+    const email = String(body.email || '').trim().toLowerCase();
+    if (!email) return json(400, { error: 'email required' });
+    const cart = body.cart || [];
+    if (!cart.length) return json(400, { error: 'cart is empty' });
+    const name = String(body.name || '').slice(0, 200);
+    const token = crypto.randomBytes(24).toString('base64url');
+    const siteUrl = process.env.SITE_URL || 'https://www.kaysworks.com';
+    const checkoutUrl = `${siteUrl}/shop?recover=${token}`;
+    // Upsert: replace the existing abandoned cart for this email (only one per email)
+    const { error } = await supabase.from('abandoned_carts')
+      .upsert({
+        email, name, cart,
+        recovery_token: token,
+        checkout_url: checkoutUrl,
+        reminded: false,
+        recovered: false,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'email', ignoreDuplicates: false });
+    if (error && error.code !== '23505') return json(500, { error: error.message });
+    return json(200, { ok: true });
+  }
+  // DELETE: clear abandoned cart when a purchase completes
+  if (req.method === 'DELETE') {
+    const email = String(req.query.email || '').trim().toLowerCase();
+    if (!email) return json(400, { error: 'email required' });
+    await supabase.from('abandoned_carts').delete().eq('email', email);
+    return json(200, { ok: true });
+  }
+  return json(405, { error: 'POST or DELETE only' });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CART REMINDER CRON — called by Vercel Cron, sends reminder emails for
+// carts abandoned >3h ago, <48h ago, not yet reminded.
+// ═══════════════════════════════════════════════════════════════════════════
+async function handleShopCartReminder(req, res, supabase) {
+  // Verify cron secret to prevent abuse
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = String(req.headers.authorization || '');
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    return json(401, { error: 'Unauthorized' });
+  }
+  const RESEND_KEY = process.env.RESEND_API_KEY;
+  const FROM_EMAIL = process.env.SHOP_FROM_EMAIL || 'shop@mail.kaysworks.com';
+  const REPLY_TO = process.env.SHOP_REPLY_TO_EMAIL || '';
+  if (!RESEND_KEY) return json(500, { error: 'RESEND_API_KEY not configured' });
+
+  const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+  const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+  const { data: carts, error } = await supabase.from('abandoned_carts')
+    .select('*')
+    .eq('reminded', false)
+    .eq('recovered', false)
+    .lt('updated_at', threeHoursAgo)
+    .gt('updated_at', fortyEightHoursAgo)
+    .limit(20);
+  if (error) return json(500, { error: error.message });
+  if (!carts || !carts.length) return json(200, { ok: true, sent: 0 });
+
+  let sent = 0;
+  for (const cart of carts) {
+    const items = Array.isArray(cart.cart) ? cart.cart : [];
+    const itemList = items.map(i => `${i.name || 'Item'} × ${i.qty || 1}`).join(', ');
+    const name = cart.name || 'there';
+    try {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: `Kay's Works <${FROM_EMAIL}>`,
+          to: [cart.email],
+          reply_to: REPLY_TO || undefined,
+          subject: 'You left something behind',
+          html: `<div style="font-family:Georgia,serif;max-width:580px;margin:0 auto;padding:2rem;background:#1e1410;border-radius:12px;color:#e8d5b0">
+            <p style="font-size:18px;margin:0 0 12px">Hi ${shopEscapeHtml(name)},</p>
+            <p style="margin:0 0 16px;line-height:1.7">You were browsing Kay's Works and left a few things in your cart:</p>
+            <p style="margin:0 0 20px;color:#c4845a;font-style:italic">${shopEscapeHtml(itemList)}</p>
+            <p style="margin:0 0 24px;line-height:1.7">No pressure — your cart is still waiting if you'd like to come back.</p>
+            <a href="${cart.checkout_url}" style="display:inline-block;padding:14px 28px;background:#9e4f2e;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold">Return to my cart</a>
+            <p style="margin:24px 0 0;font-size:12px;color:#8a7060">If you've already completed your purchase, please ignore this. To stop receiving reminders, simply reply and let us know.</p>
+          </div>`,
+        }),
+      });
+      sent++;
+    } catch (e) { console.error(`[cart-reminder] failed for ${cart.email}:`, e.message); }
+    // Mark as reminded regardless of send success (to avoid re-sending)
+    await supabase.from('abandoned_carts').update({ reminded: true, reminded_at: new Date().toISOString() }).eq('id', cart.id);
+  }
+  return json(200, { ok: true, sent, total: carts.length });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COLLECTOR UPSERT — called after a successful purchase to add/update the
+// customer in the collectors table (only if they consented at checkout).
+// ═══════════════════════════════════════════════════════════════════════════
+async function _postPurchaseCleanup(supabase, email, name) {
+  upsertCollector(supabase, email, name).catch(() => {});
+  supabase.from('abandoned_carts').delete().eq('email', email).then(()=>{}).catch(()=>{});
+}
+
+async function upsertCollector(supabase, email, name) {
+  if (!email) return;
+  try {
+    const { data: existing } = await supabase.from('collectors')
+      .select('id, order_count').eq('email', email).maybeSingle();
+    if (existing) {
+      await supabase.from('collectors').update({
+        name: name || undefined,
+        last_order_at: new Date().toISOString(),
+        order_count: (existing.order_count || 0) + 1,
+      }).eq('id', existing.id);
+    } else {
+      await supabase.from('collectors').insert({
+        email, name,
+        first_order_at: new Date().toISOString(),
+        last_order_at: new Date().toISOString(),
+        order_count: 1,
+      });
+    }
+  } catch (e) { console.error('[collector] upsert failed:', e.message); }
+}
+
 module.exports = async (req, res) => {
   try {
     cors(res);
@@ -2880,6 +3094,10 @@ module.exports = async (req, res) => {
       else if (urlPath.includes('/shop-discount') || urlPath.includes('/shop/discount')) action = 'shop-discount';
       else if (urlPath.includes('/shop-order-create') || urlPath.includes('/shop/order-create')) action = 'shop-order-create';
       else if (urlPath.includes('/shop-order-confirm') || urlPath.includes('/shop/order-confirm')) action = 'shop-order-confirm';
+      else if (urlPath.includes('/shop-order-status') || urlPath.includes('/shop/order-status')) action = 'shop-order-status';
+      else if (urlPath.includes('/shop-order-history') || urlPath.includes('/shop/order-history')) action = 'shop-order-history';
+      else if (urlPath.includes('/shop-abandoned-cart') || urlPath.includes('/shop/abandoned-cart')) action = 'shop-abandoned-cart';
+      else if (urlPath.includes('/shop-cart-reminder') || urlPath.includes('/shop/cart-reminder')) action = 'shop-cart-reminder';
       else if (urlPath.includes('/shop-order') || urlPath.includes('/shop/order')) action = 'shop-order';
     }
 
@@ -2906,6 +3124,10 @@ module.exports = async (req, res) => {
       case 'shop-order-create':  return handleShopOrderCreate(req, res, supabase);
       case 'shop-order-confirm': return handleShopOrderConfirm(req, res, supabase);
       case 'shop-order':         return handleShopOrder(req, res, supabase);
+      case 'shop-order-status':  return handleShopOrderStatus(req, res, supabase);
+      case 'shop-order-history': return handleShopOrderHistory(req, res, supabase);
+      case 'shop-abandoned-cart':return handleShopAbandonedCart(req, res, supabase);
+      case 'shop-cart-reminder': return handleShopCartReminder(req, res, supabase);
       default:
         return res.status(404).json({ error: `Unknown action: ${action}` });
     }
