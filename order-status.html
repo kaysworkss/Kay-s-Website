@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Order Status · Kay's Works</title>
+<link rel="icon" type="image/svg+xml" href="/images/kaysworkslogo.svg"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+a{color:inherit;text-decoration:none}
+button{cursor:pointer}
+img{display:block;max-width:100%}
+
+:root {
+  --clay:#c4845a; --rust:#9e4f2e; --sand:#e8d5b0; --linen:#f5ede0;
+  --bark:#4a3228; --moss:#6b7c5c; --ash:#8a7060; --ink:#1e1410;
+  --gold:#c9993a; --parchment:#ede0c8;
+  --bg:var(--linen); --bg-alt:var(--parchment); --bg-card:#fff;
+  --text:var(--ink); --text-muted:#6f5d4e;
+  --border:rgba(74,50,40,0.12);
+}
+body.dark {
+  --bg:#141010; --bg-alt:#1e1510; --bg-card:#1e1510;
+  --text:#e8d5b0; --text-muted:#b3a392;
+  --border:rgba(196,132,90,0.12);
+  --linen:#141010; --ink:#e8d5b0;
+}
+body{font-family:'Crimson Pro',serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* Nav */
+nav{display:flex;align-items:center;justify-content:space-between;padding:0 clamp(1.2rem,4vw,3rem);height:60px;border-bottom:1px solid var(--border);}
+.nav-logo{font-family:'Montserrat',sans-serif;font-size:1.1rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--bark);}
+body.dark .nav-logo{color:#e0c8a8;}
+.nav-links{display:flex;gap:1.4rem;}
+.nav-links a{font-family:'Crimson Pro',serif;font-size:0.92rem;color:var(--text);opacity:0.78;transition:opacity 0.2s;}
+.nav-links a:hover{opacity:1;color:var(--rust);}
+.theme-btn{background:none;border:none;color:var(--gold);font-size:1rem;}
+
+/* Content */
+.page-wrap{max-width:720px;margin:0 auto;padding:3rem clamp(1.2rem,4vw,2rem) 6rem;}
+.page-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2rem,5vw,3rem);font-weight:300;margin-bottom:0.6rem;}
+.page-sub{font-size:1.05rem;color:var(--text-muted);line-height:1.7;margin-bottom:2.5rem;}
+
+/* Lookup form */
+.lookup-card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:2rem;margin-bottom:2rem;}
+.lookup-card h2{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.25em;text-transform:uppercase;color:var(--clay);margin-bottom:1rem;}
+.form-row{margin-bottom:1rem;}
+.form-label{display:block;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.35rem;}
+.form-input{width:100%;padding:0.75rem 1rem;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-family:'Crimson Pro',serif;font-size:1rem;transition:border-color 0.2s;}
+.form-input:focus{outline:none;border-color:var(--clay);}
+.submit-btn{width:100%;padding:0.85rem;background:var(--rust);color:#fff;border:none;border-radius:10px;font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.18em;text-transform:uppercase;transition:background 0.2s;}
+.submit-btn:hover{background:var(--bark);}
+.submit-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.msg{font-size:0.88rem;color:var(--text-muted);margin-top:0.8rem;line-height:1.6;}
+.msg.error{color:var(--rust);}
+.msg.success{color:var(--moss);}
+.or-divider{display:flex;align-items:center;gap:0.7rem;margin:1.5rem 0;color:var(--text-muted);font-family:'Cinzel',serif;font-size:0.46rem;letter-spacing:0.2em;text-transform:uppercase;}
+.or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* Orders list */
+.orders-section{display:none;}
+.orders-header{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--clay);margin-bottom:1.2rem;}
+.order-card{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;margin-bottom:1rem;transition:border-color 0.2s;}
+.order-card:hover{border-color:var(--clay);}
+.order-ref{font-family:'Montserrat',sans-serif;font-size:0.78rem;font-weight:600;color:var(--text);margin-bottom:0.3rem;}
+.order-date{font-size:0.82rem;color:var(--text-muted);margin-bottom:0.6rem;}
+.order-status{display:inline-block;font-family:'Montserrat',sans-serif;font-size:0.68rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:0.3rem 0.8rem;border-radius:20px;margin-bottom:0.8rem;}
+.order-status.paid{background:rgba(107,124,92,0.15);color:var(--moss);}
+.order-status.shipped{background:rgba(90,192,245,0.12);color:#3a8fc5;}
+.order-status.fulfilled{background:rgba(107,124,92,0.2);color:var(--moss);}
+.order-status.pending{background:rgba(196,132,90,0.15);color:var(--clay);}
+.order-status.cancelled{background:rgba(158,79,46,0.12);color:var(--rust);}
+.order-items{font-size:0.9rem;color:var(--text);line-height:1.6;margin-bottom:0.6rem;}
+.order-total{font-family:'Montserrat',sans-serif;font-size:0.85rem;font-weight:600;color:var(--text);}
+.order-tracking{margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);}
+.order-tracking-label{font-family:'Cinzel',serif;font-size:0.44rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.3rem;}
+.order-tracking a{color:var(--clay);text-decoration:underline;}
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--text-muted);}
+.empty-state p{font-size:1rem;line-height:1.7;}
+.back-link{display:inline-flex;align-items:center;gap:0.4rem;font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--clay);margin-top:2rem;transition:color 0.2s;}
+.back-link:hover{color:var(--rust);}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo"><span style="font-weight:600">KAY'S</span>&nbsp; <span style="font-weight:500">WORKS</span></a>
+  <div class="nav-links">
+    <a href="/shop">Shop</a>
+    <a href="/auction">Auction</a>
+    <button class="theme-btn" id="themeBtn">Dark</button>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <h1 class="page-title">Track your order</h1>
+  <p class="page-sub">Enter your email to see your order history, or look up a specific order by its reference number.</p>
+
+  <!-- Quick single-order lookup -->
+  <div class="lookup-card" id="quickLookup">
+    <h2>Quick lookup</h2>
+    <div class="form-row">
+      <label class="form-label">Order reference</label>
+      <input class="form-input" id="refInput" type="text" placeholder="ORD-XXXXXXXX-XXXXXX"/>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Email used at checkout</label>
+      <input class="form-input" id="refEmail" type="email" placeholder="your@email.com"/>
+    </div>
+    <button class="submit-btn" id="refBtn">Look up order</button>
+    <div class="msg" id="refMsg" style="display:none"></div>
+  </div>
+
+  <div class="or-divider">or view your full history</div>
+
+  <!-- Full order history via magic link -->
+  <div class="lookup-card" id="historyLookup">
+    <h2>All your orders</h2>
+    <p style="font-size:0.92rem;color:var(--text-muted);line-height:1.6;margin-bottom:1rem">
+      Enter your email and we'll send you a secure link to view all your orders. The link is valid for 24 hours.
+    </p>
+    <div class="form-row">
+      <label class="form-label">Email</label>
+      <input class="form-input" id="historyEmail" type="email" placeholder="your@email.com"/>
+    </div>
+    <button class="submit-btn" id="historyBtn">Send me the link</button>
+    <div class="msg" id="historyMsg" style="display:none"></div>
+  </div>
+
+  <!-- Orders display (hidden until loaded) -->
+  <div class="orders-section" id="ordersSection">
+    <p class="orders-header" id="ordersHeader">Your orders</p>
+    <div id="ordersList"></div>
+    <a href="/shop" class="back-link">← Continue shopping</a>
+  </div>
+</div>
+
+<script>
+// Theme
+function initTheme(){
+  const saved = localStorage.getItem('kaysworks-theme');
+  if(saved==='dark')document.body.classList.add('dark');
+  document.getElementById('themeBtn').textContent=document.body.classList.contains('dark')?'Light':'Dark';
+}
+document.getElementById('themeBtn').addEventListener('click',()=>{
+  const d=document.body.classList.toggle('dark');
+  localStorage.setItem('kaysworks-theme',d?'dark':'light');
+  document.getElementById('themeBtn').textContent=d?'Light':'Dark';
+});
+initTheme();
+
+function fmt(n){return '₦'+Number(n).toLocaleString('en-NG');}
+function showMsg(id,text,type){
+  const el=document.getElementById(id);
+  el.textContent=text;el.className='msg '+(type||'');el.style.display='';
+}
+
+function statusClass(s){
+  s=(s||'').toLowerCase();
+  if(s==='paid'||s==='paid_unshipped'||s==='processing')return 'paid';
+  if(s==='shipped')return 'shipped';
+  if(s==='fulfilled')return 'fulfilled';
+  if(s==='cancelled'||s==='refunded')return 'cancelled';
+  return 'pending';
+}
+function statusLabel(s){
+  const map={pending:'Pending',paid:'Paid',paid_unshipped:'Paid',processing:'Processing',shipped:'Shipped',fulfilled:'Delivered',cancelled:'Cancelled',refunded:'Refunded',confirming:'Confirming'};
+  return map[s]||s||'Pending';
+}
+
+function renderOrders(orders, heading){
+  const section=document.getElementById('ordersSection');
+  const list=document.getElementById('ordersList');
+  const header=document.getElementById('ordersHeader');
+  if(!orders||!orders.length){
+    list.innerHTML='<div class="empty-state"><p>No orders found for this email.</p></div>';
+    section.style.display='';header.textContent=heading||'Your orders';return;
+  }
+  header.textContent=(heading||'Your orders')+' · '+orders.length+' order'+(orders.length===1?'':'s');
+  list.innerHTML=orders.map(o=>{
+    const items=Array.isArray(o.items)?o.items:[];
+    const itemsText=items.map(i=>`${i.name||'Item'} (${i.variant||'—'}) × ${i.qty||1}`).join(', ');
+    const date=o.created_at?new Date(o.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
+    const tracking=o.tracking_number?`
+      <div class="order-tracking">
+        <p class="order-tracking-label">Tracking</p>
+        <p>${o.tracking_carrier||'Courier'}: ${o.tracking_number}
+          ${o.payment_metadata?.tracking_url?` · <a href="${o.payment_metadata.tracking_url}" target="_blank">Track shipment</a>`:''}
+        </p>
+      </div>`:'';
+    return `
+      <div class="order-card">
+        <div class="order-ref">${o.order_ref||o.payment_ref||'—'}</div>
+        <div class="order-date">${date}</div>
+        <span class="order-status ${statusClass(o.status)}">${statusLabel(o.status)}</span>
+        <div class="order-items">${itemsText||'—'}</div>
+        <div class="order-total">${fmt(o.total_ngn||0)}</div>
+        ${tracking}
+      </div>`;
+  }).join('');
+  section.style.display='';
+}
+
+// Quick lookup (email + order ref)
+document.getElementById('refBtn').addEventListener('click',async()=>{
+  const ref=document.getElementById('refInput').value.trim();
+  const email=document.getElementById('refEmail').value.trim();
+  if(!ref||!email){showMsg('refMsg','Enter both the order reference and your email','error');return;}
+  const btn=document.getElementById('refBtn');
+  btn.disabled=true;btn.textContent='Looking up…';
+  try{
+    const res=await fetch(`/api/shop/order-status?order_ref=${encodeURIComponent(ref)}&email=${encodeURIComponent(email)}`);
+    const data=await res.json();
+    if(!res.ok){showMsg('refMsg',data.error||'Order not found','error');return;}
+    renderOrders(Array.isArray(data)?data:[data],'Order');
+    document.getElementById('quickLookup').style.display='none';
+    document.getElementById('historyLookup').style.display='none';
+    document.querySelector('.or-divider').style.display='none';
+  }catch(e){showMsg('refMsg','Network error — try again','error');}
+  finally{btn.disabled=false;btn.textContent='Look up order';}
+});
+
+// Full history via magic link
+document.getElementById('historyBtn').addEventListener('click',async()=>{
+  const email=document.getElementById('historyEmail').value.trim();
+  if(!email){showMsg('historyMsg','Enter your email address','error');return;}
+  const btn=document.getElementById('historyBtn');
+  btn.disabled=true;btn.textContent='Sending…';
+  try{
+    const res=await fetch('/api/shop/order-history',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email})
+    });
+    const data=await res.json();
+    if(res.ok){
+      showMsg('historyMsg','Check your inbox — we sent you a secure link to view your orders.','success');
+    }else{
+      showMsg('historyMsg',data.error||'Could not send the link','error');
+    }
+  }catch(e){showMsg('historyMsg','Network error — try again','error');}
+  finally{btn.disabled=false;btn.textContent='Send me the link';}
+});
+
+// Auto-load if arriving via magic link (?token=...)
+(async function(){
+  const params=new URLSearchParams(location.search);
+  const token=params.get('token');
+  if(!token)return;
+  document.getElementById('quickLookup').style.display='none';
+  document.getElementById('historyLookup').style.display='none';
+  document.querySelector('.or-divider').style.display='none';
+  document.querySelector('.page-sub').textContent='Loading your orders…';
+  try{
+    const res=await fetch(`/api/shop/order-history?token=${encodeURIComponent(token)}`);
+    const data=await res.json();
+    if(!res.ok){document.querySelector('.page-sub').textContent=data.error||'Invalid or expired link. Request a new one below.';
+      document.getElementById('historyLookup').style.display='';return;}
+    document.querySelector('.page-sub').textContent='';
+    renderOrders(data.orders||[],'Your order history');
+  }catch(e){document.querySelector('.page-sub').textContent='Network error — refresh and try again.';}
+})();
+</script>
+</body>
+</html>
