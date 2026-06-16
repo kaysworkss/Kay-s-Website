@@ -215,7 +215,7 @@ nav.scrolled {
 /* ── Info panel ── */
 .info-panel {
   padding: clamp(2rem,5vw,4rem) clamp(1.4rem,4vw,3rem) 5rem;
-  max-width: 720px;
+  max-width: 820px;
   margin-top: 60px;
 }
 @media(max-width:900px) {
@@ -223,7 +223,7 @@ nav.scrolled {
 }
 
 .print-series-link {
-  font-family:'Cinzel',serif; font-size:0.62rem;
+  font-family:'Cinzel',serif; font-size:0.68rem;
   letter-spacing:0.25em; text-transform:uppercase;
   color:var(--gold); display:inline-flex; align-items:center; gap:0.4rem;
   margin-bottom:1rem; transition:color 0.2s;
@@ -283,7 +283,7 @@ nav.scrolled {
   content:''; flex:1; height:1px;
   background:linear-gradient(90deg, transparent, var(--border), transparent);
 }
-.section-divider::before { max-width:30px; }
+.section-divider::before { max-width:40px; width:40px; }
 
 /* Story / process */
 .print-story {
@@ -300,7 +300,7 @@ nav.scrolled {
 
 /* Spec table */
 .spec-table {
-  width:100%; border-collapse:collapse;
+  width:100%; border-radius:12px; overflow:hidden; border-collapse:separate; border-spacing:0; border-radius:12px; overflow:hidden;
   margin-bottom:2rem; font-size:0.9rem;
 }
 .spec-table tr { border-bottom:1px solid var(--border); }
@@ -564,7 +564,7 @@ body.dark .cart-toast { background:#2a1c14; }
 /* ── Sizing guide ── */
 .sizing-guide { margin: 2rem 0; padding: 2rem 0; border-top: 1px solid var(--border); }
 .sizing-guide-title {
-  font-family: 'Cinzel', serif; font-size: 0.62rem;
+  font-family: 'Cinzel', serif; font-size: 0.72rem;
   letter-spacing: 0.25em; text-transform: uppercase;
   color: var(--text-muted); margin-bottom: 1.2rem;
 }
@@ -582,7 +582,7 @@ body.dark .cart-toast { background:#2a1c14; }
   border-top:1px solid var(--border);
 }
 .related-heading {
-  font-family:'Cinzel',serif; font-size:0.68rem;
+  font-family:'Cinzel',serif; font-size:0.76rem;
   letter-spacing:0.32em; text-transform:uppercase;
   color:var(--gold); margin-bottom:2rem;
   display:flex; align-items:center; gap:1rem;
@@ -597,7 +597,7 @@ body.dark .cart-toast { background:#2a1c14; }
   gap:1.4rem;
 }
 .related-card {
-  border:1px solid var(--border); border-radius:3px; overflow:hidden;
+  border:1px solid var(--border); border-radius:14px; overflow:hidden;
   background:var(--bg-card);
   transition:border-color 0.25s, box-shadow 0.25s, transform 0.25s;
   cursor:pointer;
@@ -609,7 +609,7 @@ body.dark .cart-toast { background:#2a1c14; }
   transform:translateY(-3px);
 }
 .related-card-img {
-  aspect-ratio:4/3; overflow:hidden; background:var(--bg-alt);
+  aspect-ratio:4/3; overflow:hidden; border-radius:14px 14px 0 0; background:var(--bg-alt);
   display:flex; align-items:center; justify-content:center;
   font-size:2.5rem; color:var(--clay);
 }
@@ -1483,9 +1483,11 @@ function renderProduct(p) {
             const isEnquireOnly = p.enquire_only || (isOneOfOne && hasNoPrice);
             const isSoldOut = p.is_sold;
             if (isEnquireOnly) {
+              const enquireSizes = sizeChips || '';
               return `
-                <p style="font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--clay);margin-bottom:0.6rem">Unique work</p>
+                <p style="font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--clay);margin-bottom:0.6rem">Unique work</p>
                 <p style="font-size:0.95rem;color:var(--text-muted);line-height:1.6;margin-bottom:1.2rem">This is a one-of-a-kind piece. Reach out to discuss availability, pricing, and details.</p>
+                ${enquireSizes ? `<p class="purchase-label" style="margin-bottom:0.5rem">Available sizes</p><div class="size-picker" style="pointer-events:none;opacity:0.7;margin-bottom:1.2rem">${enquireSizes}</div>` : ''}
                 ${isSoldOut
                   ? '<button class="add-to-cart-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold</button>'
                   : '<button class="add-to-cart-btn enquire-action" onclick="openEnquire(\'' + escapeAttr(p.name) + '\')">Enquire about this work →</button>'}
@@ -1761,9 +1763,11 @@ function renderSizingGuide() {
     { label: '24×36"', cm: '61×91 cm',  key: '24x36', x: 448, y: 92,  w: 96, h: 144, tx: 496 },
   ];
   // Only show sizes that exist for this product
-  const available = _product ? availablePrintChoices(_product).map(c => {
-    const s = c.key.split(':').pop(); return s;
-  }) : [];
+  let available = [];
+  try {
+    available = _product ? availablePrintChoices(_product).map(c => c.key.split(':').pop()) : [];
+  } catch(_) {}
+  // Show all sizes if product has no variants (e.g. enquire-only 1-of-1)
   const shown = sizes.filter(s => !available.length || available.includes(s.key));
   const frames = shown.map(s => {
     const active = s.key === sizeRaw;
