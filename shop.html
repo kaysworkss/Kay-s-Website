@@ -3801,6 +3801,11 @@ function stockForChoice(p, key) {
   if (sbv[key] !== undefined) return sbv[key];
   const size = keySize(key);
   if (sbv[size] !== undefined) return sbv[size];
+  const totals = p.edition_totals || {};
+  if (p.category === 'prints' && p.print_edition === 'limited') {
+    if (totals[key] !== undefined) return totals[key];
+    if (totals[size] !== undefined) return totals[size];
+  }
   if (p.stock !== null && p.stock !== undefined) return p.stock;
   return null;
 }
@@ -4158,6 +4163,7 @@ function syncCardStock(pid, variantKey) {
   const left = remainingToAdd(p, v);              // null = unlimited
   const soldOut = cap !== null && cap <= 0;       // genuinely out of stock
   const maxedByCart = left !== null && left <= 0; // none left to add right now
+  const showEditionCount = p.category === 'prints' && p.print_edition === 'limited';
 
   // Stock label (merch cards already have a #stock-<id> span; print cards get one too)
   let stockEl = document.getElementById('stock-' + pid);
@@ -4172,8 +4178,9 @@ function syncCardStock(pid, variantKey) {
   if (stockEl) {
     if (soldOut) {
       stockEl.innerHTML = `<span style="font-family:'Montserrat',sans-serif;font-size:0.6rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--rust);margin-left:0.5rem">Sold out</span>`;
-    } else if (cap !== null && cap <= 3) {
-      stockEl.innerHTML = `<span style="font-family:'Montserrat',sans-serif;font-size:0.6rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--rust);margin-left:0.5rem">Only ${cap} left</span>`;
+    } else if (cap !== null && (showEditionCount || cap <= 3)) {
+      const label = cap <= 3 ? `Only ${cap} left` : `${cap} left`;
+      stockEl.innerHTML = `<span style="font-family:'Montserrat',sans-serif;font-size:0.6rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--rust);margin-left:0.5rem">${label}</span>`;
     } else {
       stockEl.innerHTML = '';
     }
