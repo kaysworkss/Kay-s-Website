@@ -574,6 +574,27 @@ body.dark .promo-ticker { background: #1a1210; }
   -webkit-backdrop-filter: blur(12px);
   background: rgba(245,237,224,0.92);
 }
+.filter-group {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.view-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: clamp(0.4rem, 2vw, 1rem);
+  padding-left: clamp(0.4rem, 2vw, 1rem);
+  border-left: 1px solid var(--border);
+}
+.view-controls-label {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
 body.dark .shop-filters {
   background: rgba(20,16,16,0.92);
 }
@@ -604,10 +625,10 @@ body.dark .shop-filters {
 .masonry-mode-btn {
   font-family: 'Montserrat', sans-serif; font-size: 0.62rem;
   font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-  padding: 0.55rem 1rem;
+  padding: 0.42rem 0.75rem;
   border: 1px solid var(--border);
-  background: rgba(255,255,255,0.3); color: var(--text-muted);
-  border-radius: 40px;
+  background: var(--bg-alt); color: var(--text-muted);
+  border-radius: 8px;
   transition: border-color 0.2s, color 0.2s, background 0.2s;
 }
 .masonry-mode-btn:hover { border-color: var(--clay); color: var(--clay); }
@@ -617,7 +638,7 @@ body.dark .shop-filters {
   color: var(--rust);
 }
 @media(max-width:600px){
-  .masonry-mode-btn { display:none; }
+  .view-controls { display:none; }
 }
 
 /* ── Grid ── */
@@ -2008,7 +2029,7 @@ nav.scrolled .nav-hamburger span { background: var(--text); }
 nav.scrolled .grid-toggle { color: var(--text-muted); text-shadow: none; }
 nav.scrolled .grid-toggle:hover { color: var(--clay); }
 @media (max-width: 600px) {
-  .grid-toggle { display: flex; align-items: center; justify-content: center; }
+  .grid-toggle { display: none; }
 }
 /* Single-column mode (toggled via JS) */
 .shop-grid.single-col {
@@ -2046,7 +2067,7 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
 @media(max-width:600px){
   .shop-grid {
     display: grid;
-    grid-template-columns:1fr 1fr;
+    grid-template-columns:1fr;
     gap:1rem;
   }
   .shop-grid.masonry-grid {
@@ -2054,7 +2075,7 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
     column-count: auto;
     column-gap: 0;
   }
-  .shop-grid.grid-col { grid-template-columns:repeat(2, minmax(0, 1fr)) !important; }
+  .shop-grid.grid-col { grid-template-columns:1fr !important; }
   .shop-grid.single-col { grid-template-columns:1fr !important; }
   .shop-grid.grid-col .product-card {
     min-width: 0;
@@ -2177,7 +2198,7 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
     column-count: auto;
     column-gap: 0;
   }
-  .shop-grid.grid-col { grid-template-columns:repeat(2, minmax(0, 1fr)) !important; gap:0.75rem; }
+  .shop-grid.grid-col { grid-template-columns:1fr !important; gap:1rem; }
   .shop-grid.single-col { grid-template-columns:1fr !important; }
   .shop-grid.grid-col .card-body { padding: 0.62rem; }
   .shop-grid.grid-col .card-title { font-size: 0.92rem; }
@@ -2492,12 +2513,6 @@ body.dark { --text-muted: #b3a392; }
       <a href="/#about">About the artist</a>
     </div>
     <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle theme">&#x2600;&#xFE0E;</button>
-    <button class="grid-toggle" id="gridToggle" type="button" aria-label="Toggle grid layout" title="Switch view">
-      <svg id="gridToggleIcon" width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
-        <rect x="0" y="0" width="8" height="8" rx="1.5"/><rect x="10" y="0" width="8" height="8" rx="1.5"/>
-        <rect x="0" y="10" width="8" height="8" rx="1.5"/><rect x="10" y="10" width="8" height="8" rx="1.5"/>
-      </svg>
-    </button>
     <button class="nav-cart" id="cartBtn" type="button" aria-label="Open cart">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:inline-block;vertical-align:middle"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
       <span class="cart-badge" id="cartBadge">0</span>
@@ -2531,12 +2546,17 @@ body.dark { --text-muted: #b3a392; }
 
 <!-- Filter pills — immediately below the hero -->
 <div class="shop-filters" id="filterBar" role="navigation" aria-label="Shop categories">
-  <button class="filter-btn active" data-filter="all">All</button>
-  <button class="filter-btn" data-filter="prints">Prints</button>
-  <button class="filter-btn" data-filter="merch">Merch</button>
-  <button class="filter-btn" data-filter="notebooks">Notebooks</button>
-  <button class="filter-btn" data-filter="stickers">Stickers</button>
-  <button class="masonry-mode-btn" id="masonryModeBtn" type="button" aria-pressed="false">Masonry</button>
+  <div class="filter-group" aria-label="Product categories">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="prints">Prints</button>
+    <button class="filter-btn" data-filter="merch">Merch</button>
+    <button class="filter-btn" data-filter="notebooks">Notebooks</button>
+    <button class="filter-btn" data-filter="stickers">Stickers</button>
+  </div>
+  <div class="view-controls" aria-label="View options">
+    <span class="view-controls-label">View</span>
+    <button class="masonry-mode-btn" id="masonryModeBtn" type="button" aria-pressed="false">Masonry</button>
+  </div>
 </div>
 
 <!-- Marquee strip -->
@@ -3520,8 +3540,11 @@ body.dark { --text-muted: #b3a392; }
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">
             <div class="form-row" style="margin:0">
               <label class="form-label">Slug <span style="color:var(--rust)">*</span></label>
-              <input class="form-input" id="ppSlug" type="text" placeholder="apoti-olowe-study-i"
-                style="font-family:'Montserrat',sans-serif;font-size:0.8rem"/>
+              <div style="display:grid;grid-template-columns:1fr auto;gap:0.45rem">
+                <input class="form-input" id="ppSlug" type="text" placeholder="apoti-olowe-study-i"
+                  style="font-family:'Montserrat',sans-serif;font-size:0.8rem"/>
+                <button class="admin-save-btn" id="ppAutoSlugBtn" type="button" style="margin:0;padding:0.55rem 0.75rem;font-size:0.5rem">Auto</button>
+              </div>
               <p style="font-size:0.72rem;color:var(--text-muted);margin-top:0.3rem">URL-safe, lowercase, hyphens only. This becomes the page URL.</p>
             </div>
             <div class="form-row" style="margin:0">
@@ -4642,6 +4665,7 @@ function renderFeaturedSection() {
 
 let currentShopFilter = 'all';
 let masonryMode = false;
+const SHOP_CATEGORY_ORDER = { prints: 0, merch: 1, notebooks: 2, stickers: 3 };
 
 function updateMasonryModeUI() {
   const btn = document.getElementById('masonryModeBtn');
@@ -4694,7 +4718,14 @@ function renderProductViews(activeFilter = 'all') {
     if (allGrid) {
       allGrid.style.display = '';
       updateMasonryModeUI();
-      SHOP_CONFIG.products.forEach(p => {
+      [...SHOP_CONFIG.products]
+        .sort((a, b) => {
+          const catA = SHOP_CATEGORY_ORDER[a.category] ?? 99;
+          const catB = SHOP_CATEGORY_ORDER[b.category] ?? 99;
+          if (catA !== catB) return catA - catB;
+          return (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+        })
+        .forEach(p => {
         try { allGrid.appendChild(buildCard(p)); }
         catch (e) { console.error(`[shop] Failed to render product "${p.name || p.id}":`, e.message); }
       });
@@ -6825,11 +6856,39 @@ document.addEventListener('change', function(e) {
 
 /* ─── Print page editor ─── */
 function slugify(s) {
-  return s.toLowerCase()
+  return String(s || '').toLowerCase()
     .replace(/[àáâãäå]/g,'a').replace(/[èéêë]/g,'e')
     .replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o')
     .replace(/[ùúûü]/g,'u').replace(/[ñ]/g,'n')
     .replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+}
+
+function autoSlugBaseFromProduct(p) {
+  const parts = [
+    p?.name,
+    p?.year,
+    p?.medium || p?.print_type || p?.printType,
+    p?.series_name,
+  ].map(v => String(v || '').trim()).filter(Boolean);
+  return slugify(parts.join(' ')) || 'artwork';
+}
+
+function uniqueProductSlug(base, currentProduct) {
+  const cleanBase = slugify(base) || 'artwork';
+  const used = new Set(
+    (SHOP_CONFIG.products || [])
+      .filter(p => p && p !== currentProduct)
+      .map(p => String(p.slug || '').trim())
+      .filter(Boolean)
+  );
+  if (!used.has(cleanBase)) return cleanBase;
+  let n = 2;
+  while (used.has(`${cleanBase}-${n}`)) n++;
+  return `${cleanBase}-${n}`;
+}
+
+function autoSlugForProduct(p) {
+  return uniqueProductSlug(autoSlugBaseFromProduct(p), p);
 }
 
 function populatePrintPageSelector() {
@@ -6913,9 +6972,9 @@ document.getElementById('printPageSelector').addEventListener('change', async fu
   const p = SHOP_CONFIG.products.find(x => x.id === id);
   if (!p) return;
 
-  // Pre-fill slug from name if empty
+  // Pre-fill slug from existing product details, then let server data override it.
   const slugInput = document.getElementById('ppSlug');
-  if (!slugInput.value) slugInput.value = slugify(p.name);
+  if (slugInput) slugInput.value = p.slug || autoSlugForProduct(p);
 
   // Try to load existing data from Supabase
   const token = localStorage.getItem('kaysworks-admin-token');
@@ -6932,6 +6991,7 @@ document.getElementById('printPageSelector').addEventListener('change', async fu
     } catch(_) {}
   }
 
+  if (slugInput && !slugInput.value.trim()) slugInput.value = autoSlugForProduct(p);
   updateUrlPreview();
   editor.style.display = '';
   document.getElementById('printPageSaveStatus').style.display = 'none';
@@ -6966,6 +7026,20 @@ function updateUrlPreview() {
   if (preview) preview.textContent = `kaysworks.com/shop/${slug || '…'}`;
   if (link && slug) { link.href = `/shop/${slug}`; link.textContent = `/shop/${slug}`; }
 }
+
+document.getElementById('ppAutoSlugBtn')?.addEventListener('click', () => {
+  const id = document.getElementById('printPageSelector').value;
+  const p = SHOP_CONFIG.products.find(x => x.id === id);
+  if (!p) { showToast('Select a print first'); return; }
+  const slugInput = document.getElementById('ppSlug');
+  if (slugInput) slugInput.value = autoSlugForProduct({
+    ...p,
+    year: document.getElementById('ppYear').value.trim() || p.year,
+    medium: document.getElementById('ppMedium').value.trim() || p.medium,
+    series_name: document.getElementById('ppSeriesName').value.trim() || p.series_name,
+  });
+  updateUrlPreview();
+});
 
 // Auto-slugify as user types the slug field
 document.getElementById('ppSlug').addEventListener('blur', function() {
@@ -7038,7 +7112,7 @@ function addPrintArtwork() {
   const defaults = defaultPrintOptionData();
   const prints = SHOP_CONFIG.products.filter(p => p.category === 'prints');
   const minOrder = prints.length ? Math.min(...prints.map(x => Number(x.sort_order) || 0)) : 0;
-  SHOP_CONFIG.products.unshift({
+  const newPrint = {
     id: 'prod-' + uid(), category: 'prints', name: 'New Artwork',
     desc: 'Choose the print format and size for this artwork.', emoji: '🖼',
     variants: defaults.variants.map(o => ({ ...o, sizes: [...o.sizes] })),
@@ -7048,7 +7122,9 @@ function addPrintArtwork() {
     badge: '', image: '',
     sort_order: minOrder - 1,
     _justAdded: true,
-  });
+  };
+  newPrint.slug = autoSlugForProduct(newPrint);
+  SHOP_CONFIG.products.unshift(newPrint);
   renderAdminProducts();
   scrollToJustAdded();
 }
@@ -7180,6 +7256,14 @@ function renderAdminProducts() {
         <div class="form-row" style="margin:0">
           <label class="form-label">Image URL</label>
           <input class="form-input ap-img" data-idx="${realIdx}" value="${escapeAttr(p.image||'')}"/>
+        </div>
+        <div class="form-row" style="margin:0">
+          <label class="form-label">Product page slug</label>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:0.45rem">
+            <input class="form-input ap-slug" data-idx="${realIdx}" value="${escapeAttr(p.slug||'')}" placeholder="auto-generated from artwork details"/>
+            <button class="admin-save-btn ap-auto-slug" type="button" data-key="${escapeAttr(pKey)}" style="margin:0;padding:0.55rem 0.75rem;font-size:0.5rem">Auto</button>
+          </div>
+          <p style="font-size:0.72rem;color:var(--text-muted);margin-top:0.3rem">Lives at <span style="color:var(--clay)">/shop/${escapeAttr(p.slug||'...')}</span>. Auto uses name, year, medium, and series when available.</p>
         </div>
         <label class="form-label" style="margin-top:0.4rem">Print option descriptions</label>
         <div>${optionDescHtml}</div>
@@ -7384,6 +7468,19 @@ function renderAdminProducts() {
   el.querySelectorAll('.ap-duplicate').forEach(btn => {
     btn.addEventListener('click', () => {
       duplicateProductByKey(btn.dataset.key || '');
+    });
+  });
+
+  // Generate/update a product slug from the artwork details in this row.
+  el.querySelectorAll('.ap-auto-slug').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = productByKey(btn.dataset.key || '');
+      const row = btn.closest('.admin-product-row');
+      if (!p || !row) return;
+      const nameEl = row.querySelector('.ap-name');
+      const slugEl = row.querySelector('.ap-slug');
+      if (nameEl) p.name = nameEl.value.trim() || p.name;
+      if (slugEl) slugEl.value = autoSlugForProduct(p);
     });
   });
 
@@ -7614,6 +7711,11 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
       if (imgEl)   p.image = imgEl.value.trim();
       if (emojiEl) p.emoji = emojiEl.value.trim() || '✦';
       if (stockEl) p.stock = stockEl.value === '' ? null : Number(stockEl.value);
+      const slugElCommon = row.querySelector('.ap-slug');
+      if (slugElCommon) {
+        const typed = slugElCommon.value.trim();
+        p.slug = typed ? slugify(typed) : autoSlugForProduct(p);
+      }
 
       if (p.category === 'prints') {
         const nextAvailable = {};
