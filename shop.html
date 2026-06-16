@@ -2227,7 +2227,7 @@ body.dark { --text-muted: #b3a392; }
   <div class="shop-hero-bg-img"></div>
   <div class="shop-hero-vignette"></div>
   <div class="shop-hero-content">
-    <p class="shop-hero-eyebrow">The Shop</p>
+    <p class="shop-hero-eyebrow">Where you own the story</p>
     <h1 class="shop-hero-title">Own the story.<br><em>Wear the work.</em></h1>
     <p class="shop-hero-sub">Fine art and merch made with care.</p>
   </div>
@@ -3890,8 +3890,12 @@ window.addEventListener('scroll', () => nav.classList.toggle('scrolled', window.
 /* ─── Build product cards ─── */
 function buildBadgeStack(p) {
   const tags = [];
-  if (p.badge) tags.push(`<span class="card-tag card-tag-manual">${escapeText(p.badge)}</span>`);
-  if (p.is_bestseller) tags.push(`<span class="card-tag card-tag-best">Best Seller</span>`);
+  const isOneOfOnePrint = p.category === 'prints' && p.print_edition === 'one_of_one';
+  const manualBadge = String(p.badge || '').trim();
+  if (manualBadge && !(isOneOfOnePrint && /^best\s*seller$/i.test(manualBadge))) {
+    tags.push(`<span class="card-tag card-tag-manual">${escapeText(manualBadge)}</span>`);
+  }
+  if (p.is_bestseller && !isOneOfOnePrint) tags.push(`<span class="card-tag card-tag-best">Best Seller</span>`);
   if (p.is_new) tags.push(`<span class="card-tag card-tag-new">New</span>`);
   return tags.length ? `<div class="card-badge-stack">${tags.join('')}</div>` : '';
 }
