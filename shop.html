@@ -3403,6 +3403,9 @@ body.dark { --text-muted: #b3a392; }
 'use strict';
 
 /* ─── Config (loaded from Supabase / Edge Config or defaults) ─── */
+// Live USD/NGN rate — set from the server config, falls back to 1600.
+let SHOP_RATE = 1600;
+
 let SHOP_CONFIG = {
   // Wallet addresses are the single source of truth on the server (shop_config,
   // the same row the server verifies incoming payments against). They are loaded
@@ -3546,6 +3549,34 @@ function showToast(msg, dur=2800) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), dur);
 }
+
+// Payment processing banner — used by both Paystack redirect and crypto confirm.
+function showPaymentBanner(text) {
+  const banner = document.getElementById('paymentLoadingBanner');
+  const bar = document.getElementById('paymentLoadingBar');
+  const bannerText = document.getElementById('paymentLoadingText');
+  if (!banner) return;
+  if (bannerText) bannerText.textContent = text || 'Confirming your payment… please wait';
+  if (bar) bar.style.width = '0%';
+  banner.style.display = '';
+  let progress = 0;
+  if (banner._tick) clearInterval(banner._tick);
+  banner._tick = setInterval(() => {
+    progress = Math.min(progress + 2, 80);
+    if (bar) bar.style.width = progress + '%';
+  }, 200);
+}
+function hidePaymentBanner(success) {
+  const banner = document.getElementById('paymentLoadingBanner');
+  const bar = document.getElementById('paymentLoadingBar');
+  const bannerText = document.getElementById('paymentLoadingText');
+  if (!banner) return;
+  if (banner._tick) clearInterval(banner._tick);
+  if (bar) bar.style.width = '100%';
+  if (bannerText) bannerText.textContent = success ? 'Payment confirmed ✓' : 'Payment received — see details below';
+  setTimeout(() => { banner.style.display = 'none'; }, success ? 1500 : 3000);
+}
+
 function printOptionKey(type, size) { return `${type}|${size}`; }
 function labelPrintOption(type, size) { return `${type} · ${size}`; }
 function keySize(key) { return String(key || '').includes('|') ? String(key).split('|').pop() : String(key || ''); }
@@ -4934,7 +4965,7 @@ function deliveryFeeNgn() {
   if (!r) return 0;
   const isLarge = cartHasLargePrint();
   if (r.small !== undefined) return domesticDeliveryNgn(r, isLarge);
-  return Math.round(intlRate(_deliveryZone, isLarge) * 1600);
+  return Math.round(intlRate(_deliveryZone, isLarge) * SHOP_RATE);
 }
 function deliveryFeeUsd() {
   if (!_deliveryZone) return 0;
@@ -4944,7 +4975,7 @@ function deliveryFeeUsd() {
   const isLarge = cartHasLargePrint();
   if (r.small !== undefined) {
     const ngn = domesticDeliveryNgn(r, isLarge);
-    return ngn ? +(ngn / 1600).toFixed(2) : 0;
+    return ngn ? +(ngn / SHOP_RATE).toFixed(2) : 0;
   }
   return intlRate(_deliveryZone, isLarge);
 }
@@ -4956,7 +4987,7 @@ function deliveryFeeDisplay(carrier = selectedIntlCarrier(_deliveryZone)) {
   const isLarge = cartHasLargePrint();
   if (r.small !== undefined) return fmt(domesticDeliveryNgn(r, isLarge));
   const usd = intlRate(_deliveryZone, isLarge, carrier);
-  return '$' + usd.toFixed(0) + ' USD (~' + fmt(Math.round(usd * 1600)) + ')';
+  return '$' + usd.toFixed(0) + ' USD (~' + fmt(Math.round(usd * SHOP_RATE)) + ')';
 }
 function carrierLabel(carrier) { return carrier === 'dhl' ? 'DHL Express' : 'UPS'; }
 function deliveryFeeForCarrier(carrier) {
@@ -5811,6 +5842,7 @@ async function createPendingOrder(customer, method, checkoutQuote) {
 // Confirm payment against an existing pending order by its order_ref. Retries
 // while the chain is still indexing (server returns 409 "not confirmed yet").
 async function confirmPendingOrder(orderRef, opts) {
+  showPaymentBanner('Verifying your payment on-chain… please wait');
   // Include the customer's details so that, in the create-from-quote-at-confirm
   // flow, the order row (and the confirmation emails) have name/email/address.
   // Without these the order would be created with an empty email and the
@@ -5853,7 +5885,7 @@ async function confirmPendingOrder(orderRef, opts) {
       window.__shopDiag.unshift({ t: new Date().toLocaleTimeString(), url: '/api/shop/order-confirm', status: res.status, body: diagBody });
       if (window.__shopDiag.length > 8) window.__shopDiag.length = 8;
       if (window.__renderShopDiag) window.__renderShopDiag();
-      if (res.ok) return data;
+      if (res.ok) { hidePaymentBanner(true); return data; }
       const errMsg = data.error || rawText || '';
       // Hard failure — stop immediately
       if (isHardFail(data, errMsg)) {
@@ -5873,6 +5905,7 @@ async function confirmPendingOrder(orderRef, opts) {
       throw e;
     }
   }
+  hidePaymentBanner(false);
   if (lastErr) throw lastErr;
 }
 
@@ -6130,35 +6163,14 @@ async function finalizeReturnedGatewayCheckout() {
   const gatewayRef = params.get('reference') || params.get('trxref') || params.get('tx_ref') || params.get('transaction_id');
   if (!gatewayRef) return;
 
-  // Show the processing banner so the customer knows something is happening
-  const banner = document.getElementById('paymentLoadingBanner');
-  const bar = document.getElementById('paymentLoadingBar');
-  const bannerText = document.getElementById('paymentLoadingText');
-  if (banner) {
-    banner.style.display = '';
-    // Animate the progress bar to ~80% over 8 seconds (the rest completes on success)
-    let progress = 0;
-    const tick = setInterval(() => {
-      progress = Math.min(progress + 2, 80);
-      if (bar) bar.style.width = progress + '%';
-    }, 200);
-    // Store the interval so we can clear it later
-    banner._tick = tick;
-  }
-  function hideBanner(success) {
-    if (!banner) return;
-    if (banner._tick) clearInterval(banner._tick);
-    if (bar) bar.style.width = '100%';
-    if (bannerText) bannerText.textContent = success ? 'Payment confirmed ✓' : 'Payment received — see details below';
-    setTimeout(() => { banner.style.display = 'none'; }, success ? 1500 : 3000);
-  }
+  showPaymentBanner('Confirming your payment… please wait');
 
   let pending = null;
   try { pending = JSON.parse(sessionStorage.getItem('kwPendingCheckout') || 'null'); } catch (_) {}
   if (!pending || !pending.customer || !pending.method || !pending.quote) {
     showConfirmation('paystack', gatewayRef);
     history.replaceState(null, '', location.pathname + location.hash);
-    hideBanner(true);
+    hidePaymentBanner(true);
     return;
   }
   const ref = pending.ref || gatewayRef;
@@ -6170,7 +6182,7 @@ async function finalizeReturnedGatewayCheckout() {
     if (typeof updateCartUI === 'function') updateCartUI();
     showConfirmation(pending.method, result?.order_ref || ref);
     history.replaceState(null, '', location.pathname + location.hash);
-    hideBanner(true);
+    hidePaymentBanner(true);
   } catch (e) {
     const msg = (e.message || '').toLowerCase();
     if (/already been recorded|already.*submitted|duplicate/i.test(msg)) {
@@ -6180,11 +6192,11 @@ async function finalizeReturnedGatewayCheckout() {
       if (typeof updateCartUI === 'function') updateCartUI();
       showConfirmation(pending.method, ref);
       history.replaceState(null, '', location.pathname + location.hash);
-      hideBanner(true);
+      hidePaymentBanner(true);
       return;
     }
     showToast('Payment received, but order recording needs review: ' + (e.message || 'unknown error'), 6000);
-    hideBanner(false);
+    hidePaymentBanner(false);
   }
 }
 /* ─── Admin ─── */
@@ -6241,6 +6253,11 @@ async function loadAdminConfig() {
       }
       if (cfg.eth_address)   SHOP_CONFIG.ethAddress   = cfg.eth_address;
       if (cfg.tezos_address) SHOP_CONFIG.tezosAddress = cfg.tezos_address;
+      // Live exchange rate from the server (fetched from free APIs, cached 1hr)
+      if (cfg.ngn_per_usd && cfg.ngn_per_usd > 100) SHOP_RATE = Math.round(cfg.ngn_per_usd);
+      // Update the admin rate indicator if visible
+      const rateTag = document.getElementById('adminRateTag');
+      if (rateTag) rateTag.textContent = '₦' + SHOP_RATE.toLocaleString() + '/$ live';
     }
   } catch (_) { /* keep whatever's already loaded */ }
   // Show the live server addresses in the read-only admin fields.
@@ -6416,6 +6433,54 @@ document.addEventListener('input', function(e) {
     slugInput.value = slugify(e.target.value);
   }
 });
+
+// Auto-convert between NGN and USD prices using the live exchange rate.
+// Type in NGN → auto-fills USD. Type in USD → auto-fills NGN.
+// A small rate indicator shows the current rate being used.
+(function() {
+  let _lastEditedField = null;
+  document.addEventListener('input', function(e) {
+    const t = e.target;
+    if (!t.matches) return;
+    if (t.matches('.ap-size-ngn')) {
+      // NGN → USD
+      const row = t.closest('.ap-size-row');
+      if (!row) return;
+      const usdInput = row.querySelector('.ap-size-usd');
+      if (!usdInput) return;
+      const ngn = parseFloat(t.value);
+      if (!isNaN(ngn) && ngn > 0 && SHOP_RATE > 0) {
+        usdInput.value = Math.round(ngn / SHOP_RATE);
+      } else if (!t.value.trim()) {
+        usdInput.value = '';
+      }
+    }
+    if (t.matches('.ap-size-usd')) {
+      // USD → NGN
+      const row = t.closest('.ap-size-row');
+      if (!row) return;
+      const ngnInput = row.querySelector('.ap-size-ngn');
+      if (!ngnInput) return;
+      const usd = parseFloat(t.value);
+      if (!isNaN(usd) && usd > 0 && SHOP_RATE > 0) {
+        ngnInput.value = Math.round(usd * SHOP_RATE);
+      } else if (!t.value.trim()) {
+        ngnInput.value = '';
+      }
+    }
+  });
+  // Show the current rate in the admin header
+  document.addEventListener('DOMContentLoaded', function() {
+    const adminEl = document.querySelector('.admin-panel-title');
+    if (adminEl && SHOP_RATE) {
+      const rateTag = document.createElement('span');
+      rateTag.style.cssText = 'font-family:Montserrat,sans-serif;font-size:0.68rem;color:var(--clay);margin-left:0.8rem;font-weight:500';
+      rateTag.textContent = '₦' + SHOP_RATE.toLocaleString() + '/$ live';
+      rateTag.id = 'adminRateTag';
+      adminEl.appendChild(rateTag);
+    }
+  });
+})();
 
 document.getElementById('printPageSelector').addEventListener('change', async function() {
   const id = this.value;
