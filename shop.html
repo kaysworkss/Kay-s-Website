@@ -601,6 +601,24 @@ body.dark .shop-filters {
   box-shadow: 0 4px 16px rgba(158,79,46,0.3);
   transform: translateY(-1px);
 }
+.masonry-mode-btn {
+  font-family: 'Montserrat', sans-serif; font-size: 0.62rem;
+  font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.3); color: var(--text-muted);
+  border-radius: 40px;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.masonry-mode-btn:hover { border-color: var(--clay); color: var(--clay); }
+.masonry-mode-btn.active {
+  background: rgba(196,132,90,0.12);
+  border-color: var(--clay);
+  color: var(--rust);
+}
+@media(max-width:600px){
+  .masonry-mode-btn { display:none; }
+}
 
 /* ── Grid ── */
 .shop-section {
@@ -2504,6 +2522,7 @@ body.dark { --text-muted: #b3a392; }
   <button class="filter-btn" data-filter="merch">Merch</button>
   <button class="filter-btn" data-filter="notebooks">Notebooks</button>
   <button class="filter-btn" data-filter="stickers">Stickers</button>
+  <button class="masonry-mode-btn" id="masonryModeBtn" type="button" aria-pressed="false">Masonry</button>
 </div>
 
 <!-- Marquee strip -->
@@ -2638,7 +2657,7 @@ body.dark { --text-muted: #b3a392; }
 
 <!-- Products -->
 <section class="shop-section" id="shopGrid">
-  <div class="shop-grid masonry-grid" id="allProductsGrid"></div>
+  <div class="shop-grid" id="allProductsGrid"></div>
 
   <!-- PRINTS — three sub-sections -->
   <div class="section-label" data-category="prints" id="printsLabel">Fine Art Prints</div>
@@ -4606,6 +4625,20 @@ function renderFeaturedSection() {
 }
 
 let currentShopFilter = 'all';
+let masonryMode = false;
+
+function updateMasonryModeUI() {
+  const btn = document.getElementById('masonryModeBtn');
+  const allGrid = document.getElementById('allProductsGrid');
+  const isMobile = window.matchMedia('(max-width: 600px)').matches;
+  const enabled = masonryMode && currentShopFilter === 'all' && !isMobile;
+  if (allGrid) allGrid.classList.toggle('masonry-grid', enabled);
+  if (btn) {
+    btn.classList.toggle('active', enabled);
+    btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    btn.style.display = currentShopFilter === 'all' && !isMobile ? '' : 'none';
+  }
+}
 
 function renderProducts() {
   SHOP_CONFIG.products = (SHOP_CONFIG.products || []).filter(p => p && p.active !== false).map(normalizeProduct);
@@ -4644,6 +4677,7 @@ function renderProductViews(activeFilter = 'all') {
   if (activeFilter === 'all') {
     if (allGrid) {
       allGrid.style.display = '';
+      updateMasonryModeUI();
       SHOP_CONFIG.products.forEach(p => {
         try { allGrid.appendChild(buildCard(p)); }
         catch (e) { console.error(`[shop] Failed to render product "${p.name || p.id}":`, e.message); }
@@ -4651,6 +4685,7 @@ function renderProductViews(activeFilter = 'all') {
     }
   } else {
     if (allGrid) allGrid.style.display = 'none';
+    updateMasonryModeUI();
 
     SHOP_CONFIG.products.forEach(p => {
       try {
@@ -4734,6 +4769,24 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 });
 
 /* ─── Cart ─── */
+(function wireMasonryModeToggle() {
+  const btn = document.getElementById('masonryModeBtn');
+  if (!btn) return;
+  try { masonryMode = localStorage.getItem('kw-masonry-mode') === 'on'; } catch(_){}
+  btn.addEventListener('click', () => {
+    if (window.matchMedia('(max-width: 600px)').matches) return;
+    if (currentShopFilter !== 'all') {
+      document.querySelector('.filter-btn[data-filter="all"]')?.click();
+    }
+    masonryMode = !masonryMode;
+    try { localStorage.setItem('kw-masonry-mode', masonryMode ? 'on' : 'off'); } catch(_){}
+    updateMasonryModeUI();
+    applyShowMore();
+  });
+  window.addEventListener('resize', updateMasonryModeUI, { passive: true });
+  updateMasonryModeUI();
+})();
+
 let cartOrderNote = localStorage.getItem('kwCartOrderNote') || '';
 
 function addToCart(p, variant) {
