@@ -621,9 +621,21 @@ body.dark .shop-filters {
   background: linear-gradient(90deg, var(--border), transparent);
 }
 .shop-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.15rem;
+}
+.shop-grid.masonry-grid {
   display: block;
   column-count: 4;
   column-gap: 1.15rem;
+}
+.shop-grid.masonry-grid .product-card {
+  display: inline-block;
+  width: 100%;
+  margin: 0 0 1.15rem;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 /* ── Product Card ── */
@@ -635,11 +647,7 @@ body.dark .shop-filters {
   transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
   cursor: pointer;
   position: relative;
-  display: inline-block;
-  width: 100%;
-  margin: 0 0 1.15rem;
-  break-inside: avoid;
-  page-break-inside: avoid;
+  min-width: 0;
 }
 .product-card:hover {
   border-color: var(--border-hover);
@@ -850,6 +858,9 @@ body.dark .variant-chip.selected { color: var(--sand); }
 }
 @media (max-width: 1100px) and (min-width: 901px) {
   .shop-grid {
+    gap: 0.9rem;
+  }
+  .shop-grid.masonry-grid {
     column-gap: 0.9rem;
   }
   .shop-grid .card-footer {
@@ -862,11 +873,16 @@ body.dark .variant-chip.selected { color: var(--sand); }
 }
 @media (max-width: 900px) and (min-width: 601px) {
   .shop-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+  }
+  .shop-grid.masonry-grid {
+    display: block;
     column-count: 3;
     column-gap: 1rem;
   }
   .shop-grid.grid-col {
-    column-count: 3;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 }
 @media (max-width: 420px) {
@@ -1981,7 +1997,7 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
   grid-template-columns: 1fr !important;
 }
 .shop-grid.grid-col {
-  column-count: 4;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
 }
 .show-more-btn {
   display: block; margin: 1.5rem auto 0;
@@ -1998,7 +2014,6 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
 @media(max-width:600px){
   .shop-grid {
     display: grid;
-    column-count: auto;
     grid-template-columns:1fr 1fr;
     gap:1rem;
   }
@@ -2010,8 +2025,6 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
   }
   .shop-grid .product-card {
     display: block;
-    margin: 0;
-    break-inside: auto;
   }
   .shop-grid.grid-col .card-img {
     aspect-ratio: auto;
@@ -2584,6 +2597,7 @@ body.dark { --text-muted: #b3a392; }
 
 <!-- Products -->
 <section class="shop-section" id="shopGrid">
+  <div class="shop-grid masonry-grid" id="allProductsGrid"></div>
 
   <!-- PRINTS — three sub-sections -->
   <div class="section-label" data-category="prints" id="printsLabel">Fine Art Prints</div>
@@ -4550,11 +4564,18 @@ function renderFeaturedSection() {
   }
 }
 
+let currentShopFilter = 'all';
+
 function renderProducts() {
   SHOP_CONFIG.products = (SHOP_CONFIG.products || []).filter(p => p && p.active !== false).map(normalizeProduct);
   // Respect the admin-defined display order within each category.
   SHOP_CONFIG.products.sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
   renderFeaturedSection();
+  renderProductViews(currentShopFilter);
+}
+
+function renderProductViews(activeFilter = 'all') {
+  const allGrid = document.getElementById('allProductsGrid');
   const grids = {
     prints: document.getElementById('printsGrid'),
     merch: document.getElementById('merchGrid'),
@@ -4571,26 +4592,43 @@ function renderProducts() {
     limited:    document.getElementById('sublabel-limited'),
     open:       document.getElementById('sublabel-open'),
   };
+  if (allGrid) allGrid.innerHTML = '';
   Object.values(grids).forEach(g => { if (g) g.innerHTML = ''; });
   Object.values(editionGrids).forEach(g => { if (g) g.innerHTML = ''; });
   Object.values(sublabels).forEach(l => { if (l) l.style.display = 'none'; });
-
-  SHOP_CONFIG.products.forEach(p => {
-    try {
-      if (p.category === 'prints' && p.print_edition) {
-        const grid = editionGrids[p.print_edition] || grids.prints;
-        if (grid) grid.appendChild(buildCard(p));
-        const lbl = sublabels[p.print_edition];
-        if (lbl) lbl.style.display = '';
-      } else {
-        const grid = grids[p.category];
-        if (grid) grid.appendChild(buildCard(p));
-      }
-    } catch (e) {
-      console.error(`[shop] Failed to render product "${p.name || p.id}":`, e.message);
-      // Skip this product instead of crashing the entire shop.
-    }
+  document.querySelectorAll('.section-label[data-category]').forEach(l => {
+    l.style.display = activeFilter !== 'all' && l.dataset.category === activeFilter ? '' : 'none';
   });
+
+  if (activeFilter === 'all') {
+    if (allGrid) {
+      allGrid.style.display = '';
+      SHOP_CONFIG.products.forEach(p => {
+        try { allGrid.appendChild(buildCard(p)); }
+        catch (e) { console.error(`[shop] Failed to render product "${p.name || p.id}":`, e.message); }
+      });
+    }
+  } else {
+    if (allGrid) allGrid.style.display = 'none';
+
+    SHOP_CONFIG.products.forEach(p => {
+      try {
+        if (activeFilter !== p.category) return;
+        if (p.category === 'prints' && p.print_edition) {
+          const grid = editionGrids[p.print_edition] || grids.prints;
+          if (grid) grid.appendChild(buildCard(p));
+          const lbl = sublabels[p.print_edition];
+          if (lbl) lbl.style.display = '';
+        } else {
+          const grid = grids[p.category];
+          if (grid) grid.appendChild(buildCard(p));
+        }
+      } catch (e) {
+        console.error(`[shop] Failed to render product "${p.name || p.id}":`, e.message);
+        // Skip this product instead of crashing the entire shop.
+      }
+    });
+  }
 
   // Variant / size chip clicks
   document.querySelectorAll('.variant-chip').forEach(btn => wireVariantButton(btn));
@@ -4623,10 +4661,8 @@ function renderProducts() {
 /* ─── Show More pagination ─── */
 const PRODUCTS_PER_BATCH = 8;
 function applyShowMore() {
+  document.querySelectorAll('#shopGrid .show-more-btn').forEach(btn => btn.remove());
   document.querySelectorAll('.shop-grid').forEach(grid => {
-    // Remove old show-more buttons
-    const oldBtn = grid.parentElement?.querySelector('.show-more-btn');
-    if (oldBtn) oldBtn.remove();
     const cards = Array.from(grid.children);
     if (cards.length <= PRODUCTS_PER_BATCH) { cards.forEach(c => c.style.display = ''); return; }
     let shown = PRODUCTS_PER_BATCH;
@@ -4651,28 +4687,8 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     const f = btn.dataset.filter;
-    document.querySelectorAll('.product-card').forEach(c => {
-      c.classList.toggle('hidden', f!=='all' && c.dataset.category!==f);
-    });
-    // Hide empty section labels and edition sub-grids
-    ['prints','merch','notebooks','stickers'].forEach(cat => {
-      const label = document.querySelector(`.section-label[data-category="${cat}"]`);
-      const grid = document.getElementById(cat+'Grid');
-      if (!label || !grid) return;
-      const visible = [...grid.querySelectorAll('.product-card')].some(c=>!c.classList.contains('hidden'));
-      label.style.display = (f==='all'||visible||f===cat) ? '' : 'none';
-      grid.style.display = (f==='all'||visible||f===cat) ? '' : 'none';
-    });
-    // Edition sub-grids visibility
-    ['one_of_one','limited','open'].forEach(ed => {
-      const g = document.getElementById('grid-'+ed);
-      const l = document.getElementById('sublabel-'+ed);
-      if (!g) return;
-      const hasCards = g.innerHTML.trim() !== '';
-      const show = f === 'all' || f === 'prints';
-      if (g) g.style.display = (show && hasCards) ? '' : 'none';
-      if (l) l.style.display = (show && hasCards) ? '' : 'none';
-    });
+    currentShopFilter = f;
+    renderProductViews(f);
   });
 });
 
@@ -8799,9 +8815,8 @@ function filterPrintEdition(edition) {
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   const printsBtn = document.querySelector('.filter-btn[data-filter=prints]');
   if (printsBtn) printsBtn.classList.add('active');
-  document.querySelectorAll('.product-card').forEach(c => {
-    c.classList.toggle('hidden', c.dataset.category !== 'prints');
-  });
+  currentShopFilter = 'prints';
+  renderProductViews('prints');
   // Then hide sub-grids that don't match
   ['one_of_one','limited','open'].forEach(ed => {
     const g = document.getElementById('grid-'+ed);
