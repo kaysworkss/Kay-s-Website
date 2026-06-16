@@ -7370,7 +7370,7 @@ function renderAdminProducts() {
             return `<div class="ap-size-row" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" data-size="${escapeAttr(size)}" data-v="${escapeAttr(key)}" style="display:grid;grid-template-columns:auto 1.1fr 0.75fr 0.75fr 0.75fr 0.7fr 0.7fr 0.9fr 0.65fr 0.65fr auto;gap:0;align-items:center;padding:0.5rem 0.8rem;border-bottom:1px solid var(--border)">
               <input type="checkbox" class="ap-size-check" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" data-size="${escapeAttr(size)}" data-v="${escapeAttr(key)}" ${isAvail?'checked':''} style="margin-right:0.7rem;accent-color:var(--rust);width:14px;height:14px"/>
               <span style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--text)">${opt.type}</span>
-              <span style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--text)">${size}</span>
+              <input class="form-input ap-size-label" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" data-size="${escapeAttr(size)}" data-v="${escapeAttr(key)}" value="${escapeAttr(size)}" placeholder='e.g. 8x10"' style="padding:0.35rem 0.5rem;font-size:0.78rem;margin:0 0.4rem 0 0"/>
               <input class="form-input ap-size-ngn" data-idx="${realIdx}" data-v="${escapeAttr(key)}" value="${productPrice(p, key, 'ngn')||''}" placeholder="NGN" style="padding:0.35rem 0.5rem;font-size:0.78rem;margin:0 0.4rem 0 0"/>
               <input class="form-input ap-size-usd" data-idx="${realIdx}" data-v="${escapeAttr(key)}" value="${productPrice(p, key, 'usd')||''}" placeholder="$" style="padding:0.35rem 0.5rem"/>
               <div style="padding:0 0.4rem">
@@ -7813,23 +7813,66 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         row.querySelectorAll('.ap-option-limited').forEach(chk => {
           limitedByType[chk.dataset.type] = chk.checked;
         });
-        row.querySelectorAll('.ap-size-check').forEach(chk => {
-          const v = chk.dataset.v;
-          const type = chk.dataset.type || 'Print';
-          const size = chk.dataset.size || v;
-          if (chk.checked) {
+        const validatedPrintKeys = new Set();
+        row.querySelectorAll('.ap-size-row').forEach(sizeRow => {
+          const chk = sizeRow.querySelector('.ap-size-check');
+          const labelIn = sizeRow.querySelector('.ap-size-label');
+          const type = sizeRow.dataset.type || chk?.dataset.type || 'Print';
+          const oldSize = sizeRow.dataset.size || chk?.dataset.size || '';
+          const size = (labelIn?.value || oldSize).trim();
+          const nextKey = printOptionKey(type, size);
+          if (!size) throw new Error('Print size cannot be blank');
+          if (validatedPrintKeys.has(nextKey)) throw new Error(`Duplicate size "${size}" under ${type}`);
+          validatedPrintKeys.add(nextKey);
+        });
+        const optionSizesByType = {};
+        const seenPrintKeys = new Set();
+        let sizeRenameError = false;
+        row.querySelectorAll('.ap-size-row').forEach(sizeRow => {
+          if (sizeRenameError) return;
+          const chk = sizeRow.querySelector('.ap-size-check');
+          const labelIn = sizeRow.querySelector('.ap-size-label');
+          const v = sizeRow.dataset.v || chk?.dataset.v || '';
+          const type = sizeRow.dataset.type || chk?.dataset.type || 'Print';
+          const oldSize = sizeRow.dataset.size || chk?.dataset.size || v;
+          const size = (labelIn?.value || oldSize).trim();
+          const nextKey = printOptionKey(type, size);
+          if (!size) {
+            sizeRenameError = true;
+            showToast('Print size cannot be blank');
+            return;
+          }
+          if (seenPrintKeys.has(nextKey)) {
+            sizeRenameError = true;
+            showToast(`Duplicate size "${size}" under ${type}`);
+            return;
+          }
+          seenPrintKeys.add(nextKey);
+          if (!optionSizesByType[type]) optionSizesByType[type] = [];
+          optionSizesByType[type].push(size);
+
+          if (chk?.checked) {
             if (!nextAvailable[type]) nextAvailable[type] = [];
             nextAvailable[type].push(size);
           }
-          const ngnIn = Array.from(row.querySelectorAll('.ap-size-ngn')).find(input => input.dataset.v === v);
-          const usdIn = Array.from(row.querySelectorAll('.ap-size-usd')).find(input => input.dataset.v === v);
-          if (ngnIn) p.priceNgn[v] = Number(ngnIn.value) || p.priceNgn[v];
-          if (usdIn) p.priceUsd[v] = Number(usdIn.value) || p.priceUsd[v];
 
-          const weightIn = Array.from(row.querySelectorAll('.ap-size-weight')).find(input => input.dataset.v === v);
-          const dimsIn = Array.from(row.querySelectorAll('.ap-size-dims')).find(input => input.dataset.v === v);
-          const upsIn = Array.from(row.querySelectorAll('.ap-size-ups')).find(input => input.dataset.v === v);
-          const dhlIn = Array.from(row.querySelectorAll('.ap-size-dhl')).find(input => input.dataset.v === v);
+          const ngnIn = sizeRow.querySelector('.ap-size-ngn');
+          const usdIn = sizeRow.querySelector('.ap-size-usd');
+          if (ngnIn) {
+            const nextNgn = Number(ngnIn.value) || p.priceNgn[v] || p.priceNgn[nextKey];
+            if (nextNgn) p.priceNgn[nextKey] = nextNgn;
+            if (nextKey !== v) delete p.priceNgn[v];
+          }
+          if (usdIn) {
+            const nextUsd = Number(usdIn.value) || p.priceUsd[v] || p.priceUsd[nextKey];
+            if (nextUsd) p.priceUsd[nextKey] = nextUsd;
+            if (nextKey !== v) delete p.priceUsd[v];
+          }
+
+          const weightIn = sizeRow.querySelector('.ap-size-weight');
+          const dimsIn = sizeRow.querySelector('.ap-size-dims');
+          const upsIn = sizeRow.querySelector('.ap-size-ups');
+          const dhlIn = sizeRow.querySelector('.ap-size-dhl');
           const dims = String(dimsIn?.value || '').split(/[xX, ]+/).map(Number).filter(n => n > 0);
           const shippingMeta = {};
           if (Number(weightIn?.value) > 0) shippingMeta.weight_kg = Number(weightIn.value);
@@ -7848,39 +7891,49 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
           // Limited-edition run sizes (per size). The run-size input is the
           // ORIGINAL total; remaining lives in stock_by_variant and counts
           // down from sales. Only seed remaining when starting a new run or
-          // when the admin raises the total.
-          const editionIn = Array.from(row.querySelectorAll('.ap-size-edition')).find(input => input.dataset.v === v);
+          // when the admin raises the total. Renaming a size moves the run
+          // metadata to the new type|size key instead of creating a fresh run.
+          const editionIn = sizeRow.querySelector('.ap-size-edition');
           const isLimited = limitedByType[type] === true;
           p.edition_totals = p.edition_totals || {};
           p.stock_by_variant = p.stock_by_variant || {};
           if (isLimited && editionIn && editionIn.value !== '') {
             const newTotal = Math.max(0, Number(editionIn.value) || 0);
             const prevTotal = p.edition_totals[v];
-            p.edition_totals[v] = newTotal;
             const prevRemaining = p.stock_by_variant[v];
+            p.edition_totals[nextKey] = newTotal;
             if (prevTotal === undefined || prevRemaining === undefined) {
-              // New run: remaining starts at the full total.
-              p.stock_by_variant[v] = newTotal;
+              p.stock_by_variant[nextKey] = newTotal;
             } else if (newTotal > prevTotal) {
-              // Run extended: add the difference to remaining.
-              p.stock_by_variant[v] = prevRemaining + (newTotal - prevTotal);
+              p.stock_by_variant[nextKey] = prevRemaining + (newTotal - prevTotal);
             } else if (newTotal < prevTotal) {
-              // Run reduced: don't exceed the new total.
-              p.stock_by_variant[v] = Math.min(prevRemaining, newTotal);
+              p.stock_by_variant[nextKey] = Math.min(prevRemaining, newTotal);
+            } else {
+              p.stock_by_variant[nextKey] = prevRemaining;
             }
-            // else unchanged total: leave remaining as-is.
+            if (nextKey !== v) {
+              delete p.edition_totals[v];
+              delete p.stock_by_variant[v];
+            }
           } else if (!isLimited) {
-            // No longer limited — clear edition tracking for this size.
-            if (p.edition_totals) delete p.edition_totals[v];
+            if (p.edition_totals) {
+              delete p.edition_totals[v];
+              if (nextKey !== v) delete p.edition_totals[nextKey];
+            }
           }
         });
-        p.variants = getPrintOptions(p).map(o => ({
-          type: o.type,
-          desc: descByType[o.type] || o.desc || '',
-          limited: limitedByType[o.type] ?? o.limited ?? false,
-          sizes: [...o.sizes],
-          shipping_meta: shippingByType[o.type] || {},
-        }));
+        if (sizeRenameError) throw new Error('Fix duplicate or blank print sizes before saving');
+        const previousOptionsByType = Object.fromEntries(getPrintOptions(p).map(o => [o.type, o]));
+        p.variants = Object.entries(optionSizesByType).map(([type, sizes]) => {
+          const prev = previousOptionsByType[type] || {};
+          return {
+            type,
+            desc: descByType[type] || prev.desc || '',
+            limited: limitedByType[type] ?? prev.limited ?? false,
+            sizes: [...sizes],
+            shipping_meta: shippingByType[type] || {},
+          };
+        });
         p.availableVariants = nextAvailable;
         // Edition type and sold status
         const editionTypeEl = row.querySelector('.ap-edition');
