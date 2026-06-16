@@ -1750,17 +1750,17 @@ function selectSize(v) {
 function renderSizingGuide() {
   const wrap = document.getElementById('sizingSvgWrap');
   if (!wrap) return;
-  const sizeRaw = (_selectedVariant || '').split(':').pop() || '';
-  // Each size: inches, cm equivalent, SVG position & dimensions
+  // Extract and normalize the size from the variant key (e.g. "mini_print|4x4"" → "4x4")
+  const rawPart = (_selectedVariant || '').split('|').pop() || '';
+  const sizeRaw = rawPart.replace(/[""″'']/g, '').replace(/×/g, 'x').replace(/\s/g, '').toLowerCase();
+  // Each size: inches, cm, SVG position. Small sizes spread apart to avoid overlap.
   const sizes = [
-    { label: '4×4"',   cm: '10×10 cm',  key: '4x4',   x: 110, y: 224, w: 16, h: 16,  tx: 118 },
-    { label: '4×6"',   cm: '10×15 cm',  key: '4x6',   x: 110, y: 216, w: 16, h: 24,  tx: 118 },
-    { label: '5×5"',   cm: '13×13 cm',  key: '5x5',   x: 110, y: 220, w: 20, h: 20,  tx: 120 },
-    { label: '5×7"',   cm: '13×18 cm',  key: '5x7',   x: 155, y: 208, w: 20, h: 28,  tx: 165 },
+    { label: '4×4"',   cm: '10×10 cm',  key: '4x4',   x: 100, y: 224, w: 16, h: 16,  tx: 108 },
+    { label: '5×7"',   cm: '13×18 cm',  key: '5x7',   x: 145, y: 208, w: 20, h: 28,  tx: 155 },
     { label: '8×10"',  cm: '20×25 cm',  key: '8x10',  x: 200, y: 188, w: 32, h: 40,  tx: 216 },
-    { label: '11×14"', cm: '28×36 cm',  key: '11x14', x: 260, y: 172, w: 44, h: 56,  tx: 282 },
-    { label: '18×24"', cm: '46×61 cm',  key: '18x24', x: 340, y: 132, w: 72, h: 96,  tx: 376 },
-    { label: '24×36"', cm: '61×91 cm',  key: '24x36', x: 448, y: 92,  w: 96, h: 144, tx: 496 },
+    { label: '11×14"', cm: '28×36 cm',  key: '11x14', x: 268, y: 172, w: 44, h: 56,  tx: 290 },
+    { label: '18×24"', cm: '46×61 cm',  key: '18x24', x: 350, y: 132, w: 72, h: 96,  tx: 386 },
+    { label: '24×36"', cm: '61×91 cm',  key: '24x36', x: 460, y: 92,  w: 96, h: 144, tx: 508 },
   ];
   // Show all standard frame sizes — the selected one gets highlighted.
   const frames = sizes.map(s => {
