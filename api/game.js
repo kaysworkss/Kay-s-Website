@@ -774,7 +774,57 @@ const SERVER_DELIVERY_RATES = {
   ROW: { label: 'Rest of world',  ups: { small: 42, large: 60 }, dhl: { small: 50, large: 70 } },
 };
 const SERVER_LARGE_PRINT_VARIANTS = ['12x16"', '12x18"', '18x24"', '24x36"'];
-const NGN_PER_USD = 1600;
+// ── Live USD/NGN exchange rate ──────────────────────────────────────────────
+// Fetches from free APIs, caches for 1 hour. Falls back to the manual override
+// in shop_config, then to 1600 as a last resort.
+let _cachedRate = null;
+let _cachedRateAt = 0;
+const RATE_CACHE_MS = 60 * 60 * 1000; // 1 hour
+
+async function fetchLiveNgnRate() {
+  // Return cached if fresh
+  if (_cachedRate && (Date.now() - _cachedRateAt) < RATE_CACHE_MS) return _cachedRate;
+
+  // Try multiple free APIs in order of reliability
+  const apis = [
+    { url: 'https://open.er-api.com/v6/latest/USD', parse: d => d?.rates?.NGN },
+    { url: 'https://api.exchangerate.host/latest?base=USD&symbols=NGN', parse: d => d?.rates?.NGN },
+    { url: 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json', parse: d => d?.usd?.ngn },
+  ];
+
+  for (const api of apis) {
+    try {
+      const res = await fetch(api.url, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const rate = api.parse(data);
+      if (rate && rate > 100) { // sanity: NGN/USD should be > 100
+        _cachedRate = Math.round(rate);
+        _cachedRateAt = Date.now();
+        console.log(`[rate] Live USD/NGN: ${_cachedRate} from ${api.url}`);
+        return _cachedRate;
+      }
+    } catch (_) { /* try next */ }
+  }
+
+  // Fallback: use cached or default
+  console.warn('[rate] All APIs failed, using fallback');
+  return _cachedRate || 1600;
+}
+
+// Get the current rate (with optional manual override from shop_config)
+async function getNgnPerUsd(supabase) {
+  // Check for a manual override in shop_config
+  try {
+    const { data } = await supabase.from('shop_config').select('value').eq('key', 'ngn_per_usd').maybeSingle();
+    if (data?.value && Number(data.value) > 100) return Number(data.value);
+  } catch (_) {}
+  return fetchLiveNgnRate();
+}
+
+// Synchronous fallback for functions that can't be async (uses last cached value)
+function getNgnPerUsdSync() { return _cachedRate || 1600; }
+const NGN_PER_USD_DEFAULT = 1600;
 const SERVER_HIGH_CART_USD = 60;
 const SERVER_COMPLIMENTARY_SHIPPING_USD = 500;
 const SERVER_SHIPPING_DIM_DIVISOR = 5000;
@@ -938,10 +988,10 @@ function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd = 0, requestedC
   }
   if (currency === 'usd') {
     if (tier.usd > 0) return tier.usd;
-    return tier.ngn > 0 ? +(tier.ngn / NGN_PER_USD).toFixed(2) : 0;
+    return tier.ngn > 0 ? +(tier.ngn / getNgnPerUsdSync()).toFixed(2) : 0;
   }
   if (tier.ngn > 0) return tier.ngn;
-  return tier.usd > 0 ? Math.round(tier.usd * NGN_PER_USD) : 0;
+  return tier.usd > 0 ? Math.round(tier.usd * getNgnPerUsdSync()) : 0;
 }
 
 async function computeShopCheckout(body, supabase) {
@@ -2843,6 +2893,9 @@ async function handleShopConfig(req, res, supabase) {
   // server-side only. Strip them from the public config response.
   const safe = { ...(data || {}) };
   delete safe.discount_codes;
+  // Include the live USD/NGN exchange rate so the client can convert prices.
+  // This checks for a manual override in shop_config first, then fetches live.
+  safe.ngn_per_usd = await getNgnPerUsd(supabase);
   return json(200, safe);
 }
 
