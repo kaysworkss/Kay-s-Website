@@ -3619,6 +3619,76 @@ function normalizeProduct(p) {
   p.active = p.active !== false;
   return p;
 }
+function productKey(p) {
+  if (!p) return '';
+  if (!p._adminKey) p._adminKey = String(p.id || ('prod-' + uid()));
+  return p._adminKey;
+}
+function productByKey(key) {
+  return SHOP_CONFIG.products.find(p => productKey(p) === key);
+}
+function productIndexByKey(key) {
+  return SHOP_CONFIG.products.findIndex(p => productKey(p) === key);
+}
+function clonePlain(value) {
+  return JSON.parse(JSON.stringify(value || {}));
+}
+function makeDuplicateName(name) {
+  const base = String(name || 'New product').replace(/\s+\(Copy(?:\s+\d+)?\)$/i, '').trim() || 'New product';
+  const existing = new Set(SHOP_CONFIG.products.map(p => String(p.name || '').trim()));
+  let next = `${base} (Copy)`;
+  let n = 2;
+  while (existing.has(next)) next = `${base} (Copy ${n++})`;
+  return next;
+}
+function duplicateProductByKey(key) {
+  const source = productByKey(key);
+  if (!source) return;
+  const copy = normalizeProduct(clonePlain(source));
+  copy.id = 'prod-' + uid();
+  copy._adminKey = copy.id;
+  copy.name = makeDuplicateName(source.name);
+  copy.slug = '';
+  copy._justAdded = true;
+  delete copy._isSample;
+  const sameCat = SHOP_CONFIG.products.filter(p => p.category === source.category);
+  const minOrder = sameCat.length ? Math.min(...sameCat.map(x => Number(x.sort_order) || 0)) : 0;
+  copy.sort_order = minOrder - 1;
+  SHOP_CONFIG.products.unshift(copy);
+  renderAdminProducts();
+  scrollToJustAdded();
+}
+function removePrintOptionByKey(productKeyValue, type) {
+  const p = productByKey(productKeyValue);
+  if (!p || p.category !== 'prints' || !type) return;
+  const options = getPrintOptions(p);
+  const option = options.find(o => o.type === type);
+  if (!option) return;
+
+  option.sizes.forEach(size => {
+    const key = printOptionKey(type, size);
+    if (p.priceNgn) delete p.priceNgn[key];
+    if (p.priceUsd) delete p.priceUsd[key];
+    if (p.stock_by_variant) delete p.stock_by_variant[key];
+    if (p.edition_totals) delete p.edition_totals[key];
+  });
+
+  p.variants = options
+    .filter(o => o.type !== type)
+    .map(o => ({
+      type: o.type,
+      desc: o.desc || '',
+      limited: !!o.limited,
+      sizes: [...o.sizes],
+      shipping_meta: o.shipping_meta || {},
+    }));
+
+  if (p.availableVariants && typeof p.availableVariants === 'object') {
+    delete p.availableVariants[type];
+  }
+  renderAdminProducts();
+}
+const deletingProductKeys = new Set();
 function isApparelProduct(p) {
   const text = `${p.name || ''} ${p.clothing_type || ''} ${p.print_type || ''}`.toLowerCase();
   return p.clothing === true || /\b(tee|t-shirt|tshirt|shirt|hoodie|sweatshirt|cap|hat)\b/.test(text);
@@ -6675,7 +6745,9 @@ function scrollToJustAdded() {
     const idx = SHOP_CONFIG.products.findIndex(p => p._justAdded);
     if (idx < 0) return;
     SHOP_CONFIG.products.forEach(p => { delete p._justAdded; });
-    const row = document.querySelector(`.admin-product-row[data-idx="${idx}"]`);
+    const added = SHOP_CONFIG.products[idx];
+    const key = added ? productKey(added) : '';
+    const row = key ? document.querySelector(`.admin-product-row[data-key="${key}"]`) : null;
     if (row) {
       row.scrollIntoView({ behavior: 'smooth', block: 'center' });
       row.style.transition = 'background 0.3s';
@@ -6704,21 +6776,24 @@ function renderAdminProducts() {
 
     prints.forEach((p, pi) => {
       const realIdx = SHOP_CONFIG.products.indexOf(p);
+      const pKey = productKey(p);
       const options = getPrintOptions(p);
       const optionDescHtml = options.map(opt => `
-        <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:0.45rem;margin-bottom:0.45rem;align-items:center">
+        <div style="display:grid;grid-template-columns:1fr 2fr auto auto;gap:0.45rem;margin-bottom:0.45rem;align-items:center">
           <input class="form-input" value="${escapeAttr(opt.type)}" disabled style="padding:0.4rem 0.6rem;font-size:0.8rem;background:var(--bg-alt)"/>
           <input class="form-input ap-option-desc" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" value="${escapeAttr(opt.desc)}" placeholder="Brief description for ${escapeAttr(opt.type)}" style="padding:0.4rem 0.6rem;font-size:0.8rem"/>
           <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.7rem;color:var(--text-muted);white-space:nowrap;font-family:'Montserrat',sans-serif">
             <input type="checkbox" class="ap-option-limited" data-idx="${realIdx}" data-type="${escapeAttr(opt.type)}" ${opt.limited ? 'checked' : ''} style="accent-color:var(--rust)"/>
             Limited edition
           </label>
+          <button class="ap-remove-option" data-key="${escapeAttr(pKey)}" data-type="${escapeAttr(opt.type)}" title="Remove this print option and all its sizes" style="background:none;border:none;color:var(--text-muted);font-size:0.85rem;padding:0 0.45rem;transition:color 0.15s">x</button>
         </div>`).join('');
-      html += `<div class="admin-product-row" data-idx="${realIdx}" style="grid-template-columns:1fr;gap:0.6rem">
-        <button class="admin-del-btn" data-idx="${realIdx}" title="Remove">x</button>
+      html += `<div class="admin-product-row" data-idx="${realIdx}" data-key="${escapeAttr(pKey)}" style="grid-template-columns:1fr;gap:0.6rem">
+        <button class="admin-del-btn" data-key="${escapeAttr(pKey)}" title="Remove">x</button>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem">
-          <div class="admin-prod-name">${p.name}</div>
+          <div class="admin-prod-name">${escapeText(p.name)}</div>
           <div style="display:flex;gap:0.3rem;flex-shrink:0">
+            <button class="ap-duplicate" data-key="${escapeAttr(pKey)}" title="Duplicate" style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;height:26px;color:var(--text);font-size:0.68rem;padding:0 0.45rem">Copy</button>
             <button class="ap-move-up" data-cat="prints" data-idx="${realIdx}" title="Move up" ${pi === 0 ? 'disabled' : ''} style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;width:26px;height:26px;color:var(--text);font-size:0.8rem;${pi === 0 ? 'opacity:0.3' : ''}">▲</button>
             <button class="ap-move-down" data-cat="prints" data-idx="${realIdx}" title="Move down" ${pi === prints.length - 1 ? 'disabled' : ''} style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;width:26px;height:26px;color:var(--text);font-size:0.8rem;${pi === prints.length - 1 ? 'opacity:0.3' : ''}">▼</button>
           </div>
@@ -6726,11 +6801,11 @@ function renderAdminProducts() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem">
           <div class="form-row" style="margin:0">
             <label class="form-label">Print name</label>
-            <input class="form-input ap-name" data-idx="${realIdx}" value="${p.name}"/>
+            <input class="form-input ap-name" data-idx="${realIdx}" value="${escapeAttr(p.name)}"/>
           </div>
           <div class="form-row" style="margin:0">
             <label class="form-label">Badge (optional)</label>
-            <input class="form-input ap-badge" data-idx="${realIdx}" value="${p.badge||''}"/>
+            <input class="form-input ap-badge" data-idx="${realIdx}" value="${escapeAttr(p.badge||'')}"/>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.6rem">
@@ -6755,16 +6830,16 @@ function renderAdminProducts() {
           </div>
           <div class="form-row" style="margin:0">
             <label class="form-label">Badge (optional)</label>
-            <input class="form-input ap-badge" data-idx="${realIdx}" value="${p.badge||''}"/>
+            <input class="form-input ap-badge" data-idx="${realIdx}" value="${escapeAttr(p.badge||'')}"/>
           </div>
         </div>
         <div class="form-row" style="margin:0">
           <label class="form-label">Description</label>
-          <input class="form-input ap-desc" data-idx="${realIdx}" value="${p.desc}"/>
+          <input class="form-input ap-desc" data-idx="${realIdx}" value="${escapeAttr(p.desc)}"/>
         </div>
         <div class="form-row" style="margin:0">
           <label class="form-label">Image URL</label>
-          <input class="form-input ap-img" data-idx="${realIdx}" value="${p.image||''}"/>
+          <input class="form-input ap-img" data-idx="${realIdx}" value="${escapeAttr(p.image||'')}"/>
         </div>
         <label class="form-label" style="margin-top:0.4rem">Print option descriptions</label>
         <div>${optionDescHtml}</div>
@@ -6850,6 +6925,7 @@ function renderAdminProducts() {
     items.forEach((raw, ci) => {
       const p = normalizeProduct(raw);
       const realIdx = SHOP_CONFIG.products.indexOf(raw);
+      const pKey = productKey(raw);
       const apparelAdminHtml = cat === 'merch' ? `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem">
           <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-muted);font-family:'Montserrat',sans-serif">
@@ -6871,11 +6947,12 @@ function renderAdminProducts() {
           <input class="form-input ap-v-stock" value="${p.stock_by_variant?.[v] ?? ''}" placeholder="Stock" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <button class="ap-remove-variant" type="button" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem" title="Remove">x</button>
         </div>`).join('');
-      html += `<div class="admin-product-row" data-idx="${realIdx}" style="grid-template-columns:1fr;gap:0.7rem">
-        <button class="admin-del-btn" data-idx="${realIdx}" title="Remove">x</button>
+      html += `<div class="admin-product-row" data-idx="${realIdx}" data-key="${escapeAttr(pKey)}" style="grid-template-columns:1fr;gap:0.7rem">
+        <button class="admin-del-btn" data-key="${escapeAttr(pKey)}" title="Remove">x</button>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem">
           <div class="admin-prod-name">${escapeText(p.name)}</div>
           <div style="display:flex;gap:0.3rem;flex-shrink:0">
+            <button class="ap-duplicate" data-key="${escapeAttr(pKey)}" title="Duplicate" style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;height:26px;color:var(--text);font-size:0.68rem;padding:0 0.45rem">Copy</button>
             <button class="ap-move-up" data-cat="${cat}" data-idx="${realIdx}" title="Move up" ${ci === 0 ? 'disabled' : ''} style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;width:26px;height:26px;color:var(--text);font-size:0.8rem;${ci === 0 ? 'opacity:0.3' : ''}">▲</button>
             <button class="ap-move-down" data-cat="${cat}" data-idx="${realIdx}" title="Move down" ${ci === items.length - 1 ? 'disabled' : ''} style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;width:26px;height:26px;color:var(--text);font-size:0.8rem;${ci === items.length - 1 ? 'opacity:0.3' : ''}">▼</button>
           </div>
@@ -6937,16 +7014,36 @@ function renderAdminProducts() {
   // Delete product buttons
   el.querySelectorAll('.admin-del-btn').forEach(b => {
     b.addEventListener('click', async () => {
-      const idx   = Number(b.dataset.idx);
-      const p     = SHOP_CONFIG.products[idx];
+      const key   = b.dataset.key || '';
+      if (!key || deletingProductKeys.has(key)) return;
+      const p     = productByKey(key);
+      if (!p) return;
       const token = localStorage.getItem('kaysworks-admin-token');
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      deletingProductKeys.add(key);
+      b.disabled = true;
+      b.style.opacity = '0.35';
       // Only real (UUID) products exist in the DB; samples/temp items are local only.
-      if (p && token && !p._isSample && UUID_RE.test(String(p.id))) {
-        try { await apiDeleteProduct(p.id, token); } catch(e) { showToast('Delete failed: ' + e.message); return; }
+      try {
+        if (token && !p._isSample && UUID_RE.test(String(p.id))) {
+          await apiDeleteProduct(p.id, token);
+        }
+        const idx = productIndexByKey(key);
+        if (idx >= 0) SHOP_CONFIG.products.splice(idx, 1);
+        renderAdminProducts();
+      } catch(e) {
+        deletingProductKeys.delete(key);
+        b.disabled = false;
+        b.style.opacity = '';
+        showToast('Delete failed: ' + e.message);
       }
-      SHOP_CONFIG.products.splice(idx, 1);
-      renderAdminProducts();
+    });
+  });
+
+  // Duplicate product buttons
+  el.querySelectorAll('.ap-duplicate').forEach(btn => {
+    btn.addEventListener('click', () => {
+      duplicateProductByKey(btn.dataset.key || '');
     });
   });
 
@@ -7036,6 +7133,13 @@ function renderAdminProducts() {
         return;
       }
       row.remove();
+    });
+  });
+
+  // Remove an entire print option and every size/price/stock entry under it.
+  el.querySelectorAll('.ap-remove-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      removePrintOptionByKey(btn.dataset.key || '', btn.dataset.type || '');
     });
   });
 
@@ -7144,8 +7248,8 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
 
     // ── Read and save each product ──────────────────────────────────────
     document.querySelectorAll('.admin-product-row').forEach(row => {
-      const idx = Number(row.dataset.idx);
-      const p   = SHOP_CONFIG.products[idx];
+      const key = row.dataset.key || '';
+      const p   = key ? productByKey(key) : SHOP_CONFIG.products[Number(row.dataset.idx)];
       if (!p) return;
 
       // If the admin edited a sample's name, treat it as a real product:
@@ -8315,6 +8419,7 @@ if (paystackMeta) window.__PAYSTACK_KEY__ = paystackMeta.content;
 
 /* ─── Load shop data from API ─── */
 async function loadShopData() {
+  let loadedServerProducts = false;
   try {
     const [productsRes, configRes] = await Promise.all([
       fetch('/api/shop/products'),
@@ -8365,8 +8470,9 @@ async function loadShopData() {
           is_sold:            r.is_sold || false,
           enquire_only:       r.enquire_only || false,
         }));
+        loadedServerProducts = true;
       }
-      // If API returned empty array, keep hardcoded defaults
+      // If API returned an empty array, keep hardcoded defaults for local preview.
     }
     // If API failed, keep hardcoded defaults silently
 
@@ -8388,7 +8494,11 @@ async function loadShopData() {
     }
   });
 
-  ensureExampleSections();
+  if (loadedServerProducts) {
+    SHOP_CONFIG.products = SHOP_CONFIG.products.filter(p => !p._isSample);
+  } else {
+    ensureExampleSections();
+  }
   renderProducts();
 }
 
