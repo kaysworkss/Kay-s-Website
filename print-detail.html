@@ -1762,14 +1762,8 @@ function renderSizingGuide() {
     { label: '18×24"', cm: '46×61 cm',  key: '18x24', x: 340, y: 132, w: 72, h: 96,  tx: 376 },
     { label: '24×36"', cm: '61×91 cm',  key: '24x36', x: 448, y: 92,  w: 96, h: 144, tx: 496 },
   ];
-  // Only show sizes that exist for this product
-  let available = [];
-  try {
-    available = _product ? availablePrintChoices(_product).map(c => c.key.split(':').pop()) : [];
-  } catch(_) {}
-  // Show all sizes if product has no variants (e.g. enquire-only 1-of-1)
-  const shown = sizes.filter(s => !available.length || available.includes(s.key));
-  const frames = shown.map(s => {
+  // Show all standard frame sizes — the selected one gets highlighted.
+  const frames = sizes.map(s => {
     const active = s.key === sizeRaw;
     return `<g>
       ${active ? `<rect x="${s.x - 4}" y="${s.y - 4}" width="${s.w + 8}" height="${s.h + 8}" fill="none" stroke="var(--rust)" stroke-width="1" rx="3" stroke-dasharray="4,3" opacity="0.5"/>` : ''}
