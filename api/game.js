@@ -2172,7 +2172,7 @@ async function handleShopOrderCreate(req, res, supabase) {
         .from('shop_orders')
         .update({
           customer_name:    String(body.name    || '').slice(0, 200),
-          email:            String(body.email   || '').slice(0, 320),
+          email:            String(body.email   || '').trim().toLowerCase().slice(0, 320),
           phone:            String(body.phone   || '').slice(0, 60),
           address:          String(body.address || '').slice(0, 500),
           items:            checkout.trustedItems,
@@ -2215,7 +2215,7 @@ async function handleShopOrderCreate(req, res, supabase) {
     .insert({
       order_ref:       orderRef,
       customer_name:   String(body.name    || '').slice(0, 200),
-      email:           String(body.email   || '').slice(0, 320),
+      email:           String(body.email   || '').trim().toLowerCase().slice(0, 320),
       phone:           String(body.phone   || '').slice(0, 60),
       address:         String(body.address || '').slice(0, 500),
       items:           checkout.trustedItems,
@@ -2292,7 +2292,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
       .insert({
         order_ref:        orderRef,
         customer_name:    String(body.name    || '').slice(0, 200),
-        email:            String(body.email   || '').slice(0, 320),
+        email:            String(body.email   || '').trim().toLowerCase().slice(0, 320),
         phone:            String(body.phone   || '').slice(0, 60),
         address:          String(body.address || '').slice(0, 500),
         items:            checkout.trustedItems,
@@ -2587,7 +2587,7 @@ async function finalizeFreeOrder(req, res, supabase, body, checkout) {
     .insert({
       order_ref:        freeRef,
       customer_name:    String(body.name    || '').slice(0, 200),
-      email:            String(body.email   || '').slice(0, 320),
+      email:            String(body.email   || '').trim().toLowerCase().slice(0, 320),
       phone:            String(body.phone   || '').slice(0, 60),
       address:          String(body.address || '').slice(0, 500),
       items:            checkout.trustedItems,
@@ -2618,7 +2618,7 @@ async function finalizeFreeOrder(req, res, supabase, body, checkout) {
 
   const emailOrder = {
     id: order.id, order_ref: order.order_ref,
-    customer_name: String(body.name || ''), email: String(body.email || ''),
+    customer_name: String(body.name || ''), email: String(body.email || '').trim().toLowerCase(),
     phone: String(body.phone || ''), address: String(body.address || ''),
     items: checkout.trustedItems, total_ngn: checkout.totalNgn, total_usd: checkout.totalUsd,
     delivery_fee_ngn: checkout.deliveryNgn, delivery_method: checkout.method, delivery_zone: checkout.zone,
@@ -2790,7 +2790,7 @@ async function handleShopOrder(req, res, supabase) {
     .insert({
       order_ref:       newOrderRef,
       customer_name:   String(body.name    || '').slice(0, 200),
-      email:           String(body.email   || '').slice(0, 320),
+      email:           String(body.email   || '').trim().toLowerCase().slice(0, 320),
       phone:           String(body.phone   || '').slice(0, 60),
       address:         String(body.address || '').slice(0, 500),
       items:           checkout.trustedItems,
@@ -2821,7 +2821,7 @@ async function handleShopOrder(req, res, supabase) {
   const emailOrder = savedOrder || {
     id: order.id,
     customer_name: String(body.name || ''),
-    email: String(body.email || ''),
+    email: String(body.email || '').trim().toLowerCase(),
     phone: String(body.phone || ''),
     address: String(body.address || ''),
     items: checkout.trustedItems,
