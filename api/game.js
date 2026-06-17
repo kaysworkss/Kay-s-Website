@@ -1072,6 +1072,7 @@ async function computeShopCheckout(body, supabase) {
       qty,
       priceNgn,
       priceUsd,
+      imageUrl: product.image || product.image_url || '',
     });
   }
 
