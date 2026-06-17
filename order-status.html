@@ -103,11 +103,11 @@ body.dark .nav-logo{color:#e0c8a8;}
   <div class="lookup-card" id="quickLookup">
     <h2>Quick lookup</h2>
     <div class="form-row">
-      <label class="form-label">Order reference</label>
+      <label class="form-label" for="refInput">Order reference</label>
       <input class="form-input" id="refInput" type="text" placeholder="ORD-XXXXXXXX-XXXXXX"/>
     </div>
     <div class="form-row">
-      <label class="form-label">Email used at checkout</label>
+      <label class="form-label" for="refEmail">Email used at checkout</label>
       <input class="form-input" id="refEmail" type="email" placeholder="your@email.com"/>
     </div>
     <button class="submit-btn" id="refBtn">Look up order</button>
@@ -123,7 +123,7 @@ body.dark .nav-logo{color:#e0c8a8;}
       Enter your email and we'll send you a secure link to view all your orders. The link is valid for 24 hours.
     </p>
     <div class="form-row">
-      <label class="form-label">Email</label>
+      <label class="form-label" for="historyEmail">Email</label>
       <input class="form-input" id="historyEmail" type="email" placeholder="your@email.com"/>
     </div>
     <button class="submit-btn" id="historyBtn">Send me the link</button>
@@ -250,7 +250,6 @@ document.getElementById('historyBtn').addEventListener('click',async()=>{
   const token=params.get('token');
   if(!token)return;
 
-  // Hide the lookup forms safely
   const hide = id => { const el=document.getElementById(id); if(el) el.style.display='none'; };
   hide('quickLookup');
   hide('historyLookup');
@@ -261,13 +260,17 @@ document.getElementById('historyBtn').addEventListener('click',async()=>{
   if(pageSub) pageSub.textContent='Loading your orders…';
 
   try{
-    const res=await fetch(`/api/shop/order-history?token=${encodeURIComponent(token)}`);
+    const res=await fetch('/api/shop/order-history?token='+encodeURIComponent(token));
     let data;
     try{ data=await res.json(); }
     catch(parseErr){
-      if(pageSub) pageSub.textContent='Unexpected server response. Please try requesting a new link.';
+      if(pageSub) pageSub.textContent='Unexpected server response. Status: '+res.status;
       return;
     }
+    const debugBox=document.createElement('pre');
+    debugBox.style.cssText='background:#1e1410;color:#e8d5b0;padding:1rem;border-radius:8px;font-size:0.72rem;white-space:pre-wrap;word-break:break-all;margin-bottom:1rem';
+    debugBox.textContent='HTTP '+res.status+' | '+JSON.stringify(data);
+    document.querySelector('.page-wrap').appendChild(debugBox);
     if(!res.ok){
       if(pageSub) pageSub.textContent=data.error||'Invalid or expired link. Please request a new one.';
       const hl=document.getElementById('historyLookup');
@@ -278,8 +281,8 @@ document.getElementById('historyBtn').addEventListener('click',async()=>{
     const orders=Array.isArray(data.orders)?data.orders:[];
     renderOrders(orders,'Your order history');
   }catch(e){
-    console.error('[order-status] token load error:', e);
-    if(pageSub) pageSub.textContent='Network error — please refresh and try again.';
+    console.error('[order-status] token load error:',e);
+    if(pageSub) pageSub.textContent='Network error: '+e.message;
   }
 })();
 </script>
