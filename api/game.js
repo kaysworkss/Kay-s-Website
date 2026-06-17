@@ -2966,18 +2966,21 @@ async function handleShopOrderHistory(req, res, supabase) {
   if (req.method === 'GET') {
     const token = String(req.query.token || '').trim();
     if (!token) return json(400, { error: 'token required' });
-    const { data: tok } = await supabase.from('order_history_tokens')
+    const { data: tok, error: tokErr } = await supabase.from('order_history_tokens')
       .select('email, expires_at').eq('token', token).maybeSingle();
+    console.log('[order-history] token lookup:', { found: !!tok, email: tok?.email, tokErr: tokErr?.message });
     if (!tok) return json(404, { error: 'Invalid or expired link. Request a new one.' });
     if (new Date(tok.expires_at) < new Date()) {
       await supabase.from('order_history_tokens').delete().eq('token', token);
       return json(410, { error: 'This link has expired. Request a new one.' });
     }
+    // ilike = case-insensitive match, catches any remaining case mismatches in DB
     const { data: orders, error } = await supabase.from('shop_orders')
       .select('order_ref, status, items, total_ngn, total_usd, delivery_method, delivery_zone, tracking_number, tracking_carrier, payment_method, payment_ref, payment_metadata, created_at, updated_at')
-      .eq('email', tok.email).order('created_at', { ascending: false });
+      .ilike('email', tok.email).order('created_at', { ascending: false });
+    console.log('[order-history] orders query:', { email: tok.email, count: orders?.length, error: error?.message });
     if (error) return json(500, { error: error.message });
-    return json(200, { ok: true, email: tok.email, orders: orders || [] });
+    return json(200, { ok: true, email: tok.email, orders: orders || [], _debug: { email: tok.email, count: orders?.length } });
   }
   return json(405, { error: 'POST or GET only' });
 }
