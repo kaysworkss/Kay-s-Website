@@ -205,12 +205,13 @@ function renderOrders(orders, heading){
           ${o.payment_metadata?.tracking_url?` · <a href="${o.payment_metadata.tracking_url}" target="_blank">Track shipment</a>`:''}
         </p>
       </div>`:'';
-    // Pick first item's product image
+    // Pick first item's product image — use snapshot on item first, fall back to live catalog
     const firstItem = items[0];
     const prod = firstItem ? _productMap[firstItem.id] : null;
-    const imgSrc = prod && prod.image ? prod.image : '';
+    const imgSrc = (firstItem && firstItem.imageUrl) || (prod && prod.image) || '';
+    const imgAlt = (firstItem && firstItem.name) || (prod && prod.name) || '';
     const thumbHtml = imgSrc
-      ? `<img class="order-thumb" src="${imgSrc}" alt="${prod.name||''}" loading="lazy"/>`
+      ? `<img class="order-thumb" src="${imgSrc}" alt="${imgAlt}" loading="lazy"/>`
       : `<div class="order-thumb-placeholder">🖼</div>`;
     return `
       <div class="order-card">
