@@ -249,18 +249,38 @@ document.getElementById('historyBtn').addEventListener('click',async()=>{
   const params=new URLSearchParams(location.search);
   const token=params.get('token');
   if(!token)return;
-  document.getElementById('quickLookup').style.display='none';
-  document.getElementById('historyLookup').style.display='none';
-  document.querySelector('.or-divider').style.display='none';
-  document.querySelector('.page-sub').textContent='Loading your orders…';
+
+  // Hide the lookup forms safely
+  const hide = id => { const el=document.getElementById(id); if(el) el.style.display='none'; };
+  hide('quickLookup');
+  hide('historyLookup');
+  const divider=document.querySelector('.or-divider');
+  if(divider) divider.style.display='none';
+
+  const pageSub=document.querySelector('.page-sub');
+  if(pageSub) pageSub.textContent='Loading your orders…';
+
   try{
     const res=await fetch(`/api/shop/order-history?token=${encodeURIComponent(token)}`);
-    const data=await res.json();
-    if(!res.ok){document.querySelector('.page-sub').textContent=data.error||'Invalid or expired link. Request a new one below.';
-      document.getElementById('historyLookup').style.display='';return;}
-    document.querySelector('.page-sub').textContent='';
-    renderOrders(data.orders||[],'Your order history');
-  }catch(e){document.querySelector('.page-sub').textContent='Network error — refresh and try again.';}
+    let data;
+    try{ data=await res.json(); }
+    catch(parseErr){
+      if(pageSub) pageSub.textContent='Unexpected server response. Please try requesting a new link.';
+      return;
+    }
+    if(!res.ok){
+      if(pageSub) pageSub.textContent=data.error||'Invalid or expired link. Please request a new one.';
+      const hl=document.getElementById('historyLookup');
+      if(hl) hl.style.display='';
+      return;
+    }
+    if(pageSub) pageSub.textContent='';
+    const orders=Array.isArray(data.orders)?data.orders:[];
+    renderOrders(orders,'Your order history');
+  }catch(e){
+    console.error('[order-status] token load error:', e);
+    if(pageSub) pageSub.textContent='Network error — please refresh and try again.';
+  }
 })();
 </script>
 </body>
