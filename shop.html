@@ -7009,8 +7009,9 @@ document.addEventListener('input', function(e) {
   document.addEventListener('input', function(e) {
     const t = e.target;
     if (!t.matches) return;
+
+    // Prints: .ap-size-ngn / .ap-size-usd (inside .ap-size-row)
     if (t.matches('.ap-size-ngn')) {
-      // NGN → USD
       const row = t.closest('.ap-size-row');
       if (!row) return;
       const usdInput = row.querySelector('.ap-size-usd');
@@ -7023,10 +7024,61 @@ document.addEventListener('input', function(e) {
       }
     }
     if (t.matches('.ap-size-usd')) {
-      // USD → NGN
       const row = t.closest('.ap-size-row');
       if (!row) return;
       const ngnInput = row.querySelector('.ap-size-ngn');
+      if (!ngnInput) return;
+      const usd = parseFloat(t.value);
+      if (!isNaN(usd) && usd > 0 && SHOP_RATE > 0) {
+        ngnInput.value = Math.round(usd * SHOP_RATE);
+      } else if (!t.value.trim()) {
+        ngnInput.value = '';
+      }
+    }
+
+    // Merch / notebooks / stickers: .ap-v-ngn / .ap-v-usd (inside .ap-variant-row)
+    if (t.matches('.ap-v-ngn')) {
+      const row = t.closest('.ap-variant-row');
+      if (!row) return;
+      const usdInput = row.querySelector('.ap-v-usd');
+      if (!usdInput) return;
+      const ngn = parseFloat(t.value);
+      if (!isNaN(ngn) && ngn > 0 && SHOP_RATE > 0) {
+        usdInput.value = Math.round(ngn / SHOP_RATE);
+      } else if (!t.value.trim()) {
+        usdInput.value = '';
+      }
+    }
+    if (t.matches('.ap-v-usd')) {
+      const row = t.closest('.ap-variant-row');
+      if (!row) return;
+      const ngnInput = row.querySelector('.ap-v-ngn');
+      if (!ngnInput) return;
+      const usd = parseFloat(t.value);
+      if (!isNaN(usd) && usd > 0 && SHOP_RATE > 0) {
+        ngnInput.value = Math.round(usd * SHOP_RATE);
+      } else if (!t.value.trim()) {
+        ngnInput.value = '';
+      }
+    }
+
+    // Custom size add-row: .ap-custom-ngn / .ap-custom-usd (siblings inside same parent)
+    if (t.matches('.ap-custom-ngn')) {
+      const parent = t.closest('[data-idx]') || t.parentElement;
+      if (!parent) return;
+      const usdInput = parent.querySelector('.ap-custom-usd');
+      if (!usdInput) return;
+      const ngn = parseFloat(t.value);
+      if (!isNaN(ngn) && ngn > 0 && SHOP_RATE > 0) {
+        usdInput.value = Math.round(ngn / SHOP_RATE);
+      } else if (!t.value.trim()) {
+        usdInput.value = '';
+      }
+    }
+    if (t.matches('.ap-custom-usd')) {
+      const parent = t.closest('[data-idx]') || t.parentElement;
+      if (!parent) return;
+      const ngnInput = parent.querySelector('.ap-custom-ngn');
       if (!ngnInput) return;
       const usd = parseFloat(t.value);
       if (!isNaN(usd) && usd > 0 && SHOP_RATE > 0) {
