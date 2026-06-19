@@ -144,6 +144,20 @@ body.dark nav.scrolled .nav-logo { color: #e0c8a8; }
   transition: opacity 0.2s, color 0.4s, text-shadow 0.4s;
 }
 .nav-links a:hover, .nav-links a.active { opacity: 1; color: var(--rust); }
+.currency-toggle {
+  font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.14em;
+  text-transform: uppercase; padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border); border-radius: 20px;
+  background: none; color: var(--text-muted); cursor: pointer;
+  transition: border-color 0.2s, color 0.2s; white-space: nowrap;
+}
+.currency-toggle:hover { border-color: var(--clay); color: var(--clay); }
+.currency-toggle.active { border-color: var(--clay); color: var(--clay); background: rgba(196,132,90,0.08); }
+.price-local {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.62rem; font-weight: 500;
+  letter-spacing: 0.06em; color: var(--clay);
+}
 /* Scrolled (solid bar): theme text colour, no shadow. */
 nav.scrolled .nav-links a { color: var(--text); text-shadow: none; opacity: 0.82; }
 nav.scrolled .nav-links a:hover, nav.scrolled .nav-links a.active { color: var(--rust); opacity: 1; }
@@ -2554,6 +2568,7 @@ body.dark { --text-muted: #b3a392; }
       <a href="/#commissions">Commissions</a>
       <a href="/#about">About the artist</a>
       <a href="/order-status">Track order</a>
+      <button class="currency-toggle" id="currencyToggle" style="display:none" title="Switch currency">₦</button>
     </div>
     <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle theme">&#x2600;&#xFE0E;</button>
     <button class="nav-cart" id="cartBtn" type="button" aria-label="Open cart">
@@ -2570,6 +2585,7 @@ body.dark { --text-muted: #b3a392; }
   <a href="/#commissions">Commissions</a>
   <a href="/#about">About the artist</a>
   <a href="/order-status">Track order</a>
+  <button class="currency-toggle" id="currencyToggleMobile" style="display:none;margin-top:0.4rem" title="Switch currency">₦</button>
 </div>
 
 <!-- Hero - full-bleed cinematic -->
@@ -3769,6 +3785,102 @@ body.dark { --text-muted: #b3a392; }
 // Live USD/NGN rate — set from the server config, falls back to 1600.
 let SHOP_RATE = 1600;
 
+// ── Visitor currency detection & toggle ──────────────────────────────────────
+let _visitorCurrency = null;  // e.g. 'USD', 'GBP', 'EUR'
+let _visitorSymbol   = null;  // e.g. '$', '£', '€'
+let _visitorRate     = null;  // units of visitor currency per 1 NGN
+let _showLocalCurrency = false;
+
+const CURRENCY_SYMBOLS = {
+  USD:'$', EUR:'€', GBP:'£', CAD:'CA$', AUD:'A$', JPY:'¥', CNY:'¥',
+  INR:'₹', BRL:'R$', MXN:'MX$', ZAR:'R', GHS:'₵', KES:'KSh',
+  EGP:'E£', MAD:'MAD', TZS:'TSh', UGX:'USh', XOF:'CFA', XAF:'CFA',
+  SGD:'S$', HKD:'HK$', NZD:'NZ$', CHF:'CHF', SEK:'kr', NOK:'kr',
+  DKK:'kr', AED:'AED', SAR:'SAR', QAR:'QAR', KWD:'KD', PKR:'₨',
+  BDT:'৳', LKR:'Rs', THB:'฿', IDR:'Rp', MYR:'RM', PHP:'₱',
+  VND:'₫', KRW:'₩', TWD:'NT$', TRY:'₺', PLN:'zł', CZK:'Kč',
+  HUF:'Ft', RON:'lei', HRK:'kn', RUB:'₽', UAH:'₴', ILS:'₪',
+  CLP:'CL$', COP:'CO$', PEN:'S/', ARS:'AR$', UYU:'$U',
+};
+
+async function detectVisitorCurrency() {
+  try {
+    const geo = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(4000) });
+    const d = await geo.json();
+    const currency = d.currency;
+    if (!currency || currency === 'NGN') return; // already in NGN, no toggle needed
+    _visitorCurrency = currency;
+    _visitorSymbol = CURRENCY_SYMBOLS[currency] || currency + ' ';
+    // Fetch exchange rate: NGN → visitor currency
+    // We know NGN/USD from SHOP_RATE; use that as bridge
+    const rateRes = await fetch(`https://open.er-api.com/v6/latest/NGN`, { signal: AbortSignal.timeout(5000) });
+    const rateData = await rateRes.json();
+    if (rateData && rateData.rates && rateData.rates[currency]) {
+      _visitorRate = rateData.rates[currency]; // e.g. 0.00063 for USD
+      showCurrencyToggle();
+    }
+  } catch(e) { /* silently fail — prices stay in NGN */ }
+}
+
+function showCurrencyToggle() {
+  const btn  = document.getElementById('currencyToggle');
+  const btnM = document.getElementById('currencyToggleMobile');
+  if (btn)  { btn.style.display  = ''; btn.textContent = '₦ / ' + (_visitorSymbol || _visitorCurrency); }
+  if (btnM) { btnM.style.display = ''; btnM.textContent = '₦ / ' + (_visitorSymbol || _visitorCurrency); }
+}
+
+function fmtLocal(ngn) {
+  if (!_visitorRate || !_visitorSymbol) return '';
+  const amount = ngn * _visitorRate;
+  // Format sensibly based on magnitude
+  const formatted = amount >= 100
+    ? Math.round(amount).toLocaleString()
+    : amount >= 1
+      ? amount.toFixed(2)
+      : amount.toFixed(3);
+  return '~' + _visitorSymbol + formatted;
+}
+
+function toggleCurrency() {
+  if (!_visitorRate) return;
+  _showLocalCurrency = !_showLocalCurrency;
+  const btn  = document.getElementById('currencyToggle');
+  const btnM = document.getElementById('currencyToggleMobile');
+  const label = _showLocalCurrency
+    ? (_visitorSymbol || _visitorCurrency) + ' / ₦'
+    : '₦ / ' + (_visitorSymbol || _visitorCurrency);
+  if (btn)  { btn.textContent = label; btn.classList.toggle('active', _showLocalCurrency); }
+  if (btnM) { btnM.textContent = label; btnM.classList.toggle('active', _showLocalCurrency); }
+  refreshAllPrices();
+  renderCheckoutSummary(); // refresh checkout summary if open
+}
+
+function refreshAllPrices() {
+  // Re-render all visible product cards' prices
+  if (typeof PRODUCTS !== 'undefined') {
+    PRODUCTS.forEach(p => {
+      const ngnEl = document.getElementById('pngn-' + p.id);
+      const localEl = document.getElementById('plocal-' + p.id);
+      if (!ngnEl) return;
+      // Find cheapest price for display
+      const sizes = Object.values(p.prices_ngn || {});
+      const cheapestNgn = sizes.length ? Math.min(...sizes.map(Number).filter(Boolean)) : 0;
+      if (!cheapestNgn) return;
+      if (_showLocalCurrency) {
+        ngnEl.style.display = 'none';
+        if (localEl) { localEl.textContent = fmtLocal(cheapestNgn); localEl.style.display = ''; }
+      } else {
+        ngnEl.style.display = '';
+        if (localEl) localEl.style.display = 'none';
+      }
+    });
+  }
+}
+
+document.addEventListener('click', e => {
+  if (e.target.id === 'currencyToggle' || e.target.id === 'currencyToggleMobile') toggleCurrency();
+});
+
 let SHOP_CONFIG = {
   // Wallet addresses are the single source of truth on the server (shop_config,
   // the same row the server verifies incoming payments against). They are loaded
@@ -4412,6 +4524,7 @@ function buildCard(p) {
         <div class="card-price">
           <span class="price-ngn" id="pngn-${p.id}">${fmt(ngn)}</span>
           <span class="price-usd" id="pusd-${p.id}">${fmtUsd(usd)} USD</span>
+          <span class="price-local" id="plocal-${p.id}" style="display:none"></span>
           <span id="stock-${p.id}">${stockHtml}</span>
         </div>
         <button class="add-btn" data-pid="${p.id}" ${!defaultChoice.key || defaultStock===0?'disabled style="opacity:0.4;cursor:not-allowed"':''}>
@@ -4537,7 +4650,7 @@ function buildPrintCard(p) {
       <div class="card-footer">
         <div class="card-price">
           ${ !isEnquireOnly
-            ? `<span class="price-ngn" id="pngn-${p.id}">${fmt(ngn)}</span><span class="price-usd" id="pusd-${p.id}">${fmtUsd(usd)} USD</span>`
+            ? `<span class="price-ngn" id="pngn-${p.id}">${fmt(ngn)}</span><span class="price-usd" id="pusd-${p.id}">${fmtUsd(usd)} USD</span><span class="price-local" id="plocal-${p.id}" style="display:none"></span>`
             : `<span style="font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.14em;color:var(--text-muted)">Enquire for price</span>` }
         </div>
         ${actionHtml}
@@ -4583,8 +4696,15 @@ function wireVariantButton(btn) {
     document.querySelectorAll(`.variant-chip[data-pid="${pid}"]`)
       .forEach(b => b.classList.toggle('selected', b.dataset.v === v));
     const p = SHOP_CONFIG.products.find(x=>x.id===pid);
-    document.getElementById('pngn-'+pid).textContent = fmt(productPrice(p, v, 'ngn'));
+    const _updNgn = productPrice(p, v, 'ngn');
+    document.getElementById('pngn-'+pid).textContent = fmt(_updNgn);
     document.getElementById('pusd-'+pid).textContent = fmtUsd(productPrice(p, v, 'usd')) + ' USD';
+    const _localEl = document.getElementById('plocal-'+pid);
+    if (_localEl) {
+      _localEl.textContent = fmtLocal(_updNgn);
+      _localEl.style.display = _showLocalCurrency ? '' : 'none';
+      document.getElementById('pngn-'+pid).style.display = _showLocalCurrency ? 'none' : '';
+    }
     syncCardStock(pid, v);
   });
 }
@@ -6002,7 +6122,9 @@ function buildOrderSummary() {
           <button type="button" class="qty-btn order-qty-btn" data-key="${cartDomKey(c.key)}" data-dir="1">+</button>
         </div>
       </div>
-      <span class="order-line-price">${fmt(c.priceNgn * c.qty)}</span>
+      <span class="order-line-price">
+        ${_showLocalCurrency && _visitorRate ? fmtLocal(c.priceNgn * c.qty) : fmt(c.priceNgn * c.qty)}
+      </span>
     </div>`;
   }).join('');
 
@@ -6041,7 +6163,7 @@ function buildOrderSummary() {
     ${freeBadge}
     <div class="order-total">
       <span class="order-total-label">Total</span>
-      <span class="order-total-val">${fmt(grandTotalNgn())} <span style="font-size:0.78rem;color:var(--text-muted)">/ $${grandTotalUsd().toFixed(0)}</span></span>
+      <span class="order-total-val">${_showLocalCurrency && _visitorRate ? fmtLocal(grandTotalNgn()) + ' <span style="font-size:0.78rem;color:var(--text-muted)">≈ ' + fmt(grandTotalNgn()) + '</span>' : fmt(grandTotalNgn()) + ' <span style="font-size:0.78rem;color:var(--text-muted)">/ $' + grandTotalUsd().toFixed(0) + '</span>'}</span>
     </div>`;
 
   // Desktop: populate the right-side order summary column
@@ -6063,6 +6185,8 @@ function buildOrderSummary() {
   });
   if (typeof updateFreeOrderUI === 'function') updateFreeOrderUI();
   if (typeof refreshTipUI === 'function') refreshTipUI();
+  // Refresh local currency prices if toggle is active
+  if (_showLocalCurrency) refreshAllPrices();
 
   // Mobile collapsed-summary header total (shown next to the chevron).
   const headTotal = document.getElementById('ckSummaryHeadTotal');
@@ -9476,6 +9600,7 @@ loadShopData()
   .then(maybeOpenCheckoutFromHash)
   .catch(maybeOpenCheckoutFromHash)
   .finally(finalizeReturnedGatewayCheckout);
+detectVisitorCurrency();
 
 /* ─── Footer newsletter subscribe ─── */
 (function(){
