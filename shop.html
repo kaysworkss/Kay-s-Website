@@ -3805,8 +3805,10 @@ const CURRENCY_SYMBOLS = {
 
 async function detectVisitorCurrency() {
   try {
-    const geo = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(4000) });
-    const d = await geo.json();
+    // Allow ?currency=USD (or any code) to preview the toggle locally
+    const forceCurrency = new URLSearchParams(location.search).get('currency');
+    const geo = forceCurrency ? { currency: forceCurrency } : await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(4000) }).then(r => r.json());
+    const d = geo;
     const currency = d.currency;
     if (!currency || currency === 'NGN') return; // already in NGN, no toggle needed
     _visitorCurrency = currency;
