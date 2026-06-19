@@ -3295,15 +3295,6 @@ body.dark { --text-muted: #b3a392; }
         </button>
         <div id="ckSummaryCollapsible">
         <div id="orderSummaryItems"></div>
-        <!-- Discount code -->
-        <div style="margin:0.9rem 0;padding-top:0.8rem;border-top:1px solid var(--border)">
-          <label class="form-label" style="margin-bottom:0.4rem">Discount code</label>
-          <div style="display:flex;gap:0.5rem">
-            <input class="form-input" id="discountInput" type="text" placeholder="Enter code" autocomplete="off" style="text-transform:uppercase;flex:1"/>
-            <button type="button" id="discountApplyBtn" class="ck-delivery-btn" style="flex:0 0 auto;padding:0.7rem 1.1rem;border-color:var(--clay);color:var(--clay)">Apply</button>
-          </div>
-          <div id="discountMsg" style="font-size:0.72rem;margin-top:0.4rem;display:none"></div>
-        </div>
         <!-- Tip -->
         <div id="tipBlock" style="margin:0.9rem 0;padding-top:0.8rem;border-top:1px solid var(--border)">
           <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.7rem;cursor:pointer">
@@ -3333,6 +3324,15 @@ body.dark { --text-muted: #b3a392; }
           </div>
         </div>
         </div><!-- /ckSummaryCollapsible -->
+        <!-- Discount code — always visible, outside the collapsible -->
+        <div style="margin:0.9rem 0;padding-top:0.8rem;border-top:1px solid var(--border)">
+          <label class="form-label" style="margin-bottom:0.4rem">Discount code</label>
+          <div style="display:flex;gap:0.5rem">
+            <input class="form-input" id="discountInput" type="text" placeholder="Enter code" autocomplete="off" style="text-transform:uppercase;flex:1"/>
+            <button type="button" id="discountApplyBtn" class="ck-delivery-btn" style="flex:0 0 auto;padding:0.7rem 1.1rem;border-color:var(--clay);color:var(--clay)">Apply</button>
+          </div>
+          <div id="discountMsg" style="font-size:0.72rem;margin-top:0.4rem;display:none"></div>
+        </div>
         <div id="orderSummaryTotals" style="padding-top:0.8rem;margin-top:0.4rem"></div>
         <!-- Mobile inline summary (hidden on desktop) -->
         <div class="order-summary" id="orderSummary" style="display:none"></div>
@@ -5842,11 +5842,10 @@ function openCheckout(defaultTab) {
   document.getElementById('formScreen').style.display='';
   document.getElementById('confirmScreen').classList.remove('active');
   document.getElementById('checkoutOverlay').classList.add('open');
-  // On mobile, start with the summary collapsed (total still visible in the
-  // header) so the form and Pay button are immediately reachable; on desktop
-  // CSS keeps it permanently expanded regardless of this class.
+  // On mobile, start expanded so item images and discount field are visible.
+  // On desktop CSS keeps it permanently expanded regardless of this class.
   const sumCol = document.getElementById('orderSummaryCol');
-  if (sumCol) sumCol.classList.remove('expanded');
+  if (sumCol) sumCol.classList.add('expanded');
   if (defaultTab) switchPayTab(defaultTab);
   // Restore any applied discount into the input + refresh the free-order view
   const di = document.getElementById('discountInput');
