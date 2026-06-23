@@ -168,9 +168,87 @@
     .connect-grid { grid-template-columns:1fr; }
     .page { padding-top:28px; padding-left:1rem; padding-right:1rem; }
   }
+
+  /* ── AUCTION REF MODE ── */
+  body.auction-ref .hero > div:first-child,
+  body.auction-ref .action-section:not(.mint-only),
+  body.auction-ref .divider-line,
+  body.auction-ref .connect-grid,
+  body.auction-ref #claimStatus,
+  body.auction-ref #claimForm,
+  body.auction-ref section:last-of-type {
+    display: none !important;
+  }
+  body.auction-ref .hero {
+    min-height: unset;
+    padding: 3rem 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+  }
+  body.auction-ref .panel {
+    width: 100%;
+    max-width: 480px;
+  }
+  .auction-ref-heading {
+    display: none;
+    font-family: 'Cinzel', serif;
+    font-size: 0.78rem;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--clay);
+    text-align: center;
+  }
+  .auction-ref-title {
+    display: none;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    font-weight: 300;
+    color: var(--sand);
+    text-align: center;
+    line-height: 1.2;
+  }
+  .auction-ref-note {
+    display: none;
+    font-size: 0.88rem;
+    color: var(--clay);
+    text-align: center;
+    max-width: 400px;
+    line-height: 1.6;
+  }
+  .auction-ref-back {
+    display: none;
+    font-family: 'Cinzel', serif;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-size: 0.62rem;
+    color: rgba(232,213,176,0.76);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0.65rem 1.1rem;
+    text-decoration: none;
+    margin-top: 0.5rem;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .auction-ref-back:hover { color: var(--gold); border-color: var(--gold); }
+  body.auction-ref .auction-ref-heading,
+  body.auction-ref .auction-ref-title,
+  body.auction-ref .auction-ref-note,
+  body.auction-ref .auction-ref-back {
+    display: block;
+  }
 </style>
 </head>
 <body>
+<script>
+  // Apply auction-ref mode immediately to avoid flash
+  if (new URLSearchParams(window.location.search).get('ref') === 'auction' ||
+      document.referrer.includes('/auction')) {
+    document.body.classList.add('auction-ref');
+  }
+</script>
 <div class="wallet-modal" id="tezosWalletModal">
   <div class="wallet-box">
     <div class="wallet-title">Connect Tezos Wallet</div>
@@ -207,10 +285,14 @@
 
     <div class="panel">
       <div class="panel-head">
-        <div class="panel-title">Entry Token Actions</div>
+        <p class="auction-ref-heading">Auction Access</p>
+        <h2 class="auction-ref-title">Mint to<br><em>Join the Auction</em></h2>
+        <p class="auction-ref-note">Your wallet isn't eligible yet. Mint your Entry Token below, then return to the auction to place your bid.</p>
+        <a href="/auction" class="auction-ref-back">← Back to Auction</a>
+        <div class="panel-title" style="margin-top:1rem;">Choose Your Chain</div>
       </div>
       <div class="panel-body">
-        <div class="action-section" aria-label="Entry token mint actions">
+        <div class="action-section mint-only" aria-label="Entry token mint actions">
           <div class="action-label">Step 1: Mint Entry Token</div>
           <p class="action-copy">Pick the chain you want to start with. This is the token that qualifies you for the series auctions.</p>
           <div class="action-grid">
