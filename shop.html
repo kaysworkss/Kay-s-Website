@@ -3145,7 +3145,12 @@ body.dark { --text-muted: #b3a392; }
 
         <!-- New payment method radio list -->
         <div class="ck-pay-methods">
-          <div class="ck-pay-method active" data-pay="paystack" onclick="switchPayTab('paystack')">
+          <div class="ck-pay-method" data-pay="flutterwave" onclick="switchPayTab('flutterwave')" style="order:-1" id="ck-pay-method-flutterwave">
+            <div class="ck-pay-method-icon">🌸</div>
+            <div class="ck-pay-method-label">Card / Bank</div>
+            <div class="ck-pay-method-sub">All cards accepted</div>
+          </div>
+          <div class="ck-pay-method" data-pay="paystack" onclick="switchPayTab('paystack')">
             <span class="ck-pay-radio"></span>
             <span class="ck-pay-label">Card (Paystack)</span>
             <div class="ck-pay-icons">
@@ -3166,13 +3171,20 @@ body.dark { --text-muted: #b3a392; }
 
         <!-- Hidden original pay-tabs (JS target, visually replaced) -->
         <div class="pay-tabs" id="payTabs" aria-hidden="true">
-          <button class="pay-tab active" data-pay="paystack">Paystack</button>
+          <button class="pay-tab active" data-pay="flutterwave">Flutterwave</button>
+          <button class="pay-tab" data-pay="paystack">Paystack</button>
           <button class="pay-tab" data-pay="eth">⬡ ETH</button>
           <button class="pay-tab" data-pay="tezos" style="color:#5ac0f5">XTZ Tezos</button>
         </div>
 
+        <!-- Flutterwave panel -->
+        <div class="pay-panel active" id="panel-flutterwave">
+          <p class="pay-info">Pay securely with <strong>Flutterwave</strong> — all cards accepted including <strong>USD, GBP, CAD</strong> and more. No redirects.</p>
+          <button class="submit-pay-btn" id="flwPayBtn">Pay now</button>
+        </div>
+
         <!-- Paystack panel -->
-        <div class="pay-panel active" id="panel-paystack">
+        <div class="pay-panel" id="panel-paystack">
           <p class="pay-info">Pay securely with <strong>Paystack</strong> — local orders are charged in <strong>NGN</strong>, and international card checkout in <strong>USD</strong>.</p>
           <button class="submit-pay-btn" id="paystackPayBtn">Pay now</button>
         </div>
@@ -3775,6 +3787,7 @@ body.dark { --text-muted: #b3a392; }
 
 <!-- Paystack SDK -->
 <script src="https://js.paystack.co/v1/inline.js" async></script>
+<script src="https://checkout.flutterwave.com/v3.js" async></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.8.0/ethers.umd.min.js" async></script>
 <script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
 
@@ -3784,6 +3797,7 @@ body.dark { --text-muted: #b3a392; }
 /* ─── Config (loaded from Supabase / Edge Config or defaults) ─── */
 // Live USD/NGN rate — set from the server config, falls back to 1600.
 let SHOP_RATE = 1600;
+const FLW_PUBLIC_KEY = 'FLWPUBK-e4b3851eb2d1a65a71d4c683e6d4c627-X';
 
 // ── Visitor currency detection & toggle ──────────────────────────────────────
 let _visitorCurrency = null;  // e.g. 'USD', 'GBP', 'EUR'
@@ -5969,6 +5983,7 @@ function openCheckout(defaultTab) {
   const sumCol = document.getElementById('orderSummaryCol');
   if (sumCol) sumCol.classList.add('expanded');
   if (defaultTab) switchPayTab(defaultTab);
+  else switchPayTab('flutterwave');
   // Restore any applied discount into the input + refresh the free-order view
   const di = document.getElementById('discountInput');
   if (di && _appliedDiscount) di.value = _appliedDiscount.code;
@@ -6228,7 +6243,7 @@ document.getElementById('checkoutOverlay').addEventListener('click', e=>{
   if(e.target===document.getElementById('checkoutOverlay')) closeCheckout();
 });
 
-document.getElementById('checkoutBtn').addEventListener('click', ()=>openCheckout('paystack'));
+document.getElementById('checkoutBtn').addEventListener('click', ()=>openCheckout('flutterwave'));
 
 
 /* ─── Payment handlers ─── */
@@ -6529,6 +6544,79 @@ document.getElementById('paystackPayBtn').addEventListener('click', async ()=>{
     showToast(e.message || 'Could not start Paystack checkout');
   } finally {
     btn.disabled = false; btn.textContent = 'Pay with Paystack';
+  }
+});
+
+// ── FLUTTERWAVE INLINE POPUP ─────────────────────────────────────────────────
+document.getElementById('flwPayBtn').addEventListener('click', async () => {
+  if (!validateForm()) return;
+  const d = getFormData();
+  const btn = document.getElementById('flwPayBtn');
+  btn.disabled = true; btn.textContent = 'Preparing checkout…';
+  try {
+    // Get a signed quote from server first (same as Paystack)
+    const init = await initServerPayment(d, 'flutterwave');
+    if (!init.reference) throw new Error('Could not initialise payment');
+    // Save pending checkout for recovery on return
+    sessionStorage.setItem('kwPendingCheckout', JSON.stringify({
+      customer: d, method: 'flutterwave', ref: init.reference, quote: init.quote
+    }));
+    const totalNgn = init.quote?.total_ngn || grandTotalNgn();
+    // Open Flutterwave inline popup
+    FlutterwaveCheckout({
+      public_key: FLW_PUBLIC_KEY,
+      tx_ref: init.reference,
+      amount: totalNgn,
+      currency: 'NGN',
+      payment_options: 'card, ussd, bank_transfer, apple_pay',
+      customer: {
+        email: d.email,
+        name: d.name,
+        phone_number: d.phone || '',
+      },
+      customizations: {
+        title: "Kay's Works",
+        description: 'Fine art prints & merch',
+        logo: 'https://www.kaysworks.com/images/kaysworkslogo.svg',
+      },
+      callback: async (response) => {
+        // Payment completed — verify server-side
+        if (response.status === 'successful' || response.status === 'completed') {
+          showPaymentBanner('Verifying your payment… please wait');
+          try {
+            const confirm = await postShopJson('/api/shop/order-confirm', {
+              payment_ref: init.reference,
+              tx_ref: init.reference,
+              transaction_id: response.transaction_id,
+              order_ref: init.order_ref || '',
+              checkout_quote: init.quote,
+              provider: 'flutterwave',
+              name: d.name,
+              email: d.email,
+              phone: d.phone || '',
+              address: d.address || '',
+              delivery_method: d.deliveryMethod,
+              delivery_zone: d.deliveryZone,
+              delivery_carrier: d.deliveryCarrier || '',
+            });
+            sessionStorage.removeItem('kwPendingCheckout');
+            hidePaymentBanner();
+            showConfirmScreen(init.reference, 'flutterwave');
+          } catch(e) {
+            hidePaymentBanner();
+            showToast('Payment received but confirmation failed — please contact Kay with ref: ' + init.reference);
+          }
+        } else {
+          showToast('Payment was not completed. Please try again.');
+        }
+      },
+      onclose: () => {
+        btn.disabled = false; btn.textContent = 'Pay now';
+      },
+    });
+  } catch(e) {
+    showToast(e.message || 'Could not start Flutterwave checkout');
+    btn.disabled = false; btn.textContent = 'Pay now';
   }
 });
 
