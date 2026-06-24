@@ -1671,6 +1671,8 @@ body.dark .cart-note-toggle { color: var(--sand); }
   font-family:'Cormorant Garamond',serif;
   font-size:1rem; color:var(--text); margin-bottom:0.6rem;
 }
+.admin-product-row.is-draft { opacity:0.5; border-style:dashed; }
+.draft-pill { display:inline-block; font-family:'Montserrat',sans-serif; font-size:0.48rem; letter-spacing:0.12em; text-transform:uppercase; background:rgba(196,132,90,0.12); color:var(--clay); border:1px solid var(--clay); border-radius:20px; padding:0.1rem 0.5rem; margin-left:0.5rem; vertical-align:middle; }
 .admin-save-btn {
   font-family:'Cinzel',serif; font-size:0.58rem;
   letter-spacing:0.2em; text-transform:uppercase;
@@ -3183,7 +3185,7 @@ body.dark { --text-muted: #b3a392; }
 
         <!-- Flutterwave panel -->
         <div class="pay-panel active" id="panel-flutterwave">
-          <p class="pay-info">All major cards accepted — Visa, Mastercard, and more. Charges in your local currency.</p>
+          <p class="pay-info">All major cards accepted internationally — Visa, Mastercard, Verve and more.</p>
           <button class="submit-pay-btn" id="flwPayBtn">Pay by card</button>
         </div>
 
@@ -4927,7 +4929,8 @@ function updateMasonryLayoutMode() {
 }
 
 function renderProducts() {
-  SHOP_CONFIG.products = (SHOP_CONFIG.products || []).filter(p => p && p.active !== false).map(normalizeProduct);
+  // Keep ALL products in SHOP_CONFIG (including drafts) — drafts are filtered at render time
+SHOP_CONFIG.products = (SHOP_CONFIG.products || []).map(normalizeProduct);
   // Respect the admin-defined display order within each category.
   SHOP_CONFIG.products.sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
   renderFeaturedSection();
@@ -4963,6 +4966,7 @@ function renderProductViews(activeFilter = 'all') {
   if (activeFilter === 'all') {
     if (allGrid) allGrid.style.display = 'none';
     const sortedProducts = [...SHOP_CONFIG.products]
+      .filter(p => p.active !== false)
       .sort((a, b) => {
         const catA = SHOP_CATEGORY_ORDER[a.category] ?? 99;
         const catB = SHOP_CATEGORY_ORDER[b.category] ?? 99;
@@ -7607,10 +7611,10 @@ function renderAdminProducts() {
           </label>
           <button class="ap-remove-option" data-key="${escapeAttr(pKey)}" data-type="${escapeAttr(opt.type)}" title="Remove this print option and all its sizes" style="background:none;border:none;color:var(--text-muted);font-size:0.85rem;padding:0 0.45rem;transition:color 0.15s">x</button>
         </div>`).join('');
-      html += `<div class="admin-product-row" data-idx="${realIdx}" data-key="${escapeAttr(pKey)}" style="grid-template-columns:1fr;gap:0.6rem">
+      html += `<div class="admin-product-row${p.active===false?' is-draft':''}" data-idx="${realIdx}" data-key="${escapeAttr(pKey)}" style="grid-template-columns:1fr;gap:0.6rem">
         <button class="admin-del-btn" data-key="${escapeAttr(pKey)}" title="Remove">x</button>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem">
-          <div class="admin-prod-name">${escapeText(p.name)}</div>
+          <div class="admin-prod-name">${escapeText(p.name)}${p.active===false?'<span class="draft-pill">draft</span>':''}</div>
           <div style="display:flex;gap:0.3rem;flex-shrink:0">
             <button class="ap-duplicate" data-key="${escapeAttr(pKey)}" title="Duplicate" style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;height:26px;color:var(--text);font-size:0.68rem;padding:0 0.45rem">Copy</button>
             <button class="ap-move-up" data-cat="prints" data-idx="${realIdx}" title="Move up" ${pi === 0 ? 'disabled' : ''} style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;width:26px;height:26px;color:var(--text);font-size:0.8rem;${pi === 0 ? 'opacity:0.3' : ''}">▲</button>
@@ -7645,6 +7649,10 @@ function renderAdminProducts() {
             <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-muted);font-family:'Montserrat',sans-serif" title="Show 'Enquire' instead of Add to bag — for unique works with no fixed price">
               <input type="checkbox" class="ap-enquire-only" data-idx="${realIdx}" ${p.enquire_only?'checked':''} style="accent-color:var(--clay);width:15px;height:15px"/>
               Enquire only
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--clay);font-family:'Montserrat',sans-serif" title="Hide from shop — stays in your config as a draft">
+              <input type="checkbox" class="ap-draft" data-idx="${realIdx}" ${p.active===false?'checked':''} style="accent-color:var(--clay);width:15px;height:15px"/>
+              Hidden (draft)
             </label>
           </div>
           <div class="form-row" style="margin:0">
@@ -7774,10 +7782,10 @@ function renderAdminProducts() {
           <input class="form-input ap-v-stock" value="${p.stock_by_variant?.[v] ?? ''}" placeholder="Stock" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <button class="ap-remove-variant" type="button" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem" title="Remove">x</button>
         </div>`).join('');
-      html += `<div class="admin-product-row" data-idx="${realIdx}" data-key="${escapeAttr(pKey)}" style="grid-template-columns:1fr;gap:0.7rem">
+      html += `<div class="admin-product-row${p.active===false?' is-draft':''}" data-idx="${realIdx}" data-key="${escapeAttr(pKey)}" style="grid-template-columns:1fr;gap:0.7rem">
         <button class="admin-del-btn" data-key="${escapeAttr(pKey)}" title="Remove">x</button>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem">
-          <div class="admin-prod-name">${escapeText(p.name)}</div>
+          <div class="admin-prod-name">${escapeText(p.name)}${p.active===false?'<span class="draft-pill">draft</span>':''}</div>
           <div style="display:flex;gap:0.3rem;flex-shrink:0">
             <button class="ap-duplicate" data-key="${escapeAttr(pKey)}" title="Duplicate" style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;height:26px;color:var(--text);font-size:0.68rem;padding:0 0.45rem">Copy</button>
             <button class="ap-move-up" data-cat="${cat}" data-idx="${realIdx}" title="Move up" ${ci === 0 ? 'disabled' : ''} style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;width:26px;height:26px;color:var(--text);font-size:0.8rem;${ci === 0 ? 'opacity:0.3' : ''}">▲</button>
@@ -8295,6 +8303,10 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         p.priceNgn = nextNgn;
         p.priceUsd = nextUsd;
         p.stock_by_variant = nextStock;
+        const draftElM = row.querySelector('.ap-draft');
+        if (draftElM) p.active = !draftElM.checked;
+        const enquireElM = row.querySelector('.ap-enquire-only');
+        if (enquireElM) p.enquire_only = enquireElM.checked;
       }
     });
 
