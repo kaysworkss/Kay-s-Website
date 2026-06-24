@@ -1758,71 +1758,50 @@ function renderSizingGuide() {
   // Detect print orientation from the product's hero image
   // We load the image to read its natural dimensions, then draw accordingly
   function drawGuide(isLandscape) {
-    // Known size definitions with pre-set cm labels
-    const KNOWN_SIZES = {
-      '4x4':   { label: '4×4"',   cm: '10×10 cm',  pw: 16,  ph: 16  },
-      '4x6':   { label: '4×6"',   cm: '10×15 cm',  pw: 16,  ph: 24  },
-      '5x5':   { label: '5×5"',   cm: '13×13 cm',  pw: 20,  ph: 20  },
-      '5x7':   { label: '5×7"',   cm: '13×18 cm',  pw: 20,  ph: 28  },
-      '8x10':  { label: '8×10"',  cm: '20×25 cm',  pw: 32,  ph: 40  },
-      '11x14': { label: '11×14"', cm: '28×36 cm',  pw: 44,  ph: 56  },
-      '16x20': { label: '16×20"', cm: '41×51 cm',  pw: 56,  ph: 70  },
-      '18x24': { label: '18×24"', cm: '46×61 cm',  pw: 72,  ph: 96  },
-      '24x36': { label: '24×36"', cm: '61×91 cm',  pw: 96,  ph: 144 },
-    };
+    // Scale: person is 170cm = 66.9", drawn at PERSON_PX height
+    // So 1 inch = PERSON_PX / 66.9 px. Person sits at left as reference.
+    const PERSON_PX = 200;  // SVG px height of silhouette
+    const PX_PER_INCH = PERSON_PX / 66.9;  // ~2.99
 
-    // Scale factor: 1 inch = ~4px in SVG space, max frame height ~144px
-    const SCALE = 4;
-    const MAX_PX = 144;
+    // cm conversion map for known sizes
+    const CM_LABELS = {
+      '4x4':'10×10 cm','4x6':'10×15 cm','5x5':'13×13 cm','5x7':'13×18 cm',
+      '8x10':'20×25 cm','11x14':'28×36 cm','16x20':'41×51 cm',
+      '18x24':'46×61 cm','24x36':'61×91 cm',
+    };
 
     // Build size list from product's actual variants — including custom sizes
     const productSizeKeys = availablePrintChoices(_product)
       .map(c => c.key.split('|').pop().replace(/[\u201c\u201d\u2033"]/g,'').replace(/×/g,'x').replace(/\s/g,'').toLowerCase());
 
     const sizes = [...new Set(productSizeKeys)].map(key => {
-      if (KNOWN_SIZES[key]) {
-        const s = KNOWN_SIZES[key];
-        return {
-          key,
-          label: s.label,
-          cm: s.cm,
-          pw: s.pw,
-          ph: s.ph,
-          w: isLandscape && s.pw !== s.ph ? s.ph : s.pw,
-          h: isLandscape && s.pw !== s.ph ? s.pw : s.ph,
-        };
-      }
-      // Custom size — parse from key e.g. "16x20" → w=16, h=20 inches
       const match = key.match(/^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/);
       if (!match) return null;
       const inW = parseFloat(match[1]);
       const inH = parseFloat(match[2]);
-      // Convert inches to cm
       const cmW = Math.round(inW * 2.54);
       const cmH = Math.round(inH * 2.54);
-      // Scale to SVG pixels, capped at MAX_PX
-      const scaleFactor = Math.min(1, MAX_PX / (Math.max(inW, inH) * SCALE));
-      const pw = Math.round(inW * SCALE * scaleFactor);
-      const ph = Math.round(inH * SCALE * scaleFactor);
+      // SVG pixel dimensions — directly scaled from real inches
+      const pw = Math.round(inW * PX_PER_INCH);
+      const ph = Math.round(inH * PX_PER_INCH);
+      // For landscape prints swap w/h; squares stay square
+      const w = isLandscape && pw !== ph ? ph : pw;
+      const h = isLandscape && pw !== ph ? pw : ph;
+      const label = `${inW % 1 === 0 ? inW : inW}×${inH % 1 === 0 ? inH : inH}"`;
       return {
-        key,
-        label: `${inW}×${inH}"`,
-        cm: `${cmW}×${cmH} cm`,
-        pw, ph,
-        w: isLandscape && pw !== ph ? ph : pw,
-        h: isLandscape && pw !== ph ? pw : ph,
+        key, label,
+        cm: CM_LABELS[key] || `${cmW}×${cmH} cm`,
+        pw, ph, w, h,
       };
     }).filter(Boolean);
 
-    // Sort by area so smallest appears leftmost
+    // Sort smallest to largest left to right
     sizes.sort((a, b) => (a.pw * a.ph) - (b.pw * b.ph));
 
     if (!sizes.length) { wrap.innerHTML = ''; return; }
 
-    // Layout — baseline is where all frames sit
-    // For landscape prints, max height is smaller so we raise the baseline
-    const maxH = Math.max(...sizes.map(s => s.h));
-    const BASELINE = Math.max(160, maxH + 40);
+    // Layout — baseline where all frames sit, matched to person height
+    const BASELINE = 210;  // person is 200px + 10px top margin
     const SVG_H = BASELINE + 55; // room for labels below
     const LEFT_MARGIN = 60;
     const RIGHT_MARGIN = 20;
@@ -1853,13 +1832,12 @@ function renderSizingGuide() {
       </g>`;
     }).join('\n');
 
-    // Silhouette — person stands to left, scaled to baseline height
-    const personH = BASELINE;
-    const personMid = Math.round(personH * 0.58); // hip
+    // Silhouette proportions based on PERSON_PX (200px = 170cm)
+    const personH = PERSON_PX;
     const headR = 10;
-    const headCY = 16;
+    const headCY = 10;
     const shoulderY = headCY + headR + 4;
-    const armY = Math.round(personH * 0.30);
+    const armY = Math.round(personH * 0.32);
     const legSplit = Math.round(personH * 0.62);
 
     wrap.innerHTML = `<svg viewBox="0 0 ${svgW} ${SVG_H}" width="${svgW}" xmlns="http://www.w3.org/2000/svg" style="font-family:'Montserrat',sans-serif">
