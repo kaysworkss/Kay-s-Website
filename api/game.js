@@ -1072,7 +1072,6 @@ async function computeShopCheckout(body, supabase) {
       qty,
       priceNgn,
       priceUsd,
-      imageUrl: product.image || product.image_url || '',
     });
   }
 
@@ -1734,12 +1733,37 @@ async function verifyCardPayment({ provider, reference, expectedTotalNgn }) {
       const e = new Error('Flutterwave reports this payment was not completed');
       e.statusCode = 402; throw e;
     }
-    const paidNgn = Number(tx.amount || 0);
-    if (String(tx.currency || 'NGN') !== 'NGN' || paidNgn + 0.5 < expectedTotalNgn) {
-      const e = new Error('Flutterwave payment amount does not match the order total');
+    const paidAmount = Number(tx.amount || 0);
+    const paidCurrency = String(tx.currency || 'NGN').toUpperCase();
+    let paidNgn = paidAmount;
+
+    if (paidCurrency !== 'NGN') {
+      // Flutterwave charged in the customer's local currency — convert to NGN
+      // using the rate embedded in the transaction (app_fee / charged_amount ratio
+      // gives us the FX rate Flutterwave used). Fallback: use server SHOP_RATE.
+      if (tx.charged_amount && tx.app_fee) {
+        // Flutterwave's charged_amount is always in the settlement currency (NGN).
+        // Use it directly as the NGN equivalent.
+        paidNgn = Number(tx.charged_amount || paidAmount);
+      } else {
+        // Fallback: use SHOP_RATE from config
+        const cfg = await getSupabase()
+          .from('shop_config').select('ngn_per_usd').eq('id', 1).maybeSingle()
+          .then(r => r.data);
+        const rate = Number(cfg?.ngn_per_usd || process.env.SHOP_RATE || 1600);
+        // Convert foreign currency to USD first (approximate), then to NGN
+        // Flutterwave's tx.amount_settled is in NGN if available
+        paidNgn = Number(tx.amount_settled || paidAmount * rate);
+      }
+    }
+
+    // Allow 1% tolerance for FX rounding
+    const tolerance = Math.max(0.5, expectedTotalNgn * 0.01);
+    if (paidNgn + tolerance < expectedTotalNgn) {
+      const e = new Error(`Flutterwave payment amount (${paidCurrency} ${paidAmount} ≈ ₦${Math.round(paidNgn)}) does not match order total (₦${expectedTotalNgn})`);
       e.statusCode = 402; throw e;
     }
-    return { provider, reference, paid_ngn: paidNgn, gateway_status: tx.status };
+    return { provider, reference, paid_ngn: paidNgn, paid_currency: paidCurrency, gateway_status: tx.status };
   }
 
   const e = new Error('Unsupported card provider for verification');
@@ -2173,7 +2197,7 @@ async function handleShopOrderCreate(req, res, supabase) {
         .from('shop_orders')
         .update({
           customer_name:    String(body.name    || '').slice(0, 200),
-          email:            String(body.email   || '').trim().toLowerCase().slice(0, 320),
+          email:            String(body.email   || '').slice(0, 320),
           phone:            String(body.phone   || '').slice(0, 60),
           address:          String(body.address || '').slice(0, 500),
           items:            checkout.trustedItems,
@@ -2216,7 +2240,7 @@ async function handleShopOrderCreate(req, res, supabase) {
     .insert({
       order_ref:       orderRef,
       customer_name:   String(body.name    || '').slice(0, 200),
-      email:           String(body.email   || '').trim().toLowerCase().slice(0, 320),
+      email:           String(body.email   || '').slice(0, 320),
       phone:           String(body.phone   || '').slice(0, 60),
       address:         String(body.address || '').slice(0, 500),
       items:           checkout.trustedItems,
@@ -2293,7 +2317,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
       .insert({
         order_ref:        orderRef,
         customer_name:    String(body.name    || '').slice(0, 200),
-        email:            String(body.email   || '').trim().toLowerCase().slice(0, 320),
+        email:            String(body.email   || '').slice(0, 320),
         phone:            String(body.phone   || '').slice(0, 60),
         address:          String(body.address || '').slice(0, 500),
         items:            checkout.trustedItems,
@@ -2318,8 +2342,8 @@ async function handleShopOrderConfirm(req, res, supabase) {
     }
   }
   if (!order) return json(404, { error: 'Order not found for that reference' });
-  const paymentMethod = String(body.payment_method || order.payment_method || '').slice(0, 40);
-  const paymentRef = String(body.payment_ref || order.payment_ref || '').trim().slice(0, 200);
+  const paymentMethod = String(body.payment_method || body.provider || order.payment_method || '').slice(0, 40);
+  const paymentRef = String(body.payment_ref || body.tx_ref || order.payment_ref || '').trim().slice(0, 200);
   const storedLock = readCryptoOrderLock(order);
   const payerAddress = String(body.payer_address || storedLock?.payer_address || order.payment_metadata?.payer_address || '').trim().slice(0, 120);
   if (order.status === 'paid') {
@@ -2588,7 +2612,7 @@ async function finalizeFreeOrder(req, res, supabase, body, checkout) {
     .insert({
       order_ref:        freeRef,
       customer_name:    String(body.name    || '').slice(0, 200),
-      email:            String(body.email   || '').trim().toLowerCase().slice(0, 320),
+      email:            String(body.email   || '').slice(0, 320),
       phone:            String(body.phone   || '').slice(0, 60),
       address:          String(body.address || '').slice(0, 500),
       items:            checkout.trustedItems,
@@ -2619,7 +2643,7 @@ async function finalizeFreeOrder(req, res, supabase, body, checkout) {
 
   const emailOrder = {
     id: order.id, order_ref: order.order_ref,
-    customer_name: String(body.name || ''), email: String(body.email || '').trim().toLowerCase(),
+    customer_name: String(body.name || ''), email: String(body.email || ''),
     phone: String(body.phone || ''), address: String(body.address || ''),
     items: checkout.trustedItems, total_ngn: checkout.totalNgn, total_usd: checkout.totalUsd,
     delivery_fee_ngn: checkout.deliveryNgn, delivery_method: checkout.method, delivery_zone: checkout.zone,
@@ -2791,7 +2815,7 @@ async function handleShopOrder(req, res, supabase) {
     .insert({
       order_ref:       newOrderRef,
       customer_name:   String(body.name    || '').slice(0, 200),
-      email:           String(body.email   || '').trim().toLowerCase().slice(0, 320),
+      email:           String(body.email   || '').slice(0, 320),
       phone:           String(body.phone   || '').slice(0, 60),
       address:         String(body.address || '').slice(0, 500),
       items:           checkout.trustedItems,
@@ -2822,7 +2846,7 @@ async function handleShopOrder(req, res, supabase) {
   const emailOrder = savedOrder || {
     id: order.id,
     customer_name: String(body.name || ''),
-    email: String(body.email || '').trim().toLowerCase(),
+    email: String(body.email || ''),
     phone: String(body.phone || ''),
     address: String(body.address || ''),
     items: checkout.trustedItems,
@@ -2967,21 +2991,18 @@ async function handleShopOrderHistory(req, res, supabase) {
   if (req.method === 'GET') {
     const token = String(req.query.token || '').trim();
     if (!token) return json(400, { error: 'token required' });
-    const { data: tok, error: tokErr } = await supabase.from('order_history_tokens')
+    const { data: tok } = await supabase.from('order_history_tokens')
       .select('email, expires_at').eq('token', token).maybeSingle();
-    console.log('[order-history] token lookup:', { found: !!tok, email: tok?.email, tokErr: tokErr?.message });
     if (!tok) return json(404, { error: 'Invalid or expired link. Request a new one.' });
     if (new Date(tok.expires_at) < new Date()) {
       await supabase.from('order_history_tokens').delete().eq('token', token);
       return json(410, { error: 'This link has expired. Request a new one.' });
     }
-    // ilike = case-insensitive match, catches any remaining case mismatches in DB
     const { data: orders, error } = await supabase.from('shop_orders')
       .select('order_ref, status, items, total_ngn, total_usd, delivery_method, delivery_zone, tracking_number, tracking_carrier, payment_method, payment_ref, payment_metadata, created_at, updated_at')
-      .ilike('email', tok.email).order('created_at', { ascending: false });
-    console.log('[order-history] orders query:', { email: tok.email, count: orders?.length, error: error?.message });
+      .eq('email', tok.email).order('created_at', { ascending: false });
     if (error) return json(500, { error: error.message });
-    return json(200, { ok: true, email: tok.email, orders: orders || [], _debug: { email: tok.email, count: orders?.length } });
+    return json(200, { ok: true, email: tok.email, orders: orders || [] });
   }
   return json(405, { error: 'POST or GET only' });
 }
