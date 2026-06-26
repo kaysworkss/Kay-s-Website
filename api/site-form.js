@@ -157,6 +157,12 @@ function buildRow(payload) {
     return row;
   }
 
+  if (formType === 'newsletter' || formType === 'subscribe') {
+    const email = clean(payload.email, 320);
+    if (!isEmail(email)) return { error: 'Please enter a valid email address.' };
+    return { form_type: 'newsletter', status: 'pending', email, name: clean(payload.name || 'Subscriber', 180), payload };
+  }
+
   const row = {
     form_type: 'commission',
     status: 'pending',
@@ -550,6 +556,57 @@ async function sendAcquisitionConfirmation(row, id) {
   return response.json().catch(() => ({}));
 }
 
+// ── Newsletter welcome email ─────────────────────────────────────────────────
+async function sendNewsletterWelcome(email) {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) return;
+
+  const subject = "You're on the list — Kay's Works";
+  const bodyHtml = `
+    <p style="margin:0 0 16px;font-size:16px;color:#2d211b;font-family:Georgia,serif;line-height:1.6">
+      Thank you for joining.
+    </p>
+    <p style="margin:0 0 14px;font-size:13px;color:#5c3e2e;font-style:italic;font-family:Georgia,serif;line-height:1.65">
+      You'll hear from me when there's something worth sharing — new drops, series releases, and collector moments from the studio. I don't send noise.
+    </p>
+    <p style="margin:0 0 14px;font-size:13px;color:#5c3e2e;font-family:Georgia,serif;line-height:1.65">
+      <strong>One small thing:</strong> if this landed in your spam or promotions folder, please move it to your inbox and add this address to your contacts. That way you won't miss a drop.
+    </p>`;
+
+  const html = _siteEmailShell({
+    eyebrow:   "Kay's Works · Collector Circle",
+    heroTitle: "You're on the list",
+    bodyHtml,
+    rows: [],
+    ctaHref:   'https://kaysworks.com/shop',
+    ctaText:   'Explore the collection',
+    ctaSub:    null,
+    logoUrl:   process.env.SHOP_LOGO_URL || 'https://www.kaysworks.com/images/kaysworkslogo.svg',
+  });
+
+  const text = [
+    "You're on the list — Kay's Works",
+    '',
+    "Thank you for joining.",
+    "You'll hear from me when there's something worth sharing — new drops, series releases, and collector moments from the studio.",
+    '',
+    "One small thing: if this landed in your spam or promotions folder, please move it to your inbox and add this address to your contacts so you don't miss a drop.",
+    '',
+    'Explore the collection: https://kaysworks.com/shop',
+  ].join('\n');
+
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: ALERT_FROM_EMAIL,
+      to: [email],
+      reply_to: ALERT_TO_EMAIL,
+      subject, text, html,
+    }),
+  });
+}
+
 // ── Admin alert ───────────────────────────────────────────────────────────────
 async function sendMinimalAlert(row, id) {
   const resendKey = process.env.RESEND_API_KEY;
@@ -646,6 +703,44 @@ async function handleCreate(req, res) {
       alert = { sent: false, error: error.message };
     }
   }
+  // Newsletter subscriber — save to collectors table + send welcome email
+  if (row.form_type === 'newsletter') {
+    let saved = false;
+    try {
+      const { createClient } = require('@supabase/supabase-js');
+      const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+      const { data: existing } = await sb.from('collectors').select('id').eq('email', row.email).maybeSingle();
+      if (!existing) {
+        await sb.from('collectors').insert({
+          email: row.email.toLowerCase(),
+          name: row.name !== 'Subscriber' ? row.name : null,
+          consented_at: new Date().toISOString(),
+          order_count: 0,
+        });
+        // Send welcome email only for new subscribers
+        await sendNewsletterWelcome(row.email).catch(e => console.error('[newsletter] welcome email failed:', e.message));
+        // Alert Kay
+        try {
+          await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              from: ALERT_FROM_EMAIL,
+              to: emailList(ALERT_TO_EMAIL),
+              subject: `New newsletter subscriber — ${row.email}`,
+              text: `${row.email} just subscribed via the shop footer.`,
+            }),
+          });
+        } catch(e) {}
+        saved = true;
+      }
+      return res.status(200).json({ ok: true, saved, existing: !!existing });
+    } catch(e) {
+      console.error('[newsletter] error:', e.message);
+      return res.status(200).json({ ok: true, saved }); // still return ok so UI shows success
+    }
+  }
+
   // Client-facing confirmation email for private offers
   let confirmation = { sent: false };
   if (row.form_type === 'private-offer') {
