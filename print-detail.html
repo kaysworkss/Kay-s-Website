@@ -863,6 +863,26 @@ footer a:hover { color:var(--rust); }
 .enquire-done { text-align: center; padding: 1.5rem 0.5rem; }
 .enquire-done-icon { font-size: 2.4rem; color: var(--gold); margin-bottom: 0.8rem; }
 @media(max-width:600px){ .enquire-fab { font-size: 0.48rem; padding: 0.65rem 0.95rem; } }
+.interest-overlay {
+  position: fixed; inset: 0; z-index: 8600;
+  background: rgba(14,10,8,0.72);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  opacity: 0; pointer-events: none; transition: opacity 0.25s;
+}
+.interest-overlay.show { opacity: 1; pointer-events: all; }
+.interest-modal {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 20px; width: min(460px, 100%);
+  max-height: 92vh; overflow-y: auto;
+  padding: 2rem; transform: translateY(16px); transition: transform 0.25s;
+  box-shadow: 0 20px 60px rgba(14,10,8,0.35);
+}
+.interest-overlay.show .interest-modal { transform: translateY(0); }
+.interest-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.3rem; }
+.interest-title { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 300; color: var(--text); }
+.interest-piece { font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); margin-bottom: 1rem; }
+.interest-body-text { font-family: 'Crimson Pro', serif; font-size: 1rem; color: var(--text-muted); line-height: 1.65; margin-bottom: 1.4rem; }
 </style>
 </head>
 <body>
@@ -1047,29 +1067,35 @@ function shippingMethodLabel(variantKey, product) {
 }
 // Local currency support — reads from shop.html's currency system if in same session
 // Falls back to NGN display if not available
-function fmtLocal(ngn) {
-  try {
-    if (window.opener && window.opener._visitorRate) {
-      const r = window.opener._visitorRate;
-      const s = window.opener._visitorSymbol;
-      const a = ngn * r;
-      return s + (a >= 100 ? Math.round(a).toLocaleString() : a.toFixed(2));
-    }
-  } catch(e) {}
-  // Check sessionStorage for saved currency preference
+// Cached currency state — populated from sessionStorage on load
+let _detailRate = null;
+let _detailSymbol = null;
+let _detailCurrency = null;
+
+function loadDetailCurrency() {
   try {
     const saved = sessionStorage.getItem('kw_currency');
     const rate  = sessionStorage.getItem('kw_rate');
     const sym   = sessionStorage.getItem('kw_symbol');
     if (saved && saved !== 'NGN' && rate && sym) {
-      const a = ngn * Number(rate);
-      return sym + (a >= 100 ? Math.round(a).toLocaleString() : a.toFixed(2));
+      _detailCurrency = saved;
+      _detailRate = Number(rate);
+      _detailSymbol = sym;
     }
   } catch(e) {}
-  return null; // no local rate available — show NGN
 }
+loadDetailCurrency(); // run immediately on script parse
+
+function fmtLocal(ngn) {
+  const rate = _detailRate;
+  const sym  = _detailSymbol;
+  if (!rate || !sym) return null;
+  const a = ngn * rate;
+  return sym + (a >= 100 ? Math.round(a).toLocaleString() : a.toFixed(2));
+}
+
 function getActiveRate() {
-  try { return sessionStorage.getItem('kw_currency'); } catch(e) { return null; }
+  return _detailCurrency || null;
 }
 
 function applyLocalCurrencyToDetail(p) {
@@ -1620,7 +1646,7 @@ function renderProduct(p) {
                 ${enquireSizes ? `<p class="purchase-label" style="margin-bottom:0.5rem">Available sizes</p><div class="size-picker" style="pointer-events:none;opacity:0.7;margin-bottom:1.2rem">${enquireSizes}</div>` : ''}
                 ${isSoldOut
                   ? '<button class="add-to-cart-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold</button>'
-                  : '<button class="add-to-cart-btn enquire-action" onclick="openEnquire(\'' + escapeAttr(p.name) + '\')">Enquire about this work →</button>'}
+                  : '<button class="add-to-cart-btn enquire-action" onclick="openInterest(p.name)">Make inquiry about this work →</button>'}
               `;
             }
             return `
@@ -2301,6 +2327,43 @@ function closeEnquire() { document.getElementById('enquireOverlay').classList.re
   });
 })();
 </script>
+<div class="interest-overlay" id="interestOverlay">
+  <div class="interest-modal" role="dialog" aria-modal="true">
+    <div class="interest-head">
+      <div>
+        <div class="interest-title">Register your interest</div>
+        <div class="interest-piece" id="interestPieceName">in this work</div>
+      </div>
+      <button class="interest-close" id="interestClose" aria-label="Close">✕</button>
+    </div>
+    <div id="interestFormBody">
+      <p class="interest-body-text">Every enquiry is read by Kay personally. Leave your details and she'll be in touch within 48 hours.</p>
+      <div class="interest-field"><label>Name</label><input type="text" id="interestName" placeholder="Full name" autocomplete="name"/></div>
+      <div class="interest-field"><label>Email</label><input type="email" id="interestEmail" placeholder="your@email.com" autocomplete="email"/></div>
+      <div class="interest-field"><label>Phone <span style="color:var(--text-muted);font-size:0.8em">optional</span></label><input type="tel" id="interestPhone" placeholder="+234…" autocomplete="tel"/></div>
+      <div class="interest-field">
+        <label>Have you collected any of my work before?</label>
+        <div style="display:flex;gap:1rem;margin-top:0.4rem">
+          <label style="display:flex;align-items:center;gap:0.4rem;font-family:'Crimson Pro',serif;font-size:0.92rem;cursor:pointer;font-weight:400">
+            <input type="radio" name="prevCollector" id="interestPrevYes" value="yes" style="accent-color:var(--rust)"/> Yes
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;font-family:'Crimson Pro',serif;font-size:0.92rem;cursor:pointer;font-weight:400">
+            <input type="radio" name="prevCollector" id="interestPrevNo" value="no" style="accent-color:var(--rust)" checked/> No
+          </label>
+        </div>
+        <input type="text" id="interestPrevDetail" placeholder="Which piece? (optional)" style="margin-top:0.5rem;display:none" class="form-input" autocomplete="off"/>
+      </div>
+      <div class="interest-field"><label>Anything else <span style="color:var(--text-muted);font-size:0.8em">optional</span></label><textarea id="interestMsg" placeholder="Any questions, context, or anything you'd like Kay to know…"></textarea></div>
+      <button class="interest-send" id="interestSend">Register interest →</button>
+    </div>
+    <div class="interest-done" id="interestDone" style="display:none">
+      <div class="interest-done-icon">✦</div>
+      <p style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--text);margin-bottom:0.5rem">Thank you.</p>
+      <p style="font-family:'Crimson Pro',serif;color:var(--text-muted);line-height:1.7">I appreciate your interest in this. I will carefully consider it and reach out to you.</p>
+    </div>
+  </div>
+</div>
+
 <!-- Mobile image lightbox -->
 <div class="img-lightbox" id="imgLightbox" onclick="closeLightbox()">
   <button class="img-lightbox-close" onclick="event.stopPropagation();closeLightbox()">✕</button>

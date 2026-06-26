@@ -2501,26 +2501,7 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
 .product-card.is-sold .card-img img { filter: grayscale(30%); }
 
 /* ── Interest form modal ── */
-.interest-overlay {
-  position: fixed; inset: 0; z-index: 8600;
-  background: rgba(14,10,8,0.72);
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  display: flex; align-items: center; justify-content: center; padding: 1rem;
-  opacity: 0; pointer-events: none; transition: opacity 0.25s;
-}
-.interest-overlay.show { opacity: 1; pointer-events: all; }
-.interest-modal {
-  background: var(--bg); border: 1px solid var(--border);
-  border-radius: 20px; width: min(460px, 100%);
-  max-height: 92vh; overflow-y: auto;
-  padding: 2rem; transform: translateY(16px); transition: transform 0.25s;
-  box-shadow: 0 20px 60px rgba(14,10,8,0.35);
-}
-.interest-overlay.show .interest-modal { transform: translateY(0); }
-.interest-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.3rem; }
-.interest-title { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 300; color: var(--text); }
-.interest-piece { font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); margin-bottom: 1rem; }
-.interest-body-text { font-family: 'Crimson Pro', serif; font-size: 1rem; color: var(--text-muted); line-height: 1.65; margin-bottom: 1.4rem; }
+
 .interest-close { background: none; border: none; font-size: 1rem; color: var(--text-muted); cursor: pointer; transition: color 0.2s; }
 .interest-close:hover { color: var(--rust); }
 .interest-field { margin-bottom: 0.9rem; }
@@ -2899,31 +2880,7 @@ body.dark { --text-muted: #b3a392; }
 </section>
 
 <!-- Interest form — for 1/1 originals without a set price -->
-<div class="interest-overlay" id="interestOverlay">
-  <div class="interest-modal" role="dialog" aria-modal="true">
-    <div class="interest-head">
-      <div>
-        <div class="interest-title">Make inquiry about this work</div>
-        <div class="interest-piece" id="interestPieceName">in this work</div>
-      </div>
-      <button class="interest-close" id="interestClose" aria-label="Close">✕</button>
-    </div>
-    <div id="interestFormBody">
-      <p class="interest-body-text">This work exists as a single print — made once, owned by one person. Leave your details and Kay will be in touch with availability, pricing, and how to make it yours.</p>
-      <div class="interest-field"><label>Your name</label><input type="text" id="interestName" placeholder="Full name" autocomplete="name"/></div>
-      <div class="interest-field"><label>Email</label><input type="email" id="interestEmail" placeholder="your@email.com" autocomplete="email"/></div>
-      <div class="interest-field"><label>Message <span style="color:var(--text-muted);font-size:0.8em">(optional)</span></label><textarea id="interestMsg" placeholder="Any questions or context you'd like Kay to know…"></textarea></div>
-      <button class="interest-send" id="interestSend">Send enquiry →</button>
-    </div>
-    <div class="interest-done" id="interestDone" style="display:none">
-      <div class="interest-done-icon">✦</div>
-      <p style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--text);margin-bottom:0.5rem">Message sent.</p>
-      <p style="font-family:'Crimson Pro',serif;color:var(--text-muted);line-height:1.6">Kay will be in touch within 24 hours.</p>
-    </div>
-  </div>
-</div>
-
-<!-- Enquiry widget -->
+-><!-- Enquiry widget -->
 <button class="enquire-fab" id="enquireFab" aria-label="Ask a question">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
   <span class="enquire-fab-label">Questions?</span>
@@ -5020,7 +4977,7 @@ function buildPrintCard(p) {
           : '' }
       <div class="card-footer">
         <div class="card-price">
-          ${ (() => { const allNgn = Object.values(p.priceNgn||{}).map(Number).filter(Boolean); const minNgn = allNgn.length ? Math.min(...allNgn) : (ngn||0); return minNgn ? `<span class="price-ngn" id="pngn-${p.id}">${isEnquireOnly ? '' : 'from '}${fmt(minNgn)}</span><span class="price-local" id="plocal-${p.id}" style="display:none"></span>` : ''; })() }
+          ${ (() => { if (isEnquireOnly) return ''; const allNgn = Object.values(p.priceNgn||{}).map(Number).filter(Boolean); const minNgn = allNgn.length ? Math.min(...allNgn) : (ngn||0); return minNgn ? `<span class="price-ngn" id="pngn-${p.id}">from ${fmt(minNgn)}</span><span class="price-local" id="plocal-${p.id}" style="display:none"></span>` : ''; })() }
         </div>
         ${actionHtml}
       </div>
@@ -9898,54 +9855,6 @@ function filterPrintEdition(edition) {
 }
 
 /* ─── Interest form ─── */
-(function() {
-  const overlay = document.getElementById('interestOverlay');
-  const closeBtn = document.getElementById('interestClose');
-  if (!overlay) return;
-
-  window.openInterestForm = function(pid, name) {
-    const pieceEl = document.getElementById('interestPieceName');
-    if (pieceEl) pieceEl.textContent = '— ' + name;
-    overlay._pid = pid;
-    overlay._pname = name;
-    document.getElementById('interestFormBody').style.display = '';
-    document.getElementById('interestDone').style.display = 'none';
-    document.getElementById('interestName').value = '';
-    document.getElementById('interestEmail').value = '';
-    document.getElementById('interestMsg').value = '';
-    overlay.classList.add('show');
-  };
-
-  function closeInterest() { overlay.classList.remove('show'); }
-  if (closeBtn) closeBtn.addEventListener('click', closeInterest);
-  overlay.addEventListener('click', e => { if (e.target === overlay) closeInterest(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInterest(); });
-
-  const sendBtn = document.getElementById('interestSend');
-  if (sendBtn) sendBtn.addEventListener('click', async () => {
-    const name  = document.getElementById('interestName').value.trim();
-    const email = document.getElementById('interestEmail').value.trim();
-    const msg   = document.getElementById('interestMsg').value.trim();
-    if (!name)  { showToast('Please enter your name'); return; }
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Please enter a valid email'); return; }
-    sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
-    try {
-      await fetch('/api/site-form', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          form_type: 'interest-1of1',
-          name, email,
-          artwork: overlay._pname,
-          message: msg,
-        }),
-      });
-    } catch(_) {}
-    document.getElementById('interestFormBody').style.display = 'none';
-    document.getElementById('interestDone').style.display = '';
-    sendBtn.disabled = false; sendBtn.textContent = 'Send interest →';
-  });
-})();
-
 /* ─── FAQ accordion ─── */
 document.querySelectorAll('.faq-q').forEach(q => {
   q.addEventListener('click', () => q.closest('.faq-item').classList.toggle('open'));
