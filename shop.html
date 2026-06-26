@@ -146,15 +146,81 @@ body.dark nav.scrolled .nav-logo { color: #e0c8a8; }
   transition: opacity 0.2s, color 0.4s, text-shadow 0.4s;
 }
 .nav-links a:hover, .nav-links a.active { opacity: 1; color: var(--rust); }
-.currency-toggle {
-  font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.14em;
-  text-transform: uppercase; padding: 0.3rem 0.7rem;
-  border: 1px solid var(--border); border-radius: 20px;
+.currency-selector { position: relative; }
+.currency-selector-btn {
+  font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.1em;
+  display: flex; align-items: center; gap: 0.3rem;
+  padding: 0.3rem 0.7rem; border: 1px solid var(--border); border-radius: 20px;
   background: none; color: var(--text-muted); cursor: pointer;
   transition: border-color 0.2s, color 0.2s; white-space: nowrap;
 }
-.currency-toggle:hover { border-color: var(--clay); color: var(--clay); }
-.currency-toggle.active { border-color: var(--clay); color: var(--clay); background: rgba(196,132,90,0.08); }
+.currency-selector-btn:hover { border-color: var(--clay); color: var(--clay); }
+.currency-dropdown {
+  position: absolute; top: calc(100% + 6px); right: 0;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; min-width: 200px; z-index: 200;
+  box-shadow: 0 8px 24px rgba(74,50,40,0.12); overflow: hidden;
+}
+.currency-option {
+  padding: 0.65rem 1rem; font-family: 'Crimson Pro', serif; font-size: 0.88rem;
+  color: var(--text); cursor: pointer; transition: background 0.15s;
+}
+.currency-option:hover { background: var(--bg-alt); }
+.currency-option.active { color: var(--clay); font-weight: 600; }
+/* Locale modal */
+.locale-modal-overlay {
+  position: fixed; inset: 0; z-index: 8000;
+  background: rgba(0,0,0,0.4); backdrop-filter: blur(2px);
+}
+.locale-modal {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  z-index: 8001; background: var(--bg-card);
+  border-radius: 16px; width: min(520px, 92vw);
+  max-height: 85vh; display: flex; flex-direction: column;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.2);
+  overflow: hidden;
+}
+.locale-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.locale-modal-title {
+  font-family: 'Cormorant Garamond', serif; font-size: 1.2rem;
+  font-weight: 400; color: var(--text); margin: 0;
+}
+.locale-modal-close {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  width: 30px; height: 30px; cursor: pointer; color: var(--text-muted);
+  font-size: 0.9rem; display: flex; align-items: center; justify-content: center;
+}
+.locale-modal-body { padding: 1.2rem 1.5rem; overflow-y: auto; flex: 1; }
+.locale-current {
+  font-family: 'Crimson Pro', serif; font-size: 1rem;
+  color: var(--text); line-height: 1.6; margin-bottom: 1rem;
+}
+.locale-current span { font-size: 0.82rem; color: var(--clay); }
+.locale-search-wrap {
+  display: flex; align-items: center; gap: 0.6rem;
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 0.6rem 0.9rem; margin-bottom: 1rem;
+}
+.locale-search-icon { font-size: 0.9rem; opacity: 0.5; }
+.locale-search {
+  border: none; background: none; outline: none; flex: 1;
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem; color: var(--text);
+}
+.locale-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.65rem 0.5rem; border-bottom: 0.5px solid var(--border);
+  cursor: pointer; transition: background 0.15s; border-radius: 6px;
+}
+.locale-item:hover { background: var(--bg-alt); }
+.locale-item.active { color: var(--clay); }
+.locale-item-left { display: flex; align-items: center; gap: 0.6rem; font-family: 'Crimson Pro', serif; font-size: 0.95rem; }
+.locale-item-flag { font-size: 1.1rem; }
+.locale-item-right { font-family: 'Montserrat', sans-serif; font-size: 0.7rem; font-weight: 500; color: var(--text-muted); }
+.locale-item.active .locale-item-right { color: var(--clay); }
 .price-local {
   font-family: 'Montserrat', sans-serif;
   font-size: 0.62rem; font-weight: 500;
@@ -2573,7 +2639,13 @@ body.dark { --text-muted: #b3a392; }
       <a href="/#commissions">Commissions</a>
       <a href="/#about">About the artist</a>
       <a href="/order-status">Track order</a>
-      <button class="currency-toggle" id="currencyToggle" style="display:none" title="Switch currency">₦</button>
+      <div class="currency-selector" id="currencySelector" style="position:relative">
+        <button class="currency-selector-btn" id="currencySelectorBtn" onclick="openLocaleModal()">
+          <span id="currencyFlag"><img src="https://flagcdn.com/16x12/ng.png" width="16" height="12" style="border-radius:2px;vertical-align:middle" alt=""/></span>
+          <span id="currencyCode">NGN</span>
+          <span style="font-size:0.6rem;opacity:0.6">▾</span>
+        </button>
+      </div>
     </div>
     <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle theme">&#x2600;&#xFE0E;</button>
     <button class="nav-cart" id="cartBtn" type="button" aria-label="Open cart">
@@ -2590,7 +2662,13 @@ body.dark { --text-muted: #b3a392; }
   <a href="/#commissions">Commissions</a>
   <a href="/#about">About the artist</a>
   <a href="/order-status">Track order</a>
-  <button class="currency-toggle" id="currencyToggleMobile" style="display:none;margin-top:0.4rem" title="Switch currency">₦</button>
+  <div class="currency-selector" id="currencySelectorMobile" style="margin-top:0.5rem">
+    <button class="currency-selector-btn" id="currencySelectorBtnMobile" onclick="openLocaleModal()">
+      <span id="currencyFlagMobile"><img src="https://flagcdn.com/16x12/ng.png" width="16" height="12" style="border-radius:2px;vertical-align:middle" alt=""/></span>
+      <span id="currencyCodeMobile">NGN</span>
+      <span style="font-size:0.6rem;opacity:0.6">▾</span>
+    </button>
+  </div>
 </div>
 
 <!-- Hero - full-bleed cinematic -->
@@ -3767,10 +3845,13 @@ let SHOP_RATE = 1600;
 const FLW_PUBLIC_KEY = 'FLWPUBK-e4b3851eb2d1a65a71d4c683e6d4c627-X';
 
 // ── Visitor currency detection & toggle ──────────────────────────────────────
-let _visitorCurrency = null;  // e.g. 'USD', 'GBP', 'EUR'
-let _visitorSymbol   = null;  // e.g. '$', '£', '€'
+let _visitorCurrency = null;  // detected currency code e.g. 'GBP'
+let _visitorSymbol   = null;  // e.g. '£'
 let _visitorRate     = null;  // units of visitor currency per 1 NGN
+let _visitorFlag     = '🇳🇬';
+let _visitorLabel    = '';
 let _showLocalCurrency = false;
+let _activeCurrency  = 'NGN'; // currently displayed currency
 
 const CURRENCY_SYMBOLS = {
   USD:'$', EUR:'€', GBP:'£', CAD:'CA$', AUD:'A$', JPY:'¥', CNY:'¥',
@@ -3784,59 +3865,341 @@ const CURRENCY_SYMBOLS = {
   CLP:'CL$', COP:'CO$', PEN:'S/', ARS:'AR$', UYU:'$U',
 };
 
-async function detectVisitorCurrency() {
-  try {
-    // Allow ?currency=USD (or any code) to preview the toggle locally
-    const forceCurrency = new URLSearchParams(location.search).get('currency');
-    const geo = forceCurrency ? { currency: forceCurrency } : await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(4000) }).then(r => r.json());
-    const d = geo;
-    const currency = d.currency;
-    if (!currency || currency === 'NGN') return; // already in NGN, no toggle needed
-    _visitorCurrency = currency;
-    _visitorSymbol = CURRENCY_SYMBOLS[currency] || currency + ' ';
-    // Fetch exchange rate: NGN → visitor currency
-    // We know NGN/USD from SHOP_RATE; use that as bridge
-    const rateRes = await fetch(`https://open.er-api.com/v6/latest/NGN`, { signal: AbortSignal.timeout(5000) });
-    const rateData = await rateRes.json();
-    if (rateData && rateData.rates && rateData.rates[currency]) {
-      _visitorRate = rateData.rates[currency]; // e.g. 0.00063 for USD
-      showCurrencyToggle();
-    }
-  } catch(e) { /* silently fail — prices stay in NGN */ }
+const CURRENCY_FLAGS = {
+  USD:'🇺🇸', EUR:'🇪🇺', GBP:'🇬🇧', CAD:'🇨🇦', AUD:'🇦🇺', JPY:'🇯🇵',
+  GHS:'🇬🇭', KES:'🇰🇪', ZAR:'🇿🇦', EGP:'🇪🇬', SGD:'🇸🇬', AED:'🇦🇪',
+  INR:'🇮🇳', BRL:'🇧🇷', MXN:'🇲🇽', CNY:'🇨🇳', CHF:'🇨🇭', SEK:'🇸🇪',
+  NOK:'🇳🇴', DKK:'🇩🇰', NZD:'🇳🇿', HKD:'🇭🇰', TWD:'🇹🇼', KRW:'🇰🇷',
+  TRY:'🇹🇷', PLN:'🇵🇱', SAR:'🇸🇦', QAR:'🇶🇦', MAD:'🇲🇦',
+};
+
+const CURRENCY_NAMES = {
+  USD:'US Dollar', EUR:'Euro', GBP:'British Pound', CAD:'Canadian Dollar',
+  AUD:'Australian Dollar', JPY:'Japanese Yen', GHS:'Ghanaian Cedi',
+  KES:'Kenyan Shilling', ZAR:'South African Rand', AED:'UAE Dirham',
+  INR:'Indian Rupee', SGD:'Singapore Dollar', CHF:'Swiss Franc',
+  NOK:'Norwegian Krone', SEK:'Swedish Krona', DKK:'Danish Krone',
+  NZD:'New Zealand Dollar', MXN:'Mexican Peso', BRL:'Brazilian Real',
+};
+
+// All supported currencies for the dropdown
+const ALL_CURRENCIES = [
+  { code:'NGN', flag:'🇳🇬', name:'Nigerian Naira' },
+  { code:'USD', flag:'🇺🇸', name:'US Dollar' },
+  { code:'GBP', flag:'🇬🇧', name:'British Pound' },
+  { code:'EUR', flag:'🇪🇺', name:'Euro' },
+  { code:'CAD', flag:'🇨🇦', name:'Canadian Dollar' },
+  { code:'AUD', flag:'🇦🇺', name:'Australian Dollar' },
+  { code:'GHS', flag:'🇬🇭', name:'Ghanaian Cedi' },
+  { code:'KES', flag:'🇰🇪', name:'Kenyan Shilling' },
+  { code:'ZAR', flag:'🇿🇦', name:'South African Rand' },
+  { code:'AED', flag:'🇦🇪', name:'UAE Dirham' },
+  { code:'INR', flag:'🇮🇳', name:'Indian Rupee' },
+  { code:'SGD', flag:'🇸🇬', name:'Singapore Dollar' },
+  { code:'JPY', flag:'🇯🇵', name:'Japanese Yen' },
+  { code:'CHF', flag:'🇨🇭', name:'Swiss Franc' },
+  { code:'NOK', flag:'🇳🇴', name:'Norwegian Krone' },
+  { code:'NZD', flag:'🇳🇿', name:'New Zealand Dollar' },
+];
+
+let _allRates = {}; // NGN-based rates for all currencies
+
+// Full world country-currency list — compact tuples [country, flag, code, symbol, name]
+// Loaded lazily (only parsed when modal opens), rendered virtually (only visible rows in DOM)
+const _LCD=[
+['Nigeria','ng','NGN','₦','Nigerian Naira'],
+['Afghanistan','af','AFN','؋','Afghan Afghani'],
+['Albania','al','ALL','L','Albanian Lek'],
+['Algeria','dz','DZD','دج','Algerian Dinar'],
+['Angola','ao','AOA','Kz','Angolan Kwanza'],
+['Argentina','ar','ARS','$','Argentine Peso'],
+['Armenia','am','AMD','֏','Armenian Dram'],
+['Australia','au','AUD','A$','Australian Dollar'],
+['Austria','at','EUR','€','Euro'],
+['Azerbaijan','az','AZN','₼','Azerbaijani Manat'],
+['Bahrain','bh','BHD','.د.ب','Bahraini Dinar'],
+['Bangladesh','bd','BDT','৳','Bangladeshi Taka'],
+['Belarus','by','BYN','Br','Belarusian Ruble'],
+['Belgium','be','EUR','€','Euro'],
+['Belize','bz','BZD','BZ$','Belize Dollar'],
+['Bolivia','bo','BOB','Bs','Bolivian Boliviano'],
+['Bosnia','ba','BAM','KM','Bosnia Mark'],
+['Botswana','bw','BWP','P','Botswana Pula'],
+['Brazil','br','BRL','R$','Brazilian Real'],
+['Brunei','bn','BND','B$','Brunei Dollar'],
+['Bulgaria','bg','BGN','лв','Bulgarian Lev'],
+['Cambodia','kh','KHR','₭','Cambodian Riel'],
+['Cameroon','cm','XAF','CFA','CFA Franc'],
+['Canada','ca','CAD','CA$','Canadian Dollar'],
+['Chile','cl','CLP','CL$','Chilean Peso'],
+['China','cn','CNY','¥','Chinese Yuan'],
+['Colombia','co','COP','CO$','Colombian Peso'],
+['Costa Rica','cr','CRC','₡','Costa Rican Colón'],
+['Croatia','hr','EUR','€','Euro'],
+['Cuba','cu','CUP','$','Cuban Peso'],
+['Czech Republic','cz','CZK','Kč','Czech Koruna'],
+['Denmark','dk','DKK','kr','Danish Krone'],
+['Dominican Republic','do','DOP','RD$','Dominican Peso'],
+['Ecuador','ec','USD','$','US Dollar'],
+['Egypt','eg','EGP','E£','Egyptian Pound'],
+['El Salvador','sv','USD','$','US Dollar'],
+['Estonia','ee','EUR','€','Euro'],
+['Ethiopia','et','ETB','Br','Ethiopian Birr'],
+['European Union','eu','EUR','€','Euro'],
+['Finland','fi','EUR','€','Euro'],
+['France','fr','EUR','€','Euro'],
+['Georgia','ge','GEL','₾','Georgian Lari'],
+['Germany','de','EUR','€','Euro'],
+['Ghana','gh','GHS','₵','Ghanaian Cedi'],
+['Greece','gr','EUR','€','Euro'],
+['Guatemala','gt','GTQ','Q','Guatemalan Quetzal'],
+['Honduras','hn','HNL','L','Honduran Lempira'],
+['Hong Kong','hk','HKD','HK$','Hong Kong Dollar'],
+['Hungary','hu','HUF','Ft','Hungarian Forint'],
+['Iceland','is','ISK','kr','Icelandic Króna'],
+['India','in','INR','₹','Indian Rupee'],
+['Indonesia','id','IDR','Rp','Indonesian Rupiah'],
+['Iran','ir','IRR','﷼','Iranian Rial'],
+['Iraq','iq','IQD','ع.د','Iraqi Dinar'],
+['Ireland','ie','EUR','€','Euro'],
+['Israel','il','ILS','₪','Israeli Shekel'],
+['Italy','it','EUR','€','Euro'],
+['Ivory Coast','ci','XOF','CFA','CFA Franc'],
+['Jamaica','jm','JMD','J$','Jamaican Dollar'],
+['Japan','jp','JPY','¥','Japanese Yen'],
+['Jordan','jo','JOD','JD','Jordanian Dinar'],
+['Kazakhstan','kz','KZT','₸','Kazakhstani Tenge'],
+['Kenya','ke','KES','KSh','Kenyan Shilling'],
+['Kuwait','kw','KWD','KD','Kuwaiti Dinar'],
+['Kyrgyzstan','kg','KGS','лв','Kyrgyzstani Som'],
+['Latvia','lv','EUR','€','Euro'],
+['Lebanon','lb','LBP','ل.ل','Lebanese Pound'],
+['Libya','ly','LYD','ل.د','Libyan Dinar'],
+['Lithuania','lt','EUR','€','Euro'],
+['Luxembourg','lu','EUR','€','Euro'],
+['Malaysia','my','MYR','RM','Malaysian Ringgit'],
+['Maldives','mv','MVR','Rf','Maldivian Rufiyaa'],
+['Malta','mt','EUR','€','Euro'],
+['Mexico','mx','MXN','MX$','Mexican Peso'],
+['Moldova','md','MDL','L','Moldovan Leu'],
+['Morocco','ma','MAD','MAD','Moroccan Dirham'],
+['Mozambique','mz','MZN','MT','Mozambican Metical'],
+['Myanmar','mm','MMK','K','Myanmar Kyat'],
+['Namibia','na','NAD','N$','Namibian Dollar'],
+['Nepal','np','NPR','₨','Nepalese Rupee'],
+['Netherlands','nl','EUR','€','Euro'],
+['New Zealand','nz','NZD','NZ$','New Zealand Dollar'],
+['Nicaragua','ni','NIO','C$','Nicaraguan Córdoba'],
+['North Macedonia','mk','MKD','ден','Macedonian Denar'],
+['Norway','no','NOK','kr','Norwegian Krone'],
+['Oman','om','OMR','﷼','Omani Rial'],
+['Pakistan','pk','PKR','₨','Pakistani Rupee'],
+['Panama','pa','PAB','B/.','Panamanian Balboa'],
+['Paraguay','py','PYG','₲','Paraguayan Guaraní'],
+['Peru','pe','PEN','S/','Peruvian Sol'],
+['Philippines','ph','PHP','₱','Philippine Peso'],
+['Poland','pl','PLN','zł','Polish Zloty'],
+['Portugal','pt','EUR','€','Euro'],
+['Qatar','qa','QAR','﷼','Qatari Riyal'],
+['Romania','ro','RON','lei','Romanian Leu'],
+['Russia','ru','RUB','₽','Russian Ruble'],
+['Rwanda','rw','RWF','RF','Rwandan Franc'],
+['Saudi Arabia','sa','SAR','﷼','Saudi Riyal'],
+['Senegal','sn','XOF','CFA','CFA Franc'],
+['Serbia','rs','RSD','дин','Serbian Dinar'],
+['Singapore','sg','SGD','S$','Singapore Dollar'],
+['Somalia','so','SOS','Sh','Somali Shilling'],
+['South Africa','za','ZAR','R','South African Rand'],
+['South Korea','kr','KRW','₩','South Korean Won'],
+['Spain','es','EUR','€','Euro'],
+['Sri Lanka','lk','LKR','Rs','Sri Lankan Rupee'],
+['Sudan','sd','SDG','ج.س','Sudanese Pound'],
+['Sweden','se','SEK','kr','Swedish Krona'],
+['Switzerland','ch','CHF','CHF','Swiss Franc'],
+['Taiwan','tw','TWD','NT$','Taiwan Dollar'],
+['Tanzania','tz','TZS','TSh','Tanzanian Shilling'],
+['Thailand','th','THB','฿','Thai Baht'],
+['Trinidad & Tobago','tt','TTD','TT$','Trinidad Dollar'],
+['Tunisia','tn','TND','د.ت','Tunisian Dinar'],
+['Turkey','tr','TRY','₺','Turkish Lira'],
+['Uganda','ug','UGX','USh','Ugandan Shilling'],
+['Ukraine','ua','UAH','₴','Ukrainian Hryvnia'],
+['United Arab Emirates','ae','AED','د.إ','UAE Dirham'],
+['United Kingdom','gb','GBP','£','British Pound'],
+['United States','us','USD','$','US Dollar'],
+['Uruguay','uy','UYU','$U','Uruguayan Peso'],
+['Uzbekistan','uz','UZS','лв','Uzbekistani Som'],
+['Venezuela','ve','VES','Bs.S','Venezuelan Bolívar'],
+['Vietnam','vn','VND','₫','Vietnamese Dong'],
+['Zambia','zm','ZMW','ZK','Zambian Kwacha'],
+['Zimbabwe','zw','ZWL','Z$','Zimbabwean Dollar'],
+];
+// Lazy-parsed full list — only converted to objects when modal opens
+let _localeCountries = null;
+function getLocaleCountries() {
+  if (!_localeCountries) {
+    _localeCountries = _LCD.map(r => ({country:r[0],flag:r[1],code:r[2],symbol:r[3],name:r[4]}));
+  }
+  return _localeCountries;
+}
+const ALL_LOCALE_COUNTRIES = {find: fn => getLocaleCountries().find(fn)}; // compat shim
+
+let _localeFilter = '';
+
+function buildCurrencyDropdown(detectedCode) {
+  // Keep ALL_CURRENCIES list in sync (used by old toggle path)
+  renderLocaleList(detectedCode || 'NGN');
 }
 
-function showCurrencyToggle() {
-  const btn  = document.getElementById('currencyToggle');
-  const btnM = document.getElementById('currencyToggleMobile');
-  if (btn)  { btn.style.display  = ''; btn.textContent = '₦ / ' + (_visitorSymbol || _visitorCurrency); }
-  if (btnM) { btnM.style.display = ''; btnM.textContent = '₦ / ' + (_visitorSymbol || _visitorCurrency); }
+function renderLocaleList(activeCurrency) {
+  const list = document.getElementById('localeList');
+  if (!list) return;
+  const q = _localeFilter.toLowerCase();
+  const filtered = getLocaleCountries().filter(c =>
+    !q || c.country.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
+  );
+  // Virtual render — cap at 80 visible items for performance, search narrows it
+  const visible = filtered.slice(0, 80);
+  list.innerHTML = visible.map(c => {
+    const flagImg = c.flag && c.flag.length === 2
+      ? `<img src="https://flagcdn.com/16x12/${c.flag}.png" width="16" height="12" alt="${c.country}" style="border-radius:2px;vertical-align:middle"/>`
+      : `<span>${c.flag||'🌍'}</span>`;
+    return `<div class="locale-item${c.code === (activeCurrency || _activeCurrency) ? ' active' : ''}" onclick="setCurrency('${c.code}');closeLocaleModal()">
+      <div class="locale-item-left">
+        <span class="locale-item-flag">${flagImg}</span>
+        <span>${c.country}</span>
+      </div>
+      <div class="locale-item-right">${c.code} ${c.symbol}</div>
+    </div>`;
+  }).join('');
+}
+
+function openLocaleModal() {
+  _localeFilter = '';
+  const search = document.getElementById('localeSearch');
+  if (search) search.value = '';
+  renderLocaleList(_activeCurrency);
+  // Update current label
+  const curr = getLocaleCountries().find(c => c.code === _activeCurrency) || getLocaleCountries()[0];
+  const el = document.getElementById('localeCurrent');
+  const modalFlagHtml = curr.flag && curr.flag.length === 2
+    ? `<img src="https://flagcdn.com/20x15/${curr.flag}.png" width="20" height="15" style="border-radius:2px;vertical-align:middle;margin-right:4px" alt=""/>`
+    : curr.flag || '';
+  if (el) el.innerHTML = `${modalFlagHtml} ${curr.country} | ${curr.code} ${curr.symbol}<br><span>You are currently viewing prices in ${curr.code} ${curr.symbol}.</span>`;
+  document.getElementById('localeModalOverlay').style.display = '';
+  document.getElementById('localeModal').style.display = '';
+  document.body.style.overflow = 'hidden';
+  if (search) setTimeout(() => search.focus(), 100);
+}
+
+function closeLocaleModal() {
+  document.getElementById('localeModalOverlay').style.display = 'none';
+  document.getElementById('localeModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function filterLocale(q) {
+  _localeFilter = q;
+  renderLocaleList(_activeCurrency);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeLocaleModal();
+});
+
+async function detectVisitorCurrency() {
+  try {
+    // Fetch all rates in one call
+    const rateRes = await fetch('https://open.er-api.com/v6/latest/NGN', { signal: AbortSignal.timeout(5000) });
+    const rateData = await rateRes.json();
+    if (rateData?.rates) _allRates = rateData.rates;
+
+    // Detect visitor location
+    const forceCurrency = new URLSearchParams(location.search).get('currency');
+    const geo = forceCurrency
+      ? { currency: forceCurrency }
+      : await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(4000) }).then(r => r.json());
+    const detected = geo.currency || 'NGN';
+
+    // Build full dropdown for everyone
+    buildCurrencyDropdown(detected);
+
+    // Auto-apply detected currency
+    setCurrency(detected);
+  } catch(e) {
+    // On failure still build dropdown with NGN selected
+    buildCurrencyDropdown('NGN');
+  }
+}
+
+function initCurrencySelector() {
+  // Fallback if detectVisitorCurrency hasn't built dropdown yet
+  if (document.querySelector('#currencyDropdown .currency-option')) return;
+  buildCurrencyDropdown('NGN');
+}
+
+
+
+function setCurrency(code) {
+  // Close dropdowns
+  ['currencyDropdown','currencyDropdownMobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+
+  const curr = getLocaleCountries().find(c => c.code === code) || getLocaleCountries()[0];
+
+  if (code === 'NGN') {
+    _showLocalCurrency = false;
+    _activeCurrency = 'NGN';
+    _visitorRate = null;
+    _visitorSymbol = null;
+  } else {
+    const rate = _allRates[code];
+    if (!rate) return;
+    _showLocalCurrency = true;
+    _activeCurrency = code;
+    _visitorCurrency = code;
+    _visitorSymbol   = CURRENCY_SYMBOLS[code] || code + ' ';
+    _visitorFlag     = curr.flag;
+    _visitorLabel    = curr.name;
+    _visitorRate     = rate;
+  }
+
+  // Update selector button
+  const flagHtml = curr.flag && curr.flag.length === 2
+    ? `<img src="https://flagcdn.com/16x12/${curr.flag}.png" width="16" height="12" style="border-radius:2px;vertical-align:middle" alt="${curr.country}"/>`
+    : curr.flag || '';
+  [['currencyFlag','currencyCode'],['currencyFlagMobile','currencyCodeMobile']].forEach(([fId,cId]) => {
+    const fEl = document.getElementById(fId);
+    const cEl = document.getElementById(cId);
+    if (fEl) fEl.innerHTML = flagHtml;
+    if (cEl) cEl.textContent = code;
+  });
+
+  // Mark active in dropdown
+  ['currencyDropdown','currencyDropdownMobile'].forEach(id => {
+    const dd = document.getElementById(id);
+    if (!dd) return;
+    dd.querySelectorAll('.currency-option').forEach(el => {
+      el.classList.toggle('active', el.textContent.includes(code));
+    });
+  });
+
+  refreshAllPrices();
+  renderCheckoutSummary();
 }
 
 function fmtLocal(ngn) {
   if (!_visitorRate || !_visitorSymbol) return '';
   const amount = ngn * _visitorRate;
-  // Format sensibly based on magnitude
   const formatted = amount >= 100
     ? Math.round(amount).toLocaleString()
-    : amount >= 1
-      ? amount.toFixed(2)
-      : amount.toFixed(3);
-  return '~' + _visitorSymbol + formatted;
+    : amount >= 1 ? amount.toFixed(2) : amount.toFixed(3);
+  return _visitorSymbol + formatted;
 }
 
-function toggleCurrency() {
-  if (!_visitorRate) return;
-  _showLocalCurrency = !_showLocalCurrency;
-  const btn  = document.getElementById('currencyToggle');
-  const btnM = document.getElementById('currencyToggleMobile');
-  const label = _showLocalCurrency
-    ? (_visitorSymbol || _visitorCurrency) + ' / ₦'
-    : '₦ / ' + (_visitorSymbol || _visitorCurrency);
-  if (btn)  { btn.textContent = label; btn.classList.toggle('active', _showLocalCurrency); }
-  if (btnM) { btnM.textContent = label; btnM.classList.toggle('active', _showLocalCurrency); }
-  refreshAllPrices();
-  renderCheckoutSummary(); // refresh checkout summary if open
-}
+function toggleCurrency() { setCurrency(_showLocalCurrency ? 'NGN' : 'local'); }
 
 function refreshAllPrices() {
   // Re-render all visible product cards' prices
@@ -9700,7 +10063,7 @@ loadShopData()
   .then(maybeOpenCheckoutFromHash)
   .catch(maybeOpenCheckoutFromHash)
   .finally(finalizeReturnedGatewayCheckout);
-detectVisitorCurrency();
+detectVisitorCurrency().finally(initCurrencySelector);
 
 /* ─── Footer newsletter subscribe ─── */
 (function(){
@@ -9758,6 +10121,23 @@ detectVisitorCurrency();
 })();
 </script>
 <!-- ════════ END SHOP LOADING BAR ════════ -->
+
+<!-- Locale / currency modal -->
+<div class="locale-modal-overlay" id="localeModalOverlay" onclick="closeLocaleModal()" style="display:none"></div>
+<div class="locale-modal" id="localeModal" style="display:none">
+  <div class="locale-modal-header">
+    <h2 class="locale-modal-title">Localization options</h2>
+    <button class="locale-modal-close" onclick="closeLocaleModal()">✕</button>
+  </div>
+  <div class="locale-modal-body">
+    <p class="locale-current" id="localeCurrent">🇳🇬 Nigeria | NGN ₦<br><span>You are currently viewing prices in NGN ₦.</span></p>
+    <div class="locale-search-wrap">
+      <span class="locale-search-icon">🔍</span>
+      <input class="locale-search" id="localeSearch" type="text" placeholder="Search country or currency..." oninput="filterLocale(this.value)" autocomplete="off"/>
+    </div>
+    <div class="locale-list" id="localeList"></div>
+  </div>
+</div>
 
 <!-- ════════ DIAGNOSTIC PANEL — TEMPORARY, remove this whole block once stable ════════ -->
 <div id="shopDiag" style="position:fixed;left:0;right:0;bottom:0;z-index:99999;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:1.4;color:#e8d5b0;background:rgba(30,21,16,0.97);border-top:2px solid #c4845a;max-height:45vh;overflow:auto;display:none;">
