@@ -1021,6 +1021,30 @@ footer a:hover { color:var(--rust); }
 const slug = location.pathname.replace(/^\/shop\//, '').replace(/\/$/, '');
 function fmt(n)    { return '₦' + Number(n).toLocaleString('en-NG'); }
 function fmtUsd(n) { return '$' + Number(n).toFixed(0); }
+
+// Sizes that ship rolled in a tube rather than flat
+const TUBE_SHIP_SIZES = ['12x16','12x18','16x20','18x24','24x30','24x36','30x40'];
+function shipsInTube(variantKey, product) {
+  if (!variantKey && product?.is_large_print) return true;
+  if (!variantKey) return false;
+  const size = String(variantKey).split('|').pop()
+    .replace(/["""'']/g,'').replace(/×/g,'x').replace(/\s/g,'').toLowerCase();
+  // Check against known large sizes
+  if (TUBE_SHIP_SIZES.some(s => size.includes(s))) return true;
+  // Also check by dimension — anything where max dimension > 17 inches
+  const match = size.match(/(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)/);
+  if (match) {
+    const maxDim = Math.max(parseFloat(match[1]), parseFloat(match[2]));
+    if (maxDim > 17) return true;
+  }
+  return product?.is_large_print || false;
+}
+
+function shippingMethodLabel(variantKey, product) {
+  return shipsInTube(variantKey, product)
+    ? 'Rolled in protective archival tube'
+    : 'Flat-packed in rigid board mailer';
+}
 // Local currency support — reads from shop.html's currency system if in same session
 // Falls back to NGN display if not available
 function fmtLocal(ngn) {
@@ -1053,14 +1077,17 @@ function applyLocalCurrencyToDetail(p) {
   if (!activeCurrency || activeCurrency === 'NGN') return;
   const priceNgnEl = document.getElementById('priceNgn');
   const priceUsdEl = document.getElementById('priceUsd');
-  if (!priceNgnEl) return;
-  // Get the base NGN price
-  const allNgn = (p ? printOptions.flatMap(o => (o.sizes||[]).map(s => printPrice(p, printOptionKey(o.type,s),'ngn'))).filter(Boolean) : []);
-  const baseNgn = _selectedVariant ? printPrice(p, _selectedVariant, 'ngn') : (allNgn.length ? Math.min(...allNgn) : 0);
+  if (!priceNgnEl || !p) return;
+  // Get all NGN prices across all variants
+  const allNgn = Object.values(p.prices_ngn || {}).map(Number).filter(Boolean);
+  const baseNgn = _selectedVariant
+    ? (printPrice(p, _selectedVariant, 'ngn') || 0)
+    : (allNgn.length ? Math.min(...allNgn) : 0);
   if (!baseNgn) return;
   const localPrice = fmtLocal(baseNgn);
   if (!localPrice) return;
-  priceNgnEl.textContent = (_selectedVariant ? '' : 'from ') + localPrice;
+  const hasMultiple = allNgn.length > 1 && !_selectedVariant;
+  priceNgnEl.textContent = (hasMultiple ? 'from ' : '') + localPrice;
   priceNgnEl.style.color = 'var(--gold)';
   if (priceUsdEl) priceUsdEl.style.display = 'none';
 }
@@ -1171,7 +1198,7 @@ function buildSpecRows(p, selectedType) {
   if (opt && opt.type) rows.push(['Print type', opt.type]);
   if (opt) rows.push(['Edition', opt.limited ? 'Limited edition' : 'Open edition']);
   if (p.medium) rows.push(['Medium', p.medium]);
-  rows.push(['Packaging', p.is_large_print ? 'Rolled in protective archival tube' : 'Flat-packed in rigid board mailer']);
+  rows.push(['Packaging', shippingMethodLabel(_selectedVariant, p)]);
   rows.push(['Signed', p.signed ? 'Yes, hand signed by Kay' : 'Open edition']);
   return rows
     .filter(r => r[1])
@@ -1620,7 +1647,7 @@ function renderProduct(p) {
           })()}
           <p class="shipping-note">
             Ships from Nigeria via GIG Logistics (domestic) or DHL / UPS (international).
-            ${p.is_large_print ? ' This piece ships rolled in an archival tube.' : ' Ships flat in a rigid board mailer.'}
+            <span id="shipMethodNote">${shipsInTube(_selectedVariant, p) ? 'Ships rolled in an archival tube.' : 'Ships flat in a rigid board mailer.'}</span>
           </p>
         </div>
 
@@ -1758,16 +1785,15 @@ function selectMerchVariant(label) {
     c.classList.toggle('selected', c.dataset.v === label));
   const ngn = printPrice(_product, label, 'ngn');
   const usd = printPrice(_product, label, 'usd');
-  document.getElementById('priceNgn').textContent = fmt(ngn);
-  const _localPrice = fmtLocal(ngn);
   const priceNgnEl = document.getElementById('priceNgn');
   const priceUsdEl = document.getElementById('priceUsd');
+  const _localPrice = fmtLocal(ngn);
   if (_localPrice && getActiveRate() && getActiveRate() !== 'NGN') {
     if (priceNgnEl) { priceNgnEl.textContent = _localPrice; priceNgnEl.style.color = 'var(--gold)'; }
     if (priceUsdEl) priceUsdEl.style.display = 'none';
   } else {
-    if (priceNgnEl) { priceNgnEl.style.color = 'var(--gold)'; }
-    if (priceUsdEl) priceUsdEl.textContent = fmtUsd(usd) + ' USD';
+    if (priceNgnEl) { priceNgnEl.textContent = fmt(ngn); priceNgnEl.style.color = 'var(--gold)'; }
+    if (priceUsdEl) { priceUsdEl.textContent = fmtUsd(usd) + ' USD'; priceUsdEl.style.display = ''; }
   }
   const stock = merchStock(_product, label);
   const soldOut = stock === 0;
@@ -1853,19 +1879,25 @@ function selectSize(v) {
   document.querySelectorAll('.size-picker .size-chip').forEach(c => c.classList.toggle('selected', c.dataset.v === v));
   const ngn = printPrice(_product, v, 'ngn');
   const usd = printPrice(_product, v, 'usd');
-  document.getElementById('priceNgn').textContent = fmt(ngn);
-  const _localPrice = fmtLocal(ngn);
   const priceNgnEl = document.getElementById('priceNgn');
   const priceUsdEl = document.getElementById('priceUsd');
+  const _localPrice = fmtLocal(ngn);
   if (_localPrice && getActiveRate() && getActiveRate() !== 'NGN') {
     if (priceNgnEl) { priceNgnEl.textContent = _localPrice; priceNgnEl.style.color = 'var(--gold)'; }
     if (priceUsdEl) priceUsdEl.style.display = 'none';
   } else {
-    if (priceNgnEl) { priceNgnEl.style.color = 'var(--gold)'; }
-    if (priceUsdEl) priceUsdEl.textContent = fmtUsd(usd) + ' USD';
+    if (priceNgnEl) { priceNgnEl.textContent = fmt(ngn); priceNgnEl.style.color = 'var(--gold)'; }
+    if (priceUsdEl) { priceUsdEl.textContent = fmtUsd(usd) + ' USD'; priceUsdEl.style.display = ''; }
   }
   updateEditionState(v);
   renderSizingGuide();
+  // Update shipping method based on selected size
+  const shipNoteEl = document.getElementById('shipMethodNote');
+  if (shipNoteEl && _product) {
+    shipNoteEl.textContent = shipsInTube(v, _product)
+      ? 'Ships rolled in an archival tube.'
+      : 'Ships flat in a rigid board mailer.';
+  }
 }
 
 // Render the sizing guide SVG with the currently selected size highlighted.
