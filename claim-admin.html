@@ -1,206 +1,515 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Claim Requests Admin | Kay's Works</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Admin Queue · Kay's Works</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
-  * { box-sizing: border-box; }
-  body { margin:0; min-height:100vh; font-family: Georgia, serif; color:#e8d5b0; background:#1e1510; }
-  main { width:min(1180px, calc(100% - 28px)); margin:0 auto; padding:32px 0 52px; }
-  .top { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:24px; }
-  h1 { margin:0; font-size:clamp(2rem, 5vw, 4rem); font-weight:400; line-height:1; }
-  .label { color:#c4845a; letter-spacing:0.2em; text-transform:uppercase; font-size:0.72rem; margin-bottom:0.5rem; }
-  .card { border:1px solid rgba(201,153,58,0.28); border-radius:8px; background:rgba(42,28,20,0.82); padding:1rem; }
-  .login { max-width:420px; margin-top:22px; }
-  input, select, button, textarea { font:inherit; }
-  input, select { width:100%; border:1px solid rgba(232,213,176,0.22); background:rgba(245,237,224,0.08); color:#e8d5b0; border-radius:5px; padding:0.78rem 0.86rem; }
-  button { border:1px solid rgba(201,153,58,0.5); background:#9e4f2e; color:#f5ede0; border-radius:5px; padding:0.76rem 1rem; cursor:pointer; }
-  button.secondary { background:transparent; color:#e8d5b0; }
-  button:disabled { opacity:0.55; cursor:not-allowed; }
-  .controls { display:grid; grid-template-columns:1fr 1fr auto auto; gap:0.7rem; align-items:end; margin:20px 0; }
-  .grid { display:grid; gap:0.85rem; }
-  .item { border:1px solid rgba(232,213,176,0.14); border-radius:8px; background:rgba(0,0,0,0.16); padding:1rem; }
-  .item-head { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:0.8rem; }
-  .item-title { font-size:1.2rem; color:#f5ede0; }
-  .badge { display:inline-flex; border:1px solid rgba(201,153,58,0.42); color:#c9993a; border-radius:999px; padding:0.25rem 0.55rem; font-size:0.72rem; }
-  .fields { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0.55rem 1rem; }
-  .field span { display:block; color:#9a8070; text-transform:uppercase; letter-spacing:0.12em; font-size:0.68rem; margin-bottom:0.18rem; }
-  .field strong { color:#e8d5b0; font-weight:400; overflow-wrap:anywhere; }
-  .message { grid-column:1 / -1; white-space:pre-wrap; }
-  .actions { display:flex; flex-wrap:wrap; gap:0.55rem; margin-top:0.9rem; }
-  .status { margin-top:0.8rem; color:#c4845a; }
-  .hidden { display:none; }
-  @media (max-width:760px) {
-    .top { align-items:flex-start; flex-direction:column; }
-    .controls { grid-template-columns:1fr; }
-    .fields { grid-template-columns:1fr; }
-  }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #f5ede0;
+  --bg-card:   #fffdf9;
+  --bg-alt:    #ede0c8;
+  --text:      #2d211b;
+  --text-muted:#7a5a40;
+  --border:    rgba(90,55,30,0.14);
+  --border-accent: rgba(196,132,90,0.3);
+  --rust:      #9e4f2e;
+  --clay:      #c4845a;
+  --gold:      #c9993a;
+  --bark:      #6b3d22;
+  --green:     #4a7c59;
+  --green-bg:  rgba(74,124,89,0.08);
+  --amber:     #b8821e;
+  --amber-bg:  rgba(184,130,30,0.08);
+  --red:       #9e2e2e;
+  --red-bg:    rgba(158,46,46,0.08);
+}
+
+body {
+  font-family: 'Crimson Pro', Georgia, serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* ── Nav ── */
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 clamp(1rem,4vw,2.5rem);
+  height: 56px;
+  background: rgba(245,237,224,0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+  font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--text); text-decoration: none; font-weight: 500;
+}
+.nav-right { display: flex; align-items: center; gap: 1rem; }
+.nav-link {
+  font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--text-muted); text-decoration: none;
+  transition: color 0.2s;
+}
+.nav-link:hover { color: var(--clay); }
+
+/* ── Layout ── */
+.main {
+  width: min(1080px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2.5rem 0 4rem;
+}
+
+/* ── Login ── */
+.login-wrap {
+  max-width: 400px; margin: 4rem auto; padding: 2.4rem;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 16px; box-shadow: 0 4px 24px rgba(74,50,40,0.08);
+}
+.login-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--clay); margin-bottom: 0.4rem;
+}
+.login-title {
+  font-family: 'Cinzel', serif; font-size: 1.4rem; font-weight: 400;
+  color: var(--text); margin-bottom: 1.8rem;
+}
+.field-label {
+  display: block; font-family: 'Cinzel', serif; font-size: 0.46rem;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+.field-input {
+  width: 100%; padding: 0.72rem 0.9rem;
+  border: 1px solid var(--border-accent); border-radius: 8px;
+  background: var(--bg); color: var(--text);
+  font-family: 'Crimson Pro', serif; font-size: 1rem;
+  outline: none; transition: border-color 0.2s;
+}
+.field-input:focus { border-color: var(--clay); }
+
+/* ── Buttons ── */
+.btn {
+  font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.16em;
+  text-transform: uppercase; padding: 0.72rem 1.4rem;
+  border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+}
+.btn-primary { background: var(--rust); color: #fff; }
+.btn-primary:hover { background: var(--bark); }
+.btn-ghost { background: none; border: 1px solid var(--border-accent); color: var(--text-muted); }
+.btn-ghost:hover { border-color: var(--clay); color: var(--clay); }
+.btn-sm { font-size: 0.44rem; padding: 0.45rem 0.9rem; border-radius: 6px; }
+.btn-settle { background: var(--green-bg); color: var(--green); border: 1px solid rgba(74,124,89,0.25); }
+.btn-settle:hover { background: var(--green); color: #fff; }
+.btn-archive { background: none; border: 1px solid var(--border); color: var(--text-muted); }
+.btn-archive:hover { border-color: var(--red); color: var(--red); }
+.btn-pending { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(184,130,30,0.25); }
+.btn-pending:hover { background: var(--amber); color: #fff; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Page header ── */
+.page-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;
+}
+.page-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--clay); margin-bottom: 0.3rem;
+}
+.page-title {
+  font-family: 'Cinzel', serif; font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 400; color: var(--text);
+}
+.page-count {
+  font-family: 'Montserrat', sans-serif; font-size: 0.72rem;
+  color: var(--text-muted); font-weight: 500;
+}
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex; align-items: center; gap: 0.7rem;
+  margin-bottom: 1.6rem; flex-wrap: wrap;
+}
+.toolbar-select {
+  font-family: 'Cinzel', serif; font-size: 0.46rem; letter-spacing: 0.1em;
+  text-transform: uppercase; padding: 0.55rem 0.9rem;
+  border: 1px solid var(--border-accent); border-radius: 8px;
+  background: var(--bg-card); color: var(--text);
+  outline: none; cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a5a40' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 0.7rem center;
+  padding-right: 2rem;
+}
+.toolbar-select:focus { border-color: var(--clay); }
+.toolbar-spacer { flex: 1; }
+
+/* ── Groups ── */
+.group { margin-bottom: 2.5rem; }
+.group-header {
+  display: flex; align-items: center; gap: 0.8rem;
+  margin-bottom: 0.9rem; padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+.group-label {
+  font-family: 'Cinzel', serif; font-size: 0.52rem; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.group-pill {
+  font-family: 'Montserrat', sans-serif; font-size: 0.62rem; font-weight: 600;
+  padding: 0.15rem 0.55rem; border-radius: 99px;
+  background: var(--bg-alt); color: var(--text-muted);
+}
+
+/* ── Request cards ── */
+.req-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.2rem 1.4rem;
+  margin-bottom: 0.7rem; transition: box-shadow 0.2s;
+}
+.req-card:hover { box-shadow: 0 2px 12px rgba(74,50,40,0.08); }
+.req-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1rem; margin-bottom: 0.9rem;
+}
+.req-name { font-size: 1.1rem; font-weight: 600; color: var(--text); }
+.req-time {
+  font-family: 'Montserrat', sans-serif; font-size: 0.62rem;
+  color: var(--text-muted); margin-top: 0.15rem;
+}
+.req-badge {
+  font-family: 'Cinzel', serif; font-size: 0.44rem; letter-spacing: 0.14em;
+  text-transform: uppercase; padding: 0.3rem 0.75rem; border-radius: 99px;
+  flex-shrink: 0; border: 1px solid;
+}
+.badge-pending { color: var(--amber); border-color: rgba(184,130,30,0.3); background: var(--amber-bg); }
+.badge-settled { color: var(--green); border-color: rgba(74,124,89,0.3); background: var(--green-bg); }
+.badge-archived { color: var(--text-muted); border-color: var(--border); background: var(--bg-alt); }
+
+.req-fields {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.6rem 1.2rem; margin-bottom: 0.9rem;
+}
+.req-field-label {
+  font-family: 'Cinzel', serif; font-size: 0.44rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.15rem;
+}
+.req-field-value {
+  font-size: 0.95rem; color: var(--text); overflow-wrap: anywhere;
+}
+.req-field-wide { grid-column: 1 / -1; }
+.req-message {
+  background: var(--bg-alt); border-radius: 8px; padding: 0.8rem 1rem;
+  font-size: 0.9rem; color: var(--text); white-space: pre-wrap; line-height: 1.6;
+  margin-bottom: 0.9rem;
+}
+.req-artwork {
+  display: inline-block; font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--clay); background: rgba(196,132,90,0.1);
+  border: 1px solid var(--border-accent); border-radius: 6px;
+  padding: 0.25rem 0.65rem; margin-bottom: 0.8rem;
+}
+.req-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+/* ── Status / feedback ── */
+.status-msg {
+  font-family: 'Montserrat', sans-serif; font-size: 0.72rem;
+  color: var(--text-muted); padding: 0.5rem 0;
+}
+.empty {
+  text-align: center; padding: 3rem 1rem;
+  color: var(--text-muted); font-style: italic;
+}
+
+.hidden { display: none !important; }
+
+@media (max-width: 600px) {
+  .page-header { flex-direction: column; align-items: flex-start; }
+  .req-fields { grid-template-columns: 1fr; }
+  .req-head { flex-direction: column; gap: 0.5rem; }
+}
 </style>
 </head>
 <body>
-<main>
-  <div class="top">
-    <div>
-      <div class="label">Kay's Works</div>
-      <h1>Form Requests</h1>
+
+<nav class="nav">
+  <a href="/" class="nav-logo">Kay's Works</a>
+  <div class="nav-right">
+    <a href="/shop" class="nav-link">Shop</a>
+    <a href="/" class="nav-link">Site</a>
+  </div>
+</nav>
+
+<main class="main">
+
+  <!-- Login -->
+  <div id="loginBox">
+    <div class="login-wrap">
+      <p class="login-eyebrow">Kay's Works</p>
+      <h1 class="login-title">Admin Queue</h1>
+      <label class="field-label" for="password">Password</label>
+      <input class="field-input" type="password" id="password" placeholder="Enter admin password" autocomplete="current-password"/>
+      <div style="margin-top:1rem">
+        <button class="btn btn-primary" id="loginBtn">Load queue</button>
+      </div>
+      <p class="status-msg" id="loginStatus"></p>
     </div>
-    <a href="/" style="color:#c9993a">Back to site</a>
   </div>
 
-  <section class="card login" id="loginBox">
-    <div class="label">Admin Login</div>
-    <input type="password" id="password" placeholder="Admin password" autocomplete="current-password" />
-    <div class="actions"><button type="button" id="loginBtn">Load Requests</button></div>
-    <div class="status" id="loginStatus"></div>
-  </section>
+  <!-- Admin panel -->
+  <div id="adminBox" class="hidden">
 
-  <section id="adminBox" class="hidden">
-    <div class="controls">
-      <label><span class="label">Status</span><select id="statusFilter"><option value="pending">Pending</option><option value="settled">Settled</option><option value="archived">Archived</option><option value="all">All</option></select></label>
-      <label><span class="label">Type</span><select id="typeFilter"><option value="">All forms</option><option value="matching-token">Matching token</option><option value="commission">Commission</option></select></label>
-      <button type="button" id="refreshBtn">Refresh</button>
-      <button type="button" class="secondary" id="logoutBtn">Logout</button>
+    <div class="page-header">
+      <div>
+        <p class="page-eyebrow">Admin Queue</p>
+        <h1 class="page-title">Form Requests</h1>
+      </div>
+      <div style="display:flex;gap:0.6rem;align-items:center">
+        <span class="page-count" id="countLabel"></span>
+        <button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh</button>
+        <button class="btn btn-ghost btn-sm" id="logoutBtn">Log out</button>
+      </div>
     </div>
-    <div class="status" id="adminStatus"></div>
-    <div class="grid" id="requestList"></div>
-  </section>
+
+    <div class="toolbar">
+      <select class="toolbar-select" id="statusFilter">
+        <option value="pending">Pending</option>
+        <option value="settled">Settled</option>
+        <option value="archived">Archived</option>
+        <option value="all">All statuses</option>
+      </select>
+      <select class="toolbar-select" id="typeFilter">
+        <option value="">All types</option>
+        <option value="interest-1of1">Acquisition enquiry</option>
+        <option value="commission">Commission</option>
+        <option value="newsletter">Newsletter</option>
+        <option value="matching-token">Matching token</option>
+        <option value="private-offer">Private offer</option>
+        <option value="delivery-details">Delivery</option>
+      </select>
+    </div>
+
+    <p class="status-msg" id="adminStatus"></p>
+    <div id="requestList"></div>
+
+  </div>
+
 </main>
 
 <script>
 const API = '/api/site-form';
 let adminPassword = '';
 
-const els = {
-  loginBox: document.getElementById('loginBox'),
-  adminBox: document.getElementById('adminBox'),
-  password: document.getElementById('password'),
-  loginBtn: document.getElementById('loginBtn'),
-  loginStatus: document.getElementById('loginStatus'),
-  adminStatus: document.getElementById('adminStatus'),
-  statusFilter: document.getElementById('statusFilter'),
-  typeFilter: document.getElementById('typeFilter'),
-  refreshBtn: document.getElementById('refreshBtn'),
-  logoutBtn: document.getElementById('logoutBtn'),
-  requestList: document.getElementById('requestList')
+const $ = id => document.getElementById(id);
+
+// ── Type display names ──
+const TYPE_LABELS = {
+  'interest-1of1':   'Acquisition enquiry',
+  'commission':      'Commission',
+  'newsletter':      'Newsletter sub',
+  'matching-token':  'Matching token',
+  'private-offer':   'Private offer',
+  'delivery-details':'Delivery notification',
 };
 
-function esc(value) {
-  return String(value || '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
+function esc(v) {
+  return String(v || '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function field(label, value, wide) {
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return 'Just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7)  return `${d}d ago`;
+  return new Date(dateStr).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+}
+
+function renderField(label, value, wide) {
   if (!value) return '';
-  return `<div class="field ${wide ? 'message' : ''}"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`;
+  return `<div class="req-field${wide ? ' req-field-wide' : ''}">
+    <div class="req-field-label">${esc(label)}</div>
+    <div class="req-field-value">${esc(value)}</div>
+  </div>`;
 }
 
-function rowTitle(row) {
-  return row.form_type === 'matching-token'
-    ? `${row.collector_name || 'Collector'} -> ${row.requested_token || 'Matching token'}`
-    : `${row.name || 'Client'} -> ${row.commission_type || 'Commission'}`;
+function renderCard(row) {
+  const type = TYPE_LABELS[row.form_type] || row.form_type;
+  const badge = `badge-${row.status || 'pending'}`;
+
+  // Artwork pill for acquisition enquiries
+  const artwork = row.artwork || (row.commission_type === 'interest-1of1' ? '' : '');
+  const artworkPill = artwork ? `<div class="req-artwork">${esc(artwork)}</div>` : '';
+
+  // Build fields based on type
+  let fields = '';
+  if (row.form_type === 'matching-token') {
+    fields = [
+      renderField('Email', row.email),
+      renderField('Source chain', row.source_chain),
+      renderField('Source wallet', row.source_wallet),
+      renderField('Balance', row.source_balance),
+      renderField('Requested token', row.requested_token),
+      renderField('Destination wallet', row.destination_wallet, true),
+    ].join('');
+  } else if (row.form_type === 'private-offer') {
+    fields = [
+      renderField('Email', row.email),
+      renderField('Offer', row.offer_amount ? `${row.offer_amount} ${row.offer_currency || ''}`.trim() : ''),
+      renderField('Chain', row.chain),
+      renderField('Wallet', row.wallet_address, true),
+    ].join('');
+  } else {
+    fields = [
+      renderField('Email', row.email),
+      renderField('Type', row.form_type !== 'commission' ? type : (row.commission_type || type)),
+    ].join('');
+  }
+
+  const message = row.message
+    ? `<div class="req-message">${esc(row.message)}</div>`
+    : '';
+
+  const actions = `<div class="req-actions">
+    ${row.status !== 'settled'  ? `<button class="btn btn-sm btn-settle"  data-action="settled"  data-id="${esc(row.id)}">Mark settled</button>` : ''}
+    ${row.status !== 'pending'  ? `<button class="btn btn-sm btn-pending"  data-action="pending"  data-id="${esc(row.id)}">Move to pending</button>` : ''}
+    ${row.status !== 'archived' ? `<button class="btn btn-sm btn-archive" data-action="archived" data-id="${esc(row.id)}">Archive</button>` : ''}
+  </div>`;
+
+  return `<article class="req-card">
+    <div class="req-head">
+      <div>
+        <div class="req-name">${esc(row.name || row.collector_name || 'Unknown')}</div>
+        <div class="req-time">${timeAgo(row.created_at)} · ${esc(new Date(row.created_at).toLocaleString('en-GB', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}))}</div>
+      </div>
+      <span class="req-badge ${badge}">${esc(row.status || 'pending')}</span>
+    </div>
+    ${artworkPill}
+    <div class="req-fields">${fields}</div>
+    ${message}
+    ${actions}
+  </article>`;
+}
+
+function groupByType(rows) {
+  // Group order — most important first
+  const order = ['interest-1of1','private-offer','commission','newsletter','matching-token','delivery-details'];
+  const groups = {};
+  rows.forEach(r => {
+    const key = r.form_type || 'commission';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(r);
+  });
+  // Sort by order, then any unknown types at the end
+  const sorted = [...order.filter(k => groups[k]), ...Object.keys(groups).filter(k => !order.includes(k))];
+  return sorted.map(key => ({ key, label: TYPE_LABELS[key] || key, rows: groups[key] }));
 }
 
 function render(rows) {
+  $('countLabel').textContent = `${rows.length} request${rows.length !== 1 ? 's' : ''}`;
   if (!rows.length) {
-    els.requestList.innerHTML = '<div class="card">No requests found.</div>';
+    $('requestList').innerHTML = '<p class="empty">Nothing here — the queue is clear.</p>';
     return;
   }
-  els.requestList.innerHTML = rows.map((row) => {
-    const isClaim = row.form_type === 'matching-token';
-    const body = isClaim ? [
-      field('Email', row.email),
-      field('Source chain', row.source_chain),
-      field('Source wallet', row.source_wallet),
-      field('Balance', row.source_balance),
-      field('Requested token', row.requested_token),
-      field('Destination wallet', row.destination_wallet),
-      field('Note', row.note, true)
-    ].join('') : [
-      field('Email', row.email),
-      field('Commission type', row.commission_type),
-      field('Message', row.message, true)
-    ].join('');
-    return `<article class="item">
-      <div class="item-head">
-        <div><div class="item-title">${esc(rowTitle(row))}</div><div style="color:#9a8070">${esc(new Date(row.created_at).toLocaleString())}</div></div>
-        <span class="badge">${esc(row.status)}</span>
-      </div>
-      <div class="fields">${body}</div>
-      <div class="actions">
-        ${row.status !== 'settled' ? `<button type="button" data-action="settled" data-id="${esc(row.id)}">Mark Settled</button>` : ''}
-        ${row.status !== 'pending' ? `<button type="button" class="secondary" data-action="pending" data-id="${esc(row.id)}">Move to Pending</button>` : ''}
-        ${row.status !== 'archived' ? `<button type="button" class="secondary" data-action="archived" data-id="${esc(row.id)}">Archive</button>` : ''}
-      </div>
-    </article>`;
-  }).join('');
+  const typeVal = $('typeFilter').value;
+  if (typeVal) {
+    // Single type — no grouping needed
+    $('requestList').innerHTML = rows.map(renderCard).join('');
+  } else {
+    // Group by type
+    const groups = groupByType(rows);
+    $('requestList').innerHTML = groups.map(g => `
+      <div class="group">
+        <div class="group-header">
+          <span class="group-label">${esc(g.label)}</span>
+          <span class="group-pill">${g.rows.length}</span>
+        </div>
+        ${g.rows.map(renderCard).join('')}
+      </div>`).join('');
+  }
 }
 
-async function request(path, options = {}) {
-  const response = await fetch(path, {
+async function req(path, options = {}) {
+  const res = await fetch(path, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       ...(adminPassword ? { 'X-Admin-Password': adminPassword } : {}),
-      ...(options.headers || {})
-    }
+      ...(options.headers || {}),
+    },
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Request failed.');
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
 
-async function login() {
-  els.loginStatus.textContent = '';
-  els.loginBtn.disabled = true;
+async function loadRequests() {
+  $('adminStatus').textContent = 'Loading…';
+  const params = new URLSearchParams({ status: $('statusFilter').value });
+  if ($('typeFilter').value) params.set('type', $('typeFilter').value);
   try {
-    adminPassword = els.password.value;
-    if (!adminPassword) throw new Error('Password required.');
-    await loadRequests();
-    els.loginBox.classList.add('hidden');
-    els.adminBox.classList.remove('hidden');
-  } catch (error) {
-    adminPassword = '';
-    els.loginStatus.textContent = error.message;
-  } finally {
-    els.loginBtn.disabled = false;
+    const rows = await req(API + '?' + params.toString());
+    render(rows);
+    $('adminStatus').textContent = '';
+  } catch (e) {
+    $('adminStatus').textContent = e.message;
   }
 }
 
-async function loadRequests() {
-  els.adminStatus.textContent = 'Loading...';
-  const params = new URLSearchParams({ status: els.statusFilter.value });
-  if (els.typeFilter.value) params.set('type', els.typeFilter.value);
+async function login() {
+  $('loginStatus').textContent = '';
+  $('loginBtn').disabled = true;
   try {
-    const rows = await request(API + '?' + params.toString());
-    render(rows);
-    els.adminStatus.textContent = `${rows.length} request${rows.length === 1 ? '' : 's'} loaded.`;
-  } catch (error) {
-    els.adminStatus.textContent = error.message;
+    adminPassword = $('password').value;
+    if (!adminPassword) throw new Error('Password required');
+    await loadRequests();
+    $('loginBox').classList.add('hidden');
+    $('adminBox').classList.remove('hidden');
+  } catch (e) {
+    adminPassword = '';
+    $('loginStatus').textContent = e.message;
+  } finally {
+    $('loginBtn').disabled = false;
   }
 }
 
 async function updateStatus(id, status) {
-  await request(API + '?id=' + encodeURIComponent(id), { method:'PATCH', body: JSON.stringify({ status }) });
-  await loadRequests();
+  try {
+    await req(API + '?id=' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ status }) });
+    await loadRequests();
+  } catch (e) {
+    $('adminStatus').textContent = e.message;
+  }
 }
 
-els.loginBtn.addEventListener('click', login);
-els.password.addEventListener('keydown', (event) => { if (event.key === 'Enter') login(); });
-els.refreshBtn.addEventListener('click', loadRequests);
-els.statusFilter.addEventListener('change', loadRequests);
-els.typeFilter.addEventListener('change', loadRequests);
-els.logoutBtn.addEventListener('click', () => {
+// Events
+$('loginBtn').addEventListener('click', login);
+$('password').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+$('refreshBtn').addEventListener('click', loadRequests);
+$('statusFilter').addEventListener('change', loadRequests);
+$('typeFilter').addEventListener('change', loadRequests);
+$('logoutBtn').addEventListener('click', () => {
   adminPassword = '';
-  els.password.value = '';
-  els.adminBox.classList.add('hidden');
-  els.loginBox.classList.remove('hidden');
+  $('password').value = '';
+  $('adminBox').classList.add('hidden');
+  $('loginBox').classList.remove('hidden');
 });
-els.requestList.addEventListener('click', (event) => {
-  const button = event.target.closest('button[data-id]');
-  if (button) updateStatus(button.dataset.id, button.dataset.action);
+$('requestList').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-id]');
+  if (btn) updateStatus(btn.dataset.id, btn.dataset.action);
 });
-
 </script>
 </body>
 </html>
