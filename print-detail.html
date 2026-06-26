@@ -1647,7 +1647,7 @@ function renderProduct(p) {
                 ${enquireSizes ? `<p class="purchase-label" style="margin-bottom:0.5rem">Available sizes</p><div class="size-picker" style="pointer-events:none;opacity:0.7;margin-bottom:1.2rem">${enquireSizes}</div>` : ''}
                 ${isSoldOut
                   ? '<button class="add-to-cart-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold</button>'
-                  : '<button class="add-to-cart-btn enquire-action" onclick="openInterest(p.name)">Make inquiry about this work →</button>'}
+                  : '<button class="add-to-cart-btn enquire-action" onclick="openInterest(_product&&_product.name)">Register interest →</button>'}
               `;
             }
             return `
@@ -2139,6 +2139,11 @@ async function load() {
     renderProduct(product);
     // Apply local currency if visitor has one selected
     applyLocalCurrencyToDetail(product);
+    // Re-render sizing guide once hero image dimensions are known
+    const heroImgEl = document.getElementById('heroImg');
+    if (heroImgEl && !heroImgEl.complete) {
+      heroImgEl.addEventListener('load', () => renderSizingGuide(), { once: true });
+    }
 
     // Load related (same series or same category)
     const seriesSlug = product.series_slug || '';
@@ -2350,6 +2355,86 @@ function closeEnquire() { document.getElementById('enquireOverlay').classList.re
     } finally {
       send.disabled = false; send.textContent = 'Send message';
     }
+  });
+})();
+
+// ─── Interest / registration form ───────────────────────────────────────────
+function openInterest(pname) {
+  const overlay = document.getElementById('interestOverlay');
+  if (!overlay) return;
+  const name = pname || (_product && _product.name) || document.title;
+  overlay._pname = name;
+  const pieceEl = document.getElementById('interestPieceName');
+  if (pieceEl) pieceEl.textContent = name;
+  document.getElementById('interestFormBody').style.display = '';
+  document.getElementById('interestDone').style.display = 'none';
+  ['interestName','interestEmail','interestPhone','interestMsg','interestPrevDetail'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const noRadio = document.getElementById('interestPrevNo');
+  if (noRadio) noRadio.checked = true;
+  const detail = document.getElementById('interestPrevDetail');
+  if (detail) detail.style.display = 'none';
+  overlay.classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeInterest() {
+  const overlay = document.getElementById('interestOverlay');
+  if (overlay) overlay.classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+(function() {
+  const overlay = document.getElementById('interestOverlay');
+  if (!overlay) return;
+  const closeBtn = document.getElementById('interestClose');
+  if (closeBtn) closeBtn.addEventListener('click', closeInterest);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeInterest(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInterest(); });
+
+  // Show/hide previous collector detail field
+  const prevYes = document.getElementById('interestPrevYes');
+  const prevDetail = document.getElementById('interestPrevDetail');
+  if (prevYes && prevDetail) {
+    document.querySelectorAll('input[name="prevCollector"]').forEach(r => {
+      r.addEventListener('change', () => {
+        prevDetail.style.display = prevYes.checked ? '' : 'none';
+      });
+    });
+  }
+
+  const sendBtn = document.getElementById('interestSend');
+  if (sendBtn) sendBtn.addEventListener('click', async () => {
+    const name  = document.getElementById('interestName').value.trim();
+    const email = document.getElementById('interestEmail').value.trim();
+    const phone = document.getElementById('interestPhone')?.value.trim() || '';
+    const msg   = document.getElementById('interestMsg').value.trim();
+    const prevCollector = document.getElementById('interestPrevYes')?.checked ? 'yes' : 'no';
+    const prevDetailVal = prevCollector === 'yes' ? (document.getElementById('interestPrevDetail')?.value.trim() || '') : '';
+    if (!name)  { alert('Please enter your name'); return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Please enter a valid email'); return; }
+    sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
+    const fullMessage = [
+      msg,
+      prevCollector === 'yes' ? ('Previously collected: Yes' + (prevDetailVal ? ' - ' + prevDetailVal : '')) : 'Previously collected: No',
+      phone ? 'Phone: ' + phone : '',
+    ].filter(Boolean).join(' | ');
+    try {
+      await fetch('/api/site-form', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          form_type: 'interest-1of1',
+          name, email,
+          artwork: overlay._pname,
+          message: fullMessage,
+        }),
+      });
+    } catch(_) {}
+    document.getElementById('interestFormBody').style.display = 'none';
+    document.getElementById('interestDone').style.display = '';
+    sendBtn.disabled = false; sendBtn.textContent = 'Register interest →';
   });
 })();
 </script>
