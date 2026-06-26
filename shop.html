@@ -14,7 +14,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet"/>
 
 <style>
-/* ── Custom cursor (matches index.html) ── */
+/* ── Custom cursor — fine pointer (mouse) only, not touch ── */
+@media (pointer: fine) {
 html, body, * { cursor: none !important; }
 .cursor { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999; }
 .cursor-dot {
@@ -34,6 +35,7 @@ html, body, * { cursor: none !important; }
 .cursor-ring.light { border-color: #f5ede0; opacity: 1; }
 .cursor-dot.gold { background: var(--gold); }
 .cursor-ring.gold { border-color: var(--gold); }
+} /* end @media (pointer: fine) */
 
 /* ── Reset ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -2766,14 +2768,14 @@ body.dark { --text-muted: #b3a392; }
   <div class="faq-item">
     <button class="faq-q">How do I track my order?<span class="faq-icon">+</span></button>
     <div class="faq-a"><div class="faq-a-inner">
-      Once your order ships, you'll receive an email with a tracking number and a link to follow it. <strong>Nigerian orders</strong> ship via GIG Logistics — track at giglogistics.com with your waybill number. <strong>International orders</strong> ship via DHL or UPS — track on the carrier's site (dhl.com or ups.com) with the air waybill number in your email. If you haven't received tracking within 3 business days of ordering, message us and we'll chase it up.
+      Once your order ships, you'll receive an email with your tracking number. <strong>Nigerian orders</strong> ship via GIG Logistics — track at giglogistics.com with your waybill number. <strong>International orders</strong> ship via DHL or UPS — track on the carrier's site with the number in your email. Kay packs and ships on weekends, so tracking details typically arrive early the following week. If you have any questions about your order in the meantime, reach out via the Questions button and Kay will update you directly.
     </div></div>
   </div>
 
   <div class="faq-item">
     <button class="faq-q">What payment methods can I use?<span class="faq-icon">+</span></button>
     <div class="faq-a"><div class="faq-a-inner">
-      We accept <strong>cards</strong> (debit/credit) through Paystack — which handles both <strong>Naira and US dollar</strong> payments — and <strong>cryptocurrency</strong>: ETH and stablecoins (USDC, USDT) on Ethereum, plus XTZ on Tezos. Card payments are processed securely on Paystack's page; crypto payments are confirmed on-chain before your order is finalised. Choose your method at checkout.
+      We accept <strong>cards</strong> via Flutterwave (international cards — Visa, Mastercard) and Paystack (Nigerian cards, bank transfer, USSD). We also accept <strong>cryptocurrency</strong>: ETH and stablecoins (USDC, USDT) on Ethereum, plus XTZ on Tezos. Card payments are processed securely; crypto payments are confirmed on-chain before your order is finalised. Choose your method at checkout.
     </div></div>
   </div>
 
@@ -2804,6 +2806,7 @@ body.dark { --text-muted: #b3a392; }
       Limited-edition prints are produced in a fixed run and hand-numbered (e.g. 3 of 30). Once the run sells out, no more are made. The number remaining is shown on the product page, and the bag won't let you add more than are left.
     </div></div>
   </div>
+
 
   <div class="faq-item">
     <button class="faq-q">Still have a question?<span class="faq-icon">+</span></button>
@@ -4357,7 +4360,7 @@ function remainingToAdd(p, variantKey) {
 /* ─── Theme ─── */
 function initTheme() {
   const saved = localStorage.getItem('kaysworks-theme');
-  const dark = saved ? saved==='dark' : window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const dark = saved === 'dark';
   document.body.classList.toggle('dark', dark);
   document.getElementById('themeBtn').textContent = dark ? 'Light' : 'Dark';
 }
@@ -4608,13 +4611,16 @@ function buildPrintCard(p) {
 
   let actionHtml;
   if (isSold) {
-    actionHtml = `<button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold</button>`;
+    actionHtml = p.slug
+      ? `<a href="/shop/${p.slug}" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;opacity:0.4;pointer-events:none">Sold out</a>`
+      : `<button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold out</button>`;
   } else if (isEnquireOnly) {
     actionHtml = `<button class="interest-btn" data-pid="${p.id}" data-pname="${escapeAttr(p.name)}" onclick="openInterestForm('${escapeAttr(p.id)}','${escapeAttr(p.name)}')">Make inquiry about this work →</button>`;
   } else {
-    actionHtml = `<button class="add-btn" data-pid="${p.id}" ${!defaultKey || stock===0?'disabled style="opacity:0.4;cursor:not-allowed"':''}>
-          ${!defaultKey ? 'Unavailable' : stock===0 ? 'Sold out' : 'Add to bag'}
-        </button>`;
+    // Prints always go to detail page — no add-to-bag on grid
+    actionHtml = p.slug
+      ? `<a href="/shop/${p.slug}" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">View print →</a>`
+      : `<a href="#" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">View print →</a>`;
   }
 
   card.innerHTML = `
@@ -4624,14 +4630,14 @@ function buildPrintCard(p) {
       <p class="card-category">${p.category}</p>
       <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
       <p class="card-desc" id="pdesc-${p.id}">${active.desc || p.desc}</p>
-      ${ !isEnquireOnly
-          ? `<div class="print-type-wrap">${typeSelectHtml}</div><div class="card-variants" id="variants-${p.id}">${sizeChipsHtml}</div>`
-          : sizeChipsHtml ? `<div class="card-variants" id="variants-${p.id}" style="pointer-events:none;opacity:0.7">${sizeChipsHtml}</div>` : '' }
+      ${ isEnquireOnly && sizeChipsHtml
+          ? `<div class="card-variants" id="variants-${p.id}" style="pointer-events:none;opacity:0.7">${sizeChipsHtml}</div>`
+          : '' }
       <div class="card-footer">
         <div class="card-price">
           ${ !isEnquireOnly
-            ? `<span class="price-ngn" id="pngn-${p.id}">${fmt(ngn)}</span><span class="price-usd" id="pusd-${p.id}">${fmtUsd(usd)} USD</span><span class="price-local" id="plocal-${p.id}" style="display:none"></span>`
-            : `<span style="font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.14em;color:var(--text-muted)">Enquire for price</span>` }
+            ? `<span class="price-ngn" id="pngn-${p.id}" style="font-size:0.78rem;color:var(--text-muted)">from ${fmt(Math.min(...Object.values(p.priceNgn||{}).map(Number).filter(Boolean)) || ngn)}</span>`
+            : '' }
         </div>
         ${actionHtml}
       </div>
@@ -4824,8 +4830,8 @@ function buildShopEmptyState(category) {
   const label = SHOP_CATEGORY_LABELS[category] || category || 'shop';
   const title = SHOP_EMPTY_TITLES[category] || `${label.charAt(0).toUpperCase()}${label.slice(1)} is coming soon.`;
   const note = category === 'all'
-    ? 'The shop is being refreshed. Check back shortly for available works.'
-    : 'This section is being refreshed. Check back shortly for the next drop.';
+    ? 'New work is always in the making — check back soon.'
+    : 'Nothing here yet, but this section is growing. Check back soon.';
   const el = document.createElement('div');
   el.className = 'shop-empty-state';
   el.innerHTML = `
