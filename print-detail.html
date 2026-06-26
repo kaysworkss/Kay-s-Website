@@ -197,6 +197,43 @@ nav.scrolled {
   transition:opacity 0.3s;
 }
 .hero-img-wrap:hover .zoom-hint { opacity:0; }
+/* Mobile lightbox */
+.img-lightbox {
+  display:none; position:fixed; inset:0; z-index:9000;
+  background:rgba(0,0,0,0.95); align-items:center; justify-content:center;
+  cursor:zoom-out;
+}
+.img-lightbox.open { display:flex; }
+.img-lightbox img { max-width:95vw; max-height:95vh; object-fit:contain; touch-action:pinch-zoom; }
+.img-lightbox-close {
+  position:absolute; top:1rem; right:1rem;
+  font-size:1.5rem; color:#fff; background:none; border:none;
+  cursor:pointer; line-height:1; padding:0.5rem;
+}
+.tap-zoom-hint {
+  display:none; position:absolute; bottom:1.2rem; left:1.2rem;
+  font-family:'Cinzel',serif; font-size:0.44rem;
+  letter-spacing:0.2em; text-transform:uppercase;
+  color:var(--text-muted); background:var(--bg);
+  padding:0.4rem 0.8rem; border-radius:2px;
+  border:1px solid var(--border); opacity:0.8; pointer-events:none;
+}
+@media (pointer: coarse) {
+  .zoom-hint { display:none; }
+  .tap-zoom-hint { display:block; }
+}
+/* Sticky buy bar — mobile */
+.sticky-buy-bar {
+  display:none; position:fixed; bottom:0; left:0; right:0; z-index:500;
+  background:var(--bg); border-top:1px solid var(--border);
+  padding:0.8rem 1.2rem; align-items:center; gap:0.8rem;
+  box-shadow:0 -4px 20px rgba(74,50,40,0.1);
+}
+.sticky-buy-bar.visible { display:flex; }
+.sticky-buy-name { font-family:'Cormorant Garamond',serif; font-size:0.95rem; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sticky-buy-price { font-family:'Montserrat',sans-serif; font-size:0.78rem; font-weight:600; color:var(--text); white-space:nowrap; }
+.sticky-buy-btn { font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.14em; text-transform:uppercase; padding:0.7rem 1.2rem; background:var(--rust); color:#fff; border:none; border-radius:10px; cursor:pointer; white-space:nowrap; flex-shrink:0; }
+.sticky-buy-btn:disabled { opacity:0.4; cursor:not-allowed; }
 
 /* Thumbnail strip */
 .thumb-strip {
@@ -1107,7 +1144,7 @@ function escapeAttrText(s) {
 /* ─── Theme ─── */
 function initTheme() {
   const saved = localStorage.getItem('kaysworks-theme');
-  const dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const dark = saved === 'dark';
   document.body.classList.toggle('dark', dark);
   document.getElementById('themeBtn').textContent = dark ? 'Light' : 'Dark';
 }
@@ -1338,11 +1375,33 @@ function updateCartUI() {
   });
 }
 
+/* ─── Mobile lightbox ─── */
+function openLightbox(src) {
+  const lb = document.getElementById('imgLightbox');
+  const img = document.getElementById('lightboxImg');
+  if (!lb || !img) return;
+  img.src = src;
+  lb.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox() {
+  const lb = document.getElementById('imgLightbox');
+  if (lb) lb.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
 /* ─── Image zoom on mousemove ─── */
 function initZoom(wrap) {
   const img = wrap.querySelector('img');
   if (!img) return;
   let zoomed = false;
+  // Mobile: tap to open lightbox
+  wrap.addEventListener('click', () => {
+    if (window.matchMedia('(pointer: coarse)').matches && img && img.src) {
+      openLightbox(img.src);
+    }
+  });
   wrap.addEventListener('mouseenter', () => { zoomed = true; img.style.transform = 'scale(2)'; });
   wrap.addEventListener('mouseleave', () => { zoomed = false; img.style.transform = 'scale(1)'; img.style.transformOrigin = 'center center'; });
   wrap.addEventListener('mousemove', e => {
@@ -1446,6 +1505,7 @@ function renderProduct(p) {
         <div class="hero-img-wrap" id="heroWrap">
           ${mainImg}
           <span class="zoom-hint">Hover to zoom</span>
+          <span class="tap-zoom-hint">Tap to zoom</span>
           ${thumbsHtml}
         </div>
       </div>
@@ -1502,8 +1562,8 @@ function renderProduct(p) {
           <div class="size-picker">${sizeChips}</div>
           <p class="editions-left" id="editionsLeft" style="display:${editionLabel(p, _selectedVariant) ? 'block' : 'none'}">${editionLabel(p, _selectedVariant)}</p>
           <div class="price-row">
-            <span class="price-ngn" id="priceNgn">${fmt(ngn)}</span>
-            <span class="price-usd" id="priceUsd">${fmtUsd(usd)} USD</span>
+            <span class="price-ngn" id="priceNgn">${ngn ? fmt(ngn) : (() => { const allNgn = printOptions.flatMap(o => (o.sizes||[]).map(s => printPrice(p, printOptionKey(o.type,s),'ngn'))).filter(Boolean); return allNgn.length ? 'from ' + fmt(Math.min(...allNgn)) : ''; })()}</span>
+            <span class="price-usd" id="priceUsd">${usd ? fmtUsd(usd) + ' USD' : ''}</span>
           </div>
           ${(() => {
             const isSoldOut2 = p.is_sold || (isLimitedKey(p, _selectedVariant) && (editionRemaining(p, _selectedVariant) ?? 0) <= 0);
@@ -1511,8 +1571,8 @@ function renderProduct(p) {
               return '<button class="add-to-cart-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold out</button>';
             }
             const disabled = !_selectedVariant;
-            const label = _selectedVariant ? 'Add to bag' : 'Unavailable';
-            return '<button class="add-to-cart-btn" id="addBtn" onclick="handleAddToCart()" ' + (disabled ? 'disabled' : '') + '>' + label + '</button>';
+            const label = _selectedVariant ? 'Add to bag' : 'Select a size';
+            return '<button class="add-to-cart-btn" id="addBtn" onclick="handleAddToCart()" ' + (disabled ? 'disabled style="opacity:0.5;cursor:not-allowed"' : '') + '>' + label + '</button>';
           })()}`;
           })()}
           <p class="shipping-note">
@@ -1609,6 +1669,7 @@ function renderMerchProduct(p) {
         <div class="hero-img-wrap" id="heroWrap">
           ${mainImg}
           <span class="zoom-hint">Hover to zoom</span>
+          <span class="tap-zoom-hint">Tap to zoom</span>
           ${thumbsHtml}
         </div>
       </div>
@@ -1750,126 +1811,79 @@ function selectSize(v) {
 function renderSizingGuide() {
   const wrap = document.getElementById('sizingSvgWrap');
   if (!wrap) return;
-
-  // Normalize selected variant key to a size key (e.g. "Mini Print|4×4"" → "4x4")
+  // Extract and normalize the size from the variant key (e.g. "mini_print|4x4"" → "4x4")
   const rawPart = (_selectedVariant || '').split('|').pop() || '';
-  const sizeRaw = rawPart.replace(/[\u201c\u201d\u2033\u2018\u2019"]/g, '').replace(/×/g, 'x').replace(/\s/g, '').toLowerCase();
-
-  // Detect print orientation from the product's hero image
-  // We load the image to read its natural dimensions, then draw accordingly
-  function drawGuide(isLandscape) {
-    // Scale: person is 170cm = 66.9", drawn at PERSON_PX height
-    // So 1 inch = PERSON_PX / 66.9 px. Person sits at left as reference.
-    const PERSON_PX = 200;  // SVG px height of silhouette
-    const PX_PER_INCH = PERSON_PX / 66.9;  // ~2.99
-
-    // cm conversion map for known sizes
-    const CM_LABELS = {
-      '4x4':'10×10 cm','4x6':'10×15 cm','5x5':'13×13 cm','5x7':'13×18 cm',
-      '8x10':'20×25 cm','11x14':'28×36 cm','16x20':'41×51 cm',
-      '18x24':'46×61 cm','24x36':'61×91 cm',
-    };
-
-    // Build size list from product's actual variants — including custom sizes
-    const productSizeKeys = availablePrintChoices(_product)
-      .map(c => c.key.split('|').pop().replace(/[\u201c\u201d\u2033"]/g,'').replace(/×/g,'x').replace(/\s/g,'').toLowerCase());
-
-    const sizes = [...new Set(productSizeKeys)].map(key => {
-      const match = key.match(/^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/);
-      if (!match) return null;
-      const inW = parseFloat(match[1]);
-      const inH = parseFloat(match[2]);
-      const cmW = Math.round(inW * 2.54);
-      const cmH = Math.round(inH * 2.54);
-      // SVG pixel dimensions — directly scaled from real inches
-      const pw = Math.round(inW * PX_PER_INCH);
-      const ph = Math.round(inH * PX_PER_INCH);
-      // For landscape prints swap w/h; squares stay square
-      const w = isLandscape && pw !== ph ? ph : pw;
-      const h = isLandscape && pw !== ph ? pw : ph;
-      const label = `${inW % 1 === 0 ? inW : inW}×${inH % 1 === 0 ? inH : inH}"`;
-      return {
-        key, label,
-        cm: CM_LABELS[key] || `${cmW}×${cmH} cm`,
-        pw, ph, w, h,
-      };
-    }).filter(Boolean);
-
-    // Sort smallest to largest left to right
-    sizes.sort((a, b) => (a.pw * a.ph) - (b.pw * b.ph));
-
-    if (!sizes.length) { wrap.innerHTML = ''; return; }
-
-    // Layout — baseline where all frames sit, matched to person height
-    const BASELINE = 210;  // person is 200px + 10px top margin
-    const SVG_H = BASELINE + 55; // room for labels below
-    const LEFT_MARGIN = 60;
-    const RIGHT_MARGIN = 20;
-    const GAP = sizes.length <= 3 ? 40 : sizes.length <= 5 ? 24 : 16;
-    const totalWidth = sizes.reduce((sum, s) => sum + s.w, 0) + GAP * (sizes.length - 1);
-    const svgW = Math.max(280, LEFT_MARGIN + totalWidth + RIGHT_MARGIN + 20);
-
-    let cursor = LEFT_MARGIN + 20;
-    const positioned = sizes.map(s => {
-      const x = cursor;
-      const tx = x + s.w / 2;
-      const y = BASELINE - s.h;
-      cursor += s.w + GAP;
-      return { ...s, x, y, tx };
-    });
-
-    const frames = positioned.map(s => {
-      const active = s.key === sizeRaw;
-      const labelY1 = BASELINE + 14;
-      const labelY2 = BASELINE + 25;
-      const labelY3 = BASELINE + 38;
-      return `<g>
-        ${active ? `<rect x="${s.x - 4}" y="${s.y - 4}" width="${s.w + 8}" height="${s.h + 8}" fill="none" stroke="var(--rust)" stroke-width="1" rx="3" stroke-dasharray="4,3" opacity="0.5"/>` : ''}
-        <rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="${active ? 'rgba(158,79,46,0.15)' : 'none'}" stroke="${active ? 'var(--rust)' : 'var(--clay)'}" stroke-width="${active ? 3 : 1.2}" rx="1"/>
-        <text x="${s.tx}" y="${labelY1}" text-anchor="middle" fill="${active ? 'var(--rust)' : 'var(--text-muted)'}" font-size="${active ? 10 : 8}" font-weight="${active ? '700' : '400'}">${s.label}</text>
-        <text x="${s.tx}" y="${labelY2}" text-anchor="middle" fill="${active ? 'var(--rust)' : 'var(--text-muted)'}" font-size="7" opacity="${active ? 1 : 0.5}">${s.cm}</text>
-        ${active ? `<text x="${s.tx}" y="${labelY3}" text-anchor="middle" fill="var(--rust)" font-size="8" font-weight="700">▲ Your size</text>` : ''}
-      </g>`;
-    }).join('\n');
-
-    // Silhouette proportions based on PERSON_PX (200px = 170cm)
-    const personH = PERSON_PX;
-    const headR = 10;
-    const headCY = 10;
-    const shoulderY = headCY + headR + 4;
-    const armY = Math.round(personH * 0.32);
-    const legSplit = Math.round(personH * 0.62);
-
-    wrap.innerHTML = `<svg viewBox="0 0 ${svgW} ${SVG_H}" width="${svgW}" xmlns="http://www.w3.org/2000/svg" style="font-family:'Montserrat',sans-serif">
-      <g transform="translate(10,2)" opacity="0.45">
-        <line x1="24" y1="0" x2="24" y2="${BASELINE}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>
-        <ellipse cx="24" cy="${headCY}" rx="${headR}" ry="12" fill="none" stroke="var(--text-muted)" stroke-width="1.2"/>
-        <line x1="24" y1="${shoulderY}" x2="24" y2="${legSplit}" stroke="var(--text-muted)" stroke-width="1.2"/>
-        <line x1="4" y1="${armY}" x2="44" y2="${armY}" stroke="var(--text-muted)" stroke-width="1.2"/>
-        <line x1="14" y1="${legSplit}" x2="8" y2="${BASELINE}" stroke="var(--text-muted)" stroke-width="1.2"/>
-        <line x1="34" y1="${legSplit}" x2="40" y2="${BASELINE}" stroke="var(--text-muted)" stroke-width="1.2"/>
-        <text x="24" y="${BASELINE + 13}" text-anchor="middle" fill="var(--text-muted)" font-size="7">~170cm</text>
-      </g>
-      <g>${frames}</g>
-      <line x1="20" y1="${BASELINE}" x2="${svgW - 10}" y2="${BASELINE}" stroke="var(--border)" stroke-width="0.5"/>
-    </svg>`;
-  }
-
-  // Detect orientation from hero image natural dimensions
-  const heroImg = document.getElementById('heroImg');
-  if (heroImg && heroImg.naturalWidth && heroImg.naturalHeight) {
-    drawGuide(heroImg.naturalWidth > heroImg.naturalHeight);
-  } else if (heroImg) {
-    const tmp = new Image();
-    tmp.onload = () => drawGuide(tmp.naturalWidth > tmp.naturalHeight);
-    tmp.onerror = () => drawGuide(false); // default portrait
-    tmp.src = heroImg.src;
-  } else {
-    drawGuide(false);
-  }
+  const sizeRaw = rawPart.replace(/[""″'']/g, '').replace(/×/g, 'x').replace(/\s/g, '').toLowerCase();
+  // Each size: inches, cm, SVG position. Small sizes spread apart to avoid overlap.
+  const sizes = [
+    { label: '4×4"',   cm: '10×10 cm',  key: '4x4',   x: 100, y: 224, w: 16, h: 16,  tx: 108 },
+    { label: '5×7"',   cm: '13×18 cm',  key: '5x7',   x: 145, y: 208, w: 20, h: 28,  tx: 155 },
+    { label: '8×10"',  cm: '20×25 cm',  key: '8x10',  x: 200, y: 188, w: 32, h: 40,  tx: 216 },
+    { label: '11×14"', cm: '28×36 cm',  key: '11x14', x: 268, y: 172, w: 44, h: 56,  tx: 290 },
+    { label: '18×24"', cm: '46×61 cm',  key: '18x24', x: 350, y: 132, w: 72, h: 96,  tx: 386 },
+    { label: '24×36"', cm: '61×91 cm',  key: '24x36', x: 460, y: 92,  w: 96, h: 144, tx: 508 },
+  ];
+  // Show all standard frame sizes — the selected one gets highlighted.
+  const frames = sizes.map(s => {
+    const active = s.key === sizeRaw;
+    return `<g>
+      ${active ? `<rect x="${s.x - 4}" y="${s.y - 4}" width="${s.w + 8}" height="${s.h + 8}" fill="none" stroke="var(--rust)" stroke-width="1" rx="3" stroke-dasharray="4,3" opacity="0.5"/>` : ''}
+      <rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="${active ? 'rgba(158,79,46,0.15)' : 'none'}" stroke="${active ? 'var(--rust)' : 'var(--clay)'}" stroke-width="${active ? 3 : 1.2}" rx="1"/>
+      <text x="${s.tx}" y="260" text-anchor="middle" fill="${active ? 'var(--rust)' : 'var(--text-muted)'}" font-size="${active ? 10 : 8}" font-weight="${active ? '700' : '400'}">${s.label}</text>
+      <text x="${s.tx}" y="273" text-anchor="middle" fill="${active ? 'var(--rust)' : 'var(--text-muted)'}" font-size="7" opacity="${active ? 1 : 0.5}">${s.cm}</text>
+      ${active ? `<text x="${s.tx}" y="288" text-anchor="middle" fill="var(--rust)" font-size="8" font-weight="700">▲ Your size</text>` : ''}
+    </g>`;
+  }).join('\n');
+  wrap.innerHTML = `<svg viewBox="0 0 620 ${sizeRaw ? '300' : '290'}" width="620" xmlns="http://www.w3.org/2000/svg" style="font-family:'Montserrat',sans-serif">
+    <g transform="translate(30,2)">
+      <line x1="24" y1="0" x2="24" y2="248" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>
+      <ellipse cx="24" cy="18" rx="10" ry="12" fill="none" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
+      <line x1="24" y1="30" x2="24" y2="148" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
+      <line x1="4" y1="65" x2="44" y2="65" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
+      <line x1="14" y1="148" x2="8" y2="248" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
+      <line x1="34" y1="148" x2="40" y2="248" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
+      <text x="24" y="263" text-anchor="middle" fill="var(--text-muted)" font-size="8" opacity="0.6">~170 cm</text>
+    </g>
+    <g>${frames}</g>
+    <line x1="20" y1="248" x2="600" y2="248" stroke="var(--border)" stroke-width="0.5"/>
+  </svg>`;
 }
 
+// ─── Sticky buy bar (mobile) ───
+(function() {
+  const addBtn = document.getElementById('addBtn');
+  if (!addBtn) return;
+  const bar   = document.getElementById('stickyBuyBar');
+  const sName = document.getElementById('stickyBuyName');
+  const sPrice= document.getElementById('stickyBuyPrice');
+  const sBtn  = document.getElementById('stickyBuyBtn');
+  if (!bar) return;
+  const observer = new IntersectionObserver(entries => {
+    const hidden = !entries[0].isIntersecting;
+    bar.classList.toggle('visible', hidden);
+    if (sName && window._productName) sName.textContent = window._productName;
+    if (sPrice) {
+      const priceEl = document.getElementById('priceNgn');
+      sPrice.textContent = priceEl ? priceEl.textContent : '';
+    }
+    if (sBtn) {
+      sBtn.disabled = addBtn.disabled;
+      sBtn.textContent = addBtn.textContent;
+    }
+  }, { threshold: 0 });
+  observer.observe(addBtn);
+  // Keep sticky btn in sync when price/state changes
+  const syncSticky = () => {
+    if (!bar.classList.contains('visible')) return;
+    if (sBtn) { sBtn.disabled = addBtn.disabled; sBtn.textContent = addBtn.textContent; }
+    const priceEl = document.getElementById('priceNgn');
+    if (sPrice && priceEl) sPrice.textContent = priceEl.textContent;
+  };
+  const priceEl = document.getElementById('priceNgn');
+  if (priceEl) new MutationObserver(syncSticky).observe(priceEl, { childList: true, characterData: true, subtree: true });
+})();
 
+// Reflect limited-edition remaining count and sold-out state for a variant key.
 function updateEditionState(v) {
   const label = editionLabel(_product, v);
   const el = document.getElementById('editionsLeft');
@@ -2192,5 +2206,21 @@ function closeEnquire() { document.getElementById('enquireOverlay').classList.re
   });
 })();
 </script>
+<!-- Mobile image lightbox -->
+<div class="img-lightbox" id="imgLightbox" onclick="closeLightbox()">
+  <button class="img-lightbox-close" onclick="event.stopPropagation();closeLightbox()">✕</button>
+  <img id="lightboxImg" src="" alt=""/>
+</div>
+<!-- Mobile sticky buy bar -->
+<div class="sticky-buy-bar" id="stickyBuyBar">
+  <div class="sticky-buy-name" id="stickyBuyName"></div>
+  <div class="sticky-buy-price" id="stickyBuyPrice"></div>
+  <button class="sticky-buy-btn" id="stickyBuyBtn" onclick="handleAddToCart()">Add to bag</button>
+</div>
+<!-- Mobile image lightbox -->
+<div class="img-lightbox" id="imgLightbox" onclick="closeLightbox()">
+  <button class="img-lightbox-close" onclick="event.stopPropagation();closeLightbox()">✕</button>
+  <img id="lightboxImg" src="" alt="Full artwork view"/>
+</div>
 </body>
 </html>
