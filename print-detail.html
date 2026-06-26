@@ -2407,57 +2407,66 @@ function closeInterest() {
   document.body.style.overflow = '';
 }
 
-(function() {
+// Wire interest form — use DOMContentLoaded so modal elements exist
+document.addEventListener('DOMContentLoaded', function() {
   const overlay = document.getElementById('interestOverlay');
   if (!overlay) return;
+
+  // Close handlers
   const closeBtn = document.getElementById('interestClose');
   if (closeBtn) closeBtn.addEventListener('click', closeInterest);
   overlay.addEventListener('click', e => { if (e.target === overlay) closeInterest(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInterest(); });
 
-  // Show/hide previous collector detail field
-  const prevYes = document.getElementById('interestPrevYes');
-  const prevDetail = document.getElementById('interestPrevDetail');
-  if (prevYes && prevDetail) {
-    document.querySelectorAll('input[name="prevCollector"]').forEach(r => {
-      r.addEventListener('change', () => {
-        prevDetail.style.display = prevYes.checked ? '' : 'none';
-      });
-    });
-  }
+  // Show/hide "Which piece?" when Yes is selected
+  document.addEventListener('change', function(e) {
+    if (e.target && e.target.name === 'prevCollector') {
+      const detail = document.getElementById('interestPrevDetail');
+      const yes = document.getElementById('interestPrevYes');
+      if (detail) detail.style.display = yes && yes.checked ? '' : 'none';
+    }
+  });
 
+  // Submit handler
   const sendBtn = document.getElementById('interestSend');
   if (sendBtn) sendBtn.addEventListener('click', async () => {
-    const name  = document.getElementById('interestName').value.trim();
-    const email = document.getElementById('interestEmail').value.trim();
-    const phone = document.getElementById('interestPhone')?.value.trim() || '';
-    const msg   = document.getElementById('interestMsg').value.trim();
-    const prevCollector = document.getElementById('interestPrevYes')?.checked ? 'yes' : 'no';
-    const prevDetailVal = prevCollector === 'yes' ? (document.getElementById('interestPrevDetail')?.value.trim() || '') : '';
-    if (!name)  { alert('Please enter your name'); return; }
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Please enter a valid email'); return; }
+    const name  = (document.getElementById('interestName')?.value || '').trim();
+    const email = (document.getElementById('interestEmail')?.value || '').trim();
+    const phone = (document.getElementById('interestPhone')?.value || '').trim();
+    const msg   = (document.getElementById('interestMsg')?.value || '').trim();
+    const prevYes = document.getElementById('interestPrevYes');
+    const prevCollector = prevYes?.checked ? 'yes' : 'no';
+    const prevDetailVal = prevCollector === 'yes' ? (document.getElementById('interestPrevDetail')?.value || '').trim() : '';
+    if (!name)  { showToast('Please enter your name'); return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Please enter a valid email'); return; }
     sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
-    const fullMessage = [
-      msg,
-      prevCollector === 'yes' ? ('Previously collected: Yes' + (prevDetailVal ? ' - ' + prevDetailVal : '')) : 'Previously collected: No',
+    const parts = [
+      msg || '',
+      prevCollector === 'yes'
+        ? ('Previously collected Kay’s work: Yes' + (prevDetailVal ? ' — ' + prevDetailVal : ''))
+        : 'Previously collected Kay’s work: No',
       phone ? 'Phone: ' + phone : '',
-    ].filter(Boolean).join(' | ');
+    ].filter(Boolean);
+    const fullMessage = parts.join(' | ');
     try {
       await fetch('/api/site-form', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           form_type: 'interest-1of1',
           name, email,
-          artwork: overlay._pname,
+          artwork: overlay._pname || (_product && _product.name) || '',
           message: fullMessage,
         }),
       });
     } catch(_) {}
-    document.getElementById('interestFormBody').style.display = 'none';
-    document.getElementById('interestDone').style.display = '';
-    sendBtn.disabled = false; sendBtn.textContent = 'Register interest →';
+    const formBody = document.getElementById('interestFormBody');
+    const done = document.getElementById('interestDone');
+    if (formBody) formBody.style.display = 'none';
+    if (done) done.style.display = '';
+    sendBtn.disabled = false;
+    sendBtn.textContent = 'Register interest →';
   });
-})();
+});
 </script>
 <div class="interest-overlay" id="interestOverlay">
   <div class="interest-modal" role="dialog" aria-modal="true">
