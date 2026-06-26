@@ -4497,7 +4497,7 @@ function buildCard(p) {
   card.dataset.pid = p.id;
   card.dataset.category = p.category;
   card.innerHTML = `
-    <div class="card-img">${imgHtml}${badgeHtml}<div class="card-img-hover"><span class="card-img-hover-label">Quick view</span></div></div>
+    <div class="card-img">${imgHtml}${badgeHtml}</div>
     <div class="card-body">
       <p class="card-category">${p.category}</p>
       <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
@@ -4556,8 +4556,9 @@ function buildPrintCard(p) {
       footerHtml = `<div class="card-price"><span class="price-ngn" style="color:var(--text-muted)">Sold</span></div>
         <button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold</button>`;
     } else if (isEnquire) {
-      footerHtml = `<div class="card-price"><span class="price-ngn">Unique work</span></div>
-        <button class="interest-btn" data-pid="${p.id}" data-pname="${escapeAttr(p.name)}" onclick="openInterestForm('${escapeAttr(p.id)}','${escapeAttr(p.name)}')">Make inquiry about this work →</button>`;
+      footerHtml = p.slug
+        ? `<a href="/shop/${p.slug}" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%">View artwork →</a>`
+        : `<button class="interest-btn" data-pid="${p.id}" data-pname="${escapeAttr(p.name)}" onclick="openInterestForm('${escapeAttr(p.id)}','${escapeAttr(p.name)}')" style="width:100%;text-align:center">Make inquiry →</button>`;
     } else {
       footerHtml = `<div class="card-price"><span class="price-ngn">Unavailable</span></div>
         <button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed">Unavailable</button>`;
@@ -4615,7 +4616,10 @@ function buildPrintCard(p) {
       ? `<a href="/shop/${p.slug}" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;opacity:0.4;pointer-events:none">Sold out</a>`
       : `<button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold out</button>`;
   } else if (isEnquireOnly) {
-    actionHtml = `<button class="interest-btn" data-pid="${p.id}" data-pname="${escapeAttr(p.name)}" onclick="openInterestForm('${escapeAttr(p.id)}','${escapeAttr(p.name)}')">Make inquiry about this work →</button>`;
+    // 1-of-1: no inquiry on grid — send them to the detail page first
+    actionHtml = p.slug
+      ? `<a href="/shop/${p.slug}" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">View artwork →</a>`
+      : `<a href="#" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">View artwork →</a>`;
   } else {
     // Prints always go to detail page — no add-to-bag on grid
     actionHtml = p.slug
@@ -4635,9 +4639,7 @@ function buildPrintCard(p) {
           : '' }
       <div class="card-footer">
         <div class="card-price">
-          ${ !isEnquireOnly
-            ? `<span class="price-ngn" id="pngn-${p.id}" style="font-size:0.78rem;color:var(--text-muted)">from ${fmt(Math.min(...Object.values(p.priceNgn||{}).map(Number).filter(Boolean)) || ngn)}</span>`
-            : '' }
+          ${ (() => { const allNgn = Object.values(p.priceNgn||{}).map(Number).filter(Boolean); const minNgn = allNgn.length ? Math.min(...allNgn) : (ngn||0); return minNgn ? `<span class="price-ngn" id="pngn-${p.id}" style="font-size:0.78rem;color:var(--text-muted)">${isEnquireOnly ? '' : 'from '}${fmt(minNgn)}</span>` : ''; })() }
         </div>
         ${actionHtml}
       </div>
@@ -4746,11 +4748,15 @@ function syncCardStock(pid, variantKey) {
 
   const btn = card.querySelector('.add-btn');
   if (btn) {
-    const block = soldOut || maxedByCart;
-    btn.disabled = block;
-    btn.style.opacity = block ? '0.4' : '';
-    btn.style.cursor = block ? 'not-allowed' : '';
-    btn.textContent = soldOut ? 'Sold out' : (maxedByCart ? 'All in your bag' : 'Add to bag');
+    // Print cards use an <a> tag linking to the detail page — don't overwrite with "Add to bag"
+    const isPrintCard = card.dataset.category === 'prints' && btn.tagName === 'A';
+    if (!isPrintCard) {
+      const block = soldOut || maxedByCart;
+      btn.disabled = block;
+      btn.style.opacity = block ? '0.4' : '';
+      btn.style.cursor = block ? 'not-allowed' : '';
+      btn.textContent = soldOut ? 'Sold out' : (maxedByCart ? 'All in your bag' : 'Add to bag');
+    }
   }
 }
 
