@@ -1047,6 +1047,23 @@ function fmtLocal(ngn) {
 function getActiveRate() {
   try { return sessionStorage.getItem('kw_currency'); } catch(e) { return null; }
 }
+
+function applyLocalCurrencyToDetail(p) {
+  const activeCurrency = getActiveRate();
+  if (!activeCurrency || activeCurrency === 'NGN') return;
+  const priceNgnEl = document.getElementById('priceNgn');
+  const priceUsdEl = document.getElementById('priceUsd');
+  if (!priceNgnEl) return;
+  // Get the base NGN price
+  const allNgn = (p ? printOptions.flatMap(o => (o.sizes||[]).map(s => printPrice(p, printOptionKey(o.type,s),'ngn'))).filter(Boolean) : []);
+  const baseNgn = _selectedVariant ? printPrice(p, _selectedVariant, 'ngn') : (allNgn.length ? Math.min(...allNgn) : 0);
+  if (!baseNgn) return;
+  const localPrice = fmtLocal(baseNgn);
+  if (!localPrice) return;
+  priceNgnEl.textContent = (_selectedVariant ? '' : 'from ') + localPrice;
+  priceNgnEl.style.color = 'var(--gold)';
+  if (priceUsdEl) priceUsdEl.style.display = 'none';
+}
 function shopHref(path = '') {
   if (location.protocol === 'file:') {
     const base = new URL('shop.html', location.href).href;
@@ -2036,6 +2053,8 @@ async function load() {
     if (!res.ok) { showError(); return; }
     const product = await res.json();
     renderProduct(product);
+    // Apply local currency if visitor has one selected
+    applyLocalCurrencyToDetail(product);
 
     // Load related (same series or same category)
     const seriesSlug = product.series_slug || '';
