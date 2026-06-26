@@ -222,9 +222,9 @@ body.dark nav.scrolled .nav-logo { color: #e0c8a8; }
 .locale-item-right { font-family: 'Montserrat', sans-serif; font-size: 0.7rem; font-weight: 500; color: var(--text-muted); }
 .locale-item.active .locale-item-right { color: var(--clay); }
 .price-local {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 0.62rem; font-weight: 500;
-  letter-spacing: 0.06em; color: var(--clay);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem; font-weight: 600;
+  letter-spacing: 0; color: var(--gold);
 }
 /* Scrolled (solid bar): theme text colour, no shadow. */
 nav.scrolled .nav-links a { color: var(--text); text-shadow: none; opacity: 0.82; }
@@ -3226,7 +3226,6 @@ body.dark { --text-muted: #b3a392; }
         <div class="pay-panel active" id="panel-flutterwave">
           <p class="pay-info">All major cards accepted internationally — Visa, Mastercard, Verve and more.</p>
           <button class="submit-pay-btn" id="flwPayBtn">Pay by card</button>
-          <p style="font-size:0.72rem;color:var(--text-muted);margin-top:0.6rem;line-height:1.5;text-align:center">Amount charged in NGN — your bank handles conversion at their rate.</p>
         </div>
 
         <!-- Paystack panel -->
@@ -4192,12 +4191,21 @@ function setCurrency(code) {
 }
 
 function fmtLocal(ngn) {
-  if (!_visitorRate || !_visitorSymbol) return '';
-  const amount = ngn * _visitorRate;
-  const formatted = amount >= 100
-    ? Math.round(amount).toLocaleString()
-    : amount >= 1 ? amount.toFixed(2) : amount.toFixed(3);
-  return _visitorSymbol + formatted;
+  if (!_visitorRate || !_activeCurrency || _activeCurrency === 'NGN') return '';
+  const amount = Number(ngn) * _visitorRate;
+  const maximumFractionDigits = amount >= 100 ? 0 : amount >= 1 ? 2 : 3;
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: _activeCurrency,
+      maximumFractionDigits,
+    }).format(amount);
+  } catch (_) {
+    const formatted = amount >= 100
+      ? Math.round(amount).toLocaleString()
+      : amount >= 1 ? amount.toFixed(2) : amount.toFixed(3);
+    return (_visitorSymbol || _activeCurrency + ' ') + formatted;
+  }
 }
 
 function toggleCurrency() { setCurrency(_showLocalCurrency ? 'NGN' : 'local'); }
@@ -4210,8 +4218,9 @@ function refreshAllPrices() {
       const localEl = document.getElementById('plocal-' + p.id);
       if (!ngnEl) return;
       // Find cheapest price for display
-      const sizes = Object.values(p.prices_ngn || {});
-      const cheapestNgn = sizes.length ? Math.min(...sizes.map(Number).filter(Boolean)) : 0;
+      const priceMap = p.priceNgn || p.prices_ngn || {};
+      const sizes = Object.values(priceMap).map(Number).filter(Boolean);
+      const cheapestNgn = sizes.length ? Math.min(...sizes) : 0;
       if (!cheapestNgn) return;
       if (_showLocalCurrency) {
         ngnEl.style.display = 'none';
