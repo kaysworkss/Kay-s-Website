@@ -422,29 +422,1272 @@ nav.scrolled .nav-cart:hover { color: var(--rust); opacity: 1; }
 }
 .coll-tile:hover .coll-tile-arrow { color: var(--clay); }
 
-/* ── Promo ticker (replaces bulky banner) ── */
-.promo-ticker {
-  background: var(--parchment);
-  border-top: 1px solid rgba(196,132,90,0.2);
-  border-bottom: 1px solid rgba(196,132,90,0.2);
-  padding: 0.6rem 0;
+UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Shop · Kay's Works</title>
+<link rel="icon" href="/images/kaysworkslogo.svg" type="image/svg+xml"/>
+<link rel="alternate icon" href="/favicon.ico" sizes="any"/>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+<link rel="manifest" href="/site.webmanifest"/>
+<meta name="theme-color" content="#f5ede0"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet"/>
+
+<style>
+/* ── Custom cursor (matches index.html) ── */
+html, body, * { cursor: none !important; }
+.cursor { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999; }
+.cursor-dot {
+  width: 10px; height: 10px; background: #c4845a;
+  border-radius: 50%; position: absolute;
+  transform: translate(-50%, -50%);
+  transition: background 0.3s ease, transform 0.1s ease;
+}
+.cursor-ring {
+  width: 36px; height: 36px; border: 1.5px solid #c4845a;
+  border-radius: 50%; position: absolute;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s, border-color 0.3s ease;
+  opacity: 0.8;
+}
+.cursor-dot.light { background: #f5ede0; }
+.cursor-ring.light { border-color: #f5ede0; opacity: 1; }
+.cursor-dot.gold { background: var(--gold); }
+.cursor-ring.gold { border-color: var(--gold); }
+
+/* ── Reset ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* Ensure only this page's elements are visible — kills any bfcache-ghosted
+   fixed-position navs painted by the browser during cross-page transitions */
+nav:not(#nav) { display: none !important; }
+a{color:inherit;text-decoration:none;-webkit-tap-highlight-color:transparent}
+button{-webkit-tap-highlight-color:transparent;cursor:pointer}
+img{display:block;max-width:100%}
+
+/* ── Tokens ── */
+:root {
+  --clay:      #c4845a;
+  --rust:      #9e4f2e;
+  --sand:      #e8d5b0;
+  --linen:     #f5ede0;
+  --bark:      #4a3228;
+  --ash:       #8a7060;
+  --gold:      #c9993a;
+  --moss:      #5f7a4a;
+  --parchment: #ede0c8;
+  --bg:        var(--linen);
+  --bg-alt:    var(--parchment);
+  --bg-card:   #fff;
+  --text:      var(--bark);
+  --text-muted: var(--ash);
+  --border:    rgba(74,50,40,0.12);
+  --border-hover: rgba(196,132,90,0.45);
+  --nav-scrolled: rgba(245,237,224,0.94);
+  --shadow:    0 2px 24px rgba(74,50,40,0.09);
+  --shadow-hover: 0 8px 40px rgba(74,50,40,0.15);
+}
+body.dark {
+  --bg:        #141010;
+  --bg-alt:    #1e1510;
+  --bg-card:   #1e1510;
+  --text:      #e8d5b0;
+  --text-muted: #b09888;
+  --border:    rgba(196,132,90,0.12);
+  --border-hover: rgba(196,132,90,0.5);
+  --nav-scrolled: rgba(20,16,16,0.94);
+  --shadow:    0 2px 24px rgba(0,0,0,0.35);
+  --shadow-hover: 0 8px 40px rgba(0,0,0,0.5);
+}
+
+/* ── Base ── */
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Crimson Pro', serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.4s, color 0.4s;
+  min-height: 100vh;
+}
+
+/* ── Noise overlay ── */
+body::before {
+  content:'';pointer-events:none;position:fixed;inset:0;z-index:0;opacity:0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Nav ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 clamp(1.2rem,4vw,3rem);
+  height: 60px;
+  background: transparent;
+  transition: background 0.4s, backdrop-filter 0.4s;
+  isolation: isolate;
+}
+nav.scrolled {
+  background: var(--nav-scrolled);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+/* Contrast scrim: a stronger top-down gradient so nav text stays readable over
+   ANY hero image — light or dark. Combined with light nav text + text-shadow
+   below, this guarantees legibility regardless of the photo behind it. */
+nav::before {
+  content: '';
+  position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(to bottom, rgba(20,12,8,0.72) 0%, rgba(20,12,8,0.34) 55%, transparent 100%);
+  pointer-events: none;
+  opacity: 1; transition: opacity 0.4s;
+}
+nav.scrolled::before { opacity: 0; }
+.nav-logo {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase;
+  color: #f5ede0; text-decoration: none;
+  display: flex; align-items: center;
+  -webkit-tap-highlight-color: transparent;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+  transition: color 0.4s, text-shadow 0.4s;
+}
+/* When the nav has a solid background (scrolled), drop the shadow and use the
+   theme text color for clean contrast against the bar itself. */
+nav.scrolled .nav-logo { color: var(--bark); text-shadow: none; }
+body.dark nav.scrolled .nav-logo { color: #e0c8a8; }
+.nav-right { display: flex; align-items: center; gap: 1.4rem; }
+.nav-links { display: flex; gap: 1.4rem; }
+.nav-links a {
+  font-family: 'Crimson Pro', serif; font-size: 0.92rem;
+  color: #f5ede0; opacity: 0.92;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+  transition: opacity 0.2s, color 0.4s, text-shadow 0.4s;
+}
+.nav-links a:hover, .nav-links a.active { opacity: 1; color: var(--rust); }
+.currency-toggle {
+  font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.14em;
+  text-transform: uppercase; padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border); border-radius: 20px;
+  background: none; color: var(--text-muted); cursor: pointer;
+  transition: border-color 0.2s, color 0.2s; white-space: nowrap;
+}
+.currency-toggle:hover { border-color: var(--clay); color: var(--clay); }
+.currency-toggle.active { border-color: var(--clay); color: var(--clay); background: rgba(196,132,90,0.08); }
+.price-local {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.62rem; font-weight: 500;
+  letter-spacing: 0.06em; color: var(--clay);
+}
+/* Scrolled (solid bar): theme text colour, no shadow. */
+nav.scrolled .nav-links a { color: var(--text); text-shadow: none; opacity: 0.82; }
+nav.scrolled .nav-links a:hover, nav.scrolled .nav-links a.active { color: var(--rust); opacity: 1; }
+.theme-btn {
+  background: none; border: none;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gold); font-size: 1rem; border-radius: 50%;
+  transition: background 0.2s, text-shadow 0.4s;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+}
+.theme-btn:hover { background: rgba(201,153,58,0.1); }
+nav.scrolled .theme-btn { text-shadow: none; }
+.nav-cart {
+  position: relative;
+  background: none; border: none;
+  color: #f5ede0; font-size: 1.1rem;
+  display: flex; align-items: center; gap: 0.4rem;
+  font-family: 'Crimson Pro', serif; font-size: 0.92rem;
+  opacity: 0.92; transition: opacity 0.2s, color 0.4s, text-shadow 0.4s;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+}
+.nav-cart:hover { opacity: 1; color: var(--rust); }
+nav.scrolled .nav-cart { color: var(--text); text-shadow: none; opacity: 0.82; }
+nav.scrolled .nav-cart:hover { color: var(--rust); opacity: 1; }
+.cart-badge {
+  position: absolute; top: -5px; right: -8px;
+  background: var(--rust); color: #fff;
+  font-family: 'Montserrat', sans-serif; font-size: 0.55rem;
+  font-weight: 600; letter-spacing: 0;
+  width: 16px; height: 16px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transform: scale(0); transition: opacity 0.2s, transform 0.2s;
+}
+.cart-badge.visible { opacity: 1; transform: scale(1); }
+
+/* ── Hero — full bleed cinematic ── */
+.shop-hero {
+  position: relative;
+  min-height: 92vh;
+  display: flex; align-items: flex-end; justify-content: center;
+  overflow: hidden;
+  background: #0e0a08;
+}
+.shop-hero-bg {
+  position: absolute; inset: 0; z-index: 0;
+  /* No coloured gradient — the image speaks for itself. A plain dark
+     fallback shows while the image loads. */
+  background: #0e0a08;
+}
+.shop-hero-bg-img {
+  position: absolute; inset: 0; z-index: 1;
+  background-image: url('/images/seeing%20it%20through%20banner.png');
+  background-size: cover; background-position: center 55%;
+  opacity: 1;
+  transition: transform 8s ease;
+}
+@media (max-width: 600px) {
+  .shop-hero-bg-img {
+    background-image: url('/images/seeing%20it%20through.jpg');
+    background-position: center 50%;
+  }
+}
+.shop-hero:hover .shop-hero-bg-img { transform: scale(1.04); }
+.shop-hero-vignette {
+  display: none;
+}
+.shop-hero-content {
+  position: relative; z-index: 3;
+  padding: 0 clamp(1.4rem,6vw,5rem) clamp(4rem,8vw,7rem);
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  text-align: center;
+}
+.shop-hero-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.75rem;
+  letter-spacing: 0.35em; text-transform: uppercase;
+  color: #f0e4cc; margin-bottom: 1.2rem;
+  display: flex; align-items: center; justify-content: center; gap: 0.8rem;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+}
+.shop-hero-eyebrow::before, .shop-hero-eyebrow::after {
+  content: ''; display: inline-block; width: 32px; height: 1px;
+  background: #f0e4cc;
+}
+.shop-hero-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.6rem, 7vw, 6rem);
+  font-weight: 300; line-height: 0.95;
+  color: #f0e4cc;
+  margin-bottom: 1.2rem;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+.shop-hero-title em { font-style: italic; color: var(--clay); }
+.shop-hero-sub {
+  font-size: 1.05rem; color: #ffffff; opacity: 0.92;
+  line-height: 1.75; max-width: 440px;
+  margin: 0 auto;
+  text-align: center;
+  font-family: 'Crimson Pro', serif;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.45);
+}
+.shop-hero-ctas {
+  display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: center;
+}
+.hero-cta-primary {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 0.9rem 2.2rem;
+  background: var(--clay); color: #fff;
+  border: none; border-radius: 10px;
+  transition: background 0.2s, transform 0.15s;
+}
+.hero-cta-primary:hover { background: var(--rust); transform: translateY(-1px); }
+.hero-cta-ghost {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 0.9rem 2.2rem;
+  background: transparent; color: rgba(240,228,204,0.8);
+  border: 1px solid rgba(240,228,204,0.35); border-radius: 10px;
+  text-decoration: none;
+  transition: border-color 0.2s, color 0.2s;
+}
+.hero-cta-ghost:hover { border-color: var(--clay); color: var(--clay); }
+/* Scroll hint */
+.hero-scroll-hint {
+  position: absolute; bottom: 2rem; right: clamp(1.4rem,5vw,4rem);
+  z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.28em; text-transform: uppercase; color: rgba(240,228,204,0.4);
+}
+.hero-scroll-line {
+  width: 1px; height: 48px;
+  background: linear-gradient(to bottom, transparent, rgba(240,228,204,0.4));
+  animation: scrollPulse 2s ease-in-out infinite;
+}
+@keyframes scrollPulse { 0%,100%{opacity:0.4;} 50%{opacity:1;} }
+
+/* ── Marquee strip ── */
+.marquee-strip {
+  background: var(--rust);
+  padding: 0.75rem 0;
   overflow: hidden; white-space: nowrap;
 }
-body.dark .promo-ticker { background: #1a1210; }
-.promo-ticker-track {
-  display: inline-flex; align-items: center; gap: 1.4rem;
-  animation: tickerScroll 32s linear infinite;
+.marquee-track {
+  display: inline-flex; gap: 0;
+  animation: marqueeScroll 28s linear infinite;
 }
-.promo-ticker-track:hover { animation-play-state: paused; }
-@keyframes tickerScroll { 0%{transform:translateX(0);} 100%{transform:translateX(-50%);} }
-.promo-ticker-item {
+.marquee-track:hover { animation-play-state: paused; }
+@keyframes marqueeScroll { 0%{transform:translateX(0);} 100%{transform:translateX(-50%);} }
+.marquee-item {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.3em; text-transform: uppercase; color: var(--linen);
+  padding: 0 2.5rem; display: inline-flex; align-items: center; gap: 2.5rem;
+}
+.marquee-item::after { content: '✦'; color: var(--clay); opacity: 0.7; }
+
+/* ── Collection tiles ── */
+.collections-section {
+  padding: clamp(3rem,6vw,5rem) clamp(1.4rem,5vw,4rem);
+  background: var(--bg);
+}
+.collections-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 2.4rem; flex-wrap: wrap; gap: 1rem;
+}
+.collections-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.32em; text-transform: uppercase; color: var(--gold);
+  margin-bottom: 0.5rem;
+}
+.collections-heading {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 300; color: var(--text); line-height: 1.1;
+}
+.collections-heading em { font-style: italic; color: var(--rust); }
+.collections-browse-all {
   font-family: 'Cinzel', serif; font-size: 0.5rem;
-  letter-spacing: 0.2em; text-transform: uppercase;
-  color: var(--text-muted);
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--text-muted); text-decoration: none;
+  display: flex; align-items: center; gap: 0.5rem;
+  transition: color 0.2s; white-space: nowrap;
 }
-.promo-ticker-sep {
-  color: var(--gold); font-size: 0.45rem; opacity: 0.6;
+.collections-browse-all:hover { color: var(--clay); }
+.collections-browse-all::after { content: '→'; }
+.collections-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 0.8rem;
+  height: 480px;
 }
+@media(max-width:700px) {
+  .collections-grid { grid-template-columns: 1fr; height: auto; }
+  .coll-tile { height: 300px; }
+}
+.coll-tile {
+  position: relative; overflow: hidden;
+  cursor: pointer; background: var(--bg-alt);
+  border-radius: 14px;
+  transition: transform 0.3s;
+}
+.coll-tile:hover { transform: scale(0.99); }
+.coll-tile-chips {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.7rem 0 0.8rem;
+}
+.coll-chip {
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  padding: 0.32rem 0.75rem;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 20px; color: rgba(240,228,204,0.8);
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.coll-chip:hover {
+  background: rgba(196,132,90,0.35);
+  border-color: var(--clay); color: #fff;
+}
+.coll-tile-img {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  transition: transform 0.7s ease;
+}
+.coll-tile:hover .coll-tile-img { transform: scale(1.06); }
+.coll-tile-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(14,10,8,0.95) 0%,
+    rgba(14,10,8,0.85) 40%,
+    rgba(14,10,8,0.45) 70%,
+    rgba(14,10,8,0.08) 100%
+  );
+}
+.coll-tile-body {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 1.6rem 1.6rem;
+}
+.coll-tile-label {
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 0.4rem;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+.coll-tile-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.3rem, 2.5vw, 1.8rem);
+  font-weight: 300; color: #f0e4cc; line-height: 1.1;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+}
+.coll-tile-name em { font-style: italic; color: var(--clay); }
+.coll-tile-arrow {
+  display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.6rem;
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: rgba(240,228,204,0.7);
+  transition: color 0.2s;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+.coll-tile:hover .coll-tile-arrow { color: var(--clay); }
+
+/* ── Promo ticker (replaces bulky banner) ── */
+UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Shop · Kay's Works</title>
+<link rel="icon" href="/images/kaysworkslogo.svg" type="image/svg+xml"/>
+<link rel="alternate icon" href="/favicon.ico" sizes="any"/>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+<link rel="manifest" href="/site.webmanifest"/>
+<meta name="theme-color" content="#f5ede0"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet"/>
+
+<style>
+/* ── Custom cursor (matches index.html) ── */
+html, body, * { cursor: none !important; }
+.cursor { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999; }
+.cursor-dot {
+  width: 10px; height: 10px; background: #c4845a;
+  border-radius: 50%; position: absolute;
+  transform: translate(-50%, -50%);
+  transition: background 0.3s ease, transform 0.1s ease;
+}
+.cursor-ring {
+  width: 36px; height: 36px; border: 1.5px solid #c4845a;
+  border-radius: 50%; position: absolute;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s, border-color 0.3s ease;
+  opacity: 0.8;
+}
+.cursor-dot.light { background: #f5ede0; }
+.cursor-ring.light { border-color: #f5ede0; opacity: 1; }
+.cursor-dot.gold { background: var(--gold); }
+.cursor-ring.gold { border-color: var(--gold); }
+
+/* ── Reset ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* Ensure only this page's elements are visible — kills any bfcache-ghosted
+   fixed-position navs painted by the browser during cross-page transitions */
+nav:not(#nav) { display: none !important; }
+a{color:inherit;text-decoration:none;-webkit-tap-highlight-color:transparent}
+button{-webkit-tap-highlight-color:transparent;cursor:pointer}
+img{display:block;max-width:100%}
+
+/* ── Tokens ── */
+:root {
+  --clay:      #c4845a;
+  --rust:      #9e4f2e;
+  --sand:      #e8d5b0;
+  --linen:     #f5ede0;
+  --bark:      #4a3228;
+  --ash:       #8a7060;
+  --gold:      #c9993a;
+  --moss:      #5f7a4a;
+  --parchment: #ede0c8;
+  --bg:        var(--linen);
+  --bg-alt:    var(--parchment);
+  --bg-card:   #fff;
+  --text:      var(--bark);
+  --text-muted: var(--ash);
+  --border:    rgba(74,50,40,0.12);
+  --border-hover: rgba(196,132,90,0.45);
+  --nav-scrolled: rgba(245,237,224,0.94);
+  --shadow:    0 2px 24px rgba(74,50,40,0.09);
+  --shadow-hover: 0 8px 40px rgba(74,50,40,0.15);
+}
+body.dark {
+  --bg:        #141010;
+  --bg-alt:    #1e1510;
+  --bg-card:   #1e1510;
+  --text:      #e8d5b0;
+  --text-muted: #b09888;
+  --border:    rgba(196,132,90,0.12);
+  --border-hover: rgba(196,132,90,0.5);
+  --nav-scrolled: rgba(20,16,16,0.94);
+  --shadow:    0 2px 24px rgba(0,0,0,0.35);
+  --shadow-hover: 0 8px 40px rgba(0,0,0,0.5);
+}
+
+/* ── Base ── */
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Crimson Pro', serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.4s, color 0.4s;
+  min-height: 100vh;
+}
+
+/* ── Noise overlay ── */
+body::before {
+  content:'';pointer-events:none;position:fixed;inset:0;z-index:0;opacity:0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Nav ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 clamp(1.2rem,4vw,3rem);
+  height: 60px;
+  background: transparent;
+  transition: background 0.4s, backdrop-filter 0.4s;
+  isolation: isolate;
+}
+nav.scrolled {
+  background: var(--nav-scrolled);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+/* Contrast scrim: a stronger top-down gradient so nav text stays readable over
+   ANY hero image — light or dark. Combined with light nav text + text-shadow
+   below, this guarantees legibility regardless of the photo behind it. */
+nav::before {
+  content: '';
+  position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(to bottom, rgba(20,12,8,0.72) 0%, rgba(20,12,8,0.34) 55%, transparent 100%);
+  pointer-events: none;
+  opacity: 1; transition: opacity 0.4s;
+}
+nav.scrolled::before { opacity: 0; }
+.nav-logo {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase;
+  color: #f5ede0; text-decoration: none;
+  display: flex; align-items: center;
+  -webkit-tap-highlight-color: transparent;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+  transition: color 0.4s, text-shadow 0.4s;
+}
+/* When the nav has a solid background (scrolled), drop the shadow and use the
+   theme text color for clean contrast against the bar itself. */
+nav.scrolled .nav-logo { color: var(--bark); text-shadow: none; }
+body.dark nav.scrolled .nav-logo { color: #e0c8a8; }
+.nav-right { display: flex; align-items: center; gap: 1.4rem; }
+.nav-links { display: flex; gap: 1.4rem; }
+.nav-links a {
+  font-family: 'Crimson Pro', serif; font-size: 0.92rem;
+  color: #f5ede0; opacity: 0.92;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+  transition: opacity 0.2s, color 0.4s, text-shadow 0.4s;
+}
+.nav-links a:hover, .nav-links a.active { opacity: 1; color: var(--rust); }
+.currency-toggle {
+  font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.14em;
+  text-transform: uppercase; padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border); border-radius: 20px;
+  background: none; color: var(--text-muted); cursor: pointer;
+  transition: border-color 0.2s, color 0.2s; white-space: nowrap;
+}
+.currency-toggle:hover { border-color: var(--clay); color: var(--clay); }
+.currency-toggle.active { border-color: var(--clay); color: var(--clay); background: rgba(196,132,90,0.08); }
+.price-local {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.62rem; font-weight: 500;
+  letter-spacing: 0.06em; color: var(--clay);
+}
+/* Scrolled (solid bar): theme text colour, no shadow. */
+nav.scrolled .nav-links a { color: var(--text); text-shadow: none; opacity: 0.82; }
+nav.scrolled .nav-links a:hover, nav.scrolled .nav-links a.active { color: var(--rust); opacity: 1; }
+.theme-btn {
+  background: none; border: none;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gold); font-size: 1rem; border-radius: 50%;
+  transition: background 0.2s, text-shadow 0.4s;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+}
+.theme-btn:hover { background: rgba(201,153,58,0.1); }
+nav.scrolled .theme-btn { text-shadow: none; }
+.nav-cart {
+  position: relative;
+  background: none; border: none;
+  color: #f5ede0; font-size: 1.1rem;
+  display: flex; align-items: center; gap: 0.4rem;
+  font-family: 'Crimson Pro', serif; font-size: 0.92rem;
+  opacity: 0.92; transition: opacity 0.2s, color 0.4s, text-shadow 0.4s;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+}
+.nav-cart:hover { opacity: 1; color: var(--rust); }
+nav.scrolled .nav-cart { color: var(--text); text-shadow: none; opacity: 0.82; }
+nav.scrolled .nav-cart:hover { color: var(--rust); opacity: 1; }
+.cart-badge {
+  position: absolute; top: -5px; right: -8px;
+  background: var(--rust); color: #fff;
+  font-family: 'Montserrat', sans-serif; font-size: 0.55rem;
+  font-weight: 600; letter-spacing: 0;
+  width: 16px; height: 16px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transform: scale(0); transition: opacity 0.2s, transform 0.2s;
+}
+.cart-badge.visible { opacity: 1; transform: scale(1); }
+
+/* ── Hero — full bleed cinematic ── */
+.shop-hero {
+  position: relative;
+  min-height: 92vh;
+  display: flex; align-items: flex-end; justify-content: center;
+  overflow: hidden;
+  background: #0e0a08;
+}
+.shop-hero-bg {
+  position: absolute; inset: 0; z-index: 0;
+  /* No coloured gradient — the image speaks for itself. A plain dark
+     fallback shows while the image loads. */
+  background: #0e0a08;
+}
+.shop-hero-bg-img {
+  position: absolute; inset: 0; z-index: 1;
+  background-image: url('/images/seeing%20it%20through%20banner.png');
+  background-size: cover; background-position: center 55%;
+  opacity: 1;
+  transition: transform 8s ease;
+}
+@media (max-width: 600px) {
+  .shop-hero-bg-img {
+    background-image: url('/images/seeing%20it%20through.jpg');
+    background-position: center 50%;
+  }
+}
+.shop-hero:hover .shop-hero-bg-img { transform: scale(1.04); }
+.shop-hero-vignette {
+  display: none;
+}
+.shop-hero-content {
+  position: relative; z-index: 3;
+  padding: 0 clamp(1.4rem,6vw,5rem) clamp(4rem,8vw,7rem);
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  text-align: center;
+}
+.shop-hero-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.75rem;
+  letter-spacing: 0.35em; text-transform: uppercase;
+  color: #f0e4cc; margin-bottom: 1.2rem;
+  display: flex; align-items: center; justify-content: center; gap: 0.8rem;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+}
+.shop-hero-eyebrow::before, .shop-hero-eyebrow::after {
+  content: ''; display: inline-block; width: 32px; height: 1px;
+  background: #f0e4cc;
+}
+.shop-hero-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.6rem, 7vw, 6rem);
+  font-weight: 300; line-height: 0.95;
+  color: #f0e4cc;
+  margin-bottom: 1.2rem;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+.shop-hero-title em { font-style: italic; color: var(--clay); }
+.shop-hero-sub {
+  font-size: 1.05rem; color: #ffffff; opacity: 0.92;
+  line-height: 1.75; max-width: 440px;
+  margin: 0 auto;
+  text-align: center;
+  font-family: 'Crimson Pro', serif;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.45);
+}
+.shop-hero-ctas {
+  display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: center;
+}
+.hero-cta-primary {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 0.9rem 2.2rem;
+  background: var(--clay); color: #fff;
+  border: none; border-radius: 10px;
+  transition: background 0.2s, transform 0.15s;
+}
+.hero-cta-primary:hover { background: var(--rust); transform: translateY(-1px); }
+.hero-cta-ghost {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 0.9rem 2.2rem;
+  background: transparent; color: rgba(240,228,204,0.8);
+  border: 1px solid rgba(240,228,204,0.35); border-radius: 10px;
+  text-decoration: none;
+  transition: border-color 0.2s, color 0.2s;
+}
+.hero-cta-ghost:hover { border-color: var(--clay); color: var(--clay); }
+/* Scroll hint */
+.hero-scroll-hint {
+  position: absolute; bottom: 2rem; right: clamp(1.4rem,5vw,4rem);
+  z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.28em; text-transform: uppercase; color: rgba(240,228,204,0.4);
+}
+.hero-scroll-line {
+  width: 1px; height: 48px;
+  background: linear-gradient(to bottom, transparent, rgba(240,228,204,0.4));
+  animation: scrollPulse 2s ease-in-out infinite;
+}
+@keyframes scrollPulse { 0%,100%{opacity:0.4;} 50%{opacity:1;} }
+
+/* ── Marquee strip ── */
+.marquee-strip {
+  background: var(--rust);
+  padding: 0.75rem 0;
+  overflow: hidden; white-space: nowrap;
+}
+.marquee-track {
+  display: inline-flex; gap: 0;
+  animation: marqueeScroll 28s linear infinite;
+}
+.marquee-track:hover { animation-play-state: paused; }
+@keyframes marqueeScroll { 0%{transform:translateX(0);} 100%{transform:translateX(-50%);} }
+.marquee-item {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.3em; text-transform: uppercase; color: var(--linen);
+  padding: 0 2.5rem; display: inline-flex; align-items: center; gap: 2.5rem;
+}
+.marquee-item::after { content: '✦'; color: var(--clay); opacity: 0.7; }
+
+/* ── Collection tiles ── */
+.collections-section {
+  padding: clamp(3rem,6vw,5rem) clamp(1.4rem,5vw,4rem);
+  background: var(--bg);
+}
+.collections-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 2.4rem; flex-wrap: wrap; gap: 1rem;
+}
+.collections-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.32em; text-transform: uppercase; color: var(--gold);
+  margin-bottom: 0.5rem;
+}
+.collections-heading {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 300; color: var(--text); line-height: 1.1;
+}
+.collections-heading em { font-style: italic; color: var(--rust); }
+.collections-browse-all {
+  font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--text-muted); text-decoration: none;
+  display: flex; align-items: center; gap: 0.5rem;
+  transition: color 0.2s; white-space: nowrap;
+}
+.collections-browse-all:hover { color: var(--clay); }
+.collections-browse-all::after { content: '→'; }
+.collections-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 0.8rem;
+  height: 480px;
+}
+@media(max-width:700px) {
+  .collections-grid { grid-template-columns: 1fr; height: auto; }
+  .coll-tile { height: 300px; }
+}
+.coll-tile {
+  position: relative; overflow: hidden;
+  cursor: pointer; background: var(--bg-alt);
+  border-radius: 14px;
+  transition: transform 0.3s;
+}
+.coll-tile:hover { transform: scale(0.99); }
+.coll-tile-chips {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.7rem 0 0.8rem;
+}
+.coll-chip {
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  padding: 0.32rem 0.75rem;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 20px; color: rgba(240,228,204,0.8);
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.coll-chip:hover {
+  background: rgba(196,132,90,0.35);
+  border-color: var(--clay); color: #fff;
+}
+.coll-tile-img {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  transition: transform 0.7s ease;
+}
+.coll-tile:hover .coll-tile-img { transform: scale(1.06); }
+.coll-tile-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(14,10,8,0.95) 0%,
+    rgba(14,10,8,0.85) 40%,
+    rgba(14,10,8,0.45) 70%,
+    rgba(14,10,8,0.08) 100%
+  );
+}
+.coll-tile-body {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 1.6rem 1.6rem;
+}
+.coll-tile-label {
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 0.4rem;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+.coll-tile-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.3rem, 2.5vw, 1.8rem);
+  font-weight: 300; color: #f0e4cc; line-height: 1.1;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+}
+.coll-tile-name em { font-style: italic; color: var(--clay); }
+.coll-tile-arrow {
+  display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.6rem;
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: rgba(240,228,204,0.7);
+  transition: color 0.2s;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+.coll-tile:hover .coll-tile-arrow { color: var(--clay); }
+
+UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Shop · Kay's Works</title>
+<link rel="icon" href="/images/kaysworkslogo.svg" type="image/svg+xml"/>
+<link rel="alternate icon" href="/favicon.ico" sizes="any"/>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+<link rel="manifest" href="/site.webmanifest"/>
+<meta name="theme-color" content="#f5ede0"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet"/>
+
+<style>
+/* ── Custom cursor (matches index.html) ── */
+html, body, * { cursor: none !important; }
+.cursor { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999; }
+.cursor-dot {
+  width: 10px; height: 10px; background: #c4845a;
+  border-radius: 50%; position: absolute;
+  transform: translate(-50%, -50%);
+  transition: background 0.3s ease, transform 0.1s ease;
+}
+.cursor-ring {
+  width: 36px; height: 36px; border: 1.5px solid #c4845a;
+  border-radius: 50%; position: absolute;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s, border-color 0.3s ease;
+  opacity: 0.8;
+}
+.cursor-dot.light { background: #f5ede0; }
+.cursor-ring.light { border-color: #f5ede0; opacity: 1; }
+.cursor-dot.gold { background: var(--gold); }
+.cursor-ring.gold { border-color: var(--gold); }
+
+/* ── Reset ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* Ensure only this page's elements are visible — kills any bfcache-ghosted
+   fixed-position navs painted by the browser during cross-page transitions */
+nav:not(#nav) { display: none !important; }
+a{color:inherit;text-decoration:none;-webkit-tap-highlight-color:transparent}
+button{-webkit-tap-highlight-color:transparent;cursor:pointer}
+img{display:block;max-width:100%}
+
+/* ── Tokens ── */
+:root {
+  --clay:      #c4845a;
+  --rust:      #9e4f2e;
+  --sand:      #e8d5b0;
+  --linen:     #f5ede0;
+  --bark:      #4a3228;
+  --ash:       #8a7060;
+  --gold:      #c9993a;
+  --moss:      #5f7a4a;
+  --parchment: #ede0c8;
+  --bg:        var(--linen);
+  --bg-alt:    var(--parchment);
+  --bg-card:   #fff;
+  --text:      var(--bark);
+  --text-muted: var(--ash);
+  --border:    rgba(74,50,40,0.12);
+  --border-hover: rgba(196,132,90,0.45);
+  --nav-scrolled: rgba(245,237,224,0.94);
+  --shadow:    0 2px 24px rgba(74,50,40,0.09);
+  --shadow-hover: 0 8px 40px rgba(74,50,40,0.15);
+}
+body.dark {
+  --bg:        #141010;
+  --bg-alt:    #1e1510;
+  --bg-card:   #1e1510;
+  --text:      #e8d5b0;
+  --text-muted: #b09888;
+  --border:    rgba(196,132,90,0.12);
+  --border-hover: rgba(196,132,90,0.5);
+  --nav-scrolled: rgba(20,16,16,0.94);
+  --shadow:    0 2px 24px rgba(0,0,0,0.35);
+  --shadow-hover: 0 8px 40px rgba(0,0,0,0.5);
+}
+
+/* ── Base ── */
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Crimson Pro', serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.4s, color 0.4s;
+  min-height: 100vh;
+}
+
+/* ── Noise overlay ── */
+body::before {
+  content:'';pointer-events:none;position:fixed;inset:0;z-index:0;opacity:0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Nav ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 clamp(1.2rem,4vw,3rem);
+  height: 60px;
+  background: transparent;
+  transition: background 0.4s, backdrop-filter 0.4s;
+  isolation: isolate;
+}
+nav.scrolled {
+  background: var(--nav-scrolled);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+/* Contrast scrim: a stronger top-down gradient so nav text stays readable over
+   ANY hero image — light or dark. Combined with light nav text + text-shadow
+   below, this guarantees legibility regardless of the photo behind it. */
+nav::before {
+  content: '';
+  position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(to bottom, rgba(20,12,8,0.72) 0%, rgba(20,12,8,0.34) 55%, transparent 100%);
+  pointer-events: none;
+  opacity: 1; transition: opacity 0.4s;
+}
+nav.scrolled::before { opacity: 0; }
+.nav-logo {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase;
+  color: #f5ede0; text-decoration: none;
+  display: flex; align-items: center;
+  -webkit-tap-highlight-color: transparent;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+  transition: color 0.4s, text-shadow 0.4s;
+}
+/* When the nav has a solid background (scrolled), drop the shadow and use the
+   theme text color for clean contrast against the bar itself. */
+nav.scrolled .nav-logo { color: var(--bark); text-shadow: none; }
+body.dark nav.scrolled .nav-logo { color: #e0c8a8; }
+.nav-right { display: flex; align-items: center; gap: 1.4rem; }
+.nav-links { display: flex; gap: 1.4rem; }
+.nav-links a {
+  font-family: 'Crimson Pro', serif; font-size: 0.92rem;
+  color: #f5ede0; opacity: 0.92;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+  transition: opacity 0.2s, color 0.4s, text-shadow 0.4s;
+}
+.nav-links a:hover, .nav-links a.active { opacity: 1; color: var(--rust); }
+.currency-toggle {
+  font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.14em;
+  text-transform: uppercase; padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border); border-radius: 20px;
+  background: none; color: var(--text-muted); cursor: pointer;
+  transition: border-color 0.2s, color 0.2s; white-space: nowrap;
+}
+.currency-toggle:hover { border-color: var(--clay); color: var(--clay); }
+.currency-toggle.active { border-color: var(--clay); color: var(--clay); background: rgba(196,132,90,0.08); }
+.price-local {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.62rem; font-weight: 500;
+  letter-spacing: 0.06em; color: var(--clay);
+}
+/* Scrolled (solid bar): theme text colour, no shadow. */
+nav.scrolled .nav-links a { color: var(--text); text-shadow: none; opacity: 0.82; }
+nav.scrolled .nav-links a:hover, nav.scrolled .nav-links a.active { color: var(--rust); opacity: 1; }
+.theme-btn {
+  background: none; border: none;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gold); font-size: 1rem; border-radius: 50%;
+  transition: background 0.2s, text-shadow 0.4s;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+}
+.theme-btn:hover { background: rgba(201,153,58,0.1); }
+nav.scrolled .theme-btn { text-shadow: none; }
+.nav-cart {
+  position: relative;
+  background: none; border: none;
+  color: #f5ede0; font-size: 1.1rem;
+  display: flex; align-items: center; gap: 0.4rem;
+  font-family: 'Crimson Pro', serif; font-size: 0.92rem;
+  opacity: 0.92; transition: opacity 0.2s, color 0.4s, text-shadow 0.4s;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+}
+.nav-cart:hover { opacity: 1; color: var(--rust); }
+nav.scrolled .nav-cart { color: var(--text); text-shadow: none; opacity: 0.82; }
+nav.scrolled .nav-cart:hover { color: var(--rust); opacity: 1; }
+.cart-badge {
+  position: absolute; top: -5px; right: -8px;
+  background: var(--rust); color: #fff;
+  font-family: 'Montserrat', sans-serif; font-size: 0.55rem;
+  font-weight: 600; letter-spacing: 0;
+  width: 16px; height: 16px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transform: scale(0); transition: opacity 0.2s, transform 0.2s;
+}
+.cart-badge.visible { opacity: 1; transform: scale(1); }
+
+/* ── Hero — full bleed cinematic ── */
+.shop-hero {
+  position: relative;
+  min-height: 92vh;
+  display: flex; align-items: flex-end; justify-content: center;
+  overflow: hidden;
+  background: #0e0a08;
+}
+.shop-hero-bg {
+  position: absolute; inset: 0; z-index: 0;
+  /* No coloured gradient — the image speaks for itself. A plain dark
+     fallback shows while the image loads. */
+  background: #0e0a08;
+}
+.shop-hero-bg-img {
+  position: absolute; inset: 0; z-index: 1;
+  background-image: url('/images/seeing%20it%20through%20banner.png');
+  background-size: cover; background-position: center 55%;
+  opacity: 1;
+  transition: transform 8s ease;
+}
+@media (max-width: 600px) {
+  .shop-hero-bg-img {
+    background-image: url('/images/seeing%20it%20through.jpg');
+    background-position: center 50%;
+  }
+}
+.shop-hero:hover .shop-hero-bg-img { transform: scale(1.04); }
+.shop-hero-vignette {
+  display: none;
+}
+.shop-hero-content {
+  position: relative; z-index: 3;
+  padding: 0 clamp(1.4rem,6vw,5rem) clamp(4rem,8vw,7rem);
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  text-align: center;
+}
+.shop-hero-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.75rem;
+  letter-spacing: 0.35em; text-transform: uppercase;
+  color: #f0e4cc; margin-bottom: 1.2rem;
+  display: flex; align-items: center; justify-content: center; gap: 0.8rem;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+}
+.shop-hero-eyebrow::before, .shop-hero-eyebrow::after {
+  content: ''; display: inline-block; width: 32px; height: 1px;
+  background: #f0e4cc;
+}
+.shop-hero-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.6rem, 7vw, 6rem);
+  font-weight: 300; line-height: 0.95;
+  color: #f0e4cc;
+  margin-bottom: 1.2rem;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+.shop-hero-title em { font-style: italic; color: var(--clay); }
+.shop-hero-sub {
+  font-size: 1.05rem; color: #ffffff; opacity: 0.92;
+  line-height: 1.75; max-width: 440px;
+  margin: 0 auto;
+  text-align: center;
+  font-family: 'Crimson Pro', serif;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.45);
+}
+.shop-hero-ctas {
+  display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: center;
+}
+.hero-cta-primary {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 0.9rem 2.2rem;
+  background: var(--clay); color: #fff;
+  border: none; border-radius: 10px;
+  transition: background 0.2s, transform 0.15s;
+}
+.hero-cta-primary:hover { background: var(--rust); transform: translateY(-1px); }
+.hero-cta-ghost {
+  font-family: 'Cinzel', serif; font-size: 0.58rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 0.9rem 2.2rem;
+  background: transparent; color: rgba(240,228,204,0.8);
+  border: 1px solid rgba(240,228,204,0.35); border-radius: 10px;
+  text-decoration: none;
+  transition: border-color 0.2s, color 0.2s;
+}
+.hero-cta-ghost:hover { border-color: var(--clay); color: var(--clay); }
+/* Scroll hint */
+.hero-scroll-hint {
+  position: absolute; bottom: 2rem; right: clamp(1.4rem,5vw,4rem);
+  z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.28em; text-transform: uppercase; color: rgba(240,228,204,0.4);
+}
+.hero-scroll-line {
+  width: 1px; height: 48px;
+  background: linear-gradient(to bottom, transparent, rgba(240,228,204,0.4));
+  animation: scrollPulse 2s ease-in-out infinite;
+}
+@keyframes scrollPulse { 0%,100%{opacity:0.4;} 50%{opacity:1;} }
+
+/* ── Marquee strip ── */
+.marquee-strip {
+  background: var(--rust);
+  padding: 0.75rem 0;
+  overflow: hidden; white-space: nowrap;
+}
+.marquee-track {
+  display: inline-flex; gap: 0;
+  animation: marqueeScroll 28s linear infinite;
+}
+.marquee-track:hover { animation-play-state: paused; }
+@keyframes marqueeScroll { 0%{transform:translateX(0);} 100%{transform:translateX(-50%);} }
+.marquee-item {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.3em; text-transform: uppercase; color: var(--linen);
+  padding: 0 2.5rem; display: inline-flex; align-items: center; gap: 2.5rem;
+}
+.marquee-item::after { content: '✦'; color: var(--clay); opacity: 0.7; }
+
+/* ── Collection tiles ── */
+.collections-section {
+  padding: clamp(3rem,6vw,5rem) clamp(1.4rem,5vw,4rem);
+  background: var(--bg);
+}
+.collections-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 2.4rem; flex-wrap: wrap; gap: 1rem;
+}
+.collections-eyebrow {
+  font-family: 'Cinzel', serif; font-size: 0.52rem;
+  letter-spacing: 0.32em; text-transform: uppercase; color: var(--gold);
+  margin-bottom: 0.5rem;
+}
+.collections-heading {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 300; color: var(--text); line-height: 1.1;
+}
+.collections-heading em { font-style: italic; color: var(--rust); }
+.collections-browse-all {
+  font-family: 'Cinzel', serif; font-size: 0.5rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--text-muted); text-decoration: none;
+  display: flex; align-items: center; gap: 0.5rem;
+  transition: color 0.2s; white-space: nowrap;
+}
+.collections-browse-all:hover { color: var(--clay); }
+.collections-browse-all::after { content: '→'; }
+.collections-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 0.8rem;
+  height: 480px;
+}
+@media(max-width:700px) {
+  .collections-grid { grid-template-columns: 1fr; height: auto; }
+  .coll-tile { height: 300px; }
+}
+.coll-tile {
+  position: relative; overflow: hidden;
+  cursor: pointer; background: var(--bg-alt);
+  border-radius: 14px;
+  transition: transform 0.3s;
+}
+.coll-tile:hover { transform: scale(0.99); }
+.coll-tile-chips {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.7rem 0 0.8rem;
+}
+.coll-chip {
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  padding: 0.32rem 0.75rem;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 20px; color: rgba(240,228,204,0.8);
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.coll-chip:hover {
+  background: rgba(196,132,90,0.35);
+  border-color: var(--clay); color: #fff;
+}
+.coll-tile-img {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  transition: transform 0.7s ease;
+}
+.coll-tile:hover .coll-tile-img { transform: scale(1.06); }
+.coll-tile-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(14,10,8,0.95) 0%,
+    rgba(14,10,8,0.85) 40%,
+    rgba(14,10,8,0.45) 70%,
+    rgba(14,10,8,0.08) 100%
+  );
+}
+.coll-tile-body {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 1.6rem 1.6rem;
+}
+.coll-tile-label {
+  font-family: 'Cinzel', serif; font-size: 0.48rem;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--clay); margin-bottom: 0.4rem;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+.coll-tile-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.3rem, 2.5vw, 1.8rem);
+  font-weight: 300; color: #f0e4cc; line-height: 1.1;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+}
+.coll-tile-name em { font-style: italic; color: var(--clay); }
+.coll-tile-arrow {
+  display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.6rem;
+  font-family: 'Cinzel', serif; font-size: 0.44rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: rgba(240,228,204,0.7);
+  transition: color 0.2s;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+.coll-tile:hover .coll-tile-arrow { color: var(--clay); }
+
+/* ── Promo ticker (replaces bulky banner) ── */
+
 
 /* ── Shop editorial image breaks ── */
 .shop-editorial-break {
@@ -2621,47 +3864,25 @@ body.dark { --text-muted: #b3a392; }
 <div class="marquee-strip" aria-hidden="true">
   <div class="marquee-track">
     <span class="marquee-item">Fine Art Prints</span>
+    <span class="marquee-item">🌍 Worldwide Shipping</span>
     <span class="marquee-item">Hand-Signed Editions</span>
-    <span class="marquee-item">Ships Worldwide</span>
-    <span class="marquee-item">Premium Merch</span>
-    <span class="marquee-item">Handcrafted Notebooks</span>
+    <span class="marquee-item">💳 Card, Crypto or Transfer</span>
     <span class="marquee-item">Giclée on Cotton Rag</span>
+    <span class="marquee-item">📦 Archival Packaging</span>
     <span class="marquee-item">Limited Editions</span>
+    <span class="marquee-item">🇳🇬 Nationwide Delivery</span>
+    <span class="marquee-item">Customised Notebooks</span>
     <span class="marquee-item">Unique Works</span>
     <span class="marquee-item">Fine Art Prints</span>
+    <span class="marquee-item">🌍 Worldwide Shipping</span>
     <span class="marquee-item">Hand-Signed Editions</span>
-    <span class="marquee-item">Ships Worldwide</span>
-    <span class="marquee-item">Premium Merch</span>
-    <span class="marquee-item">Handcrafted Notebooks</span>
+    <span class="marquee-item">💳 Card, Crypto or Transfer</span>
     <span class="marquee-item">Giclée on Cotton Rag</span>
+    <span class="marquee-item">📦 Archival Packaging</span>
     <span class="marquee-item">Limited Editions</span>
+    <span class="marquee-item">🇳🇬 Nationwide Delivery</span>
+    <span class="marquee-item">Customised Notebooks</span>
     <span class="marquee-item">Unique Works</span>
-  </div>
-</div>
-
-<!-- Promo ticker — elegant single-line -->
-<div class="promo-ticker" aria-hidden="true">
-  <div class="promo-ticker-track">
-    <span class="promo-ticker-item">🇳🇬 Nationwide delivery available</span>
-    <span class="promo-ticker-sep">✦</span>
-    <span class="promo-ticker-item">🌍 Worldwide shipping available</span>
-    <span class="promo-ticker-sep">✦</span>
-    <span class="promo-ticker-item">✍ Hand-signed editions</span>
-    <span class="promo-ticker-sep">✦</span>
-    <span class="promo-ticker-item">💳 Pay with card, crypto or transfer</span>
-    <span class="promo-ticker-sep">✦</span>
-    <span class="promo-ticker-item">📦 Archival packaging on every order</span>
-    <span class="promo-ticker-sep">✦</span>
-    <span class="promo-ticker-item">🇳🇬 Nationwide delivery available</span>
-    <span class="promo-ticker-sep">✦</span>
-    <span class="promo-ticker-item">🌍 Worldwide shipping available</span>
-    <span class="promo-ticker-sep">✦</span>
-    <span class="promo-ticker-item">✍ Hand-signed editions</span>
-    <span class="promo-ticker-sep">✦</span>
-    <span class="promo-ticker-item">💳 Pay with card, crypto or transfer</span>
-    <span class="promo-ticker-sep">✦</span>
-    <span class="promo-ticker-item">📦 Archival packaging on every order</span>
-    <span class="promo-ticker-sep">✦</span>
   </div>
 </div>
 
@@ -7832,6 +9053,20 @@ function renderAdminProducts() {
           <p style="font-size:0.72rem;color:var(--text-muted);margin-top:0.3rem">Lives at <span style="color:var(--clay)">/shop/${escapeAttr(p.slug||'…')}</span>. Leave blank to auto-generate from the name.</p>
         </div>
         ${apparelAdminHtml}
+        <div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-bottom:0.4rem">
+          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-muted);font-family:'Montserrat',sans-serif">
+            <input type="checkbox" class="ap-sold" data-idx="${realIdx}" ${p.is_sold?'checked':''} style="accent-color:var(--rust);width:15px;height:15px"/>
+            Mark as sold
+          </label>
+          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-muted);font-family:'Montserrat',sans-serif">
+            <input type="checkbox" class="ap-enquire-only" data-idx="${realIdx}" ${p.enquire_only?'checked':''} style="accent-color:var(--clay);width:15px;height:15px"/>
+            Enquire only
+          </label>
+          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--clay);font-family:'Montserrat',sans-serif" title="Hide from shop — stays in your config as a draft">
+            <input type="checkbox" class="ap-draft" data-idx="${realIdx}" ${p.active===false?'checked':''} style="accent-color:var(--clay);width:15px;height:15px"/>
+            Hidden (draft)
+          </label>
+        </div>
         <label class="form-label">Variants, prices &amp; stock</label>
         <div class="ap-variant-list" data-idx="${realIdx}">
           <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr auto;gap:0.4rem;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.35rem">
