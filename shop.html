@@ -222,9 +222,9 @@ body.dark nav.scrolled .nav-logo { color: #e0c8a8; }
 .locale-item-right { font-family: 'Montserrat', sans-serif; font-size: 0.7rem; font-weight: 500; color: var(--text-muted); }
 .locale-item.active .locale-item-right { color: var(--clay); }
 .price-local {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 1.2rem; font-weight: 600;
-  letter-spacing: 0; color: var(--gold);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.62rem; font-weight: 500;
+  letter-spacing: 0.06em; color: var(--clay);
 }
 /* Scrolled (solid bar): theme text colour, no shadow. */
 nav.scrolled .nav-links a { color: var(--text); text-shadow: none; opacity: 0.82; }
@@ -903,12 +903,16 @@ body.dark .variant-chip.selected { color: var(--sand); }
 .card-price { display: flex; flex-direction: column; gap: 0.1rem; }
 .price-ngn {
   font-family: 'Cormorant Garamond', serif;
-  font-size: 1.2rem; font-weight: 600; color: var(--text);
+  font-size: 1.2rem; font-weight: 600; color: var(--gold);
 }
 .price-usd {
   font-family: 'Montserrat', sans-serif;
   font-size: 0.62rem; font-weight: 500;
   letter-spacing: 0.06em; color: var(--text-muted);
+}
+.price-local {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem; font-weight: 600; color: var(--gold);
 }
 .add-btn {
   font-family: 'Cinzel', serif; font-size: 0.56rem;
@@ -4191,46 +4195,34 @@ function setCurrency(code) {
 }
 
 function fmtLocal(ngn) {
-  if (!_visitorRate || !_activeCurrency || _activeCurrency === 'NGN') return '';
-  const amount = Number(ngn) * _visitorRate;
-  const maximumFractionDigits = amount >= 100 ? 0 : amount >= 1 ? 2 : 3;
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: _activeCurrency,
-      maximumFractionDigits,
-    }).format(amount);
-  } catch (_) {
-    const formatted = amount >= 100
-      ? Math.round(amount).toLocaleString()
-      : amount >= 1 ? amount.toFixed(2) : amount.toFixed(3);
-    return (_visitorSymbol || _activeCurrency + ' ') + formatted;
-  }
+  if (!_visitorRate || !_visitorSymbol) return '';
+  const amount = ngn * _visitorRate;
+  const formatted = amount >= 100
+    ? Math.round(amount).toLocaleString()
+    : amount >= 1 ? amount.toFixed(2) : amount.toFixed(3);
+  return _visitorSymbol + formatted;
 }
 
 function toggleCurrency() { setCurrency(_showLocalCurrency ? 'NGN' : 'local'); }
 
 function refreshAllPrices() {
-  // Re-render all visible product cards' prices
-  if (typeof PRODUCTS !== 'undefined') {
-    PRODUCTS.forEach(p => {
-      const ngnEl = document.getElementById('pngn-' + p.id);
-      const localEl = document.getElementById('plocal-' + p.id);
-      if (!ngnEl) return;
-      // Find cheapest price for display
-      const priceMap = p.priceNgn || p.prices_ngn || {};
-      const sizes = Object.values(priceMap).map(Number).filter(Boolean);
-      const cheapestNgn = sizes.length ? Math.min(...sizes) : 0;
-      if (!cheapestNgn) return;
-      if (_showLocalCurrency) {
-        ngnEl.style.display = 'none';
-        if (localEl) { localEl.textContent = fmtLocal(cheapestNgn); localEl.style.display = ''; }
-      } else {
-        ngnEl.style.display = '';
-        if (localEl) localEl.style.display = 'none';
-      }
-    });
-  }
+  if (typeof SHOP_CONFIG === 'undefined') return;
+  (SHOP_CONFIG.products || []).forEach(p => {
+    const ngnEl   = document.getElementById('pngn-' + p.id);
+    const localEl = document.getElementById('plocal-' + p.id);
+    if (!ngnEl) return;
+    // Get the base NGN price for this product
+    const allNgn = Object.values(p.priceNgn || p.prices_ngn || {}).map(Number).filter(Boolean);
+    const baseNgn = allNgn.length ? Math.min(...allNgn) : 0;
+    if (!baseNgn) return;
+    if (_showLocalCurrency && _visitorRate) {
+      ngnEl.style.display = 'none';
+      if (localEl) { localEl.textContent = fmtLocal(baseNgn); localEl.style.display = ''; }
+    } else {
+      ngnEl.style.display = '';
+      if (localEl) localEl.style.display = 'none';
+    }
+  });
 }
 
 document.addEventListener('click', e => {
@@ -4879,7 +4871,6 @@ function buildCard(p) {
       <div class="card-footer">
         <div class="card-price">
           <span class="price-ngn" id="pngn-${p.id}">${fmt(ngn)}</span>
-          <span class="price-usd" id="pusd-${p.id}">${fmtUsd(usd)} USD</span>
           <span class="price-local" id="plocal-${p.id}" style="display:none"></span>
           <span id="stock-${p.id}">${stockHtml}</span>
         </div>
