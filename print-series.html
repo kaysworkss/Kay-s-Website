@@ -131,7 +131,7 @@ nav.scrolled{background:var(--nav-scrolled);backdrop-filter:blur(12px);-webkit-b
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
 .series-card-footer{display:flex;align-items:center;justify-content:space-between;padding-top:0.8rem;border-top:1px solid var(--border);}
-.series-card-price{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:var(--text);}
+.series-card-price{font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:600;color:var(--gold);}
 .series-card-price-usd{font-family:'Montserrat',sans-serif;font-size:0.6rem;color:var(--text-muted);margin-top:0.1rem;}
 .series-card-cta{
   font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;
@@ -179,14 +179,16 @@ footer a:hover{color:var(--rust);}
     <div class="skeleton" style="width:50%;height:16px;margin-bottom:0.6rem"></div>
     <div class="skeleton" style="width:60%;height:16px;margin-bottom:2rem"></div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;margin-top:3rem">
-      ${[1,2,3].map(()=>`<div><div class="skeleton" style="aspect-ratio:3/4;margin-bottom:1rem"></div><div class="skeleton" style="height:14px;margin-bottom:0.5rem"></div><div class="skeleton" style="height:12px;width:60%"></div></div>`).join('')}
+      <div><div class="skeleton" style="aspect-ratio:3/4;margin-bottom:1rem"></div><div class="skeleton" style="height:14px;margin-bottom:0.5rem"></div><div class="skeleton" style="height:12px;width:60%"></div></div>
+      <div><div class="skeleton" style="aspect-ratio:3/4;margin-bottom:1rem"></div><div class="skeleton" style="height:14px;margin-bottom:0.5rem"></div><div class="skeleton" style="height:12px;width:60%"></div></div>
+      <div><div class="skeleton" style="aspect-ratio:3/4;margin-bottom:1rem"></div><div class="skeleton" style="height:14px;margin-bottom:0.5rem"></div><div class="skeleton" style="height:12px;width:60%"></div></div>
     </div>
   </div>
   <div id="seriesContent" style="display:none"></div>
   <div id="errorState" style="display:none;padding:8rem 2rem;text-align:center">
     <p style="font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;color:var(--text);margin-bottom:0.6rem">Series not found</p>
     <p style="color:var(--text-muted);margin-bottom:2rem">This series may have moved or doesn't exist yet.</p>
-    <a href="/shop" style="font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;padding:0.85rem 2rem;border:1px solid var(--border);border-radius:2px;color:var(--text-muted)">Back to shop</a>
+    <a href="/shop" style="font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--clay);display:inline-flex;align-items:center;gap:0.4rem">← Back to shop</a>
   </div>
 </div>
 
@@ -277,7 +279,7 @@ function renderSeries(prints) {
   document.getElementById('seriesContent').innerHTML = `
     <div class="series-hero">
       <div class="breadcrumb">
-        <a href="/shop">Shop</a>
+        <a href="/shop" style="display:inline-flex;align-items:center;gap:0.4rem">← Shop</a>
         <span class="breadcrumb-sep">·</span>
         <span style="color:var(--text)">${seriesName}</span>
       </div>
@@ -298,13 +300,15 @@ function renderSeries(prints) {
   document.getElementById('seriesGrid').innerHTML = prints.map((p,i)=>{
     const choices = availablePrintChoices(p);
     const optionCount = getPrintOptions(p).length;
-    const lowestPrice = Math.min(...choices.map(c=>printPrice(p, c.key, 'ngn')).filter(Boolean));
-    const lowestUsd   = Math.min(...choices.map(c=>printPrice(p, c.key, 'usd')).filter(Boolean));
+    const _ngnPrices = choices.map(c=>printPrice(p, c.key, 'ngn')).filter(Boolean);
+    const _usdPrices = choices.map(c=>printPrice(p, c.key, 'usd')).filter(Boolean);
+    const lowestPrice = _ngnPrices.length ? Math.min(..._ngnPrices) : 0;
+    const lowestUsd   = _usdPrices.length ? Math.min(..._usdPrices) : 0;
     const pSlug = p.slug || slugify(p.name);
     return `
       <a href="/shop/${pSlug}" class="series-card">
         <div class="series-card-img">
-          ${p.image_url ? `<img src="${normalizeImg(p.image_url)}" alt="${p.name}" loading="lazy"/>` : (p.emoji||'=')}
+          ${(p.image_url||p.image) ? `<img src="${normalizeImg(p.image_url||p.image)}" alt="${p.name}" loading="lazy"/>` : (p.emoji||'✦')}
           ${p.badge ? `<span class="series-card-badge">${p.badge}</span>` : ''}
         </div>
         <div class="series-card-body">
@@ -314,8 +318,8 @@ function renderSeries(prints) {
           <p class="series-card-desc">${p.description || p.desc || ''}</p>
           <div class="series-card-footer">
             <div>
-              <div class="series-card-price">${p.enquire_only ? 'Enquire' : 'From ' + fmt(lowestPrice)}</div>
-              <div class="series-card-price-usd">${fmtUsd(lowestUsd)} USD · ${optionCount} print option${optionCount!==1?'s':''}</div>
+              <div class="series-card-price">${p.enquire_only ? '' : (lowestPrice ? 'From ' + fmt(lowestPrice) : '')}</div>
+              <div class="series-card-price-usd">${optionCount} print option${optionCount!==1?'s':''}</div>
             </div>
             <button class="series-card-cta">View print</button>
           </div>
