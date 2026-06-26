@@ -1930,79 +1930,105 @@ function selectSize(v) {
 function renderSizingGuide() {
   const wrap = document.getElementById('sizingSvgWrap');
   if (!wrap) return;
-  // Extract and normalize the size from the variant key (e.g. "mini_print|4x4"" → "4x4")
+
   const rawPart = (_selectedVariant || '').split('|').pop() || '';
-  const sizeRaw = rawPart.replace(/[""″'']/g, '').replace(/×/g, 'x').replace(/\s/g, '').toLowerCase();
-  // Each size: inches, cm, SVG position. Small sizes spread apart to avoid overlap.
-  const sizes = [
-    { label: '4×4"',   cm: '10×10 cm',  key: '4x4',   x: 100, y: 224, w: 16, h: 16,  tx: 108 },
-    { label: '5×7"',   cm: '13×18 cm',  key: '5x7',   x: 145, y: 208, w: 20, h: 28,  tx: 155 },
-    { label: '8×10"',  cm: '20×25 cm',  key: '8x10',  x: 200, y: 188, w: 32, h: 40,  tx: 216 },
-    { label: '11×14"', cm: '28×36 cm',  key: '11x14', x: 268, y: 172, w: 44, h: 56,  tx: 290 },
-    { label: '18×24"', cm: '46×61 cm',  key: '18x24', x: 350, y: 132, w: 72, h: 96,  tx: 386 },
-    { label: '24×36"', cm: '61×91 cm',  key: '24x36', x: 460, y: 92,  w: 96, h: 144, tx: 508 },
-  ];
-  // Show all standard frame sizes — the selected one gets highlighted.
-  const frames = sizes.map(s => {
-    const active = s.key === sizeRaw;
-    return `<g>
-      ${active ? `<rect x="${s.x - 4}" y="${s.y - 4}" width="${s.w + 8}" height="${s.h + 8}" fill="none" stroke="var(--rust)" stroke-width="1" rx="3" stroke-dasharray="4,3" opacity="0.5"/>` : ''}
-      <rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="${active ? 'rgba(158,79,46,0.15)' : 'none'}" stroke="${active ? 'var(--rust)' : 'var(--clay)'}" stroke-width="${active ? 3 : 1.2}" rx="1"/>
-      <text x="${s.tx}" y="260" text-anchor="middle" fill="${active ? 'var(--rust)' : 'var(--text-muted)'}" font-size="${active ? 10 : 8}" font-weight="${active ? '700' : '400'}">${s.label}</text>
-      <text x="${s.tx}" y="273" text-anchor="middle" fill="${active ? 'var(--rust)' : 'var(--text-muted)'}" font-size="7" opacity="${active ? 1 : 0.5}">${s.cm}</text>
-      ${active ? `<text x="${s.tx}" y="288" text-anchor="middle" fill="var(--rust)" font-size="8" font-weight="700">▲ Your size</text>` : ''}
-    </g>`;
-  }).join('\n');
-  wrap.innerHTML = `<svg viewBox="0 0 620 ${sizeRaw ? '300' : '290'}" width="620" xmlns="http://www.w3.org/2000/svg" style="font-family:'Montserrat',sans-serif">
-    <g transform="translate(30,2)">
-      <line x1="24" y1="0" x2="24" y2="248" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>
-      <ellipse cx="24" cy="18" rx="10" ry="12" fill="none" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
-      <line x1="24" y1="30" x2="24" y2="148" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
-      <line x1="4" y1="65" x2="44" y2="65" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
-      <line x1="14" y1="148" x2="8" y2="248" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
-      <line x1="34" y1="148" x2="40" y2="248" stroke="var(--text-muted)" stroke-width="1.2" opacity="0.5"/>
-      <text x="24" y="263" text-anchor="middle" fill="var(--text-muted)" font-size="8" opacity="0.6">~170 cm</text>
-    </g>
-    <g>${frames}</g>
-    <line x1="20" y1="248" x2="600" y2="248" stroke="var(--border)" stroke-width="0.5"/>
-  </svg>`;
+  const sizeRaw = rawPart.replace(/["""′″'']/g,'').replace(/×/g,'x').replace(/\s/g,'').toLowerCase();
+
+  // Detect orientation from hero image
+  function drawGuide(isLandscape) {
+    const PERSON_PX = 200;
+    const PX_PER_INCH = PERSON_PX / 66.9;
+
+    const CM_LABELS = {
+      '4x4':'10×10 cm','4x6':'10×15 cm','5x5':'13×13 cm','5x7':'13×18 cm',
+      '8x10':'20×25 cm','11x14':'28×36 cm','16x20':'41×51 cm',
+      '18x24':'46×61 cm','24x36':'61×91 cm',
+    };
+
+    // Get sizes this product actually has
+    const productSizeKeys = availablePrintChoices(_product)
+      .map(c => c.key.split('|').pop().replace(/["""″'']/g,'').replace(/×/g,'x').replace(/\s/g,'').toLowerCase());
+
+    const sizes = [...new Set(productSizeKeys)].map(key => {
+      const match = key.match(/^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/);
+      if (!match) return null;
+      const inW = parseFloat(match[1]);
+      const inH = parseFloat(match[2]);
+      const cmW = Math.round(inW * 2.54);
+      const cmH = Math.round(inH * 2.54);
+      const pw = Math.round(inW * PX_PER_INCH);
+      const ph = Math.round(inH * PX_PER_INCH);
+      const w = isLandscape && pw !== ph ? ph : pw;
+      const h = isLandscape && pw !== ph ? pw : ph;
+      return { key, label: `${inW}×${inH}"`, cm: CM_LABELS[key] || `${cmW}×${cmH} cm`, pw, ph, w, h };
+    }).filter(Boolean);
+
+    sizes.sort((a, b) => (a.pw * a.ph) - (b.pw * b.ph));
+    if (!sizes.length) { wrap.innerHTML = ''; return; }
+
+    const BASELINE = 210;
+    const SVG_H = BASELINE + 55;
+    const LEFT_MARGIN = 60;
+    const GAP = sizes.length <= 2 ? 50 : sizes.length <= 4 ? 30 : sizes.length <= 5 ? 24 : 16;
+    const totalWidth = sizes.reduce((sum, s) => sum + s.w, 0) + GAP * (sizes.length - 1);
+    const svgW = Math.max(280, LEFT_MARGIN + totalWidth + 30);
+
+    let cursor = LEFT_MARGIN + 20;
+    const positioned = sizes.map(s => {
+      const x = cursor;
+      const tx = x + s.w / 2;
+      const y = BASELINE - s.h;
+      cursor += s.w + GAP;
+      return { ...s, x, y, tx };
+    });
+
+    const frames = positioned.map(s => {
+      const active = s.key === sizeRaw;
+      const lY1 = BASELINE + 14, lY2 = BASELINE + 25, lY3 = BASELINE + 38;
+      return `<g>
+        ${active ? `<rect x="${s.x-4}" y="${s.y-4}" width="${s.w+8}" height="${s.h+8}" fill="none" stroke="var(--rust)" stroke-width="1" rx="3" stroke-dasharray="4,3" opacity="0.5"/>` : ''}
+        <rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="${active?'rgba(158,79,46,0.15)':'none'}" stroke="${active?'var(--rust)':'var(--clay)'}" stroke-width="${active?3:1.2}" rx="1"/>
+        <text x="${s.tx}" y="${lY1}" text-anchor="middle" fill="${active?'var(--rust)':'var(--text-muted)'}" font-size="${active?10:8}" font-weight="${active?'700':'400'}">${s.label}</text>
+        <text x="${s.tx}" y="${lY2}" text-anchor="middle" fill="${active?'var(--rust)':'var(--text-muted)'}" font-size="7" opacity="${active?1:0.5}">${s.cm}</text>
+        ${active?`<text x="${s.tx}" y="${lY3}" text-anchor="middle" fill="var(--rust)" font-size="8" font-weight="700">▲ Your size</text>`:''}
+      </g>`;
+    }).join('\n');
+
+    const personH = PERSON_PX;
+    const headCY = 10;
+    const shoulderY = headCY + 10 + 4;
+    const armY = Math.round(personH * 0.32);
+    const legSplit = Math.round(personH * 0.62);
+
+    wrap.innerHTML = `<svg viewBox="0 0 ${svgW} ${SVG_H}" width="${svgW}" xmlns="http://www.w3.org/2000/svg" style="font-family:'Montserrat',sans-serif">
+      <g transform="translate(10,2)" opacity="0.45">
+        <line x1="24" y1="0" x2="24" y2="${BASELINE}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>
+        <ellipse cx="24" cy="${headCY}" rx="10" ry="12" fill="none" stroke="var(--text-muted)" stroke-width="1.2"/>
+        <line x1="24" y1="${shoulderY}" x2="24" y2="${legSplit}" stroke="var(--text-muted)" stroke-width="1.2"/>
+        <line x1="4" y1="${armY}" x2="44" y2="${armY}" stroke="var(--text-muted)" stroke-width="1.2"/>
+        <line x1="14" y1="${legSplit}" x2="8" y2="${BASELINE}" stroke="var(--text-muted)" stroke-width="1.2"/>
+        <line x1="34" y1="${legSplit}" x2="40" y2="${BASELINE}" stroke="var(--text-muted)" stroke-width="1.2"/>
+        <text x="24" y="${BASELINE+13}" text-anchor="middle" fill="var(--text-muted)" font-size="7">~170cm</text>
+      </g>
+      <g>${frames}</g>
+      <line x1="20" y1="${BASELINE}" x2="${svgW-10}" y2="${BASELINE}" stroke="var(--border)" stroke-width="0.5"/>
+    </svg>`;
+  }
+
+  const heroImg = document.getElementById('heroImg');
+  if (heroImg && heroImg.naturalWidth && heroImg.naturalHeight) {
+    drawGuide(heroImg.naturalWidth > heroImg.naturalHeight);
+  } else if (heroImg) {
+    const tmp = new Image();
+    tmp.onload = () => drawGuide(tmp.naturalWidth > tmp.naturalHeight);
+    tmp.onerror = () => drawGuide(false);
+    tmp.src = heroImg.src;
+  } else {
+    drawGuide(false);
+  }
 }
 
-// ─── Sticky buy bar (mobile) ───
-(function() {
-  const addBtn = document.getElementById('addBtn');
-  if (!addBtn) return;
-  const bar   = document.getElementById('stickyBuyBar');
-  const sName = document.getElementById('stickyBuyName');
-  const sPrice= document.getElementById('stickyBuyPrice');
-  const sBtn  = document.getElementById('stickyBuyBtn');
-  if (!bar) return;
-  const observer = new IntersectionObserver(entries => {
-    const hidden = !entries[0].isIntersecting;
-    bar.classList.toggle('visible', hidden);
-    if (sName && window._productName) sName.textContent = window._productName;
-    if (sPrice) {
-      const priceEl = document.getElementById('priceNgn');
-      sPrice.textContent = priceEl ? priceEl.textContent : '';
-    }
-    if (sBtn) {
-      sBtn.disabled = addBtn.disabled;
-      sBtn.textContent = addBtn.textContent;
-    }
-  }, { threshold: 0 });
-  observer.observe(addBtn);
-  // Keep sticky btn in sync when price/state changes
-  const syncSticky = () => {
-    if (!bar.classList.contains('visible')) return;
-    if (sBtn) { sBtn.disabled = addBtn.disabled; sBtn.textContent = addBtn.textContent; }
-    const priceEl = document.getElementById('priceNgn');
-    if (sPrice && priceEl) sPrice.textContent = priceEl.textContent;
-  };
-  const priceEl = document.getElementById('priceNgn');
-  if (priceEl) new MutationObserver(syncSticky).observe(priceEl, { childList: true, characterData: true, subtree: true });
-})();
 
-// Reflect limited-edition remaining count and sold-out state for a variant key.
 function updateEditionState(v) {
   const label = editionLabel(_product, v);
   const el = document.getElementById('editionsLeft');
