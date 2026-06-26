@@ -1021,6 +1021,32 @@ footer a:hover { color:var(--rust); }
 const slug = location.pathname.replace(/^\/shop\//, '').replace(/\/$/, '');
 function fmt(n)    { return '₦' + Number(n).toLocaleString('en-NG'); }
 function fmtUsd(n) { return '$' + Number(n).toFixed(0); }
+// Local currency support — reads from shop.html's currency system if in same session
+// Falls back to NGN display if not available
+function fmtLocal(ngn) {
+  try {
+    if (window.opener && window.opener._visitorRate) {
+      const r = window.opener._visitorRate;
+      const s = window.opener._visitorSymbol;
+      const a = ngn * r;
+      return s + (a >= 100 ? Math.round(a).toLocaleString() : a.toFixed(2));
+    }
+  } catch(e) {}
+  // Check sessionStorage for saved currency preference
+  try {
+    const saved = sessionStorage.getItem('kw_currency');
+    const rate  = sessionStorage.getItem('kw_rate');
+    const sym   = sessionStorage.getItem('kw_symbol');
+    if (saved && saved !== 'NGN' && rate && sym) {
+      const a = ngn * Number(rate);
+      return sym + (a >= 100 ? Math.round(a).toLocaleString() : a.toFixed(2));
+    }
+  } catch(e) {}
+  return null; // no local rate available — show NGN
+}
+function getActiveRate() {
+  try { return sessionStorage.getItem('kw_currency'); } catch(e) { return null; }
+}
 function shopHref(path = '') {
   if (location.protocol === 'file:') {
     const base = new URL('shop.html', location.href).href;
@@ -1716,7 +1742,16 @@ function selectMerchVariant(label) {
   const ngn = printPrice(_product, label, 'ngn');
   const usd = printPrice(_product, label, 'usd');
   document.getElementById('priceNgn').textContent = fmt(ngn);
-  document.getElementById('priceUsd').textContent = fmtUsd(usd) + ' USD';
+  const _localPrice = fmtLocal(ngn);
+  const priceNgnEl = document.getElementById('priceNgn');
+  const priceUsdEl = document.getElementById('priceUsd');
+  if (_localPrice && getActiveRate() && getActiveRate() !== 'NGN') {
+    if (priceNgnEl) { priceNgnEl.textContent = _localPrice; priceNgnEl.style.color = 'var(--gold)'; }
+    if (priceUsdEl) priceUsdEl.style.display = 'none';
+  } else {
+    if (priceNgnEl) { priceNgnEl.style.color = 'var(--gold)'; }
+    if (priceUsdEl) priceUsdEl.textContent = fmtUsd(usd) + ' USD';
+  }
   const stock = merchStock(_product, label);
   const soldOut = stock === 0;
   const left = remainingToAdd(_product, label); // cart-aware
@@ -1802,7 +1837,16 @@ function selectSize(v) {
   const ngn = printPrice(_product, v, 'ngn');
   const usd = printPrice(_product, v, 'usd');
   document.getElementById('priceNgn').textContent = fmt(ngn);
-  document.getElementById('priceUsd').textContent = fmtUsd(usd) + ' USD';
+  const _localPrice = fmtLocal(ngn);
+  const priceNgnEl = document.getElementById('priceNgn');
+  const priceUsdEl = document.getElementById('priceUsd');
+  if (_localPrice && getActiveRate() && getActiveRate() !== 'NGN') {
+    if (priceNgnEl) { priceNgnEl.textContent = _localPrice; priceNgnEl.style.color = 'var(--gold)'; }
+    if (priceUsdEl) priceUsdEl.style.display = 'none';
+  } else {
+    if (priceNgnEl) { priceNgnEl.style.color = 'var(--gold)'; }
+    if (priceUsdEl) priceUsdEl.textContent = fmtUsd(usd) + ' USD';
+  }
   updateEditionState(v);
   renderSizingGuide();
 }
