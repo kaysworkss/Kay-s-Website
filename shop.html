@@ -4717,9 +4717,11 @@ function syncCardStock(pid, variantKey) {
     }
   }
   if (stockEl) {
-    if (soldOut) {
+    // Never show stock count on enquire-only or 1-of-1 pieces
+    const isEnquireOnly = p && (p.enquire_only || p.print_edition === 'one_of_one');
+    if (soldOut && !isEnquireOnly) {
       stockEl.innerHTML = `<span style="font-family:'Montserrat',sans-serif;font-size:0.6rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--rust);margin-left:0.5rem">Sold out</span>`;
-    } else if (cap !== null && (showEditionCount || cap <= 3)) {
+    } else if (!isEnquireOnly && cap !== null && (showEditionCount || cap <= 3)) {
       const label = cap <= 3 ? `Only ${cap} left` : `${cap} left`;
       stockEl.innerHTML = `<span style="font-family:'Montserrat',sans-serif;font-size:0.6rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--rust);margin-left:0.5rem">${label}</span>`;
     } else {
@@ -4887,8 +4889,18 @@ function updateMasonryLayoutMode() {
 }
 
 function renderProducts() {
+  // If there was a load error, show a message instead of an empty or default grid
+  if (SHOP_CONFIG._loadError) {
+    const grid = document.getElementById('allProductsGrid');
+    if (grid) grid.innerHTML = `<div class="shop-empty-state" style="grid-column:1/-1;padding:4rem 1rem;text-align:center">
+      <p style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;margin-bottom:0.8rem">The shop couldn't load right now</p>
+      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:1.4rem">Please check your connection and try again.</p>
+      <button onclick="location.reload()" style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.18em;text-transform:uppercase;padding:0.7rem 1.6rem;background:var(--rust);color:#fff;border:none;border-radius:10px;cursor:pointer">Refresh the page</button>
+    </div>`;
+    return;
+  }
   // Keep ALL products in SHOP_CONFIG (including drafts) — drafts are filtered at render time
-SHOP_CONFIG.products = (SHOP_CONFIG.products || []).map(normalizeProduct);
+  SHOP_CONFIG.products = (SHOP_CONFIG.products || []).map(normalizeProduct);
   // Respect the admin-defined display order within each category.
   SHOP_CONFIG.products.sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
   renderFeaturedSection();
@@ -9341,9 +9353,9 @@ async function loadShopData() {
         }));
         loadedServerProducts = true;
       }
-      // If API returned an empty array, keep hardcoded defaults for local preview.
+      // If API returned an empty array show empty shop, not defaults
+      if (!loadedServerProducts) SHOP_CONFIG.products = [];
     }
-    // If API failed, keep hardcoded defaults silently
 
     if (configRes.ok) {
       const cfg = await configRes.json();
@@ -9352,8 +9364,10 @@ async function loadShopData() {
       if (cfg.featured_product_id)  SHOP_CONFIG.featured_product_id = cfg.featured_product_id;
     }
   } catch (e) {
-    // API not reachable or tables don't exist yet — use hardcoded defaults
-    console.warn('Shop API unavailable, using defaults:', e.message);
+    // API not reachable — show error state, never show fake default products
+    console.error('Shop API unavailable:', e.message);
+    SHOP_CONFIG.products = [];
+    SHOP_CONFIG._loadError = true;
   }
 
   // Always stamp _standardVariants and always render
