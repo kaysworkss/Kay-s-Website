@@ -1978,11 +1978,22 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           <div class="status-line upcoming-line" style="margin-top:8px">Bidding opens at the time above</div>
         </div>
 
-        <div style="background:var(--bg-alt);border:1px solid var(--rule);border-radius:var(--r);padding:16px">
-          <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">Gate requirement</div>
-          <div style="font-size:13px" id="upcoming-gate-name">Token-gated auction</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px" id="upcoming-gate-detail"></div>
-          <a id="upcoming-gate-link" href="#" target="_blank" style="display:none;margin-top:10px;font-size:11px;color:var(--accent);text-decoration:none">Acquire gate token →</a>
+        <div style="background:rgba(158,79,46,0.08);border:1px solid rgba(158,79,46,0.5);border-radius:var(--r);padding:16px 18px;position:relative;overflow:hidden">
+          <!-- left accent bar -->
+          <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--rust);border-radius:var(--r) 0 0 var(--r)"></div>
+          <div style="padding-left:4px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span style="font-size:15px;line-height:1">🔐</span>
+              <span style="font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--rust);font-weight:600">Token-gated auction</span>
+            </div>
+            <div style="font-family:'Crimson Pro',serif;font-size:0.92rem;color:var(--text);margin-bottom:6px">
+              You must hold the required token to place a bid. Connecting your wallet without it will not grant access.
+            </div>
+            <div style="font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Required token</div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:var(--clay)" id="upcoming-gate-name">Token-gated auction</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:3px;font-style:italic" id="upcoming-gate-detail"></div>
+            <a id="upcoming-gate-link" href="#" target="_blank" style="display:none;margin-top:12px;font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--rust);text-decoration:none;display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(158,79,46,0.45);border-radius:2px;padding:5px 10px;transition:background 0.2s" onmouseover="this.style.background='rgba(158,79,46,0.15)'" onmouseout="this.style.background='transparent'">Acquire gate token →</a>
+          </div>
         </div>
 
         <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--divider);text-align:center">
@@ -2080,6 +2091,24 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
       <!-- Right: bid panel -->
       <div class="bid-col">
         <div class="bid-inner">
+
+          <!-- Gate access warning — shown when auction requires a token; hidden for open auctions and once wallet connects -->
+          <div id="live-gate-notice" style="display:none;margin-bottom:14px;background:rgba(158,79,46,0.08);border:1px solid rgba(158,79,46,0.5);border-radius:var(--r);padding:13px 15px;position:relative;overflow:hidden">
+            <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--rust);border-radius:var(--r) 0 0 var(--r)"></div>
+            <div style="padding-left:4px">
+              <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
+                <span style="font-size:13px;line-height:1">🔐</span>
+                <span style="font-family:'Cinzel',serif;font-size:0.54rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--rust)">Token-gated auction</span>
+              </div>
+              <div style="font-family:'Crimson Pro',serif;font-size:0.88rem;color:var(--text);line-height:1.5;margin-bottom:7px">
+                This auction is restricted. You must hold <strong id="live-gate-name-inline" style="color:var(--clay)">the required token</strong> in your wallet to be eligible to bid.
+              </div>
+              <div style="font-family:'Crimson Pro',serif;font-size:0.8rem;color:var(--text-muted);font-style:italic">
+                Connecting without the token will result in an ineligibility notice.
+              </div>
+              <a id="live-gate-link" href="#" target="_blank" style="display:none;margin-top:10px;font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--rust);text-decoration:none;display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(158,79,46,0.4);border-radius:2px;padding:4px 9px;transition:background 0.2s" onmouseover="this.style.background='rgba(158,79,46,0.15)'" onmouseout="this.style.background='transparent'">Acquire gate token →</a>
+            </div>
+          </div>
 
           <!-- Wallet -->
           <div class="wallet-row">
@@ -4100,6 +4129,27 @@ async function _switchAuction(idx) {
   cfg.gateName     = slot.gateName;
   cfg.gateLink     = slot.gateLink;
 
+  // Show / hide the gate access warning in the live bid panel
+  const _lgNotice = document.getElementById("live-gate-notice");
+  if (_lgNotice) {
+    if (slot.gateName) {
+      _lgNotice.style.display = "block";
+      const _lgName = document.getElementById("live-gate-name-inline");
+      if (_lgName) _lgName.textContent = slot.gateName;
+      const _lgLink = document.getElementById("live-gate-link");
+      if (_lgLink) {
+        if (slot.gateLink && slot.gateLink.startsWith("http")) {
+          _lgLink.href = slot.gateLink;
+          _lgLink.style.display = "inline-flex";
+        } else {
+          _lgLink.style.display = "none";
+        }
+      }
+    } else {
+      _lgNotice.style.display = "none";
+    }
+  }
+
   populateAbout("live", slot);
   loadStaticImage("live", slot);
   _syncCollectorRoomForSlot(slot);
@@ -4526,6 +4576,9 @@ function setWalletUi(state, addr) {
     connectBtn.style.display = "none";
     if (connectTezosBtn) connectTezosBtn.style.display = "none";
     disconnectBtn.style.display = "inline-flex";
+    // Hide gate notice once wallet is connected — eligibility checker takes over
+    const _lgn = document.getElementById("live-gate-notice");
+    if (_lgn) _lgn.style.display = "none";
     return;
   }
 
@@ -4540,6 +4593,9 @@ function setWalletUi(state, addr) {
   label.textContent = "Not connected";
   connectBtn.textContent = "Connect ETH";
   if (connectTezosBtn) connectTezosBtn.textContent = "Connect Tezos";
+  // Re-show gate notice on disconnect if this auction is gated
+  const _lgnd = document.getElementById("live-gate-notice");
+  if (_lgnd && cfg.gateName) _lgnd.style.display = "block";
 }
 
 // ── ETH Wallet Connection — injected + WalletConnect v2 ──────────────────────
