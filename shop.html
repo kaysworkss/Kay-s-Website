@@ -10095,6 +10095,40 @@ loadShopData()
   .then(maybeOpenCheckoutFromHash)
   .catch(maybeOpenCheckoutFromHash)
   .finally(finalizeReturnedGatewayCheckout);
+
+// Restore saved currency preference from previous page visit
+(async function restoreCurrency() {
+  try {
+    const saved = sessionStorage.getItem('kw_currency');
+    const savedRate = sessionStorage.getItem('kw_rate');
+    const savedSym = sessionStorage.getItem('kw_symbol');
+    if (saved && saved !== 'NGN' && savedRate && savedSym) {
+      // Restore without fetching again — use saved values
+      _visitorCurrency = saved;
+      _visitorRate = Number(savedRate);
+      _visitorSymbol = savedSym;
+      _visitorFlag = (typeof CURRENCY_FLAGS !== 'undefined' && CURRENCY_FLAGS[saved]) || '🌍';
+      _showLocalCurrency = true;
+      _activeCurrency = saved;
+      // Update selector button
+      const curr = typeof getLocaleCountries === 'function'
+        ? getLocaleCountries().find(c => c.code === saved)
+        : null;
+      const flagHtml = curr?.flag?.length === 2
+        ? `<img src="https://flagcdn.com/16x12/${curr.flag}.png" width="16" height="12" style="border-radius:2px;vertical-align:middle" alt=""/>`
+        : '';
+      [['currencyFlag','currencyCode'],['currencyFlagMobile','currencyCodeMobile']].forEach(([fId,cId]) => {
+        const fEl = document.getElementById(fId);
+        const cEl = document.getElementById(cId);
+        if (fEl && flagHtml) fEl.innerHTML = flagHtml;
+        if (cEl) cEl.textContent = saved;
+      });
+      // Wait for products to render then apply
+      await new Promise(r => setTimeout(r, 200));
+      refreshAllPrices();
+    }
+  } catch(e) {}
+})();
 detectVisitorCurrency().finally(initCurrencySelector);
 
 /* ─── Footer newsletter subscribe ─── */
