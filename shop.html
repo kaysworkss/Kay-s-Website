@@ -3638,6 +3638,15 @@ body.dark { --text-muted: #b3a392; }
           <p style="font-size:0.85rem;color:var(--text-muted);line-height:1.6;margin-bottom:1.2rem">
             Set <code style="color:var(--clay);font-size:0.78rem">PAYSTACK_PUBLIC_KEY</code> in your Vercel environment variables. It is injected at runtime by the page — never stored here.
           </p>
+
+          <p class="admin-section-title" style="margin-top:1.4rem">Price auto-conversion</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:0.8rem;background:var(--bg-alt);border-radius:10px;border:1px solid var(--border)">
+            <div>
+              <p style="font-size:0.78rem;color:var(--text);margin:0 0 0.2rem;font-family:'Montserrat',sans-serif;font-weight:500">Auto-convert NGN ↔ USD</p>
+              <p style="font-size:0.68rem;color:var(--text-muted);margin:0;line-height:1.5">When on, typing a NGN price fills USD automatically and vice versa. Turn off to set prices independently.</p>
+            </div>
+            <button id="autoConvertToggle" onclick="toggleAutoConvert()" style="font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.14em;text-transform:uppercase;padding:0.5rem 1.2rem;border-radius:20px;border:1px solid var(--clay);background:var(--clay);color:#fff;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.2s">On</button>
+          </div>
         </div>
 
         <!-- ░░ TAB: PRINT PAGES ░░ -->
@@ -3809,6 +3818,7 @@ body.dark { --text-muted: #b3a392; }
       <p class="footer-col-title">Stay in the loop</p>
       <p class="footer-newsletter-text">Be the first to hear about new drops, series releases, and collector rewards from the studio.</p>
       <div class="footer-newsletter-form">
+        <input class="footer-newsletter-input" type="text" id="footerNameInput" placeholder="your name" autocomplete="given-name" style="margin-bottom:0.5rem"/>
         <input class="footer-newsletter-input" type="email" id="footerEmailInput" placeholder="your@email.com" autocomplete="email"/>
         <button class="footer-newsletter-btn" id="footerSubBtn">Subscribe</button>
       </div>
@@ -4223,7 +4233,8 @@ function refreshAllPrices() {
     if (!baseNgn) return;
     if (_showLocalCurrency && _visitorRate) {
       ngnEl.style.display = 'none';
-      if (localEl) { localEl.textContent = fmtLocal(baseNgn); localEl.style.display = ''; }
+      const prefix = allNgn.length > 1 ? 'from ' : '';
+      if (localEl) { localEl.textContent = prefix + fmtLocal(baseNgn); localEl.style.display = ''; }
     } else {
       ngnEl.style.display = '';
       if (localEl) localEl.style.display = 'none';
@@ -7636,11 +7647,25 @@ document.addEventListener('input', function(e) {
 // Auto-convert between NGN and USD prices using the live exchange rate.
 // Type in NGN → auto-fills USD. Type in USD → auto-fills NGN.
 // A small rate indicator shows the current rate being used.
+let _autoConvert = true; // can be toggled off in admin
+
+function toggleAutoConvert() {
+  _autoConvert = !_autoConvert;
+  const btn = document.getElementById('autoConvertToggle');
+  if (btn) {
+    btn.textContent = _autoConvert ? 'On' : 'Off';
+    btn.style.background = _autoConvert ? 'var(--clay)' : 'transparent';
+    btn.style.color = _autoConvert ? '#fff' : 'var(--clay)';
+  }
+  showToast('Price auto-conversion ' + (_autoConvert ? 'enabled' : 'disabled'));
+}
+
 (function() {
   let _lastEditedField = null;
   document.addEventListener('input', function(e) {
     const t = e.target;
     if (!t.matches) return;
+    if (!_autoConvert) return; // auto-convert disabled
 
     // Prints: .ap-size-ngn / .ap-size-usd (inside .ap-size-row)
     if (t.matches('.ap-size-ngn')) {
@@ -10085,12 +10110,13 @@ detectVisitorCurrency().finally(initCurrencySelector);
     }
     btn.disabled = true; btn.textContent = 'Subscribing…';
     try {
-      // Route through site-form endpoint
-      await fetch('/api/site-form', {
+      const res = await fetch('/api/site-form', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ form_type: 'newsletter', email, name: 'Shop subscriber' }),
+        body: JSON.stringify({ form_type: 'newsletter', email, name: document.getElementById('footerNameInput')?.value.trim() || 'Subscriber' }),
       });
-    } catch(_) {}
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showToast(data.error || 'Could not subscribe — please try again'); btn.disabled = false; btn.textContent = 'Subscribe'; return; }
+    } catch(_) { showToast('Network error — please try again'); btn.disabled = false; btn.textContent = 'Subscribe'; return; }
     btn.style.display = 'none';
     inp.style.display = 'none';
     if (msg) msg.style.display = 'block';
