@@ -4641,7 +4641,6 @@ function buildPrintCard(p) {
         </div>
         ${actionHtml}
       </div>
-      ${detailsLink(p)}
     </div>`;
   if (isSold) card.classList.add('is-sold');
   return card;
@@ -4723,13 +4722,23 @@ function syncCardStock(pid, variantKey) {
     }
   }
   if (stockEl) {
-    // Never show stock count on enquire-only or 1-of-1 pieces
     const isEnquireOnly = p && (p.enquire_only || p.print_edition === 'one_of_one');
-    if (soldOut && !isEnquireOnly) {
-      stockEl.innerHTML = `<span style="font-family:'Montserrat',sans-serif;font-size:0.6rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--rust);margin-left:0.5rem">Sold out</span>`;
-    } else if (!isEnquireOnly && cap !== null && (showEditionCount || cap <= 3)) {
-      const label = cap <= 3 ? `Only ${cap} left` : `${cap} left`;
-      stockEl.innerHTML = `<span style="font-family:'Montserrat',sans-serif;font-size:0.6rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--rust);margin-left:0.5rem">${label}</span>`;
+    if (!isEnquireOnly) {
+      // For limited prints, sum stock across ALL variants for a true total
+      let displayCap = cap;
+      if (showEditionCount && p.stock_by_variant && Object.keys(p.stock_by_variant).length > 1) {
+        const total = Object.values(p.stock_by_variant).reduce((sum, n) => sum + (Number(n) || 0), 0);
+        if (total > 0) displayCap = total;
+      }
+      const allSoldOut = p.is_sold || (showEditionCount && displayCap !== null && displayCap <= 0);
+      if (allSoldOut) {
+        stockEl.innerHTML = `<span style="font-family:'Montserrat',sans-serif;font-size:0.6rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--rust)">Sold out</span>`;
+      } else if (displayCap !== null && (showEditionCount || displayCap <= 3)) {
+        const label = displayCap <= 3 ? `Only ${displayCap} left` : `${displayCap} left`;
+        stockEl.innerHTML = `<span style="font-family:'Montserrat',sans-serif;font-size:0.6rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--clay)">${label}</span>`;
+      } else {
+        stockEl.innerHTML = '';
+      }
     } else {
       stockEl.innerHTML = '';
     }
