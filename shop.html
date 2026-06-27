@@ -789,6 +789,8 @@ body.dark .shop-empty-state {
   position: relative;
 }
 .card-img img { width:100%; height:auto; object-fit:contain; transition: transform 0.6s ease; }
+.card-img img:not([src]) { display: none; }
+.product-card { contain: layout; }
 .product-card:hover .card-img img { transform: scale(1.05); }
 .card-img-placeholder {
   width:100%; min-height: 260px; aspect-ratio: 3/4;
@@ -5216,6 +5218,13 @@ function scheduleMasonryLayout() {
   masonryLayoutFrame = requestAnimationFrame(() => {
     masonryLayoutFrame = 0;
     document.querySelectorAll('.shop-grid.masonry-grid').forEach(layoutMasonryGrid);
+    // Re-run after images load — images load async and change card heights
+    document.querySelectorAll('.shop-grid.masonry-grid .card-img img').forEach(img => {
+      if (!img.complete) {
+        img.addEventListener('load', scheduleMasonryLayout, { once: true });
+        img.addEventListener('error', scheduleMasonryLayout, { once: true });
+      }
+    });
   });
 }
 
