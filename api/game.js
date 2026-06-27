@@ -823,7 +823,7 @@ async function getNgnPerUsd(supabase) {
 }
 
 // Synchronous fallback for functions that can't be async (uses last cached value)
-function getNgnPerUsdSync() { return _cachedRate || 1600; }
+function getNgnPerUsdSync() { return _cachedRate || 1400; }
 const NGN_PER_USD_DEFAULT = 1600;
 const SERVER_HIGH_CART_USD = 60;
 const SERVER_COMPLIMENTARY_SHIPPING_USD = 500;
