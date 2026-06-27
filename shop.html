@@ -5645,7 +5645,7 @@ function updateCartUI() {
         </div>
       </div>
       <div>
-        <div class="cart-item-price">${fmt(c.priceNgn * c.qty)}</div>
+        <div class="cart-item-price">${fmt(liveCartItemPrice(c) * c.qty)}</div>
       </div>
     </div>`;
   }).join('') + renderCartRecommendations();
@@ -6256,7 +6256,16 @@ function refreshTipUI() {
 })();
 
 /* ─── Updated total helpers (include delivery) ─── */
-function cartNgnTotal() { return cart.reduce((a,c)=>a+c.priceNgn*c.qty, 0); }
+function liveCartItemPrice(c) {
+  // Always use live product price from SHOP_CONFIG, not stale cart price
+  const p = SHOP_CONFIG.products && SHOP_CONFIG.products.find(x => x.id === c.id);
+  if (p) {
+    const live = productPrice(p, c.variantKey, 'ngn');
+    if (live > 0) return live;
+  }
+  return c.priceNgn; // fallback to cart price if product not found
+}
+function cartNgnTotal() { return cart.reduce((a,c)=>a+liveCartItemPrice(c)*c.qty, 0); }
 function cartUsdTotal() { return cart.reduce((a,c)=>a+c.priceUsd*c.qty, 0); }
 
 function discountNgn() {
@@ -6478,7 +6487,7 @@ function buildOrderSummary() {
         </div>
       </div>
       <span class="order-line-price">
-        ${_showLocalCurrency && _visitorRate ? fmtLocal(c.priceNgn * c.qty) : fmt(c.priceNgn * c.qty)}
+        ${_showLocalCurrency && _visitorRate ? fmtLocal(liveCartItemPrice(c) * c.qty) : fmt(liveCartItemPrice(c) * c.qty)}
       </span>
     </div>`;
   }).join('');
