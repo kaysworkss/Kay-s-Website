@@ -411,11 +411,8 @@ body.dark .size-chip.selected { color:var(--sand); }
   font-size:2rem; font-weight:400; color:var(--text);
 }
 .price-usd {
-  font-family:'Montserrat',sans-serif;
-  font-size:0.72rem; font-weight:500;
-  letter-spacing:0.06em; color:var(--text-muted);
+  display: none !important; /* Hidden — localisation handles all currency display */
 }
-.local-currency-active .price-usd { display:none !important; }
 
 .add-to-cart-btn {
   width:100%;
@@ -1703,7 +1700,7 @@ function renderProduct(p) {
           <p class="editions-left" id="editionsLeft" style="display:${editionLabel(p, _selectedVariant) ? 'block' : 'none'}">${editionLabel(p, _selectedVariant)}</p>
           <div class="price-row">
             <span class="price-ngn" id="priceNgn">${ngn ? fmt(ngn) : (() => { const allNgn = printOptions.flatMap(o => (o.sizes||[]).map(s => printPrice(p, printOptionKey(o.type,s),'ngn'))).filter(Boolean); return allNgn.length ? 'from ' + fmt(Math.min(...allNgn)) : ''; })()}</span>
-            <span class="price-usd" id="priceUsd" style="${_detailCurrency && _detailCurrency !== 'NGN' ? 'display:none' : ''}">${usd ? fmtUsd(usd) + ' USD' : ''}</span>
+            <span class="price-usd" id="priceUsd">${usd ? fmtUsd(usd) + ' USD' : ''}</span>
           </div>
           ${(() => {
             const isSoldOut2 = p.is_sold || (isLimitedKey(p, _selectedVariant) && (editionRemaining(p, _selectedVariant) ?? 0) <= 0);
@@ -1832,7 +1829,7 @@ function renderMerchProduct(p) {
           <div class="size-picker">${variantChips}</div>
           <div class="price-row">
             <span class="price-ngn" id="priceNgn">${(_detailCurrency && _detailCurrency !== 'NGN' && _detailRate) ? (fmtLocal(ngn) || fmt(ngn)) : fmt(ngn)}</span>
-            <span class="price-usd" id="priceUsd" style="${_detailCurrency && _detailCurrency !== 'NGN' ? 'display:none' : ''}">${fmtUsd(usd)} USD</span>
+            <span class="price-usd" id="priceUsd">${fmtUsd(usd)} USD</span>
             <span id="merchStock" style="font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;margin-left:0.6rem;color:${soldOut?'var(--rust)':'var(--gold)'}">${soldOut?'Sold out':(stock!==null&&stock<=3?`Only ${stock} left`:'')}</span>
           </div>
           <button class="add-to-cart-btn" id="addBtn" onclick="handleMerchAddToCart()" ${(!_selectedVariant||soldOut)?'disabled':''}>${soldOut?'Sold out':(_selectedVariant?'Add to bag':'Unavailable')}</button>
@@ -2162,7 +2159,7 @@ function renderRelated(prints) {
         </div>
         <div class="related-card-body">
           <div class="related-card-title">${p.name}</div>
-          <div class="related-card-price">${isEnquireOnly ? 'Enquire' : `From ${fmt(lowestPrice)} · ${firstAvail}`}</div>
+          <div class="related-card-price">${isEnquireOnly ? 'Enquire' : `From ${(_detailCurrency && _detailCurrency !== 'NGN' && _detailRate && fmtLocal(lowestPrice)) ? fmtLocal(lowestPrice) : fmt(lowestPrice)} · ${firstAvail}`}</div>
         </div>
       </a>`;
     } catch (e) {
@@ -2180,8 +2177,8 @@ async function load() {
     if (!res.ok) { showError(); return; }
     const product = await res.json();
     renderProduct(product);
-    // Apply local currency if visitor has one selected
-    applyLocalCurrencyToDetail(product);
+    // Apply local currency — use requestAnimationFrame to ensure DOM is painted first
+    requestAnimationFrame(() => applyLocalCurrencyToDetail(product));
     // Re-render sizing guide once hero image dimensions are known
     const heroImgEl = document.getElementById('heroImg');
     if (heroImgEl && !heroImgEl.complete) {
