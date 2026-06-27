@@ -230,6 +230,46 @@ body {
 
 .hidden { display: none !important; }
 
+/* ── Reply modal ── */
+.reply-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(45,33,27,0.5); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.reply-modal {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 16px; width: min(540px, 100%);
+  box-shadow: 0 16px 48px rgba(45,33,27,0.16);
+  display: flex; flex-direction: column; max-height: 90vh; overflow: hidden;
+}
+.reply-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.reply-modal-title {
+  font-family: 'Cinzel', serif; font-size: 1rem; font-weight: 400; color: var(--text);
+}
+.reply-modal-to {
+  font-family: 'Montserrat', sans-serif; font-size: 0.68rem;
+  color: var(--text-muted); margin-top: 0.2rem;
+}
+.reply-modal-body { padding: 1.2rem 1.5rem; overflow-y: auto; flex: 1; }
+.reply-subject-input, .reply-textarea {
+  width: 100%; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border-accent); border-radius: 8px;
+  font-family: 'Crimson Pro', serif; font-size: 1rem;
+  outline: none; transition: border-color 0.2s; box-sizing: border-box;
+}
+.reply-subject-input { padding: 0.6rem 0.85rem; margin-bottom: 0.8rem; }
+.reply-subject-input:focus, .reply-textarea:focus { border-color: var(--clay); }
+.reply-textarea { padding: 0.8rem; min-height: 180px; resize: vertical; line-height: 1.6; }
+.reply-modal-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.5rem; border-top: 1px solid var(--border); flex-shrink: 0; gap: 0.7rem;
+}
+.reply-status { font-family: 'Montserrat', sans-serif; font-size: 0.68rem; color: var(--text-muted); }
+
 @media (max-width: 600px) {
   .page-header { flex-direction: column; align-items: flex-start; }
   .req-fields { grid-template-columns: 1fr; }
@@ -302,6 +342,32 @@ body {
   </div>
 
 </main>
+
+<!-- Reply modal -->
+<div class="reply-overlay hidden" id="replyOverlay">
+  <div class="reply-modal">
+    <div class="reply-modal-head">
+      <div>
+        <div class="reply-modal-title">Reply to enquiry</div>
+        <div class="reply-modal-to" id="replyTo"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="replyClose">✕</button>
+    </div>
+    <div class="reply-modal-body">
+      <label class="field-label" for="replySubject">Subject</label>
+      <input class="reply-subject-input" type="text" id="replySubject" placeholder="Re: Your enquiry — Kay's Works"/>
+      <label class="field-label" for="replyMessage">Message</label>
+      <textarea class="reply-textarea" id="replyMessage" placeholder="Write your reply here…"></textarea>
+    </div>
+    <div class="reply-modal-footer">
+      <span class="reply-status" id="replyStatus"></span>
+      <div style="display:flex;gap:0.6rem">
+        <button class="btn btn-ghost btn-sm" id="replyCancelBtn">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="replySendBtn">Send reply →</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 const API = '/api/site-form';
@@ -382,6 +448,7 @@ function renderCard(row) {
     : '';
 
   const actions = `<div class="req-actions">
+    ${row.email ? `<button class="btn btn-sm btn-primary" data-reply-id="${esc(row.id)}" data-reply-email="${esc(row.email)}" data-reply-name="${esc(row.name||row.collector_name||'')}" data-reply-artwork="${esc(row.artwork||'')}">Reply →</button>` : ''}
     ${row.status !== 'settled'  ? `<button class="btn btn-sm btn-settle"  data-action="settled"  data-id="${esc(row.id)}">Mark settled</button>` : ''}
     ${row.status !== 'pending'  ? `<button class="btn btn-sm btn-pending"  data-action="pending"  data-id="${esc(row.id)}">Move to pending</button>` : ''}
     ${row.status !== 'archived' ? `<button class="btn btn-sm btn-archive" data-action="archived" data-id="${esc(row.id)}">Archive</button>` : ''}
@@ -509,6 +576,58 @@ $('logoutBtn').addEventListener('click', () => {
 $('requestList').addEventListener('click', e => {
   const btn = e.target.closest('button[data-id]');
   if (btn) updateStatus(btn.dataset.id, btn.dataset.action);
+  const replyBtn = e.target.closest('button[data-reply-id]');
+  if (replyBtn) openReply(replyBtn.dataset.replyId, replyBtn.dataset.replyEmail, replyBtn.dataset.replyName, replyBtn.dataset.replyArtwork);
+});
+
+// ── Reply modal ──
+let _replyId = null;
+
+function openReply(id, email, name, artwork) {
+  _replyId = id;
+  $('replyTo').textContent = 'To: ' + (name ? name + ' <' + email + '>' : email);
+  $('replySubject').value = artwork
+    ? 'Re: Your enquiry about "' + artwork + '" — Kay’s Works'
+    : "Re: Your enquiry — Kay’s Works";
+  $('replyMessage').value = '';
+  $('replyStatus').textContent = '';
+  $('replyOverlay').classList.remove('hidden');
+  setTimeout(() => $('replyMessage').focus(), 50);
+}
+
+function closeReply() {
+  $('replyOverlay').classList.add('hidden');
+  _replyId = null;
+}
+
+async function sendReply() {
+  const message = $('replyMessage').value.trim();
+  const subject = $('replySubject').value.trim();
+  if (!message) { $('replyStatus').textContent = 'Please write a message'; return; }
+  $('replySendBtn').disabled = true;
+  $('replySendBtn').textContent = 'Sending…';
+  $('replyStatus').textContent = '';
+  try {
+    const res = await req(API + '?reply=1&id=' + encodeURIComponent(_replyId), {
+      method: 'PATCH',
+      body: JSON.stringify({ message, subject }),
+    });
+    $('replyStatus').textContent = 'Sent to ' + res.to;
+    setTimeout(() => { closeReply(); loadRequests(); }, 1400);
+  } catch (e) {
+    $('replyStatus').textContent = e.message || 'Send failed';
+    $('replySendBtn').disabled = false;
+    $('replySendBtn').textContent = 'Send reply →';
+  }
+}
+
+$('replyClose').addEventListener('click', closeReply);
+$('replyCancelBtn').addEventListener('click', closeReply);
+$('replySendBtn').addEventListener('click', sendReply);
+$('replyOverlay').addEventListener('click', e => { if (e.target === $('replyOverlay')) closeReply(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReply(); });
+$('replyMessage').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendReply();
 });
 </script>
 </body>
