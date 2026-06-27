@@ -1107,7 +1107,11 @@ async function computeShopCheckout(body, supabase) {
 
   // Optional tip (client-supplied, clamped to >= 0). Added on top of the total.
   const tipNgn = Math.max(0, +(Number(body.tip_ngn) || 0).toFixed(2));
-  const tipUsd = Math.max(0, +(Number(body.tip_usd) || 0).toFixed(2));
+  // Derive tipUsd from tipNgn at live rate — don't trust client's stale USD value
+  const tipNgnVal = Math.max(0, +(Number(body.tip_ngn) || 0));
+  const tipUsd = tipNgnVal > 0 && getNgnPerUsdSync() > 0
+    ? +(tipNgnVal / getNgnPerUsdSync()).toFixed(2)
+    : Math.max(0, +(Number(body.tip_usd) || 0).toFixed(2));
 
   const totalNgn = Math.max(0, +(discountedSubtotalNgn + discountedDeliveryNgn + tipNgn).toFixed(2));
   const totalUsd = Math.max(0, +(discountedSubtotalUsd + discountedDeliveryUsd + tipUsd).toFixed(2));
@@ -1246,7 +1250,10 @@ function verifyShopQuote(quote, checkout, expected = {}) {
   const expectedBuf = Buffer.from(expectedSig, 'hex');
   if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return false;
   if (Number(payload.total_ngn) !== checkout.totalNgn) return false;
-  if (Number(payload.total_usd) !== checkout.totalUsd) return false;
+  // USD tolerance of 2% — rate may drift slightly between quote generation and confirmation
+  const quotedUsd = Number(payload.total_usd);
+  const computedUsd = checkout.totalUsd;
+  if (Math.abs(quotedUsd - computedUsd) > Math.max(0.5, computedUsd * 0.02)) return false;
   if (String(payload.discount_code || '') !== String(checkout.discountCode || '')) return false;
   if (Number(payload.discount_percent || 0) !== Number(checkout.discountPercent || 0)) return false;
   if (Number(payload.tip_ngn || 0) !== Number(checkout.tipNgn || 0)) return false;
