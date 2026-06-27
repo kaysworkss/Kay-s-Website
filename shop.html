@@ -6256,17 +6256,16 @@ function refreshTipUI() {
 })();
 
 /* ─── Updated total helpers (include delivery) ─── */
-function liveCartItemPrice(c) {
-  // Always use live product price from SHOP_CONFIG, not stale cart price
+function liveCartItemPrice(c, currency) {
   const p = SHOP_CONFIG.products && SHOP_CONFIG.products.find(x => x.id === c.id);
   if (p) {
-    const live = productPrice(p, c.variantKey, 'ngn');
+    const live = productPrice(p, c.variantKey, currency || 'ngn');
     if (live > 0) return live;
   }
-  return c.priceNgn; // fallback to cart price if product not found
+  return currency === 'usd' ? c.priceUsd : c.priceNgn;
 }
-function cartNgnTotal() { return cart.reduce((a,c)=>a+liveCartItemPrice(c)*c.qty, 0); }
-function cartUsdTotal() { return cart.reduce((a,c)=>a+c.priceUsd*c.qty, 0); }
+function cartNgnTotal() { return cart.reduce((a,c)=>a+liveCartItemPrice(c,'ngn')*c.qty, 0); }
+function cartUsdTotal() { return cart.reduce((a,c)=>a+liveCartItemPrice(c,'usd')*c.qty, 0); }
 
 function discountNgn() {
   if (!_appliedDiscount) return 0;
