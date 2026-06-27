@@ -1002,6 +1002,9 @@ async function computeShopCheckout(body, supabase) {
     throw err;
   }
 
+  // Always fetch fresh NGN/USD rate before computing USD amounts for crypto
+  try { _cachedRate = await getNgnPerUsd(supabase); } catch(_) {}
+
   const productCache = {};
   for (const item of items) {
     if (!item.id || productCache[item.id]) continue;
@@ -1057,7 +1060,9 @@ async function computeShopCheckout(body, supabase) {
     const vkey = item.variantKey || item.variant;
     const qty = Math.max(1, Number(item.qty) || 1);
     const priceNgn = serverVariantPrice(product, vkey, item.variant, 'ngn');
-    const priceUsd = serverVariantPrice(product, vkey, item.variant, 'usd');
+    // Derive USD from NGN at live rate — never use stale prices_usd for crypto
+    const liveRate = getNgnPerUsdSync(); // uses cached live rate or fallback
+    const priceUsd = liveRate > 0 ? +(priceNgn / liveRate).toFixed(4) : serverVariantPrice(product, vkey, item.variant, 'usd');
     subtotalNgn += priceNgn * qty;
     subtotalUsd += priceUsd * qty;
     if (product.category === 'prints' &&
@@ -1082,7 +1087,11 @@ async function computeShopCheckout(body, supabase) {
   hasLarge = hasLarge || shippingProfile.tube;
   const deliveryCarrier = method === 'ship' ? serverIntlCarrierTier(zone, subtotalUsd, body.delivery_carrier) : '';
   const deliveryNgn = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'ngn', subtotalUsd, deliveryCarrier, shippingProfile) : 0;
-  const deliveryUsd = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'usd', subtotalUsd, deliveryCarrier, shippingProfile) : 0;
+  // Derive delivery USD from NGN at live rate
+  const liveRateForDelivery = getNgnPerUsdSync();
+  const deliveryUsd = deliveryNgn > 0 && liveRateForDelivery > 0
+    ? +(deliveryNgn / liveRateForDelivery).toFixed(2)
+    : (method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'usd', subtotalUsd, deliveryCarrier, shippingProfile) : 0);
 
   // ── Discount code ────────────────────────────────────────────────────────
   // Resolve and apply a discount code (if provided). The discount is computed
