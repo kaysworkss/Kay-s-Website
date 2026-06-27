@@ -834,6 +834,72 @@ async function handleUpdate(req, res) {
   return res.status(200).json({ ok: true, submission: rows && rows[0] });
 }
 
+async function handleReply(req, res) {
+  const id      = req.query && req.query.id;
+  const body    = req.body || {};
+  const message = String(body.message || '').trim();
+  const subject = String(body.subject || '').trim();
+  if (!id)      return res.status(400).json({ error: 'Missing submission id' });
+  if (!message) return res.status(400).json({ error: 'Reply message required' });
+
+  // Fetch the submission
+  const rows = await supabaseFetch(`${TABLE}?id=eq.${encodeURIComponent(id)}`, { method: 'GET' });
+  const row = rows && rows[0];
+  if (!row) return res.status(404).json({ error: 'Submission not found' });
+  if (!row.email) return res.status(400).json({ error: 'No email address on this submission' });
+
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) return res.status(500).json({ error: 'RESEND_API_KEY not configured' });
+
+  const fromEmail = process.env.SHOP_ORDER_FROM_EMAIL || "Kay's Works <shop@mail.kaysworks.com>";
+  const replyToEmail = process.env.SHOP_REPLY_TO_EMAIL || process.env.CONTACT_EMAIL || 'hello@kaysworks.com';
+  const emailSubject = subject || `Re: Your enquiry — Kay's Works`;
+
+  // Format message as plain text + simple HTML
+  const paragraphs = message.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+  const bodyHtml = paragraphs.map(p =>
+    `<p style="margin:0 0 14px;font-size:15px;color:#2d211b;font-family:Georgia,serif;line-height:1.7">${p.replace(/\n/g,'<br/>')}</p>`
+  ).join('');
+
+  const html = _siteEmailShell({
+    eyebrow:   "Kay's Works",
+    heroTitle: emailSubject,
+    bodyHtml,
+    rows: [],
+    ctaHref:   'https://www.kaysworks.com/shop',
+    ctaText:   'Visit the shop',
+    ctaSub:    '',
+    logoUrl:   process.env.SHOP_LOGO_URL || 'https://www.kaysworks.com/images/kaysworkslogo.svg',
+  });
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: fromEmail,
+      to: [row.email],
+      reply_to: replyToEmail,
+      subject: emailSubject,
+      text: message,
+      html,
+    }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    return res.status(502).json({ error: data.message || 'Email send failed' });
+  }
+
+  // Mark as settled after replying
+  await supabaseFetch(`${TABLE}?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ status: 'settled', settled_at: new Date().toISOString() }),
+  });
+
+  return res.status(200).json({ ok: true, to: row.email });
+}
+
 module.exports = async (req, res) => {
   setHeaders(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -841,7 +907,11 @@ module.exports = async (req, res) => {
   try {
     if (req.method === 'POST') return handleCreate(req, res);
     if (req.method === 'GET') return handleList(req, res);
-    if (req.method === 'PATCH') return handleUpdate(req, res);
+    if (req.method === 'PATCH') {
+      // ?reply=1 triggers reply flow, plain PATCH updates status
+      if (req.query && req.query.reply === '1') return handleReply(req, res);
+      return handleUpdate(req, res);
+    }
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
     return res.status(500).json({ error: error.message || 'Server error' });
