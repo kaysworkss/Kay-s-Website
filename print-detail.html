@@ -415,6 +415,7 @@ body.dark .size-chip.selected { color:var(--sand); }
   font-size:0.72rem; font-weight:500;
   letter-spacing:0.06em; color:var(--text-muted);
 }
+.local-currency-active .price-usd { display:none !important; }
 
 .add-to-cart-btn {
   width:100%;
@@ -1106,6 +1107,24 @@ function loadDetailCurrency() {
   } catch(e) {}
 }
 loadDetailCurrency(); // run immediately on script parse
+// Add body class immediately so CSS can hide USD price
+if (_detailCurrency && _detailCurrency !== 'NGN') {
+  document.documentElement.classList.add('local-currency-active');
+}
+
+function liveCartItemPrice(c, currency) {
+  // Re-read live price from product config, not stale cart cache
+  if (window._shopProducts) {
+    const p = window._shopProducts.find(x => x.id === c.id);
+    if (p) {
+      const prices = currency === 'usd' ? (p.prices_usd || {}) : (p.prices_ngn || {});
+      const key = c.variantKey || c.variant || '';
+      const live = Number(prices[key] || 0);
+      if (live > 0) return live;
+    }
+  }
+  return currency === 'usd' ? (c.priceUsd || 0) : (c.priceNgn || 0);
+}
 
 function fmtLocal(ngn) {
   const rate = _detailRate;
@@ -1474,12 +1493,12 @@ function updateCartUI() {
         </div>
       </div>
       <div>
-        <div class="cart-item-price">${fmt(c.priceNgn * c.qty)}</div>
+        <div class="cart-item-price">${_detailCurrency && _detailCurrency !== 'NGN' && _detailRate ? fmtLocal(liveCartItemPrice(c,'ngn') * c.qty) : fmt(liveCartItemPrice(c,'ngn') * c.qty)}</div>
       </div>
     </div>`;
   }).join('');
 
-  const ngnTotal = cart.reduce((a, c) => a + (c.priceNgn || 0) * c.qty, 0);
+  const ngnTotal = cart.reduce((a, c) => a + liveCartItemPrice(c,'ngn') * c.qty, 0);
   document.getElementById('cartTotals').innerHTML = `
     <div class="cart-total-row"><span>Subtotal</span><span>${fmt(ngnTotal)}</span></div>
     <div class="cart-total-row"><span>Delivery</span><span><span style="color:#6b7c5c">TBD at checkout</span></span></div>
@@ -1545,6 +1564,9 @@ function detailTags(p) {
 
 function renderProduct(p) {
   _product = p;
+  // Expose to liveCartItemPrice helper
+  window._shopProducts = window._shopProducts || [];
+  if (!window._shopProducts.find(x => x.id === p.id)) window._shopProducts.push(p);
 
   // Non-print products use a simpler variant/price selector.
   if (p.category && p.category !== 'prints') {
