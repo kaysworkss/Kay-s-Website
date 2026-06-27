@@ -337,14 +337,38 @@ async function insertSubmission(row) {
   if (row.form_type === 'private-offer') {
     attempts.push(compactRow(row), minimalRow(row));
   } else if (row.form_type === 'delivery-details') {
-    // If the full shipping row fails on a missing column, fall back to a
-    // compact row, then a minimal one — the email must still go out.
     attempts.push(compactDeliveryRow(row), {
       form_type: 'delivery-details',
       status: row.status || 'pending',
       name: row.name,
       email: row.email,
       message: row.message || '',
+    });
+  } else if (row.form_type === 'interest-1of1') {
+    attempts.push({
+      form_type: 'interest-1of1',
+      status: row.status || 'pending',
+      name: row.name,
+      email: row.email,
+      artwork: row.artwork || '',
+      commission_type: 'interest-1of1',
+      message: row.message || '',
+    }, {
+      form_type: 'commission',
+      status: 'pending',
+      name: row.name,
+      email: row.email,
+      commission_type: 'interest-1of1',
+      message: (row.artwork ? 'Artwork: ' + row.artwork + ' | ' : '') + (row.message || ''),
+    });
+  } else if (row.form_type === 'newsletter') {
+    attempts.push({
+      form_type: 'commission',
+      status: 'pending',
+      name: row.name,
+      email: row.email,
+      commission_type: 'newsletter',
+      message: 'Newsletter subscription from shop footer.',
     });
   }
 
@@ -358,7 +382,7 @@ async function insertSubmission(row) {
       });
     } catch (error) {
       lastError = error;
-      const hasFallback = (row.form_type === 'private-offer' || row.form_type === 'delivery-details');
+      const hasFallback = ['private-offer','delivery-details','interest-1of1','newsletter'].includes(row.form_type);
       if (!hasFallback || !isSchemaMismatch(error)) throw error;
       console.warn(`${row.form_type} insert shape failed, retrying with compact schema:`, error.message);
     }
