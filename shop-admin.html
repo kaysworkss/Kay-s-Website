@@ -619,7 +619,7 @@ body.dark .toast { background:#2a1c14; }
 
 
 
-<script src="/shop-utils.js"></script>
+<script src="./shop-utils.js"></script>
 <script>
 'use strict';
 
@@ -646,7 +646,9 @@ function renderProducts() {
 
 
 // ── Auto-unlock if token already stored ──
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // Load the real product rows before attempting to render the editor.
+  await loadShopData();
   const token = localStorage.getItem('kaysworks-admin-token');
   if (token) {
     // Verify token silently
@@ -727,22 +729,6 @@ async function loadAdminConfig() {
       if (rateTag) rateTag.textContent = '₦' + SHOP_RATE.toLocaleString() + '/$ live';
     }
   } catch (_) { /* keep whatever's already loaded */ }
-
-  // Fetch live products from Supabase via the admin API
-  try {
-    const token = localStorage.getItem('kaysworks-admin-token');
-    const res = await fetch('/api/admin/shop-products', {
-      headers: { 'x-admin-token': token || '' },
-    });
-    if (res.ok) {
-      const products = await res.json().catch(() => null);
-      if (Array.isArray(products) && products.length) {
-        SHOP_CONFIG.products = products.map(p => normalizeProduct(p));
-        renderAdminProducts();
-      }
-    }
-  } catch (_) { /* fall back to defaults already rendered */ }
-
   // Show the live server addresses in the read-only admin fields.
   const ethInput = document.getElementById('cfgEthAddr');
   const tezInput = document.getElementById('cfgTezosAddr');
@@ -2032,7 +2018,7 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
       throw new Error(`Config save failed (${cfgRes.status}): ${d.error || cfgRes.statusText}`);
     }
 
-    renderProducts();
+    renderAdminProducts();
     populatePrintPageSelector();
     populateFeaturedSelector();
     showToast('Saved ✦');
@@ -2043,6 +2029,10 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
     btn.disabled = false; btn.textContent = 'Save configuration';
   }
 });
+
+// Checkout controls are not part of the standalone admin page. The legacy
+// payment block remains for now, but must not initialize against missing DOM.
+if (document.getElementById('ethConnectBtn')) {
 
 /* ─── ETH wallet payment ─── */
 // Uses window.ethereum (MetaMask, Coinbase Wallet, Rabby, any EIP-1193 provider)
@@ -3012,6 +3002,8 @@ document.querySelectorAll('.pay-tab').forEach(t => {
 // <meta name="paystack-key" content="pk_live_…"/>
 const paystackMeta = document.querySelector('meta[name="paystack-key"]');
 if (paystackMeta) window.__PAYSTACK_KEY__ = paystackMeta.content;
+
+} // end checkout-only code
 
 /* ─── Load shop data from API ─── */
 async function loadShopData() {
