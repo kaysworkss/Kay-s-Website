@@ -6021,6 +6021,9 @@ async function refreshLock(method, silent) {
       ? window.__activeLock.order_ref : '';
     const extra = payer ? { payer_address: payer } : {};
     if (prevRef) extra.reuse_order_ref = prevRef;
+    // Send client-fetched price as fallback in case server price sources are unreachable
+    if (method === 'eth' && window._ethUsdPrice) extra.client_crypto_price = window._ethUsdPrice;
+    if (method === 'tezos' && window._xtzUsdPrice) extra.client_crypto_price = window._xtzUsdPrice;
     const q = await getServerCheckoutQuote(d, method, extra);
     if (seq !== _lockSeq) return; // a newer lock superseded this one
     const orderRef = q.order_ref || q.quote?.order_ref || prevRef || '';
@@ -6929,7 +6932,7 @@ async function refreshCryptoRates() {
     ]);
 
     if (ethPrice) window._ethUsdPrice = ethPrice;
-    if (xtzPrice) _xtzPerUsd = 1 / xtzPrice;
+    if (xtzPrice) { _xtzPerUsd = 1 / xtzPrice; window._xtzUsdPrice = xtzPrice; }
     if (ethPrice || xtzPrice) _lastCryptoRateAt = Date.now();
 
     if (ethPrice) {
