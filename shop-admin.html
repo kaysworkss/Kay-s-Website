@@ -88,25 +88,7 @@ body.dark .toast { background:#2a1c14; }
   border-color: var(--clay); color: var(--clay);
 }
 
-/* Override admin-panel to fill page rather than overlay */
-.admin-panel {
-  position: static !important;
-  opacity: 1 !important;
-  pointer-events: all !important;
-  background: none !important;
-  backdrop-filter: none !important;
-  display: block !important;
-  padding: 0 !important;
-}
-.admin-box {
-  max-width: 1080px;
-  margin: 0 auto;
-  border-radius: 0 !important;
-  border-left: none !important;
-  border-right: none !important;
-  max-height: none !important;
-  overflow-y: visible !important;
-}
+
 
 /* ── Admin Panel ── */
 .admin-bar {
@@ -364,6 +346,40 @@ body.dark .toast { background:#2a1c14; }
 .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
 
+/* Override admin-panel to fill page rather than overlay */
+.admin-panel {
+  position: static !important;
+  opacity: 1 !important;
+  pointer-events: all !important;
+  background: none !important;
+  backdrop-filter: none !important;
+  display: none; /* hidden until JS opens it */
+  padding: 0 !important;
+}
+.admin-panel.open {
+  display: block !important;
+}
+.admin-box {
+  max-width: 1080px;
+  margin: 0 auto;
+  border-radius: 0 !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+  max-height: none !important;
+  overflow-y: visible !important;
+  box-shadow: none !important;
+}
+/* Login box centred nicely on standalone page */
+#adminLogin {
+  max-width: 420px;
+  margin: 4rem auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: var(--shadow);
+}
 </style>
 </head>
 <body>
@@ -380,7 +396,7 @@ body.dark .toast { background:#2a1c14; }
 <div class="toast" id="toast"></div>
 
 <!-- Admin FAB — hidden from public view, triggered by Ctrl+Shift+A -->
-<div class="admin-bar" id="adminBar" style="position:fixed;bottom:1.5rem;left:1.5rem;z-index:150">
+<div class="admin-bar" id="adminBar" style="display:none">
   <button class="admin-fab" id="adminFab" title="Admin panel">⚙</button>
 </div>
 
@@ -391,7 +407,7 @@ body.dark .toast { background:#2a1c14; }
     <!-- Login -->
     <div id="adminLogin">
       <div class="admin-head">
-        <span class="admin-head-title">Admin · Shop Config</span>
+        <span class="admin-head-title">⚙&#xFE0E; Kay's Works — Shop Admin</span>
         <button class="admin-close" id="adminClose">✕</button>
       </div>
       <div class="admin-login">
@@ -686,20 +702,12 @@ document.addEventListener('DOMContentLoaded', () => {
 const ADMIN_PW = ''; // checked server-side — this is just UX gating
 let adminUnlocked = false;
 
-document.getElementById('adminFab').addEventListener('click', ()=>{
-  document.getElementById('adminPanel').classList.add('open');
-  if (!adminUnlocked) {
-    document.getElementById('adminLogin').style.display='';
-    document.getElementById('adminConfig').style.display='none';
-  }
-});
+// adminFab not used on standalone admin page
 
 function closeAdmin() { window.location.href = '/shop'; }
 document.getElementById('adminClose').addEventListener('click', closeAdmin);
 document.getElementById('adminConfigClose').addEventListener('click', closeAdmin);
-document.getElementById('adminPanel').addEventListener('click', e=>{
-  if(e.target===document.getElementById('adminPanel')) closeAdmin();
-});
+// No click-outside-to-close on standalone admin page
 
 document.getElementById('adminLoginBtn').addEventListener('click', async ()=>{
   const pw = document.getElementById('adminPwInput').value;
@@ -717,7 +725,7 @@ document.getElementById('adminLoginBtn').addEventListener('click', async ()=>{
       renderAdminProducts();
       loadAdminConfig();
     } else { showToast('Incorrect password'); }
-  } catch(_) { showToast('Server error'); }
+  } catch(e) { showToast('Could not reach server — check your connection'); console.error('[Admin login]', e); }
 });
 
 async function loadAdminConfig() {
