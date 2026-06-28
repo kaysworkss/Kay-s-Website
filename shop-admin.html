@@ -727,6 +727,22 @@ async function loadAdminConfig() {
       if (rateTag) rateTag.textContent = '₦' + SHOP_RATE.toLocaleString() + '/$ live';
     }
   } catch (_) { /* keep whatever's already loaded */ }
+
+  // Fetch live products from Supabase via the admin API
+  try {
+    const token = localStorage.getItem('kaysworks-admin-token');
+    const res = await fetch('/api/admin/shop-products', {
+      headers: { 'x-admin-token': token || '' },
+    });
+    if (res.ok) {
+      const products = await res.json().catch(() => null);
+      if (Array.isArray(products) && products.length) {
+        SHOP_CONFIG.products = products.map(p => normalizeProduct(p));
+        renderAdminProducts();
+      }
+    }
+  } catch (_) { /* fall back to defaults already rendered */ }
+
   // Show the live server addresses in the read-only admin fields.
   const ethInput = document.getElementById('cfgEthAddr');
   const tezInput = document.getElementById('cfgTezosAddr');
