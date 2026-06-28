@@ -1323,18 +1323,21 @@ body.dark .cart-note-toggle { color: var(--sand); }
   }
 }
 @media(max-width: 719px) {
-  /* Stripe-style mobile order: summary (items + discount + total) on top,
-     then the form and Pay button below it. */
+  /* Keep the form immediately reachable; the full order detail opens on demand. */
   #formScreen { flex-direction: column; }
   #orderSummaryCol {
     order: 1;
-    padding: 1.25rem 1.2rem;
+    padding: 0.8rem 1rem;
     border-bottom: 1px solid var(--border);
     background: var(--bg-alt);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    box-shadow: 0 5px 18px rgba(64, 46, 35, 0.06);
   }
   #ckFormCol {
     order: 2;
-    padding: 1.5rem 1.2rem;
+    padding: 1.15rem 1rem 2rem;
   }
   /* On mobile the summary collapses to keep the form + Pay button reachable. */
   #ckSummaryChevron { display: inline-block !important; }
@@ -1343,9 +1346,38 @@ body.dark .cart-note-toggle { color: var(--sand); }
     max-height: 0; overflow: hidden;
     transition: max-height 0.3s ease;
   }
-  #orderSummaryCol.expanded #ckSummaryCollapsible { max-height: 2000px; }
+  #orderSummaryCol.expanded #ckSummaryCollapsible {
+    max-height: calc(100vh - 92px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.15rem;
+  }
   #orderSummaryCol.expanded #ckSummaryChevron { transform: rotate(180deg); }
-  #ckSummaryToggle { margin-bottom: 0.4rem; }
+  #ckSummaryToggle { min-height: 42px; margin: 0; }
+  #orderSummaryCol.expanded #ckSummaryToggle { margin-bottom: 0.25rem; }
+  #orderSummaryCol.summary-attention {
+    animation: summary-bar-cue 1.55s ease-out 0.45s 2;
+  }
+  #orderSummaryCol.summary-attention #ckSummaryChevron {
+    animation: summary-chevron-cue 1.05s ease-in-out 0.55s 3;
+  }
+  #orderSummaryCol .order-line.item { gap: 0.65rem; padding: 0.65rem 0; }
+  #orderSummaryCol .order-line-thumb { width: 52px; height: 52px; }
+  #orderSummaryCol .order-line-controls { margin-top: 0.2rem; }
+  #orderSummaryCol .order-line-price { font-size: 0.9rem; }
+  .ck-brand-bar { margin-bottom: 1.25rem; }
+}
+@keyframes summary-bar-cue {
+  0%, 100% { box-shadow: 0 5px 18px rgba(64, 46, 35, 0.06); }
+  45% { box-shadow: 0 5px 22px rgba(168, 78, 48, 0.24), inset 0 -2px 0 rgba(168, 78, 48, 0.2); }
+}
+@keyframes summary-chevron-cue {
+  0%, 100% { transform: translateY(0); }
+  45% { transform: translateY(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #orderSummaryCol.summary-attention,
+  #orderSummaryCol.summary-attention #ckSummaryChevron { animation: none !important; }
 }
 @media(min-width: 720px) {
   /* Desktop: always expanded, no toggle affordance. */
@@ -3212,14 +3244,13 @@ body.dark { --text-muted: #b3a392; }
 
       <!-- RIGHT: Order summary column -->
       <div id="orderSummaryCol">
-        <button type="button" id="ckSummaryToggle" class="ck-summary-title" style="width:100%;background:none;border:none;display:flex;align-items:center;justify-content:space-between;cursor:pointer;text-align:left">
-          <span style="display:flex;align-items:center;gap:0.5rem">Order summary <span id="ckSummaryChevron" style="display:none;transition:transform 0.2s">⌄</span></span>
+        <button type="button" id="ckSummaryToggle" class="ck-summary-title" aria-expanded="false" aria-controls="ckSummaryCollapsible" style="width:100%;background:none;border:none;display:flex;align-items:center;justify-content:space-between;cursor:pointer;text-align:left">
+          <span style="display:flex;align-items:center;gap:0.5rem"><span id="ckSummaryLabel">Order summary</span> <span id="ckSummaryChevron" style="display:none;transition:transform 0.2s">⌄</span></span>
           <span id="ckSummaryHeadTotal" style="display:none;font-family:'Montserrat',sans-serif;font-size:0.85rem;letter-spacing:0;text-transform:none;color:var(--text);font-weight:600"></span>
         </button>
         <div id="ckSummaryCollapsible">
         <div id="orderSummaryItems"></div>
-        </div><!-- /ckSummaryCollapsible -->
-        <!-- Discount code — always visible, outside the collapsible -->
+        <!-- Discount code -->
         <div style="margin:0.9rem 0;padding-top:0.8rem;border-top:1px solid var(--border)">
           <label class="form-label" style="margin-bottom:0.4rem">Discount code</label>
           <div style="display:flex;gap:0.5rem">
@@ -3253,6 +3284,7 @@ body.dark { --text-muted: #b3a392; }
             </div>
           </div>
         </div>
+        </div><!-- /ckSummaryCollapsible -->
         <!-- Mobile inline summary (hidden on desktop) -->
         <div class="order-summary" id="orderSummary" style="display:none"></div>
       </div>
@@ -5010,8 +5042,17 @@ setDeliveryMethod('ship');
 (function() {
   const toggle = document.getElementById('ckSummaryToggle');
   const col = document.getElementById('orderSummaryCol');
+  const label = document.getElementById('ckSummaryLabel');
   if (toggle && col) {
-    toggle.addEventListener('click', () => col.classList.toggle('expanded'));
+    toggle.addEventListener('click', () => {
+      const expanded = col.classList.toggle('expanded');
+      toggle.setAttribute('aria-expanded', String(expanded));
+      col.classList.remove('summary-attention');
+      if (label && window.matchMedia('(max-width: 719px)').matches) {
+        label.textContent = expanded ? 'Hide order details' : 'Show order details';
+      }
+      try { sessionStorage.setItem('kwSummaryDiscovered', '1'); } catch (_) {}
+    });
   }
 })();
 
@@ -5150,10 +5191,20 @@ function openCheckout(defaultTab) {
   document.getElementById('formScreen').style.display='';
   document.getElementById('confirmScreen').classList.remove('active');
   document.getElementById('checkoutOverlay').classList.add('open');
-  // On mobile, start expanded so item images and discount field are visible.
-  // On desktop CSS keeps it permanently expanded regardless of this class.
+  // Mobile opens compact so customers reach the contact and payment form first.
+  // Desktop CSS keeps the summary permanently visible.
   const sumCol = document.getElementById('orderSummaryCol');
-  if (sumCol) sumCol.classList.add('expanded');
+  const sumToggle = document.getElementById('ckSummaryToggle');
+  const sumLabel = document.getElementById('ckSummaryLabel');
+  const isMobileCheckout = window.matchMedia('(max-width: 719px)').matches;
+  if (sumCol) sumCol.classList.remove('expanded');
+  if (sumToggle) sumToggle.setAttribute('aria-expanded', 'false');
+  if (sumLabel) sumLabel.textContent = isMobileCheckout ? 'Show order details' : 'Order summary';
+  if (sumCol) {
+    let summaryDiscovered = false;
+    try { summaryDiscovered = sessionStorage.getItem('kwSummaryDiscovered') === '1'; } catch (_) {}
+    sumCol.classList.toggle('summary-attention', isMobileCheckout && !summaryDiscovered);
+  }
   if (defaultTab) switchPayTab(defaultTab);
   else switchPayTab('flutterwave');
   // Restore any applied discount into the input + refresh the free-order view
