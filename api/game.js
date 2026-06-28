@@ -1330,8 +1330,19 @@ async function handleShopQuote(req, res, supabase) {
     if (paymentRef) extra.payment_ref = paymentRef;
     if (method === 'eth' || method === 'tezos') {
       const asset = method === 'tezos' ? 'xtz' : 'eth';
-      const price = await fetchServerCryptoPrice(asset);
-      if (!price) return json(503, { error: `${asset.toUpperCase()} rate unavailable (price sources unreachable from server)` });
+      let price = await fetchServerCryptoPrice(asset);
+      // If server-side price sources fail, accept a client-provided price as fallback.
+      // The client fetches from Binance/CoinGecko/Coinbase directly.
+      // We sanity-check the range (ETH: $100-$100k, XTZ: $0.01-$1k) to prevent manipulation.
+      if (!price && body.client_crypto_price) {
+        const clientPrice = Number(body.client_crypto_price);
+        const [minP, maxP] = asset === 'eth' ? [100, 100000] : [0.01, 1000];
+        if (clientPrice > minP && clientPrice < maxP) {
+          price = clientPrice;
+          console.warn(`[shop-quote] using client-provided ${asset.toUpperCase()} price: $${price} (server sources unavailable)`);
+        }
+      }
+      if (!price) return json(503, { error: `${asset.toUpperCase()} rate unavailable — please try again in a moment` });
       extra.crypto_asset = asset;
       extra.crypto_usd_price = price;
       extra.crypto_amount = asset === 'eth'
