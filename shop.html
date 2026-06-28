@@ -3456,7 +3456,7 @@ body.dark { --text-muted: #b3a392; }
 <!-- Paystack SDK -->
 <script src="https://js.paystack.co/v1/inline.js" async></script>
 <script src="https://checkout.flutterwave.com/v3.js" async></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.8.0/ethers.umd.min.js" async></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.8.0/ethers.umd.min.js"></script>
 <script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
 
 <script src="/shop-utils.js"></script>
@@ -6625,6 +6625,10 @@ function renderEthPanel() {
 async function ethConnectWallet() {
   if (_ethConnectedAddr || _ethConnecting) return;
 
+  if (typeof ethers === 'undefined') {
+    showToast('Payment library still loading — please try again in a moment');
+    return;
+  }
   if (!window.ethereum) {
     showToast('No Ethereum wallet detected — install MetaMask or use manual send');
     return;
