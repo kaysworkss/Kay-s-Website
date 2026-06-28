@@ -3452,8 +3452,8 @@ body.dark { --text-muted: #b3a392; }
 <!-- Paystack SDK -->
 <script src="https://js.paystack.co/v1/inline.js" async></script>
 <script src="https://checkout.flutterwave.com/v3.js" async></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.8.0/ethers.umd.min.js"></script>
-<script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.8.0/ethers.umd.min.js" defer></script>
+<script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js" defer></script>
 
 <script src="/shop-utils.js"></script>
 <script>
@@ -6340,6 +6340,11 @@ function maybeOpenCheckoutFromHash() {
   hideCheckoutLoading();
 }
 
+// The cart already lives in localStorage and is ready at this point. Open the
+// checkout on the next paint instead of making the customer wait for network
+// product/config refreshes; loadShopData() reconciles it in the background.
+if (_arrivedForCheckout) requestAnimationFrame(maybeOpenCheckoutFromHash);
+
 // Recover an abandoned cart from a reminder email link (?recover=TOKEN).
 (function recoverAbandonedCart() {
   const params = new URLSearchParams(location.search);
@@ -7458,6 +7463,14 @@ async function loadShopData() {
     ensureExampleSections();
   }
   renderProducts();
+  // A checkout handed off from a product page opens immediately from the
+  // shared cart. Refresh it once authoritative product/config data arrives so
+  // live prices, edition stock and shipping metadata replace cached values.
+  if (typeof updateCartUI === 'function') updateCartUI();
+  const checkout = document.getElementById('checkoutOverlay');
+  if (checkout && checkout.classList.contains('open') && typeof buildOrderSummary === 'function') {
+    buildOrderSummary();
+  }
 }
 
 /* ─── Save product via admin API ─── */
@@ -7640,12 +7653,5 @@ detectVisitorCurrency().finally(initCurrencySelector);
   </div>
 </div>
 
-<!-- ════════ DIAGNOSTIC PANEL — TEMPORARY, remove this whole block once stable ════════ -->
-<div id="shopDiag" style="position:fixed;left:0;right:0;bottom:0;z-index:99999;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:1.4;color:#e8d5b0;background:rgba(30,21,16,0.97);border-top:2px solid #c4845a;max-height:45vh;overflow:auto;display:none;">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#9e4f2e;color:#fff;position:sticky;top:0;">
-    <strong>SHOP DIAGNOSTIC</strong>
-    <span>
-      <button id="shopDiagCopy" style="margin-right:6px;font-size:11px;padding:3px 8px;background:#e8d5b0;color:#3a2418;border:none;border-radius: 12px;">Copy</button>
-      <button id="shopDiagClose" style="font-size:11px;padding:3px 8px;background:#3a2418;color:#e8d5b0;border:none;border-radius: 12px;">Hide</button>
-    </span>
-  </div>
+</body>
+</html>
