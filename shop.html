@@ -6038,8 +6038,15 @@ async function refreshLock(method, silent) {
     renderLockUI(method);
     if (method === 'tezos' && typeof renderTezosPanel === 'function') renderTezosPanel();
     if (method === 'eth' && typeof renderEthPanel === 'function') renderEthPanel();
+    return window.__activeLock;
   } catch (e) {
+    if (seq === _lockSeq) {
+      window.__activeLock = null;
+      renderLockUI(method);
+    }
     if (!silent) showToast(e.message || 'Could not lock price — retrying');
+    console.error('[crypto] quote lock failed:', e);
+    return null;
   }
 }
 
@@ -6670,6 +6677,21 @@ async function ethConnectWallet() {
   }
 }
 
+async function ensureEthereumMainnet() {
+  if (!window.ethereum) throw new Error('No Ethereum wallet detected');
+  const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+  if (String(chainId).toLowerCase() === '0x1') return;
+  try {
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: '0x1' }],
+    });
+  } catch (e) {
+    if (e && e.code === 4001) throw e;
+    throw new Error('Switch your wallet to Ethereum Mainnet and try again');
+  }
+}
+
 /* ── Send ETH via connected wallet ── */
 document.getElementById('ethConnectBtn').addEventListener('click', ethConnectWallet);
 
@@ -6689,14 +6711,14 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
 
   const btn = document.getElementById('ethSendBtn');
   btn.disabled = true; btn.textContent = 'Getting quote\u2026';
+  let txHash = '';
 
   try {
     let lock = window.__activeLock;
     console.log('[ETH] lock at send:', lock);
     if (!lock || lock.method !== 'eth' || Date.now() > lock.expires) {
       console.log('[ETH] refreshing lock, client price:', window._ethUsdPrice);
-      await refreshLock('eth', false);
-      lock = window.__activeLock;
+      lock = await refreshLock('eth', false);
       console.log('[ETH] lock after refresh:', lock, 'diag:', JSON.stringify((window.__shopDiag||[]).slice(0,2)));
     }
     if (!lock || !lock.order_ref) {
@@ -6716,12 +6738,26 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
     const orderRef = lock.order_ref;
     console.log('[ETH] calling sendTransaction, to:', toAddr, 'amount:', ethAmt, 'ETH');
 
-    btn.textContent = 'Waiting for wallet\u2026';
-    const signer = _ethProvider.getSigner();
-    const tx = await signer.sendTransaction({
-      to:    toAddr,
-      value: ethers.utils.parseEther(String(ethAmt)),
+    btn.textContent = 'Opening wallet\u2026';
+    await ensureEthereumMainnet();
+    const activeAccounts = await window.ethereum.request({ method: 'eth_accounts' });
+    const from = activeAccounts && activeAccounts[0];
+    if (!from) throw new Error('Wallet disconnected — connect it and try again');
+    _ethConnectedAddr = from;
+
+    // Ask the injected wallet directly so account/network changes cannot leave
+    // ethers holding a stale signer that never opens the payment prompt.
+    txHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from,
+        to: toAddr,
+        value: ethers.utils.parseEther(String(ethAmt)).toHexString(),
+      }],
     });
+    if (!/^0x[a-fA-F0-9]{64}$/.test(String(txHash || ''))) {
+      throw new Error('Wallet did not return a transaction hash');
+    }
 
     // Transaction is broadcast — now wait for chain indexing before confirming.
     // ETH nodes typically need 15–60s to mine and index. We show a clear status
@@ -6729,20 +6765,23 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
     // Confirm against the locked pending order (raw 0x tx hash).
     await confirmPendingOrder(orderRef, {
       payment_method: 'eth',
-      payment_ref: tx.hash,
+      payment_ref: txHash,
       payer_address: _ethConnectedAddr,
       checkout_quote: lock.quote,
     });
     clearPendingOrder(orderRef);
     stopLockTimer();
-    showConfirmation('eth', 'KW-ETH-' + tx.hash);
+    showConfirmation('eth', 'KW-ETH-' + txHash);
   } catch (e) {
     const msg = e?.message || String(e);
     if (/rejected|denied|cancel|user denied/i.test(msg)) {
       showToast('Transaction cancelled');
-    } else {
+    } else if (txHash) {
       showToast('Transaction sent — confirming. If this doesn’t complete, use “confirm manually” with your transaction hash.');
       console.error('[ETH] send error:', e);
+    } else {
+      showToast(msg || 'Could not open the wallet payment prompt');
+      console.error('[ETH] payment prompt error:', e);
     }
   } finally {
     btn.disabled = false;
@@ -6765,6 +6804,8 @@ async function sendErc20(token) {
   btn.disabled = true; btn.textContent = 'Waiting for wallet…';
 
   try {
+    await ensureEthereumMainnet();
+    _ethProvider = new ethers.providers.Web3Provider(window.ethereum);
     const quoteData = await getServerCheckoutQuote(d, token, { payer_address: _ethConnectedAddr });
     const usd = Number(quoteData.quote?.crypto_amount);
     if (!usd) { showToast(label + ' quote unavailable'); return; }
