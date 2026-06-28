@@ -208,6 +208,12 @@ body.dark .toast { background:#2a1c14; }
 }
 .admin-product-row.is-draft { opacity:0.5; border-style:dashed; }
 .draft-pill { display:inline-block; font-family:'Montserrat',sans-serif; font-size:0.48rem; letter-spacing:0.12em; text-transform:uppercase; background:rgba(196,132,90,0.12); color:var(--clay); border:1px solid var(--clay); border-radius:20px; padding:0.1rem 0.5rem; margin-left:0.5rem; vertical-align:middle; }
+.product-admin-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.6rem; }
+.admin-product-toolbar { position:sticky; top:147px; z-index:12; margin:0 -0.35rem 1rem; padding:0.7rem; background:color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter:blur(12px); border:1px solid var(--border); border-radius:12px; box-shadow:0 8px 20px rgba(58,39,26,0.06); }
+.admin-product-filters, .admin-product-quickadd { display:flex; gap:0.4rem; flex-wrap:wrap; }
+.admin-product-quickadd { margin-top:0.55rem; padding-top:0.55rem; border-top:1px solid var(--border); }
+.admin-product-filter, .admin-product-quickadd button { border:1px solid var(--border); border-radius:999px; background:var(--bg-alt); color:var(--text-muted); padding:0.42rem 0.7rem; font-family:'Montserrat',sans-serif; font-size:0.58rem; letter-spacing:0.08em; }
+.admin-product-filter.active { background:var(--rust); border-color:var(--rust); color:var(--linen); }
 .admin-save-btn {
   font-family:'Cinzel',serif; font-size:0.58rem;
   letter-spacing:0.2em; text-transform:uppercase;
@@ -435,6 +441,8 @@ body.dark .toast { background:#2a1c14; }
   .admin-body { padding: 1rem; }
   .admin-product-row { grid-template-columns: 1fr; padding: 0.8rem; }
   .form-row-2 { grid-template-columns: 1fr; }
+  .product-admin-grid { grid-template-columns: 1fr; }
+  .admin-product-toolbar { top:145px; }
   #printPageEditor > div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
 }
 </style>
@@ -498,6 +506,22 @@ body.dark .toast { background:#2a1c14; }
         <!-- ░░ TAB: PRODUCTS ░░ -->
         <div class="admin-tab-panel active" data-panel="products">
           <p class="admin-section-title" style="margin-top:0">Products</p>
+          <div class="admin-product-toolbar" aria-label="Product editor tools">
+            <div class="admin-product-filters" aria-label="Filter products">
+              <button class="admin-product-filter active" type="button" data-product-filter="all">All</button>
+              <button class="admin-product-filter" type="button" data-product-filter="prints">Prints</button>
+              <button class="admin-product-filter" type="button" data-product-filter="merch">Merch</button>
+              <button class="admin-product-filter" type="button" data-product-filter="notebooks">Notebooks</button>
+              <button class="admin-product-filter" type="button" data-product-filter="stickers">Stickers</button>
+              <button class="admin-product-filter" type="button" data-product-filter="drafts">Drafts</button>
+            </div>
+            <div class="admin-product-quickadd" aria-label="Add product">
+              <button type="button" data-quick-add="prints">+ Print</button>
+              <button type="button" data-quick-add="merch">+ Merch</button>
+              <button type="button" data-quick-add="notebooks">+ Notebook</button>
+              <button type="button" data-quick-add="stickers">+ Sticker</button>
+            </div>
+          </div>
           <div id="adminProducts"></div>
           <button class="admin-add-btn" id="addProductBtn" style="display:none">+ Add print artwork</button>
         </div>
@@ -758,6 +782,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const ADMIN_PW = ''; // checked server-side — this is just UX gating
 let adminUnlocked = false;
+let adminProductFilter = 'all';
+let adminProductsDirty = false;
+
+function setAdminProductFilter(filter, shouldRender = true) {
+  const nextFilter = ['all','prints','merch','notebooks','stickers','drafts'].includes(filter) ? filter : 'all';
+  if (nextFilter !== adminProductFilter && adminProductsDirty) {
+    showToast('Save configuration before switching product sections');
+    return false;
+  }
+  adminProductFilter = nextFilter;
+  document.querySelectorAll('.admin-product-filter').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.productFilter === adminProductFilter);
+  });
+  if (shouldRender) renderAdminProducts();
+  return true;
+}
+
+document.querySelectorAll('.admin-product-filter').forEach(btn => {
+  btn.addEventListener('click', () => setAdminProductFilter(btn.dataset.productFilter || 'all'));
+});
+
+document.querySelectorAll('[data-quick-add]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const cat = btn.dataset.quickAdd || 'prints';
+    if (!setAdminProductFilter(cat, false)) return;
+    if (cat === 'prints') {
+      addPrintArtwork();
+      return;
+    }
+    const np = defaultProduct(cat);
+    const catItems = SHOP_CONFIG.products.filter(x => x.category === cat);
+    const minOrder = catItems.length ? Math.min(...catItems.map(x => Number(x.sort_order) || 0)) : 0;
+    np.sort_order = minOrder - 1;
+    np._justAdded = true;
+    SHOP_CONFIG.products.unshift(np);
+    adminProductsDirty = true;
+    renderAdminProducts();
+    scrollToJustAdded();
+  });
+});
+
+const adminProductsEditor = document.getElementById('adminProducts');
+adminProductsEditor.addEventListener('input', () => { adminProductsDirty = true; });
+adminProductsEditor.addEventListener('change', () => { adminProductsDirty = true; });
 
 // adminFab not used on standalone admin page
 
@@ -876,6 +944,7 @@ async function loadAdminConfig() {
         enquire_only:       r.enquire_only || false,
       }));
       renderAdminProducts();
+      adminProductsDirty = false;
     } else if (Array.isArray(products)) {
       if (el) el.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem">No products found in the database.</p>';
     }
@@ -1346,6 +1415,7 @@ document.getElementById('savePrintPageBtn').addEventListener('click', async () =
 
 // Insert a new print artwork at the top of the prints section and scroll to it.
 function addPrintArtwork() {
+  if (!setAdminProductFilter('prints', false)) return;
   const defaults = defaultPrintOptionData();
   const prints = SHOP_CONFIG.products.filter(p => p.category === 'prints');
   const minOrder = prints.length ? Math.min(...prints.map(x => Number(x.sort_order) || 0)) : 0;
@@ -1362,6 +1432,7 @@ function addPrintArtwork() {
   };
   newPrint.slug = autoSlugForProduct(newPrint);
   SHOP_CONFIG.products.unshift(newPrint);
+  adminProductsDirty = true;
   renderAdminProducts();
   scrollToJustAdded();
 }
@@ -1388,6 +1459,7 @@ function moveProductInCategory(cat, realIdx, dir) {
     return (Number(m.sort_order) || 0) - (Number(n.sort_order) || 0);
   });
   moving._justAdded = true; // reuse highlight/scroll
+  adminProductsDirty = true;
   renderAdminProducts();
   scrollToJustAdded();
 }
@@ -1415,13 +1487,22 @@ function renderAdminProducts() {
 
   // Separate prints from other products for dedicated sections, sorted by sort_order
   const byOrder = (a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
-  const prints = SHOP_CONFIG.products.filter(p => p.category === 'prints').sort(byOrder);
-  const others = SHOP_CONFIG.products.filter(p => p.category !== 'prints').sort(byOrder);
+  const visibleProducts = SHOP_CONFIG.products.filter(p => {
+    if (adminProductFilter === 'all') return true;
+    if (adminProductFilter === 'drafts') return p.active === false;
+    return p.category === adminProductFilter;
+  });
+  const prints = visibleProducts.filter(p => p.category === 'prints').sort(byOrder);
+  const others = visibleProducts.filter(p => p.category !== 'prints').sort(byOrder);
 
   let html = '';
+  if (adminProductFilter === 'drafts' && !visibleProducts.length) {
+    html = '<p style="padding:1.2rem;border:1px dashed var(--border);border-radius:12px;color:var(--text-muted);font-size:0.82rem">No draft products. Everything is currently published.</p>';
+  }
 
   // ── Print admin section ───────────────────────────────────────────────
-  if (prints.length) {
+  const showPrintSection = adminProductFilter === 'all' || adminProductFilter === 'prints' || (adminProductFilter === 'drafts' && prints.length > 0);
+  if (showPrintSection && prints.length) {
     html += `<p class="admin-section-title" style="margin-top:0">Print options, sizes &amp; availability</p>
     <p style="font-size:0.82rem;color:var(--text-muted);line-height:1.6;margin-bottom:1rem">
       One row is one artwork. Add print options inside it, such as Giclee, Canvas Print, and Mini Print, then add sizes and prices under each option.
@@ -1451,7 +1532,7 @@ function renderAdminProducts() {
             <button class="ap-move-down" data-cat="prints" data-idx="${realIdx}" title="Move down" ${pi === prints.length - 1 ? 'disabled' : ''} style="background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;width:26px;height:26px;color:var(--text);font-size:0.8rem;${pi === prints.length - 1 ? 'opacity:0.3' : ''}">▼</button>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem">
+        <div class="product-admin-grid">
           <div class="form-row" style="margin:0">
             <label class="form-label">Print name</label>
             <input class="form-input ap-name" data-idx="${realIdx}" value="${escapeAttr(p.name)}"/>
@@ -1461,7 +1542,7 @@ function renderAdminProducts() {
             <input class="form-input ap-badge" data-idx="${realIdx}" value="${escapeAttr(p.badge||'')}"/>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.6rem">
+        <div class="product-admin-grid">
           <div class="form-row" style="margin:0">
             <label class="form-label">Edition type</label>
             <select class="form-select ap-edition" data-idx="${realIdx}">
@@ -1484,14 +1565,14 @@ function renderAdminProducts() {
               <input type="checkbox" class="ap-certificate" data-idx="${realIdx}" ${p.certificate_of_authenticity?'checked':''} style="accent-color:var(--gold);width:15px;height:15px"/>
               Certificate of Authenticity
             </label>
-            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--clay);font-family:'Montserrat',sans-serif" title="Hide from shop — stays in your config as a draft">
-              <input type="checkbox" class="ap-draft" data-idx="${realIdx}" ${p.active===false?'checked':''} style="accent-color:var(--clay);width:15px;height:15px"/>
-              Hidden (draft)
-            </label>
           </div>
           <div class="form-row" style="margin:0">
-            <label class="form-label">Badge (optional)</label>
-            <input class="form-input ap-badge" data-idx="${realIdx}" value="${escapeAttr(p.badge||'')}"/>
+            <label class="form-label">Shop visibility</label>
+            <select class="form-select ap-status" data-idx="${realIdx}" title="Draft products remain in admin but are hidden from the public shop">
+              <option value="published" ${p.active!==false?'selected':''}>Published</option>
+              <option value="draft" ${p.active===false?'selected':''}>Draft — hidden from shop</option>
+            </select>
+            <p style="font-size:0.68rem;color:var(--text-muted);margin-top:0.3rem">Drafts stay saved here and do not appear in the shop.</p>
           </div>
         </div>
         <div class="form-row" style="margin:0">
@@ -1568,26 +1649,33 @@ function renderAdminProducts() {
     });
     // Add-print button at the END of the prints section (not per item)
     html += `<div style="margin:0.6rem 0 0.4rem"><button class="admin-add-btn ap-add-print-inline">+ Add print artwork</button></div>`;
-  } else {
+  } else if (showPrintSection) {
     // No prints yet — still offer the add button
     html += `<p class="admin-section-title" style="margin-top:0">Print options, sizes &amp; availability</p>
     <div style="margin:0.6rem 0 0.4rem"><button class="admin-add-btn ap-add-print-inline">+ Add print artwork</button></div>`;
   }
 
   // ── Other products ────────────────────────────────────────────────────
-  html += `<p class="admin-section-title" style="margin-top:1.6rem">Merch, notebooks &amp; stickers</p>
+  const allOtherCats = ['merch','notebooks','stickers'];
+  const otherCats = adminProductFilter === 'all'
+    ? allOtherCats
+    : adminProductFilter === 'drafts'
+      ? allOtherCats.filter(cat => others.some(p => p.category === cat))
+      : allOtherCats.includes(adminProductFilter) ? [adminProductFilter] : [];
+  if (otherCats.length) {
+  const otherSectionTitle = otherCats.length === 1
+    ? (otherCats[0] === 'merch' ? 'Merch' : otherCats[0].charAt(0).toUpperCase() + otherCats[0].slice(1))
+    : 'Merch, notebooks &amp; stickers';
+  html += `<p class="admin-section-title" style="margin-top:1.6rem">${otherSectionTitle}</p>
   <p style="font-size:0.82rem;color:var(--text-muted);line-height:1.6;margin-bottom:1rem">
     Edit each product as its own item. Apparel merch such as tees, hoodies, and caps can use size guides; notebooks, stickers, totes, and other goods use their own variant labels, prices, and stock.
-  </p>
-  <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem">
-    <button class="admin-save-btn ap-add-product" data-category="merch" style="margin:0;padding:0.55rem 0.8rem">+ Merch</button>
-    <button class="admin-save-btn ap-add-product" data-category="notebooks" style="margin:0;padding:0.55rem 0.8rem">+ Notebook</button>
-    <button class="admin-save-btn ap-add-product" data-category="stickers" style="margin:0;padding:0.55rem 0.8rem">+ Sticker</button>
-  </div>`;
+  </p>`;
 
-  ['merch','notebooks','stickers'].forEach(cat => {
+  otherCats.forEach(cat => {
     const items = others.filter(p => p.category === cat);
-    html += `<p class="admin-section-title" style="margin-top:1rem">${cat === 'merch' ? 'Merch' : cat.charAt(0).toUpperCase() + cat.slice(1)}</p>`;
+    if (otherCats.length > 1) {
+      html += `<p class="admin-section-title" style="margin-top:1rem">${cat === 'merch' ? 'Merch' : cat.charAt(0).toUpperCase() + cat.slice(1)}</p>`;
+    }
     if (!items.length) {
       html += `<p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.8rem">No ${cat} products yet.</p>`;
     }
@@ -1637,6 +1725,14 @@ function renderAdminProducts() {
               ${['merch','notebooks','stickers'].map(c=>`<option value="${c}"${p.category===c?' selected':''}>${c}</option>`).join('')}
             </select>
           </div>
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Shop visibility</label>
+            <select class="form-select ap-status" data-idx="${realIdx}" title="Draft products remain in admin but are hidden from the public shop">
+              <option value="published" ${p.active!==false?'selected':''}>Published</option>
+              <option value="draft" ${p.active===false?'selected':''}>Draft — hidden from shop</option>
+            </select>
+            <p style="font-size:0.68rem;color:var(--text-muted);margin-top:0.3rem">Drafts stay saved here and do not appear in the shop.</p>
+          </div>
         </div>
         <div class="form-row" style="margin:0">
           <label class="form-label">Description</label>
@@ -1677,8 +1773,27 @@ function renderAdminProducts() {
       </div>`;
     });
   });
+  }
 
   el.innerHTML = html;
+
+  // Make publish/draft changes obvious immediately; the Save configuration
+  // action below persists the selected state to the products API.
+  el.querySelectorAll('.ap-status').forEach(select => {
+    select.addEventListener('change', () => {
+      const row = select.closest('.admin-product-row');
+      if (!row) return;
+      const isDraft = select.value === 'draft';
+      const key = row.dataset.key || '';
+      const p = key ? productByKey(key) : SHOP_CONFIG.products[Number(row.dataset.idx)];
+      if (p) p.active = !isDraft;
+      row.classList.toggle('is-draft', isDraft);
+      const name = row.querySelector('.admin-prod-name');
+      const pill = name?.querySelector('.draft-pill');
+      if (isDraft && name && !pill) name.insertAdjacentHTML('beforeend', '<span class="draft-pill">draft</span>');
+      if (!isDraft && pill) pill.remove();
+    });
+  });
 
   // Delete product buttons
   el.querySelectorAll('.admin-del-btn').forEach(b => {
@@ -1733,6 +1848,7 @@ function renderAdminProducts() {
   el.querySelectorAll('.ap-add-product').forEach(btn => {
     btn.addEventListener('click', () => {
       const cat = btn.dataset.category || 'merch';
+      if (!setAdminProductFilter(cat, false)) return;
       const np = defaultProduct(cat);
       // Give it a sort_order below the current minimum so it sorts to the top.
       const catItems = SHOP_CONFIG.products.filter(x => x.category === cat);
@@ -1740,6 +1856,7 @@ function renderAdminProducts() {
       np.sort_order = minOrder - 1;
       np._justAdded = true;
       SHOP_CONFIG.products.unshift(np);
+      adminProductsDirty = true;
       renderAdminProducts();
       scrollToJustAdded();
     });
@@ -1956,6 +2073,8 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
       if (imgEl)   p.image = imgEl.value.trim();
       if (emojiEl) p.emoji = emojiEl.value.trim() || '✦';
       if (stockEl) p.stock = stockEl.value === '' ? null : Number(stockEl.value);
+      const statusEl = row.querySelector('.ap-status');
+      if (statusEl) p.active = statusEl.value !== 'draft';
       const slugElCommon = row.querySelector('.ap-slug');
       if (slugElCommon) {
         const typed = slugElCommon.value.trim();
@@ -2139,8 +2258,6 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         p.priceNgn = nextNgn;
         p.priceUsd = nextUsd;
         p.stock_by_variant = nextStock;
-        const draftElM = row.querySelector('.ap-draft');
-        if (draftElM) p.active = !draftElM.checked;
         const enquireElM = row.querySelector('.ap-enquire-only');
         if (enquireElM) p.enquire_only = enquireElM.checked;
       }
@@ -2185,6 +2302,7 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
     renderProducts();
     populatePrintPageSelector();
     populateFeaturedSelector();
+    adminProductsDirty = false;
     showToast('Saved ✦');
     closeAdmin();
   } catch (e) {
