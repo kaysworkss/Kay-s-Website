@@ -406,6 +406,25 @@ nav.scrolled {
   color:var(--gold); margin:0.2rem 0 0.9rem;
 }
 .editions-left.sold-out { color:var(--rust); }
+.edition-breakdown {
+  margin:-0.25rem 0 1rem;
+  padding:0.7rem 0.8rem;
+  border:1px solid var(--border);
+  background:rgba(232,213,176,0.12);
+  font-family:'Montserrat',sans-serif;
+  font-size:0.68rem;
+  line-height:1.65;
+  color:var(--text-muted);
+}
+.edition-breakdown-title {
+  margin-bottom:0.25rem;
+  font-family:'Cinzel',serif;
+  font-size:0.5rem;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:var(--clay);
+}
+.edition-breakdown-total { margin-top:0.25rem; color:var(--text); font-weight:600; }
 .size-chip {
   font-family:'Montserrat',sans-serif; font-size:0.62rem;
   letter-spacing:0.06em; font-weight:500;
@@ -1270,7 +1289,21 @@ function editionLabel(p, key) {
   const total = editionTotal(p, key);
   if (remaining === null || total === null) return '';
   if (remaining <= 0) return 'Sold out';
-  return `${remaining} of ${total} editions left`;
+  const size = String(key || '').split('|').slice(1).join('|') || String(key || '');
+  return `${size} — ${remaining} of ${total} editions available`;
+}
+function editionBreakdownHtml(p, selectedType) {
+  const opt = getPrintOptions(p).find(o => o.type === selectedType);
+  if (!opt || !opt.limited) return '';
+  const runs = (opt.sizes || []).map(size => {
+    const total = editionTotal(p, printOptionKey(opt.type, size));
+    return total === null ? null : { size, total };
+  }).filter(Boolean);
+  if (!runs.length) return '';
+  const totalAcrossSizes = runs.reduce((sum, run) => sum + run.total, 0);
+  return `<div class="edition-breakdown-title">${escapeAttrText(opt.type)} edition runs</div>
+    ${runs.map(run => `<div>${escapeAttrText(run.size)} — edition of ${run.total}</div>`).join('')}
+    <div class="edition-breakdown-total">Total image edition across all sizes: ${totalAcrossSizes}</div>`;
 }
 
 // Build the specification rows for a given selected print option. The
@@ -1286,6 +1319,7 @@ function buildSpecRows(p, selectedType) {
   // Packaging — add id so it can update when size changes
   rows.push(['Packaging', `<span id="specPackaging">${shippingMethodLabel(_selectedVariant, p)}</span>`]);
   if (p.signed) rows.push(['Signed', 'Hand signed by Kay']);
+  if (p.certificate_of_authenticity) rows.push(['Certificate', 'Certificate of Authenticity included']);
   return rows
     .filter(r => r[1])
     .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
@@ -1720,6 +1754,7 @@ function renderProduct(p) {
           <p class="purchase-label">Choose your size</p>
           <div class="size-picker">${sizeChips}</div>
           <p class="editions-left" id="editionsLeft" style="display:${editionLabel(p, _selectedVariant) ? 'block' : 'none'}">${editionLabel(p, _selectedVariant)}</p>
+          <div class="edition-breakdown" id="editionBreakdown" style="display:${editionBreakdownHtml(p, _selectedPrintType) ? 'block' : 'none'}">${editionBreakdownHtml(p, _selectedPrintType)}</div>
           <div class="price-row">
             <span class="price-ngn" id="priceNgn">${ngn ? fmt(ngn) : (() => { const allNgn = printOptions.flatMap(o => (o.sizes||[]).map(s => printPrice(p, printOptionKey(o.type,s),'ngn'))).filter(Boolean); return allNgn.length ? 'from ' + fmt(Math.min(...allNgn)) : ''; })()}</span>
             <span class="price-usd" id="priceUsd">${usd ? fmtUsd(usd) + ' USD' : ''}</span>
@@ -2098,6 +2133,12 @@ function updateEditionState(v) {
     el.textContent = label;
     el.style.display = label ? 'block' : 'none';
     el.classList.toggle('sold-out', label === 'Sold out');
+  }
+  const breakdown = document.getElementById('editionBreakdown');
+  if (breakdown) {
+    const html = editionBreakdownHtml(_product, _selectedPrintType);
+    breakdown.innerHTML = html;
+    breakdown.style.display = html ? 'block' : 'none';
   }
   const soldOut = isLimitedKey(_product, v) && (editionRemaining(_product, v) ?? 0) <= 0;
   // Also lock the button once the buyer already holds the whole edition.

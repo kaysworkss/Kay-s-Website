@@ -860,6 +860,7 @@ async function loadAdminConfig() {
         medium:             r.medium || '',
         signed:             r.signed || false,
         is_large_print:     r.is_large_print || false,
+        certificate_of_authenticity: r.certificate_of_authenticity || false,
         clothing:           r.clothing || false,
         clothing_type:      r.clothing_type || '',
         stock:              r.stock ?? null,
@@ -1479,6 +1480,10 @@ function renderAdminProducts() {
               <input type="checkbox" class="ap-enquire-only" data-idx="${realIdx}" ${p.enquire_only?'checked':''} style="accent-color:var(--clay);width:15px;height:15px"/>
               Enquire only
             </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-muted);font-family:'Montserrat',sans-serif" title="Show that this print ships with a Certificate of Authenticity">
+              <input type="checkbox" class="ap-certificate" data-idx="${realIdx}" ${p.certificate_of_authenticity?'checked':''} style="accent-color:var(--gold);width:15px;height:15px"/>
+              Certificate of Authenticity
+            </label>
             <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--clay);font-family:'Montserrat',sans-serif" title="Hide from shop — stays in your config as a draft">
               <input type="checkbox" class="ap-draft" data-idx="${realIdx}" ${p.active===false?'checked':''} style="accent-color:var(--clay);width:15px;height:15px"/>
               Hidden (draft)
@@ -2097,6 +2102,8 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         if (soldEl) p.is_sold = soldEl.checked;
         const enquireEl = row.querySelector('.ap-enquire-only');
         if (enquireEl) p.enquire_only = enquireEl.checked;
+        const certificateEl = row.querySelector('.ap-certificate');
+        if (certificateEl) p.certificate_of_authenticity = certificateEl.checked;
       } else {
         const catEl      = row.querySelector('.ap-cat');
         const clothingEl = row.querySelector('.ap-clothing');
@@ -3195,6 +3202,7 @@ async function loadShopData() {
           medium:             r.medium || '',
           signed:             r.signed || false,
           is_large_print:     r.is_large_print || false,
+          certificate_of_authenticity: r.certificate_of_authenticity || false,
           clothing:           r.clothing || false,
           clothing_type:      r.clothing_type || '',
           stock:              r.stock ?? null,
@@ -3278,6 +3286,7 @@ async function apiSaveProduct(p, token) {
     medium:             p.medium || '',
     signed:             p.signed || false,
     is_large_print:     p.is_large_print || false,
+    certificate_of_authenticity: p.certificate_of_authenticity || false,
     clothing:           p.clothing || false,
     clothing_type:      p.clothing_type || '',
     stock:              p.stock ?? null,

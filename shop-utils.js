@@ -592,6 +592,7 @@ function normalizeProduct(p) {
   p.image = p.image || p.image_url || '';
   p.stock_by_variant = p.stock_by_variant || {};
   p.edition_totals = p.edition_totals || {};
+  p.certificate_of_authenticity = p.certificate_of_authenticity === true;
   p.active = p.active !== false;
   return p;
 }
