@@ -810,9 +810,10 @@ async function loadAdminConfig() {
   } catch (_) { /* keep whatever's already loaded */ }
 
   // Fetch live products from Supabase via the admin API
+  const productsEl = document.getElementById('adminProducts');
   try {
     const token = localStorage.getItem('kaysworks-admin-token');
-    const el = document.getElementById('adminProducts');
+    const el = productsEl;
     if (el) el.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem">Loading products…</p>';
     const res = await fetch('/api/admin/shop-products', {
       headers: { 'x-admin-token': token || '' },
@@ -877,7 +878,13 @@ async function loadAdminConfig() {
     } else if (Array.isArray(products)) {
       if (el) el.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem">No products found in the database.</p>';
     }
-  } catch (e) { console.error('[admin] products fetch failed:', e); }
+  } catch (e) {
+    console.error('[admin] products fetch/render failed:', e);
+    if (productsEl && /Loading products/.test(productsEl.textContent || '')) {
+      productsEl.innerHTML = '<p style="color:var(--rust);font-size:0.85rem;padding:1rem">⚠︎ Products arrived, but the editor could not render them: '
+        + escapeText(e?.message || 'Unknown error') + '</p>';
+    }
+  }
 
   // Show the live server addresses in the read-only admin fields.
   const ethInput = document.getElementById('cfgEthAddr');

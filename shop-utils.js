@@ -543,6 +543,19 @@ function hidePaymentBanner(success) {
 }
 
 function printOptionKey(type, size) { return `${type}|${size}`; }
+
+// Shipping metadata is edited by the standalone admin and consumed by the
+// storefront checkout, so these helpers must be shared by both pages.
+function normalizedSizeLabel(value) {
+  return String(value || '').replace(/[xX×]/g, 'x');
+}
+function optionShippingMeta(product, type, size) {
+  const opts = Array.isArray(product?.variants) ? product.variants : [];
+  const opt = opts.find(v => v && typeof v === 'object'
+    && String(v.type || v.name || v.label || '') === String(type || ''));
+  const meta = opt?.shipping_meta || opt?.shipping || {};
+  return meta?.[size] || meta?.[normalizedSizeLabel(size)] || null;
+}
 function labelPrintOption(type, size) { return `${type} · ${size}`; }
 function keySize(key) { return String(key || '').includes('|') ? String(key).split('|').pop() : String(key || ''); }
 function keyType(key) { return String(key || '').includes('|') ? String(key).split('|')[0] : ''; }

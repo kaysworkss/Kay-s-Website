@@ -4711,19 +4711,10 @@ let _deliveryCarrier = '';
 function isInternationalZone(zone) {
   return !!zone && !zone.startsWith('NG-');
 }
-function normalizedSizeLabel(value) {
-  return String(value || '').replace(/[xX?]/g, 'x');
-}
 function parsePrintInches(size) {
   const m = normalizedSizeLabel(size).match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
   if (!m) return null;
   return { w: Number(m[1]), h: Number(m[2]), max: Math.max(Number(m[1]), Number(m[2])) };
-}
-function optionShippingMeta(product, type, size) {
-  const opts = Array.isArray(product?.variants) ? product.variants : [];
-  const opt = opts.find(v => v && typeof v === 'object' && String(v.type || v.name || v.label || '') === String(type || ''));
-  const meta = opt?.shipping_meta || opt?.shipping || {};
-  return meta?.[size] || meta?.[normalizedSizeLabel(size)] || null;
 }
 function printDefaultProfile(type, size) {
   const parsed = parsePrintInches(size);
