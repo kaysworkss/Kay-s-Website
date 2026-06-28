@@ -503,7 +503,118 @@ let SHOP_CONFIG = {
 
 const SHOP_DEFAULT_PRODUCTS = SHOP_CONFIG.products.map(p => JSON.parse(JSON.stringify(p)));
 
-// Cart state (let, selectedVariants, selectedTypes) lives in shop.html only.
+// Shared shop state. These declarations used to live in the monolithic shop
+// page; keep them here so the split HTML and utility bundle share one state.
+let cart = [];
+let selectedVariants = {};
+let selectedTypes = {};
+
+function saveCart() {
+  try { localStorage.setItem('kaysworks-cart', JSON.stringify(cart)); } catch (_) {}
+}
+
+function loadCart() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('kaysworks-cart') || '[]');
+    cart = Array.isArray(raw) ? raw : [];
+  } catch (_) {
+    cart = [];
+  }
+}
+
+// Keep the bag synchronized when another shop tab changes it.
+window.addEventListener('storage', (event) => {
+  if (event.key !== 'kaysworks-cart') return;
+  loadCart();
+  if (typeof updateCartUI === 'function') updateCartUI();
+});
+
+async function loadShopData() {
+  delete SHOP_CONFIG._loadError;
+
+  try {
+    const productsRes = await fetch('/api/shop/products', {
+      headers: { Accept: 'application/json' },
+    });
+    if (!productsRes.ok) {
+      throw new Error(`Product request failed (${productsRes.status})`);
+    }
+
+    const rows = await productsRes.json();
+    if (!Array.isArray(rows)) throw new Error('Product API returned invalid data');
+
+    SHOP_CONFIG.products = rows.map(r => ({
+      id:                 r.id,
+      category:           r.category,
+      print_type:         r.print_type || '',
+      name:               r.name,
+      desc:               r.description || r.desc || '',
+      emoji:              r.emoji || '✦',
+      variants:           r.variants || [],
+      availableVariants:  r.available_variants || [],
+      _standardVariants:  r.variants || [],
+      priceNgn:           r.prices_ngn || {},
+      priceUsd:           r.prices_usd || {},
+      badge:              r.badge || '',
+      image:              r.image_url || '',
+      images:             r.images || [],
+      slug:               r.slug || '',
+      series_slug:        r.series_slug || '',
+      series_name:        r.series_name || '',
+      series_desc:        r.series_desc || '',
+      series_year:        r.series_year || '',
+      story:              r.story || '',
+      process:            r.process || '',
+      quote:              r.quote || '',
+      year:               r.year || '',
+      medium:             r.medium || '',
+      signed:             r.signed || false,
+      is_large_print:     r.is_large_print || false,
+      clothing:           r.clothing || false,
+      clothing_type:      r.clothing_type || '',
+      stock:              r.stock ?? null,
+      stock_by_variant:   r.stock_by_variant || {},
+      edition_totals:     r.edition_totals || {},
+      active:             r.active !== false,
+      sort_order:         r.sort_order || 0,
+      is_new:             r.is_new || false,
+      is_bestseller:      r.is_bestseller || false,
+      order_count:        r.order_count || 0,
+      print_edition:      r.print_edition || r.edition_type || '',
+      is_sold:            r.is_sold || false,
+      enquire_only:       r.enquire_only || false,
+    }));
+  } catch (error) {
+    console.error('Shop API unavailable:', error);
+    SHOP_CONFIG.products = [];
+    SHOP_CONFIG._loadError = true;
+  }
+
+  // Shop configuration is useful but should never prevent products loading.
+  try {
+    const configRes = await fetch('/api/shop/config', {
+      headers: { Accept: 'application/json' },
+    });
+    if (configRes.ok) {
+      const cfg = await configRes.json();
+      if (cfg.eth_address) SHOP_CONFIG.ethAddress = cfg.eth_address;
+      if (cfg.tezos_address) SHOP_CONFIG.tezosAddress = cfg.tezos_address;
+      if (cfg.featured_product_id) SHOP_CONFIG.featured_product_id = cfg.featured_product_id;
+      if (Number(cfg.ngn_per_usd) > 0) SHOP_RATE = Number(cfg.ngn_per_usd);
+    }
+  } catch (error) {
+    console.warn('Shop configuration unavailable:', error);
+  }
+
+  SHOP_CONFIG.products.forEach(product => {
+    if (product.category === 'prints' && !product._standardVariants) {
+      product._standardVariants = [...product.variants];
+    }
+  });
+
+  if (typeof renderProducts === 'function') renderProducts();
+  return SHOP_CONFIG.products;
+}
 
 /* ─── Helpers ─── */
 function fmt(n) { return '₦' + Number(n).toLocaleString('en-NG'); }
@@ -828,4 +939,3 @@ function productPrice(p, key, currency) {
   if (prices[key] !== undefined) return prices[key];
   return prices[keySize(key)] || 0;
 }
-
