@@ -281,6 +281,11 @@ async function detectVisitorCurrency() {
       ? { currency: forceCurrency }
       : await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(4000) }).then(r => r.json());
     const detected = geo.currency || 'NGN';
+    const detectedCountry = String(geo.country_code || '').toUpperCase();
+    if (detectedCountry) {
+      try { sessionStorage.setItem('kw_country_code', detectedCountry); } catch (_) {}
+      window.dispatchEvent(new CustomEvent('kw:country-detected', { detail: { countryCode: detectedCountry } }));
+    }
 
     // Build full dropdown for everyone
     buildCurrencyDropdown(detected);
