@@ -4048,21 +4048,32 @@ function renderFeaturedSection() {
 let currentShopFilter = 'all';
 let currentPrintEditionFilter = 'all';
 const SHOP_CATEGORY_ORDER = { prints: 0, merch: 1, notebooks: 2, stickers: 3 };
-const SHOP_CATEGORY_LABELS = { all: 'shop', prints: 'prints', merch: 'merch', notebooks: 'notebooks', stickers: 'stickers' };
+const SHOP_CATEGORY_LABELS = {
+  all: 'shop', prints: 'prints', merch: 'merch', notebooks: 'notebooks', stickers: 'stickers',
+  limited: 'limited editions', one_of_one: '1-of-1 works', open: 'open editions',
+};
 const SHOP_EMPTY_TITLES = {
   all: 'New pieces are coming soon.',
   prints: 'Prints are coming soon.',
   merch: 'Merch is coming soon.',
   notebooks: 'Notebooks are coming soon.',
   stickers: 'Stickers are coming soon.',
+  limited: 'Limited editions are coming soon.',
+  one_of_one: 'New 1-of-1 works are coming soon.',
+  open: 'Open editions are coming soon.',
+};
+const SHOP_EMPTY_NOTES = {
+  limited: 'New signed and numbered print runs will appear here as they are released.',
+  one_of_one: 'Unique works appear here when a piece is available to collect only once.',
+  open: 'New accessible editions and sizes are being prepared for this section.',
 };
 
 function buildShopEmptyState(category) {
   const label = SHOP_CATEGORY_LABELS[category] || category || 'shop';
   const title = SHOP_EMPTY_TITLES[category] || `${label.charAt(0).toUpperCase()}${label.slice(1)} is coming soon.`;
-  const note = category === 'all'
+  const note = SHOP_EMPTY_NOTES[category] || (category === 'all'
     ? 'New work is always in the making — check back soon.'
-    : 'Nothing here yet, but this section is growing. Check back soon.';
+    : 'Nothing here yet, but this section is growing. Check back soon.');
   const el = document.createElement('div');
   el.className = 'shop-empty-state';
   el.innerHTML = `
@@ -4121,7 +4132,10 @@ function watchMasonryImages(grid) {
 function updateMasonryLayoutMode() {
   const isMobile = window.matchMedia('(max-width: 600px)').matches;
   document.querySelectorAll('.shop-grid').forEach(grid => {
-    const enabled = !isMobile && grid.style.display !== 'none';
+    // Empty-state cards need natural row height. Masonry's 8px auto-rows make
+    // their copy overflow underneath the following desktop section.
+    const hasEmptyState = !!grid.querySelector('.shop-empty-state');
+    const enabled = !isMobile && !hasEmptyState && grid.style.display !== 'none';
     grid.classList.toggle('masonry-grid', enabled);
     if (enabled) {
       watchMasonryImages(grid);
@@ -4248,8 +4262,14 @@ function renderProductViews(activeFilter = 'all') {
       }
     });
     if (!renderedCount) {
-      const emptyGrid = activeFilter === 'prints' ? grids.prints : grids[activeFilter];
-      if (emptyGrid) emptyGrid.appendChild(buildShopEmptyState(activeFilter));
+      const editionEmpty = activeFilter === 'prints' && currentPrintEditionFilter !== 'all';
+      const emptyKey = editionEmpty ? currentPrintEditionFilter : activeFilter;
+      const emptyGrid = editionEmpty ? editionGrids[currentPrintEditionFilter]
+        : (activeFilter === 'prints' ? grids.prints : grids[activeFilter]);
+      if (editionEmpty && sublabels[currentPrintEditionFilter]) {
+        sublabels[currentPrintEditionFilter].style.display = '';
+      }
+      if (emptyGrid) emptyGrid.appendChild(buildShopEmptyState(emptyKey));
     }
   }
 
