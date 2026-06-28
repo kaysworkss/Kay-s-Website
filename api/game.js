@@ -669,9 +669,84 @@ function jsonError(e) {
     variant: e.variant,
   });
 }
+
+const SHOP_PENDING_TTL_MS = 24 * 60 * 60 * 1000;
+const SHOP_CONFIRMING_REVIEW_MS = 72 * 60 * 60 * 1000;
+let _lastShopLifecycleMaintenance = 0;
+
+// No cron required: classify stale orders opportunistically during normal shop
+// and admin traffic. Nothing is deleted, so late payment evidence remains usable.
+async function maintainShopOrderLifecycle(supabase, force = false) {
+  const nowMs = Date.now();
+  if (!force && nowMs - _lastShopLifecycleMaintenance < 5 * 60 * 1000) return;
+  _lastShopLifecycleMaintenance = nowMs;
+  const now = new Date(nowMs).toISOString();
+  const pendingCutoff = new Date(nowMs - SHOP_PENDING_TTL_MS).toISOString();
+  const reviewCutoff = new Date(nowMs - SHOP_CONFIRMING_REVIEW_MS).toISOString();
+  try {
+    // Legacy rows may have a transaction reference but still say pending.
+    const promoted = await supabase.from('shop_orders').update({
+      status: 'confirming', last_checked_at: now, updated_at: now,
+    }).eq('status', 'pending').not('payment_ref', 'is', null);
+    if (promoted.error) throw promoted.error;
+
+    // Only reference-less orders expire automatically. A transaction hash or
+    // gateway reference is never discarded without verification/admin review.
+    const expired = await supabase.from('shop_orders').update({
+      status: 'expired',
+      failure_reason: 'Payment was not submitted within 24 hours.',
+      updated_at: now,
+    }).eq('status', 'pending').is('payment_ref', null).lt('created_at', pendingCutoff);
+    if (expired.error) throw expired.error;
+
+    const review = await supabase.from('shop_orders').update({
+      status: 'review_required',
+      failure_reason: 'Payment verification has remained unresolved for 72 hours.',
+      updated_at: now,
+    }).eq('status', 'confirming').lt('updated_at', reviewCutoff);
+    if (review.error) throw review.error;
+  } catch (error) {
+    // Lifecycle maintenance must never take the storefront down. A missing
+    // migration is surfaced in logs while normal requests continue.
+    console.warn('[shop-orders] lifecycle maintenance skipped:', error.message || error);
+  }
+}
+
+function paymentFailureNeedsReview(error) {
+  const text = String(error?.message || error || '').toLowerCase();
+  return /invalid|mismatch|does not match|amount.*below|failed on-chain|already.*recorded|sold.?out|wrong (wallet|network|recipient)/i.test(text);
+}
+
+async function markOrderVerificationAttempt(supabase, order, paymentRef) {
+  const now = new Date().toISOString();
+  const patch = {
+    status: 'confirming',
+    payment_ref: paymentRef || order.payment_ref || null,
+    payment_started_at: order.payment_started_at || now,
+    last_checked_at: now,
+    verification_attempts: (Number(order.verification_attempts) || 0) + 1,
+    failure_reason: null,
+    updated_at: now,
+  };
+  const { error } = await supabase.from('shop_orders').update(patch).eq('order_ref', order.order_ref);
+  if (error) console.warn('[shop-order] could not persist verification attempt:', error.message);
+  Object.assign(order, patch);
+}
+
+async function markOrderVerificationFailure(supabase, orderRef, error) {
+  const now = new Date().toISOString();
+  const { error: updateError } = await supabase.from('shop_orders').update({
+    status: paymentFailureNeedsReview(error) ? 'review_required' : 'confirming',
+    failure_reason: String(error?.message || error || 'Payment verification is incomplete.').slice(0, 1000),
+    last_checked_at: now,
+    updated_at: now,
+  }).eq('order_ref', orderRef);
+  if (updateError) console.warn('[shop-order] could not persist verification failure:', updateError.message);
+}
 // ── PRODUCTS ──────────────────────────────────────────────────────────────────
 async function handleShopProducts(req, res, supabase) {
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
+  await maintainShopOrderLifecycle(supabase);
 
   const slug   = req.query.slug   || '';
   const series = req.query.series || '';
@@ -1871,17 +1946,34 @@ async function adjustVariantStockDirect(supabase, item, qtyDelta) {
 }
 
 async function claimVariantStock(supabase, item) {
-  // Use the direct method exclusively — it resolves the variant key the same
-  // way the client does (full key → size-only → unlimited), avoiding the
-  // RPC's inconsistent keying that caused false "sold out" errors.
-  return adjustVariantStockDirect(supabase, item, -Math.abs(Number(item.qty) || 1));
+  const qty = Math.abs(Number(item.qty) || 1);
+  const { data, error } = await supabase.rpc('adjust_shop_variant_stock', {
+    p_id: item.id,
+    p_variant_key: item.variantKey || item.variant,
+    p_qty_delta: -qty,
+  });
+  if (!error) return { ok: data === true };
+  // Compatibility while the migration is being applied; production should use
+  // the row-locking function above to prevent two final editions being sold.
+  if (error.code === 'PGRST202' || error.code === '42883' || /function.*does not exist/i.test(error.message || '')) {
+    console.warn('[shop-order] atomic stock function missing; using compatibility fallback');
+    return adjustVariantStockDirect(supabase, item, -qty);
+  }
+  const e = new Error(`Atomic stock claim failed for ${item.name || item.id}: ${error.message}`);
+  e.statusCode = 500;
+  throw e;
 }
 
 async function releaseVariantStock(supabase, item) {
   const vkey = item.variantKey || item.variant;
   try {
-    // Mirror claimVariantStock — use the direct method so release keys match.
-    await adjustVariantStockDirect(supabase, item, Math.abs(Number(item.qty) || 1));
+    const qty = Math.abs(Number(item.qty) || 1);
+    const { error } = await supabase.rpc('adjust_shop_variant_stock', {
+      p_id: item.id,
+      p_variant_key: vkey,
+      p_qty_delta: qty,
+    });
+    if (error) await adjustVariantStockDirect(supabase, item, qty);
   } catch (e) {
     console.error('[shop-order] stock release threw:', item.id, vkey, e.message);
   }
@@ -2196,6 +2288,7 @@ function readCryptoOrderLock(order) {
 // if the customer's cart is gone.
 async function handleShopOrderCreate(req, res, supabase) {
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
+  await maintainShopOrderLifecycle(supabase);
   const body = req.body || {};
   let checkout;
   try {
@@ -2239,6 +2332,9 @@ async function handleShopOrderCreate(req, res, supabase) {
           delivery_zone:    checkout.zone.slice(0, 40),
           payment_method:   paymentMethod,
           payment_metadata: shopOrderMetadata(body, checkout, cryptoLockReuse),
+          expires_at:        new Date(Date.now() + SHOP_PENDING_TTL_MS).toISOString(),
+          payment_started_at:new Date().toISOString(),
+          failure_reason:    null,
           updated_at:       new Date().toISOString(),
         })
         .eq('order_ref', reuseRef)
@@ -2283,6 +2379,8 @@ async function handleShopOrderCreate(req, res, supabase) {
       payment_method:  paymentMethod,
       payment_metadata: shopOrderMetadata(body, checkout, cryptoLock),
       status: 'pending',
+      expires_at: new Date(Date.now() + SHOP_PENDING_TTL_MS).toISOString(),
+      payment_started_at: new Date().toISOString(),
     })
     .select('id, order_ref')
     .single();
@@ -2305,6 +2403,7 @@ async function handleShopOrderCreate(req, res, supabase) {
 // via the card gateway, decrements stock, and flips the order to 'paid'.
 async function handleShopOrderConfirm(req, res, supabase) {
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
+  await maintainShopOrderLifecycle(supabase);
   const body = req.body || {};
   const orderRef = String(body.order_ref || '').trim().slice(0, 80);
   if (!orderRef) return json(400, { error: 'order_ref is required' });
@@ -2339,6 +2438,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
       }, supabase);
     } catch (e) { return jsonError(e); }
     const cpm = String(body.payment_method || '').slice(0, 40);
+    const initialPaymentRef = String(body.payment_ref || body.tx_ref || '').trim().slice(0, 200);
     if (!verifyShopQuote(quote, checkout, {})) {
       return json(400, { error: 'Invalid or expired checkout quote' });
     }
@@ -2359,7 +2459,12 @@ async function handleShopOrderConfirm(req, res, supabase) {
         delivery_zone:    checkout.zone.slice(0, 40),
         payment_method:   cpm,
         payment_metadata: shopOrderMetadata(body, checkout, lockMeta),
-        status:           'pending',
+        payment_ref:      initialPaymentRef || null,
+        payment_started_at: new Date().toISOString(),
+        expires_at:       new Date(Date.now() + SHOP_PENDING_TTL_MS).toISOString(),
+        last_checked_at:  initialPaymentRef ? new Date().toISOString() : null,
+        verification_attempts: 0,
+        status:           initialPaymentRef ? 'confirming' : 'pending',
       })
       .select('*')
       .single();
@@ -2434,6 +2539,8 @@ async function handleShopOrderConfirm(req, res, supabase) {
     return json(400, { error: 'Payment reference / transaction hash is required' });
   }
 
+  if (paymentRef) await markOrderVerificationAttempt(supabase, order, paymentRef);
+
   // Guard against the same payment_ref being used for a different order.
   if (paymentRef) {
     const { data: dupe } = await supabase
@@ -2492,6 +2599,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
         order_hash: orderRef,
       };
     } catch (e) {
+      await markOrderVerificationFailure(supabase, orderRef, e);
       return jsonError(e);
     }
   } else if (isCardPayment) {
@@ -2502,6 +2610,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
         expectedTotalNgn: checkout.totalNgn,
       });
     } catch (e) {
+      await markOrderVerificationFailure(supabase, orderRef, e);
       return jsonError(e);
     }
   }
@@ -2514,10 +2623,12 @@ async function handleShopOrderConfirm(req, res, supabase) {
       result = await claimVariantStock(supabase, item);
     } catch (e) {
       for (const c of claimed) await releaseVariantStock(supabase, c);
+      await markOrderVerificationFailure(supabase, orderRef, new Error(`Payment verified but inventory claim failed: ${e.message}`));
       return jsonError(e);
     }
     if (!result.ok) {
       for (const c of claimed) await releaseVariantStock(supabase, c);
+      await markOrderVerificationFailure(supabase, orderRef, new Error(`Payment verified but sold out: ${item.name} · ${item.variant}`));
       return json(409, {
         error: `Sold out: ${item.name} · ${item.variant} is no longer available`,
         product_id: item.id,
@@ -2556,6 +2667,8 @@ async function handleShopOrderConfirm(req, res, supabase) {
         confirmations: chainVerification?.confirmations,
         paid_at: new Date().toISOString(),
       } : order.payment_metadata,
+      paid_at: new Date().toISOString(),
+      failure_reason: null,
       updated_at: new Date().toISOString(),
     })
     .eq('order_ref', orderRef);
@@ -2664,6 +2777,7 @@ async function finalizeFreeOrder(req, res, supabase, body, checkout) {
         paid_at: new Date().toISOString(),
       },
       status: 'paid',
+      paid_at: new Date().toISOString(),
     })
     .select('id, order_ref')
     .single();
@@ -2859,6 +2973,9 @@ async function handleShopOrder(req, res, supabase) {
       payment_ref:     paymentRef,
       payment_metadata: shopOrderMetadata(body, checkout),
       status: paymentConfirmed ? 'paid' : 'pending',
+      payment_started_at: new Date().toISOString(),
+      expires_at: paymentConfirmed ? null : new Date(Date.now() + SHOP_PENDING_TTL_MS).toISOString(),
+      paid_at: paymentConfirmed ? new Date().toISOString() : null,
     })
     .select('id, order_ref')
     .single();
@@ -2966,11 +3083,12 @@ async function handleShopConfig(req, res, supabase) {
 // ═══════════════════════════════════════════════════════════════════════════
 async function handleShopOrderStatus(req, res, supabase) {
   if (req.method !== 'GET') return json(405, { error: 'GET only' });
+  await maintainShopOrderLifecycle(supabase, true);
   const email = String(req.query.email || '').trim().toLowerCase();
   const orderRef = String(req.query.order_ref || '').trim();
   if (!email || !orderRef) return json(400, { error: 'email and order_ref required' });
   const { data, error } = await supabase.from('shop_orders')
-    .select('order_ref, status, items, total_ngn, total_usd, delivery_method, delivery_zone, tracking_number, tracking_carrier, payment_method, payment_ref, payment_metadata, created_at, updated_at')
+    .select('order_ref, status, items, total_ngn, total_usd, delivery_method, delivery_zone, tracking_number, tracking_carrier, payment_method, payment_ref, payment_metadata, expires_at, payment_started_at, paid_at, last_checked_at, failure_reason, verification_attempts, created_at, updated_at')
     .eq('email', email).eq('order_ref', orderRef).maybeSingle();
   if (error) return json(500, { error: error.message });
   if (!data) return json(404, { error: 'No order found for that email and reference' });
@@ -2981,6 +3099,7 @@ async function handleShopOrderStatus(req, res, supabase) {
 // ORDER HISTORY — magic link: POST to request link, GET to verify token
 // ═══════════════════════════════════════════════════════════════════════════
 async function handleShopOrderHistory(req, res, supabase) {
+  await maintainShopOrderLifecycle(supabase, true);
   // POST: send a magic link email
   if (req.method === 'POST') {
     const body = req.body || {};
@@ -3030,7 +3149,7 @@ async function handleShopOrderHistory(req, res, supabase) {
       return json(410, { error: 'This link has expired. Request a new one.' });
     }
     const { data: orders, error } = await supabase.from('shop_orders')
-      .select('order_ref, status, items, total_ngn, total_usd, delivery_method, delivery_zone, tracking_number, tracking_carrier, payment_method, payment_ref, payment_metadata, created_at, updated_at')
+      .select('order_ref, status, items, total_ngn, total_usd, delivery_method, delivery_zone, tracking_number, tracking_carrier, payment_method, payment_ref, payment_metadata, expires_at, payment_started_at, paid_at, last_checked_at, failure_reason, verification_attempts, created_at, updated_at')
       .eq('email', tok.email).order('created_at', { ascending: false });
     if (error) return json(500, { error: error.message });
     return json(200, { ok: true, email: tok.email, orders: orders || [] });

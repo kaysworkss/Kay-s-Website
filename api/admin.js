@@ -193,6 +193,28 @@ async function handleExtendChallenge(req, res, supabase) {
 // ═══════════════════════════════════════════════════════════════════════════
 let _shopAdminRes = null;
 function json(status, obj) { _shopAdminRes.status(status).json(obj); return obj; }
+
+async function maintainAdminOrderLifecycle(supabase) {
+  const nowMs = Date.now();
+  const now = new Date(nowMs).toISOString();
+  try {
+    const promoted = await supabase.from('shop_orders').update({ status: 'confirming', last_checked_at: now, updated_at: now })
+      .eq('status', 'pending').not('payment_ref', 'is', null);
+    if (promoted.error) throw promoted.error;
+    const expired = await supabase.from('shop_orders').update({
+      status: 'expired', failure_reason: 'Payment was not submitted within 24 hours.', updated_at: now,
+    }).eq('status', 'pending').is('payment_ref', null)
+      .lt('created_at', new Date(nowMs - 24 * 60 * 60 * 1000).toISOString());
+    if (expired.error) throw expired.error;
+    const review = await supabase.from('shop_orders').update({
+      status: 'review_required', failure_reason: 'Payment verification has remained unresolved for 72 hours.', updated_at: now,
+    }).eq('status', 'confirming')
+      .lt('updated_at', new Date(nowMs - 72 * 60 * 60 * 1000).toISOString());
+    if (review.error) throw review.error;
+  } catch (error) {
+    console.warn('[shop-admin] lifecycle maintenance skipped:', error.message || error);
+  }
+}
 async function handleShopProducts(req, res, supabase) {
   if (req.method === 'GET') {
     const id = req.query.id;
@@ -366,6 +388,7 @@ async function handleShopConfig(req, res, supabase) {
 // ── shop-orders (GET) ─────────────────────────────────────────────────────────
 async function handleShopOrders(req, res, supabase) {
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
+  await maintainAdminOrderLifecycle(supabase);
   const status = req.query.status || 'all';
   let query = supabase
     .from('shop_orders')
@@ -375,7 +398,9 @@ async function handleShopOrders(req, res, supabase) {
   if (status === 'paid_unshipped') {
     query = query.in('status', ['paid', 'processing']);
   } else if (status === 'pending_payment') {
-    query = query.eq('status', 'pending');
+    query = query.in('status', ['pending', 'confirming']);
+  } else if (status === 'payment_review') {
+    query = query.eq('status', 'review_required');
   } else if (status !== 'all') {
     query = query.eq('status', status);
   }
@@ -388,18 +413,19 @@ async function handleShopOrders(req, res, supabase) {
 async function handleShopOrderUpdate(req, res, supabase) {
   const id = req.query.id;
 
-  // Bulk cleanup: DELETE /api/admin/shop-order/clear-pending?older_than_hours=24
-  // Removes abandoned 'pending' (unpaid) orders so they stop reappearing.
+  // Backward-compatible cleanup endpoint: classify stale unpaid orders instead
+  // of deleting them. Payment evidence and audit history are preserved.
   if (req.method === 'DELETE' && (id === 'clear-pending' || req.query.clear_pending === '1')) {
-    const hours = Math.max(0, Number(req.query.older_than_hours) || 0);
-    let q = supabase.from('shop_orders').delete().eq('status', 'pending');
-    if (hours > 0) {
-      const cutoff = new Date(Date.now() - hours * 3600 * 1000).toISOString();
-      q = q.lt('created_at', cutoff);
-    }
-    const { data: cleared, error } = await q.select('id');
+    const hours = Math.max(1, Number(req.query.older_than_hours) || 24);
+    const cutoff = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+    const { data: cleared, error } = await supabase.from('shop_orders').update({
+      status: 'expired',
+      failure_reason: `Payment was not submitted within ${hours} hours.`,
+      updated_at: new Date().toISOString(),
+    }).eq('status', 'pending').is('payment_ref', null).lt('created_at', cutoff).select('id');
     if (error) return json(500, { error: error.message });
-    return json(200, { ok: true, cleared: cleared ? cleared.length : 0 });
+    const count = cleared ? cleared.length : 0;
+    return json(200, { ok: true, expired: count, cleared: count });
   }
 
   if (!id) return json(400, { error: 'id required' });
@@ -416,11 +442,16 @@ async function handleShopOrderUpdate(req, res, supabase) {
       for (const item of (Array.isArray(order?.items) ? order.items : [])) {
         const vkey = item.variantKey || item.variant;
         const qty = Math.max(1, Number(item.qty) || 1);
-        const { error: stockErr } = await supabase.rpc('decrement_variant_stock', {
+        let { error: stockErr } = await supabase.rpc('adjust_shop_variant_stock', {
           p_id: item.id,
           p_variant_key: vkey,
-          p_qty: -qty,
+          p_qty_delta: qty,
         });
+        if (stockErr && (stockErr.code === 'PGRST202' || stockErr.code === '42883')) {
+          ({ error: stockErr } = await supabase.rpc('decrement_variant_stock', {
+            p_id: item.id, p_variant_key: vkey, p_qty: -qty,
+          }));
+        }
         if (stockErr) return json(500, { error: `Could not restock ${item.name || item.id}: ${stockErr.message}` });
       }
     }
@@ -441,7 +472,7 @@ async function handleShopOrderUpdate(req, res, supabase) {
   const patch = { updated_at: new Date().toISOString() };
 
   if (body.status !== undefined) {
-    const ALLOWED = ['pending', 'pending_payment', 'confirming', 'paid', 'paid_unshipped', 'processing', 'shipped', 'fulfilled', 'cancelled', 'refunded'];
+    const ALLOWED = ['pending', 'pending_payment', 'confirming', 'review_required', 'expired', 'paid', 'paid_unshipped', 'processing', 'shipped', 'fulfilled', 'cancelled', 'refunded'];
     if (!ALLOWED.includes(body.status))
       return json(422, { error: 'Invalid status' });
     patch.status = body.status;
