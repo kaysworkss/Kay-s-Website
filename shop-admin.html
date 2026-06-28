@@ -385,7 +385,7 @@ body.dark .toast { background:#2a1c14; }
 </div>
 
 <!-- Admin Panel -->
-<div class="admin-panel open" id="adminPanel">
+<div class="admin-panel" id="adminPanel">
   <div class="admin-box">
 
     <!-- Login -->
@@ -647,20 +647,36 @@ function renderProducts() {
 
 // ── Auto-unlock if token already stored ──
 document.addEventListener('DOMContentLoaded', () => {
+  // Always open the panel on page load - this is the dedicated admin page
+  const panel = document.getElementById('adminPanel');
+  if (panel) panel.classList.add('open');
+
   const token = localStorage.getItem('kaysworks-admin-token');
   if (token) {
-    // Verify token silently
+    // Verify existing token silently - skip login screen if valid
     fetch('/api/admin/shop-config', { headers: { 'x-admin-token': token } })
       .then(r => {
         if (r.ok) {
           adminUnlocked = true;
           document.getElementById('adminLogin').style.display = 'none';
           document.getElementById('adminConfig').style.display = '';
-          renderAdminProducts();
-          loadAdminConfig();
+          loadAdminConfig(); // fetches products + config from Supabase
+        } else {
+          // Token stale - clear it and show login
+          localStorage.removeItem('kaysworks-admin-token');
+          document.getElementById('adminLogin').style.display = '';
+          document.getElementById('adminConfig').style.display = 'none';
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        // Network error - show login form
+        document.getElementById('adminLogin').style.display = '';
+        document.getElementById('adminConfig').style.display = 'none';
+      });
+  } else {
+    // No token - show login form
+    document.getElementById('adminLogin').style.display = '';
+    document.getElementById('adminConfig').style.display = 'none';
   }
 });
 
