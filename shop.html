@@ -6692,23 +6692,29 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
 
   try {
     let lock = window.__activeLock;
+    console.log('[ETH] lock at send:', lock);
     if (!lock || lock.method !== 'eth' || Date.now() > lock.expires) {
+      console.log('[ETH] refreshing lock, client price:', window._ethUsdPrice);
       await refreshLock('eth', false);
       lock = window.__activeLock;
+      console.log('[ETH] lock after refresh:', lock, 'diag:', JSON.stringify((window.__shopDiag||[]).slice(0,2)));
     }
     if (!lock || !lock.order_ref) {
-      showToast('Could not get ETH quote \u2014 please check your connection and try again');
+      console.error('[ETH] no lock after refresh');
+      showToast('Could not get ETH quote \u2014 check browser console for details');
       btn.disabled = false; btn.textContent = 'Send ETH';
       return;
     }
     // Use server-locked amount if available, fall back to client-side rate
     const ethAmt = lock.quote?.crypto_amount || ethEthAmount();
+    console.log('[ETH] amount:', ethAmt, '(server:', lock.quote?.crypto_amount, 'client:', ethEthAmount(), ')');
     if (!ethAmt || Number(ethAmt) <= 0) {
       showToast('ETH rate unavailable \u2014 try again in a moment');
       btn.disabled = false; btn.textContent = 'Send ETH';
       return;
     }
     const orderRef = lock.order_ref;
+    console.log('[ETH] calling sendTransaction, to:', toAddr, 'amount:', ethAmt, 'ETH');
 
     btn.textContent = 'Waiting for wallet\u2026';
     const signer = _ethProvider.getSigner();
