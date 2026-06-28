@@ -755,17 +755,31 @@ async function loadAdminConfig() {
   // Fetch live products from Supabase via the admin API
   try {
     const token = localStorage.getItem('kaysworks-admin-token');
+    const el = document.getElementById('adminProducts');
+    if (el) el.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem">Loading products…</p>';
     const res = await fetch('/api/admin/shop-products', {
       headers: { 'x-admin-token': token || '' },
     });
-    if (res.ok) {
-      const products = await res.json().catch(() => null);
-      if (Array.isArray(products) && products.length) {
-        SHOP_CONFIG.products = products.map(p => normalizeProduct(p));
-        renderAdminProducts();
-      }
+    if (res.status === 401) {
+      localStorage.removeItem('kaysworks-admin-token');
+      document.getElementById('adminLogin').style.display = '';
+      document.getElementById('adminConfig').style.display = 'none';
+      showToast('Session expired — please log in again');
+      return;
     }
-  } catch (_) { /* fall back to defaults already rendered */ }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      if (el) el.innerHTML = '<p style="color:var(--rust);font-size:0.85rem;padding:1rem">⚠︎ Could not load products: ' + (err.error || res.status) + '</p>';
+      throw new Error(err.error || 'shop-products ' + res.status);
+    }
+    const products = await res.json().catch(() => null);
+    if (Array.isArray(products) && products.length) {
+      SHOP_CONFIG.products = products.map(p => normalizeProduct(p));
+      renderAdminProducts();
+    } else if (Array.isArray(products)) {
+      if (el) el.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem">No products found in the database.</p>';
+    }
+  } catch (e) { console.error('[admin] products fetch failed:', e); }
 
   // Show the live server addresses in the read-only admin fields.
   const ethInput = document.getElementById('cfgEthAddr');
