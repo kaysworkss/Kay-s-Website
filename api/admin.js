@@ -242,6 +242,7 @@ async function handleShopProducts(req, res, supabase) {
         medium:             String(body.medium || '').slice(0, 200),
         signed:             Boolean(body.signed),
         is_large_print:     Boolean(body.is_large_print),
+        certificate_of_authenticity: Boolean(body.certificate_of_authenticity),
         clothing:           Boolean(body.clothing),
         clothing_type:      String(body.clothing_type || '').slice(0, 40),
         stock:              body.stock === undefined || body.stock === null || body.stock === '' ? null : Number(body.stock),
@@ -294,6 +295,7 @@ async function handleShopProducts(req, res, supabase) {
     if (body.process            !== undefined) patch.process            = body.process;
     if (body.signed             !== undefined) patch.signed             = Boolean(body.signed);
     if (body.is_large_print     !== undefined) patch.is_large_print     = Boolean(body.is_large_print);
+    if (body.certificate_of_authenticity !== undefined) patch.certificate_of_authenticity = Boolean(body.certificate_of_authenticity);
     if (body.images             !== undefined) patch.images             = body.images;
     if (body.print_edition      !== undefined) patch.print_edition      = String(body.print_edition).slice(0, 40) || null;
     if (body.is_sold            !== undefined) patch.is_sold            = Boolean(body.is_sold);

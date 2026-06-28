@@ -710,8 +710,9 @@ async function handleShopProducts(req, res, supabase) {
   return json(200, tagged);
 }
 
-// Compute "new" (added in last 14 days) and "bestseller" (top 3 by total
-// quantity ordered) tags, returned alongside each product.
+// Compute "new" (added in last 14 days) and "bestseller" tags. Bestseller
+// counts only money-confirmed orders; pending/cancelled/refunded rows must never
+// turn an unsold work into a bestseller.
 async function applyProductTags(products, supabase) {
   if (!products.length) return products;
 
@@ -720,6 +721,7 @@ async function applyProductTags(products, supabase) {
     const { data: orders } = await supabase
       .from('shop_orders')
       .select('items')
+      .in('status', ['paid', 'processing', 'shipped', 'fulfilled'])
       .limit(5000);
     (orders || []).forEach(o => {
       const items = Array.isArray(o.items) ? o.items : [];
@@ -733,9 +735,10 @@ async function applyProductTags(products, supabase) {
     // If orders can't be read, fall back to no bestseller tags.
   }
 
+  const MIN_BESTSELLER_UNITS = 2;
   const bestsellerIds = new Set(
     Object.entries(counts)
-      .filter(([, n]) => n > 0)
+      .filter(([, n]) => n >= MIN_BESTSELLER_UNITS)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
       .map(([id]) => id)
