@@ -346,31 +346,38 @@ body.dark .toast { background:#2a1c14; }
 .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
 
-/* Override admin-panel to fill page rather than overlay */
+/* ── Standalone admin page overrides ── */
+/* Strip the dark overlay — this is a full page, not a modal */
 .admin-panel {
   position: static !important;
   opacity: 1 !important;
   pointer-events: all !important;
-  background: none !important;
+  background: transparent !important;
   backdrop-filter: none !important;
-  display: none; /* hidden until JS opens it */
-  padding: 0 !important;
+  display: none;
+  padding: 2rem clamp(1rem, 4vw, 2.5rem) 4rem !important;
+  align-items: unset !important;
+  justify-content: unset !important;
 }
 .admin-panel.open {
   display: block !important;
 }
+/* Admin box: keep its card look, remove fixed height so page scrolls naturally */
 .admin-box {
-  max-width: 1080px;
-  margin: 0 auto;
-  border-radius: 0 !important;
-  border-left: none !important;
-  border-right: none !important;
-  border-top: none !important;
+  max-width: 1080px !important;
+  margin: 0 auto !important;
   max-height: none !important;
   overflow-y: visible !important;
-  box-shadow: none !important;
+  transform: none !important;
+  transition: none !important;
 }
-/* Login box centred nicely on standalone page */
+/* Sticky head should stick to viewport top, not inside a scroll container */
+.admin-head {
+  position: sticky !important;
+  top: 57px !important; /* below the sticky page header */
+  z-index: 100 !important;
+}
+/* Login box centred nicely */
 #adminLogin {
   max-width: 420px;
   margin: 4rem auto;
@@ -774,7 +781,48 @@ async function loadAdminConfig() {
     }
     const products = await res.json().catch(() => null);
     if (Array.isArray(products) && products.length) {
-      SHOP_CONFIG.products = products.map(p => normalizeProduct(p));
+      // Map DB row fields to the same shape loadShopData uses in shop.html
+      SHOP_CONFIG.products = products.map(r => ({
+        id:                 r.id,
+        category:           r.category,
+        print_type:         r.print_type || '',
+        name:               r.name,
+        desc:               r.description || r.desc || '',
+        emoji:              r.emoji || '✦',
+        variants:           r.variants || [],
+        availableVariants:  r.available_variants || [],
+        _standardVariants:  r.variants || [],
+        priceNgn:           r.prices_ngn || {},
+        priceUsd:           r.prices_usd || {},
+        badge:              r.badge || '',
+        image:              r.image_url || '',
+        images:             r.images || [],
+        slug:               r.slug || '',
+        series_slug:        r.series_slug || '',
+        series_name:        r.series_name || '',
+        series_desc:        r.series_desc || '',
+        series_year:        r.series_year || '',
+        story:              r.story || '',
+        process:            r.process || '',
+        quote:              r.quote || '',
+        year:               r.year || '',
+        medium:             r.medium || '',
+        signed:             r.signed || false,
+        is_large_print:     r.is_large_print || false,
+        clothing:           r.clothing || false,
+        clothing_type:      r.clothing_type || '',
+        stock:              r.stock ?? null,
+        stock_by_variant:   r.stock_by_variant || {},
+        edition_totals:     r.edition_totals || {},
+        active:             r.active !== false,
+        sort_order:         r.sort_order || 0,
+        is_new:             r.is_new || false,
+        is_bestseller:      r.is_bestseller || false,
+        order_count:        r.order_count || 0,
+        print_edition:      r.print_edition || r.edition_type || '',
+        is_sold:            r.is_sold || false,
+        enquire_only:       r.enquire_only || false,
+      }));
       renderAdminProducts();
     } else if (Array.isArray(products)) {
       if (el) el.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem">No products found in the database.</p>';
