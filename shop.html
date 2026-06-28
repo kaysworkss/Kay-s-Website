@@ -693,6 +693,24 @@ body.dark .shop-filters {
   box-shadow: 0 4px 16px rgba(158,79,46,0.3);
   transform: translateY(-1px);
 }
+.edition-filter-group {
+  flex-basis: 100%;
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 0.45rem;
+  padding-top: 0.2rem;
+}
+.edition-filter-group[hidden] { display: none; }
+.edition-filter-btn {
+  font-family: 'Montserrat', sans-serif; font-size: 0.62rem;
+  font-weight: 600; letter-spacing: 0.06em;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: transparent; color: var(--text-muted); cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.edition-filter-btn:hover { border-color: var(--clay); color: var(--rust); }
+.edition-filter-btn.active {
+  border-color: var(--clay); background: rgba(196,132,90,0.12); color: var(--rust);
+}
 
 /* ── Grid ── */
 .shop-section {
@@ -2602,6 +2620,12 @@ body.dark { --text-muted: #b3a392; }
     <button class="filter-btn" data-filter="notebooks">Notebooks</button>
     <button class="filter-btn" data-filter="stickers">Stickers</button>
   </div>
+  <div class="edition-filter-group" id="printEditionFilters" aria-label="Print edition types" hidden>
+    <button class="edition-filter-btn active" data-edition-filter="all">All prints</button>
+    <button class="edition-filter-btn" data-edition-filter="limited">Limited editions</button>
+    <button class="edition-filter-btn" data-edition-filter="one_of_one">1 of 1</button>
+    <button class="edition-filter-btn" data-edition-filter="open">Open editions</button>
+  </div>
 </div>
 
 <!-- Marquee strip -->
@@ -4022,6 +4046,7 @@ function renderFeaturedSection() {
 }
 
 let currentShopFilter = 'all';
+let currentPrintEditionFilter = 'all';
 const SHOP_CATEGORY_ORDER = { prints: 0, merch: 1, notebooks: 2, stickers: 3 };
 const SHOP_CATEGORY_LABELS = { all: 'shop', prints: 'prints', merch: 'merch', notebooks: 'notebooks', stickers: 'stickers' };
 const SHOP_EMPTY_TITLES = {
@@ -4122,11 +4147,19 @@ function renderProducts() {
   SHOP_CONFIG.products = (SHOP_CONFIG.products || []).map(normalizeProduct);
   // Respect the admin-defined display order within each category.
   SHOP_CONFIG.products.sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
-  renderFeaturedSection();
   renderProductViews(currentShopFilter);
 }
 
 function renderProductViews(activeFilter = 'all') {
+  // Discovery content belongs to the unfiltered storefront. Once a shopper has
+  // expressed intent through any category filter, prioritise the products.
+  const showDiscovery = activeFilter === 'all';
+  const collections = document.getElementById('collections');
+  const featured = document.getElementById('featuredSection');
+  if (collections) collections.style.display = showDiscovery ? '' : 'none';
+  if (showDiscovery) renderFeaturedSection();
+  else if (featured) featured.style.display = 'none';
+
   const allGrid = document.getElementById('allProductsGrid');
   const grids = {
     prints: document.getElementById('printsGrid'),
@@ -4195,7 +4228,10 @@ function renderProductViews(activeFilter = 'all') {
     let renderedCount = 0;
     SHOP_CONFIG.products.forEach(p => {
       try {
+        if (p.active === false) return;
         if (activeFilter !== p.category) return;
+        if (activeFilter === 'prints' && currentPrintEditionFilter !== 'all'
+            && p.print_edition !== currentPrintEditionFilter) return;
         renderedCount += 1;
         if (p.category === 'prints' && p.print_edition) {
           const grid = editionGrids[p.print_edition] || grids.prints;
@@ -4293,7 +4329,23 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.classList.add('active');
     const f = btn.dataset.filter;
     currentShopFilter = f;
+    const editionBar = document.getElementById('printEditionFilters');
+    if (editionBar) editionBar.hidden = f !== 'prints';
+    if (f === 'prints') {
+      currentPrintEditionFilter = 'all';
+      document.querySelectorAll('.edition-filter-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.editionFilter === 'all');
+      });
+    }
     renderProductViews(f);
+    document.getElementById('shopGrid').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+document.querySelectorAll('.edition-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentPrintEditionFilter = btn.dataset.editionFilter || 'all';
+    document.querySelectorAll('.edition-filter-btn').forEach(b => b.classList.toggle('active', b === btn));
+    renderProductViews('prints');
     document.getElementById('shopGrid').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 });
@@ -6337,20 +6389,17 @@ async function finalizeReturnedGatewayCheckout() {
 }
 /* ─── Edition filter helper (called from collection tile chips) ─── */
 function filterPrintEdition(edition) {
-  // First activate the prints filter
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   const printsBtn = document.querySelector('.filter-btn[data-filter=prints]');
   if (printsBtn) printsBtn.classList.add('active');
   currentShopFilter = 'prints';
-  renderProductViews('prints');
-  // Then hide sub-grids that don't match
-  ['one_of_one','limited','open'].forEach(ed => {
-    const g = document.getElementById('grid-'+ed);
-    const l = document.getElementById('sublabel-'+ed);
-    const show = ed === edition;
-    if (g) g.style.display = show ? '' : 'none';
-    if (l) l.style.display = show ? '' : 'none';
+  currentPrintEditionFilter = ['one_of_one','limited','open'].includes(edition) ? edition : 'all';
+  const editionBar = document.getElementById('printEditionFilters');
+  if (editionBar) editionBar.hidden = false;
+  document.querySelectorAll('.edition-filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.editionFilter === currentPrintEditionFilter);
   });
+  renderProductViews('prints');
   document.getElementById('shopGrid').scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -7530,18 +7579,28 @@ const paystackMeta = document.querySelector('meta[name="paystack-key"]');
 if (paystackMeta) window.__PAYSTACK_KEY__ = paystackMeta.content;
 
 /* ─── Load shop data from API ─── */
+let _shopProductsLoadedOnce = false;
+let _shopLoadPromise = null;
 async function loadShopData() {
-  let loadedServerProducts = false;
-  try {
-    const [productsRes, configRes] = await Promise.all([
-      fetch('/api/shop/products'),
-      fetch('/api/shop/config'),
-    ]);
+  // Coalesce overlapping refreshes (initial load, wallet retry, post-purchase)
+  // so a slower failed request cannot overwrite a successful catalogue load.
+  if (_shopLoadPromise) return _shopLoadPromise;
+  _shopLoadPromise = (async () => {
+    const productsTask = fetch('/api/shop/products').then(async response => {
+      if (!response.ok) throw new Error(`Products request failed (${response.status})`);
+      const rows = await response.json();
+      if (!Array.isArray(rows)) throw new Error('Products response was not an array');
+      return rows;
+    });
+    const configTask = fetch('/api/shop/config').then(async response => {
+      if (!response.ok) throw new Error(`Configuration request failed (${response.status})`);
+      return response.json();
+    });
+    const [productsResult, configResult] = await Promise.allSettled([productsTask, configTask]);
 
-    if (productsRes.ok) {
-      const rows = await productsRes.json();
-      if (Array.isArray(rows) && rows.length) {
-        SHOP_CONFIG.products = rows.map(r => ({
+    if (productsResult.status === 'fulfilled') {
+      const rows = productsResult.value;
+      SHOP_CONFIG.products = rows.map(r => ({
           id:                 r.id,
           category:           r.category,
           print_type:         r.print_type || '',
@@ -7582,46 +7641,52 @@ async function loadShopData() {
           print_edition:      r.print_edition || r.edition_type || '',
           is_sold:            r.is_sold || false,
           enquire_only:       r.enquire_only || false,
-        }));
-        loadedServerProducts = true;
+      })).filter(p => !p._isSample);
+      _shopProductsLoadedOnce = true;
+      delete SHOP_CONFIG._loadError;
+    } else {
+      console.error('Shop products unavailable:', productsResult.reason?.message || productsResult.reason);
+      // On the first load, show a clear retry state. On later refresh failures,
+      // keep the last authoritative catalogue already on screen.
+      if (!_shopProductsLoadedOnce) {
+        SHOP_CONFIG.products = [];
+        SHOP_CONFIG._loadError = true;
       }
-      // If API returned an empty array show empty shop, not defaults
-      if (!loadedServerProducts) SHOP_CONFIG.products = [];
     }
 
-    if (configRes.ok) {
-      const cfg = await configRes.json();
+    if (configResult.status === 'fulfilled') {
+      const cfg = configResult.value || {};
       if (cfg.eth_address)          SHOP_CONFIG.ethAddress          = cfg.eth_address;
       if (cfg.tezos_address)        SHOP_CONFIG.tezosAddress        = cfg.tezos_address;
       if (cfg.featured_product_id)  SHOP_CONFIG.featured_product_id = cfg.featured_product_id;
+    } else {
+      // Wallet/config data can retry independently; it must never invalidate products.
+      console.warn('Shop configuration unavailable:', configResult.reason?.message || configResult.reason);
     }
-  } catch (e) {
-    // API not reachable — show error state, never show fake default products
-    console.error('Shop API unavailable:', e.message);
-    SHOP_CONFIG.products = [];
-    SHOP_CONFIG._loadError = true;
-  }
 
-  // Always stamp _standardVariants and always render
-  SHOP_CONFIG.products.forEach(p => {
-    if (p.category === 'prints' && !p._standardVariants) {
-      p._standardVariants = [...p.variants];
+    // Always stamp _standardVariants and always render.
+    SHOP_CONFIG.products.forEach(p => {
+      if (p.category === 'prints' && !p._standardVariants) {
+        p._standardVariants = [...p.variants];
+      }
+    });
+
+    // Storefront failures never inject demo/sample products. An empty successful
+    // response renders the genuine empty-shop state; a failed first load renders retry.
+    renderProducts();
+    // A checkout handed off from a product page opens immediately from the
+    // shared cart. Refresh it once authoritative product/config data arrives so
+    // live prices, edition stock and shipping metadata replace cached values.
+    if (typeof updateCartUI === 'function') updateCartUI();
+    const checkout = document.getElementById('checkoutOverlay');
+    if (checkout && checkout.classList.contains('open') && typeof buildOrderSummary === 'function') {
+      buildOrderSummary();
     }
-  });
-
-  if (loadedServerProducts) {
-    SHOP_CONFIG.products = SHOP_CONFIG.products.filter(p => !p._isSample);
-  } else {
-    ensureExampleSections();
-  }
-  renderProducts();
-  // A checkout handed off from a product page opens immediately from the
-  // shared cart. Refresh it once authoritative product/config data arrives so
-  // live prices, edition stock and shipping metadata replace cached values.
-  if (typeof updateCartUI === 'function') updateCartUI();
-  const checkout = document.getElementById('checkoutOverlay');
-  if (checkout && checkout.classList.contains('open') && typeof buildOrderSummary === 'function') {
-    buildOrderSummary();
+  })();
+  try {
+    return await _shopLoadPromise;
+  } finally {
+    _shopLoadPromise = null;
   }
 }
 
