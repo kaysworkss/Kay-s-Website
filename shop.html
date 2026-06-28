@@ -5857,7 +5857,6 @@ function cancelManualCrypto(chain) {
 }
 
 async function submitManualCrypto(chain) {
-  if (!validateForm()) return;
   if (revealManualCryptoFields(chain)) return;
   const proof = getManualCryptoProof(chain);
   if (!proof) return;
@@ -5877,8 +5876,9 @@ async function submitManualCrypto(chain) {
     // Recovery: if the lock expired or the page was reloaded, fall back to the
     // most recent remembered order for this method (persisted in localStorage),
     // including its signed quote so the order can still be created + confirmed.
+    let remembered = null;
     if (!orderRef || !quoteForConfirm) {
-      const remembered = latestPendingOrder(method);
+      remembered = latestPendingOrder(method);
       if (remembered) {
         if (!orderRef) orderRef = remembered.ref;
         if (!quoteForConfirm && remembered.quote) quoteForConfirm = remembered.quote;
@@ -5893,6 +5893,7 @@ async function submitManualCrypto(chain) {
       payment_ref: proof.payment_ref,
       payer_address: proof.payer_address,
       checkout_quote: quoteForConfirm,
+      customer: remembered?.customer || null,
     });
     clearPendingOrder(orderRef);
     stopLockTimer();
@@ -6025,8 +6026,12 @@ async function confirmPendingOrder(orderRef, opts) {
   // flow, the order row (and the confirmation emails) have name/email/address.
   // Without these the order would be created with an empty email and the
   // customer receipt would fail to send.
-  let customer = {};
-  try { customer = getFormData() || {}; } catch (_) {}
+  let customer = opts?.customer || {};
+  if (!customer || !customer.name) {
+    try { customer = getFormData() || {}; } catch (_) { customer = {}; }
+  }
+  const confirmOpts = Object.assign({}, opts);
+  delete confirmOpts.customer;
   const payload = Object.assign({
     order_ref: orderRef,
     order_hash: orderRef,
@@ -6037,7 +6042,7 @@ async function confirmPendingOrder(orderRef, opts) {
     delivery_method: customer.deliveryMethod || _deliveryMethod || 'ship',
     delivery_zone: customer.deliveryZone || _deliveryZone || '',
     delivery_carrier: customer.deliveryCarrier || _deliveryCarrier || '',
-  }, opts);
+  }, confirmOpts);
   // Chain indexers (TzKT, ETH RPC) can lag 30-120s after broadcast.
   // Retry every 5s for up to 6 minutes. The server returns 409 for ALL
   // "not yet" states so we only stop on genuine hard business failures.
@@ -6080,22 +6085,28 @@ async function confirmPendingOrder(orderRef, opts) {
       lastErr = e;
       if (e && e.nonRetryable) throw e;
       if (attempt < maxAttempts) { await new Promise(r => setTimeout(r, RETRY_MS)); continue; }
-      throw e;
+      break;
     }
   }
   hidePaymentBanner(false);
-  if (lastErr) throw lastErr;
+  if (lastErr) {
+    const saved = new Error(`Your payment proof is saved and still confirming. Do not pay again. Keep order reference ${orderRef} for tracking.`);
+    saved.confirming = true;
+    saved.originalError = lastErr.message || String(lastErr);
+    throw saved;
+  }
 }
 
 
 // Local safety net: remember an unconfirmed crypto order so a returning
 // customer (or you) can still confirm it even after the lock timer expires,
 // the tab is closed, or the page is reloaded. Persisted to localStorage and
-// kept for 24h, so the order reference is never lost while a payment is in
+// kept for 72h, matching the server's verification-review window, so the order
+// reference is not lost while a payment is still being reconciled.
 // flight. This is what lets someone who already paid confirm manually even
 // after the countdown has cleared the on-screen reference.
 const PENDING_ORDERS_KEY = 'kwPendingCryptoOrders';
-const PENDING_ORDER_TTL = 24 * 60 * 60 * 1000; // 24h
+const PENDING_ORDER_TTL = 72 * 60 * 60 * 1000; // 72h
 
 function _loadPendingOrders() {
   try {
@@ -6239,7 +6250,7 @@ async function refreshLock(method, silent) {
       expires: Date.now() + LOCK_MS,
       payerAddress: payer,
     };
-    rememberPendingOrder(orderRef, { method, payer_address: payer, quote: q.quote });
+    rememberPendingOrder(orderRef, { method, payer_address: payer, quote: q.quote, customer: d });
     renderLockUI(method);
     if (method === 'tezos' && typeof renderTezosPanel === 'function') renderTezosPanel();
     if (method === 'eth' && typeof renderEthPanel === 'function') renderEthPanel();
@@ -7020,7 +7031,7 @@ async function sendErc20(token) {
     // 1. Create the pending order before sending.
     const pending = await createPendingOrder(d, token, quoteData.quote);
     const orderRef = pending.order_ref;
-    rememberPendingOrder(orderRef, { method: token, payer_address: _ethConnectedAddr, quote: quoteData.quote });
+    rememberPendingOrder(orderRef, { method: token, payer_address: _ethConnectedAddr, quote: quoteData.quote, customer: d });
 
     const signer       = _ethProvider.getSigner();
     const contractAddr = ERC20_CONTRACTS[token];
