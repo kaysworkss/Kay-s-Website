@@ -784,6 +784,7 @@ const ADMIN_PW = ''; // checked server-side — this is just UX gating
 let adminUnlocked = false;
 let adminProductFilter = 'all';
 let adminProductsDirty = false;
+let dirtyProductKeys = new Set();
 
 function setAdminProductFilter(filter, shouldRender = true) {
   const nextFilter = ['all','prints','merch','notebooks','stickers','drafts'].includes(filter) ? filter : 'all';
@@ -818,14 +819,20 @@ document.querySelectorAll('[data-quick-add]').forEach(btn => {
     np._justAdded = true;
     SHOP_CONFIG.products.unshift(np);
     adminProductsDirty = true;
+    dirtyProductKeys.add(productKey(np));
     renderAdminProducts();
     scrollToJustAdded();
   });
 });
 
 const adminProductsEditor = document.getElementById('adminProducts');
-adminProductsEditor.addEventListener('input', () => { adminProductsDirty = true; });
-adminProductsEditor.addEventListener('change', () => { adminProductsDirty = true; });
+function markEditedProduct(event) {
+  adminProductsDirty = true;
+  const row = event.target.closest('.admin-product-row');
+  if (row?.dataset.key) dirtyProductKeys.add(row.dataset.key);
+}
+adminProductsEditor.addEventListener('input', markEditedProduct);
+adminProductsEditor.addEventListener('change', markEditedProduct);
 
 // adminFab not used on standalone admin page
 
@@ -945,6 +952,7 @@ async function loadAdminConfig() {
       }));
       renderAdminProducts();
       adminProductsDirty = false;
+      dirtyProductKeys.clear();
     } else if (Array.isArray(products)) {
       if (el) el.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem">No products found in the database.</p>';
     }
@@ -1433,6 +1441,7 @@ function addPrintArtwork() {
   newPrint.slug = autoSlugForProduct(newPrint);
   SHOP_CONFIG.products.unshift(newPrint);
   adminProductsDirty = true;
+  dirtyProductKeys.add(productKey(newPrint));
   renderAdminProducts();
   scrollToJustAdded();
 }
@@ -1460,6 +1469,8 @@ function moveProductInCategory(cat, realIdx, dir) {
   });
   moving._justAdded = true; // reuse highlight/scroll
   adminProductsDirty = true;
+  dirtyProductKeys.add(productKey(moving));
+  dirtyProductKeys.add(productKey(swapWith.p));
   renderAdminProducts();
   scrollToJustAdded();
 }
@@ -1828,6 +1839,11 @@ function renderAdminProducts() {
   el.querySelectorAll('.ap-duplicate').forEach(btn => {
     btn.addEventListener('click', () => {
       duplicateProductByKey(btn.dataset.key || '');
+      const copy = SHOP_CONFIG.products.find(p => p._justAdded);
+      if (copy) {
+        adminProductsDirty = true;
+        dirtyProductKeys.add(productKey(copy));
+      }
     });
   });
 
@@ -1841,6 +1857,8 @@ function renderAdminProducts() {
       const slugEl = row.querySelector('.ap-slug');
       if (nameEl) p.name = nameEl.value.trim() || p.name;
       if (slugEl) slugEl.value = autoSlugForProduct(p);
+      adminProductsDirty = true;
+      dirtyProductKeys.add(productKey(p));
     });
   });
 
@@ -1857,6 +1875,7 @@ function renderAdminProducts() {
       np._justAdded = true;
       SHOP_CONFIG.products.unshift(np);
       adminProductsDirty = true;
+      dirtyProductKeys.add(productKey(np));
       renderAdminProducts();
       scrollToJustAdded();
     });
@@ -1938,6 +1957,11 @@ function renderAdminProducts() {
   // Remove an entire print option and every size/price/stock entry under it.
   el.querySelectorAll('.ap-remove-option').forEach(btn => {
     btn.addEventListener('click', () => {
+      const p = productByKey(btn.dataset.key || '');
+      if (p) {
+        adminProductsDirty = true;
+        dirtyProductKeys.add(productKey(p));
+      }
       removePrintOptionByKey(btn.dataset.key || '', btn.dataset.type || '');
     });
   });
@@ -1973,6 +1997,8 @@ function renderAdminProducts() {
       if (!nextAvailable[type]) nextAvailable[type] = [];
       nextAvailable[type].push(label);
       p.availableVariants = nextAvailable;
+      adminProductsDirty = true;
+      dirtyProductKeys.add(productKey(p));
 
       // Clear inputs
       sizeEl.value = ''; ngnEl.value = ''; usdEl.value = '';
@@ -2001,6 +2027,8 @@ function renderAdminProducts() {
         nextAvailable[o.type] = (o.availableSizes || o.sizes).filter(s => !(o.type === type && s === size));
       });
       p.availableVariants = nextAvailable;
+      adminProductsDirty = true;
+      dirtyProductKeys.add(productKey(p));
       renderAdminProducts();
     });
   });
@@ -2272,15 +2300,17 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         .forEach((p, i) => { p.sort_order = i; });
     });
 
-    // Save all products to API and replace temporary/sample ids with real
-    // Supabase UUIDs. Sample/placeholder products (_isSample) are never saved.
+    // Save only products whose persisted fields actually changed. Sending the
+    // entire catalogue at once created unnecessary concurrent serverless calls
+    // and could produce a false error after the database had already updated.
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    await Promise.all(SHOP_CONFIG.products.map(async p => {
-      if (p._isSample) return null;
+    const productsToSave = SHOP_CONFIG.products.filter(p =>
+      !p._isSample && (dirtyProductKeys.has(productKey(p)) || !UUID_RE.test(String(p.id || '')))
+    );
+    for (const p of productsToSave) {
       const saved = await apiSaveProduct(p, token);
       if (saved?.id && !UUID_RE.test(String(p.id))) p.id = saved.id;
-      return saved;
-    }));
+    }
 
     // Save config (wallet addresses handled server-side — just upsert)
     const cfgRes = await fetch('/api/admin/shop-config', {
@@ -2303,6 +2333,7 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
     populatePrintPageSelector();
     populateFeaturedSelector();
     adminProductsDirty = false;
+    dirtyProductKeys.clear();
     showToast('Saved ✦');
     closeAdmin();
   } catch (e) {
@@ -3370,6 +3401,56 @@ async function loadShopData() {
 }
 
 /* ─── Save product via admin API ─── */
+function buildProductSaveBody(p) {
+  return {
+    name: p.name, category: p.category, print_type: p.print_type || '',
+    description: p.desc, emoji: p.emoji || '✦', variants: p.variants,
+    available_variants: p.availableVariants || [], prices_ngn: p.priceNgn,
+    prices_usd: p.priceUsd, badge: p.badge, image_url: p.image,
+    images: p.images || [], slug: p.slug || '', series_slug: p.series_slug || '',
+    series_name: p.series_name || '', series_desc: p.series_desc || '',
+    series_year: p.series_year || '', story: p.story || '', process: p.process || '',
+    quote: p.quote || '', year: p.year || '', medium: p.medium || '',
+    signed: p.signed || false, is_large_print: p.is_large_print || false,
+    certificate_of_authenticity: p.certificate_of_authenticity || false,
+    clothing: p.clothing || false, clothing_type: p.clothing_type || '',
+    stock: p.stock ?? null, stock_by_variant: p.stock_by_variant || {},
+    edition_totals: p.edition_totals || {}, sort_order: p.sort_order || 0,
+    active: p.active !== false, print_edition: p.print_edition || '',
+    is_sold: p.is_sold || false, enquire_only: p.enquire_only || false,
+  };
+}
+
+function canonicalSaveValue(value) {
+  if (value === undefined || value === null || value === '') return '';
+  if (Array.isArray(value)) return value.map(canonicalSaveValue);
+  if (typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalSaveValue(value[key])]));
+  }
+  return value;
+}
+
+function savedRowMatches(row, body) {
+  return Object.keys(body).every(key =>
+    JSON.stringify(canonicalSaveValue(row[key])) === JSON.stringify(canonicalSaveValue(body[key]))
+  );
+}
+
+async function verifyProductPersisted(p, body, token) {
+  try {
+    const check = await fetch('/api/admin/shop-products', { headers: { 'x-admin-token': token } });
+    if (!check.ok) return null;
+    const rows = await check.json().catch(() => null);
+    if (!Array.isArray(rows)) return null;
+    const row = rows.find(item => String(item.id) === String(p.id))
+      || rows.find(item => body.slug && item.slug === body.slug)
+      || rows.find(item => item.name === body.name && item.category === body.category);
+    return row && savedRowMatches(row, body) ? row : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 async function apiSaveProduct(p, token) {
   // A real DB row has a UUID id. Anything else — temp 'prod-…' ids,
   // hardcoded sample ids like 'print-sample-artwork', or a missing id —
@@ -3379,51 +3460,30 @@ async function apiSaveProduct(p, token) {
   const isNew = !(typeof p.id === 'string' && UUID_RE.test(p.id));
   const method  = isNew ? 'POST' : 'PATCH';
   const url     = isNew ? '/api/admin/shop-products' : `/api/admin/shop-products/${p.id}`;
-  const body = {
-    name:               p.name,
-    category:           p.category,
-    print_type:         p.print_type || '',
-    description:        p.desc,
-    emoji:              p.emoji || '✦',
-    variants:           p.variants,
-    available_variants: p.availableVariants || [],
-    prices_ngn:         p.priceNgn,
-    prices_usd:         p.priceUsd,
-    badge:              p.badge,
-    image_url:          p.image,
-    images:             p.images || [],
-    slug:               p.slug || '',
-    series_slug:        p.series_slug || '',
-    series_name:        p.series_name || '',
-    series_desc:        p.series_desc || '',
-    series_year:        p.series_year || '',
-    story:              p.story || '',
-    process:            p.process || '',
-    quote:              p.quote || '',
-    year:               p.year || '',
-    medium:             p.medium || '',
-    signed:             p.signed || false,
-    is_large_print:     p.is_large_print || false,
-    certificate_of_authenticity: p.certificate_of_authenticity || false,
-    clothing:           p.clothing || false,
-    clothing_type:      p.clothing_type || '',
-    stock:              p.stock ?? null,
-    stock_by_variant:   p.stock_by_variant || {},
-    edition_totals:     p.edition_totals || {},
-    sort_order:         p.sort_order || 0,
-    active:             p.active !== false,
-    print_edition:      p.print_edition || '',
-    is_sold:            p.is_sold || false,
-    enquire_only:       p.enquire_only || false,
-  };
+  const body = buildProductSaveBody(p);
   const res = await fetch(url, {
     method,
     headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
     body: JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Save failed');
-  return data;
+  const raw = await res.text();
+  let data = null;
+  if (raw.trim()) {
+    try { data = JSON.parse(raw); } catch (_) { /* Vercel can return plain text */ }
+  }
+  if (res.ok) {
+    if (data && typeof data === 'object') return data;
+    const persisted = await verifyProductPersisted(p, body, token);
+    return { ok: true, id: persisted?.id || (isNew ? undefined : p.id), recovered: true };
+  }
+
+  // A serverless response can fail after Supabase committed the update. Check
+  // the stored row before telling the admin that a save failed.
+  const persisted = await verifyProductPersisted(p, body, token);
+  if (persisted) return { ok: true, id: persisted.id, recovered: true };
+
+  const message = data?.error || raw.trim().slice(0, 180) || res.statusText || 'Save failed';
+  throw new Error(`Product save failed (${res.status}): ${message}`);
 }
 
 async function apiDeleteProduct(id, token) {
