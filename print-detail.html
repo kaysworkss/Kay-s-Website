@@ -1003,6 +1003,22 @@ body.dark .cart-rec-head { color: var(--sand); }
 .cart-rec-arrow.prev { left: 4px; }
 .cart-rec-arrow.next { right: 4px; }
 
+
+.cart-note-wrap { margin-bottom: 1rem; border-top: 1px solid var(--border); padding-top: 0.9rem; }
+.cart-note-toggle {
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem; color: var(--bark);
+  background: none; border: none; text-decoration: underline; text-underline-offset: 3px; padding: 0; cursor: pointer;
+}
+body.dark .cart-note-toggle { color: var(--sand); }
+.cart-note-field { display: none; margin-top: 0.75rem; }
+.cart-note-field.open { display: block; }
+.cart-note-field textarea {
+  width: 100%; min-height: 74px; resize: vertical; border: 1px solid var(--border);
+  background: var(--bg-card); color: var(--text); border-radius: 8px; padding: 0.75rem;
+  font-family: 'Crimson Pro', serif; font-size: 0.95rem; line-height: 1.45;
+}
+.cart-note-field textarea:focus { outline: none; border-color: var(--clay); }
+
 </style>
 </head>
 <body>
@@ -1072,6 +1088,12 @@ body.dark .cart-rec-head { color: var(--sand); }
   </div>
   <div id="cartRecs"></div>
   <div class="cart-foot" id="cartFoot" style="display:none">
+    <div class="cart-note-wrap">
+      <button class="cart-note-toggle" id="cartNoteToggle" type="button">Add order note</button>
+      <div class="cart-note-field" id="cartNoteField">
+        <textarea id="cartOrderNote" maxlength="800" placeholder="Add framing, delivery, gifting, or packing notes for Kay."></textarea>
+      </div>
+    </div>
     <div class="cart-totals" id="cartTotals"></div>
     <button class="checkout-btn" id="checkoutBtn">Proceed to checkout</button>
   </div>
@@ -1424,6 +1446,8 @@ function showToast(msg) {
 function hideToast() { document.getElementById('cartToast').classList.remove('show'); }
 
 /* ─── Cart (shared localStorage key with shop.html) ─── */
+let cartOrderNote = localStorage.getItem('kwCartOrderNote') || '';
+
 function getCart() {
   try { return JSON.parse(localStorage.getItem('kaysworks-cart') || '[]'); } catch { return []; }
 }
@@ -1651,6 +1675,10 @@ function updateCartUI() {
     return;
   }
   footEl.style.display = '';
+  const noteField = document.getElementById('cartNoteField');
+  const noteInput = document.getElementById('cartOrderNote');
+  if (noteInput) noteInput.value = cartOrderNote;
+  if (noteField) noteField.classList.toggle('open', !!cartOrderNote);
 
   itemsEl.innerHTML = cart.map(c => {
     const left = lineRemainingToAdd(c); // null = unknown/unlimited
@@ -2697,6 +2725,15 @@ document.addEventListener('DOMContentLoaded', function() {
     sendBtn.disabled = false;
     sendBtn.textContent = 'Register interest →';
   });
+});
+
+document.getElementById('cartNoteToggle')?.addEventListener('click', () => {
+  document.getElementById('cartNoteField')?.classList.toggle('open');
+  document.getElementById('cartOrderNote')?.focus();
+});
+document.getElementById('cartOrderNote')?.addEventListener('input', e => {
+  cartOrderNote = e.target.value.trim();
+  localStorage.setItem('kwCartOrderNote', cartOrderNote);
 });
 </script>
 <div class="interest-overlay" id="interestOverlay">
