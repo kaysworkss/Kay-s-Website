@@ -311,6 +311,7 @@ async function handleShopProducts(req, res, supabase) {
     if (body.series_slug        !== undefined) patch.series_slug        = String(body.series_slug).slice(0, 200);
     if (body.series_name        !== undefined) patch.series_name        = String(body.series_name).slice(0, 200);
     if (body.series_desc        !== undefined) patch.series_desc        = String(body.series_desc).slice(0, 1000);
+    if (body.series_year        !== undefined) patch.series_year        = String(body.series_year).slice(0, 20);
     if (body.medium             !== undefined) patch.medium             = String(body.medium).slice(0, 200);
     if (body.quote              !== undefined) patch.quote              = String(body.quote).slice(0, 500);
     if (body.story              !== undefined) patch.story              = body.story;
