@@ -3553,5 +3553,30 @@
   }
 })();
 </script>
+
+<script>
+(function() {
+  Promise.all([
+    fetch('/api/shop/products').then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
+    fetch('/api/shop/config').then(function(r){ return r.ok ? r.json() : {}; }).catch(function(){ return {}; })
+  ]).then(function(results) {
+    var products = results[0];
+    var config   = results[1];
+    if (!Array.isArray(products) || !products.length) return;
+    var featId = config.featured_product_id;
+    if (!featId) return;
+    var p = products.find(function(x){ return x.id === featId && x.active !== false; });
+    if (!p || !p.image_url) return;
+    var imgEl = document.getElementById('shopFeaturedImg');
+    var cardEl = document.querySelector('a.shop-item');
+    if (imgEl) { imgEl.src = p.image_url; imgEl.alt = p.name; }
+    if (cardEl) {
+      var nameEl = cardEl.querySelector('.shop-item-name');
+      if (nameEl) nameEl.textContent = p.name;
+      if (p.slug) cardEl.href = '/shop/' + p.slug;
+    }
+  });
+}());
+</script>
 </body>
 </html>
