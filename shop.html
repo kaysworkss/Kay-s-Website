@@ -2654,6 +2654,11 @@ body.dark { --text-muted: #b3a392; }
   </div>
 </div>
 
+
+
+<!-- Promo ticker — elegant single-line -->
+
+<div id="shopDiscoveryExtras">
 <!-- Launch promo banner -->
 <style>
 @keyframes launchGradient {
@@ -2710,11 +2715,6 @@ body.dark { --text-muted: #b3a392; }
   <span style="opacity:0.7;margin-left:0.5rem">✦</span>
   <button onclick="document.getElementById('launchBanner').style.display='none'" style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,0.55);font-size:1rem;cursor:pointer;line-height:1" aria-label="Dismiss">✕</button>
 </div>
-
-
-<!-- Promo ticker — elegant single-line -->
-
-<div id="shopDiscoveryExtras">
 
 
 <!-- Featured artwork spotlight -->
@@ -3357,6 +3357,7 @@ body.dark { --text-muted: #b3a392; }
           <div id="discountMsg" style="font-size:0.72rem;margin-top:0.4rem;display:none"></div>
         </div>
         <div id="orderSummaryTotals" style="padding-top:0.8rem;margin-top:0.4rem"></div>
+        <div id="orderSummaryNote" style="display:none;margin-top:0.9rem;padding-top:0.9rem;border-top:1px solid var(--border)"></div>
         <!-- Optional studio support: deliberately quiet and placed after the complete order total. -->
         <div id="tipBlock" style="margin:0.8rem 0 0;padding-top:0.75rem;border-top:1px solid var(--border)">
           <div style="color:var(--text-muted);font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.14em;text-transform:uppercase">Support future releases <span style="letter-spacing:0;text-transform:none;font-family:'Montserrat',sans-serif;font-size:0.62rem">(optional)</span></div>
@@ -5624,11 +5625,26 @@ function buildOrderSummary() {
   if (colItems) colItems.innerHTML = lines;
   if (colTotals) colTotals.innerHTML = totalsHtml;
 
+  // Order note — show in summary if customer left one
+  const noteEl = document.getElementById('orderSummaryNote');
+  if (noteEl) {
+    if (cartOrderNote) {
+      noteEl.style.display = '';
+      noteEl.innerHTML = `
+        <div style="font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.45rem">Order note</div>
+        <div style="font-family:'Crimson Pro',serif;font-size:0.93rem;color:var(--text);line-height:1.5;white-space:pre-wrap;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;padding:0.65rem 0.85rem">${cartOrderNote.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+    } else {
+      noteEl.style.display = 'none';
+      noteEl.innerHTML = '';
+    }
+  }
+
   // Mobile fallback: hidden on desktop, shown on narrow screens
   document.getElementById('orderSummary').innerHTML = `
     <p class="order-summary-label">Order summary</p>
     ${lines}
-    ${totalsHtml}`;
+    ${totalsHtml}
+    ${cartOrderNote ? \`<div style="margin-top:0.9rem;padding-top:0.9rem;border-top:1px solid var(--border)"><div style="font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.45rem">Order note</div><div style="font-family:'Crimson Pro',serif;font-size:0.93rem;color:var(--text);line-height:1.5;white-space:pre-wrap;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;padding:0.65rem 0.85rem">\${cartOrderNote.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div></div>\` : ''}`;
 
   document.querySelectorAll('.order-qty-btn').forEach(b=>{
     b.addEventListener('click',()=>{
