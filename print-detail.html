@@ -942,6 +942,67 @@ footer a:hover { color:var(--rust); }
 .interest-send:hover { background: var(--bark); }
 .interest-done { text-align: center; padding: 2rem 0; }
 .interest-done-icon { font-size: 1.8rem; color: var(--gold); margin-bottom: 1rem; }
+
+/* ── Cart recommendations ── */
+.cart-recommendations {
+  margin-top: auto;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--border);
+}
+.cart-rec-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 0.8rem;
+  font-family: 'Cormorant Garamond', serif; font-size: 0.88rem; color: var(--bark);
+  margin-bottom: 0.65rem;
+}
+body.dark .cart-rec-head { color: var(--sand); }
+.cart-rec-carousel { position: relative; overflow: hidden; }
+.cart-rec-track {
+  display: flex; gap: 0.55rem; overflow-x: auto;
+  scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; padding-bottom: 2px;
+}
+.cart-rec-track::-webkit-scrollbar { display: none; }
+.cart-rec-card {
+  flex: 0 0 calc(42% - 0.28rem); scroll-snap-align: start;
+  display: flex; flex-direction: column;
+  background: var(--bg-alt); border: 1px solid var(--border); border-radius: 10px;
+  overflow: hidden; transition: border-color 0.2s;
+}
+.cart-rec-card:hover { border-color: var(--border-hover); }
+.cart-rec-img {
+  width: 100%; aspect-ratio: 4/3; background: var(--bg-card); overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--clay); font-size: 1.5rem;
+}
+.cart-rec-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cart-rec-body { padding: 0.45rem 0.55rem 0.5rem; flex: 1; display: flex; flex-direction: column; gap: 0.25rem; }
+.cart-rec-name { font-family: 'Cormorant Garamond', serif; font-size: 0.82rem; color: var(--text); line-height: 1.2; }
+.cart-rec-meta { font-size: 0.58rem; color: var(--text-muted); }
+.cart-rec-price { font-family: 'Cormorant Garamond', serif; font-size: 0.8rem; color: var(--gold); }
+.cart-rec-add {
+  width: 100%; padding: 0.5rem;
+  border: 1px solid var(--border); border-top: none; border-radius: 0 0 10px 10px;
+  display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+  color: var(--clay); background: var(--bg-card);
+  font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.14em; text-transform: uppercase;
+  transition: border-color 0.15s, background 0.15s, color 0.15s; cursor: pointer;
+}
+.cart-rec-add:hover { border-color: var(--clay); background: rgba(196,132,90,0.08); color: var(--rust); }
+.cart-rec-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--bg-card); border: 1px solid var(--border);
+  color: var(--text); font-size: 0.75rem;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: background 0.15s, border-color 0.15s;
+  z-index: 2; opacity: 0; pointer-events: none;
+}
+.cart-rec-carousel:hover .cart-rec-arrow { opacity: 1; pointer-events: all; }
+.cart-rec-arrow:hover { background: var(--clay); border-color: var(--clay); color: #fff; }
+.cart-rec-arrow.prev { left: 4px; }
+.cart-rec-arrow.next { right: 4px; }
+
 </style>
 </head>
 <body>
@@ -1009,6 +1070,7 @@ footer a:hover { color:var(--rust); }
       <p class="cart-empty-text">Your bag is empty.</p>
     </div>
   </div>
+  <div id="cartRecs"></div>
   <div class="cart-foot" id="cartFoot" style="display:none">
     <div class="cart-totals" id="cartTotals"></div>
     <button class="checkout-btn" id="checkoutBtn">Proceed to checkout</button>
@@ -1507,6 +1569,73 @@ function refreshPurchaseControl() {
   }
 }
 
+
+/* ── Cart recommendations ── */
+function recommendedCartProducts(limit) {
+  limit = limit || 6;
+  const cart = getCart();
+  const inCart = new Set(cart.map(c => c.id));
+  const all = window._shopProducts || [];
+  const candidates = all
+    .filter(p => p && p.active !== false && !p._isSample && !inCart.has(p.id))
+    .map(p => {
+      const choices = availablePrintChoices(p);
+      const first = choices.find(ch => printPrice(p, ch.key, 'ngn') || printPrice(p, ch.key, 'usd'));
+      if (!first) return null;
+      const priceNgn = printPrice(p, first.key, 'ngn');
+      let score = 0;
+      if (p.is_bestseller || p.is_new) score += 2;
+      return { p, choice: first, priceNgn, score };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score || a.priceNgn - b.priceNgn);
+  return candidates.slice(0, limit);
+}
+
+function renderCartRecommendations() {
+  const recs = recommendedCartProducts(6);
+  if (!recs.length) return '';
+  const cards = recs.map(({ p, choice, priceNgn }) => {
+    const img = normalizeImg(p.image_url || p.image || '');
+    const slug = p.slug ? `/shop/${p.slug}` : null;
+    const nameHtml = slug
+      ? `<a href="${slug}" class="cart-rec-name" style="color:inherit;text-decoration:none">${p.name}</a>`
+      : `<div class="cart-rec-name">${p.name}</div>`;
+    return `<div class="cart-rec-card">
+      ${slug
+        ? `<a href="${slug}" class="cart-rec-img" style="display:flex">${img ? `<img src="${img}" alt="${escapeAttr(p.name)}"/>` : (p.emoji || '🖼')}</a>`
+        : `<div class="cart-rec-img">${img ? `<img src="${img}" alt="${escapeAttr(p.name)}"/>` : (p.emoji || '🖼')}</div>`}
+      <div class="cart-rec-body">
+        ${nameHtml}
+        <div class="cart-rec-meta">${escapeAttr(choice.label || '')}</div>
+        <div class="cart-rec-price">${priceNgn ? fmt(priceNgn) : ''}</div>
+      </div>
+      <button class="cart-rec-add" type="button" data-pid="${escapeAttr(p.id)}" data-v="${escapeAttr(choice.key)}" title="Add to bag">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>
+        Add to bag
+      </button>
+    </div>`;
+  }).join('');
+  return `<div class="cart-recommendations">
+    <div class="cart-rec-head"><span>You might also like</span></div>
+    <div class="cart-rec-carousel" id="cartRecCarousel">
+      <button class="cart-rec-arrow prev" id="cartRecPrev" aria-label="Previous">&#8249;</button>
+      <div class="cart-rec-track" id="cartRecTrack">${cards}</div>
+      <button class="cart-rec-arrow next" id="cartRecNext" aria-label="Next">&#8250;</button>
+    </div>
+  </div>`;
+}
+
+function initCartCarousel() {
+  const track = document.getElementById('cartRecTrack');
+  const prev  = document.getElementById('cartRecPrev');
+  const next  = document.getElementById('cartRecNext');
+  if (!track || !prev || !next) return;
+  const scrollBy = () => (track.querySelector('.cart-rec-card')?.offsetWidth || 160) + 10;
+  prev.addEventListener('click', () => track.scrollBy({ left: -scrollBy(), behavior: 'smooth' }));
+  next.addEventListener('click', () => track.scrollBy({ left:  scrollBy(), behavior: 'smooth' }));
+}
+
 function updateCartUI() {
   const itemsEl = document.getElementById('cartItems');
   const footEl = document.getElementById('cartFoot');
@@ -1563,6 +1692,25 @@ function updateCartUI() {
   itemsEl.querySelectorAll('.cart-item-remove').forEach(b => {
     b.addEventListener('click', () => removeFromCart(cartKeyFromButton(b)));
   });
+
+  // Recommendations
+  const recEl = document.getElementById('cartRecs');
+  if (recEl) {
+    recEl.innerHTML = renderCartRecommendations();
+    initCartCarousel();
+    recEl.querySelectorAll('.cart-rec-add').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = (window._shopProducts || []).find(x => x.id === btn.dataset.pid);
+        if (!p) return;
+        const choices = availablePrintChoices(p);
+        const ch = choices.find(c => c.key === btn.dataset.v) || choices[0];
+        if (!ch) return;
+        addToCart({ id: p.id, name: p.name, variant: ch.label, key: p.id + '|' + ch.key,
+          image: normalizeImg(p.image_url || p.image || ''), emoji: p.emoji || '🖼',
+          priceNgn: printPrice(p, ch.key, 'ngn'), priceUsd: printPrice(p, ch.key, 'usd'), qty: 1 });
+      });
+    });
+  }
 }
 
 /* ─── Mobile lightbox ─── */
