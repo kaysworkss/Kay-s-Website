@@ -4203,7 +4203,9 @@ function renderProductViews(activeFilter = 'all') {
   });
 
   if (activeFilter === 'all') {
-    if (allGrid) allGrid.style.display = 'none';
+    // All: single collapsed masonry grid — no category labels or sub-grids
+    Object.values(grids).forEach(g => { if (g) g.style.display = 'none'; });
+    Object.values(editionGrids).forEach(g => { if (g) g.style.display = 'none'; });
     const sortedProducts = [...SHOP_CONFIG.products]
       .filter(p => p.active !== false)
       .sort((a, b) => {
@@ -4212,30 +4214,16 @@ function renderProductViews(activeFilter = 'all') {
         if (catA !== catB) return catA - catB;
         return (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
       });
-    const categoryCounts = { prints: 0, merch: 0, notebooks: 0, stickers: 0 };
-    sortedProducts.forEach(p => {
-      try {
-        if (p.category in categoryCounts) categoryCounts[p.category] += 1;
-        if (p.category === 'prints' && p.print_edition) {
-          const grid = editionGrids[p.print_edition] || grids.prints;
-          if (grid) grid.appendChild(buildCard(p));
-          const lbl = sublabels[p.print_edition];
-          if (lbl) lbl.style.display = '';
-        } else {
-          const grid = grids[p.category];
-          if (grid) grid.appendChild(buildCard(p));
-        }
-      } catch (e) {
-        console.error(`[shop] Failed to render product "${p.name || p.id}":`, e.message);
-      }
-    });
-    Object.entries(categoryCounts).forEach(([cat, count]) => {
-      const label = document.querySelector(`.section-label[data-category="${cat}"]`);
-      if (label) label.style.display = count ? '' : 'none';
-    });
-    if (!sortedProducts.length && allGrid) {
+    if (allGrid) {
       allGrid.style.display = '';
-      allGrid.appendChild(buildShopEmptyState('all'));
+      if (sortedProducts.length) {
+        sortedProducts.forEach(p => {
+          try { allGrid.appendChild(buildCard(p)); }
+          catch (e) { console.error(`[shop] Failed to render product "${p.name || p.id}":`, e.message); }
+        });
+      } else {
+        allGrid.appendChild(buildShopEmptyState('all'));
+      }
     }
   } else {
     if (allGrid) allGrid.style.display = 'none';
