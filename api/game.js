@@ -934,7 +934,7 @@ const SERVER_INTL_COUNTRY_ZONES = Object.freeze({
 const SERVER_LARGE_PRINT_VARIANTS = ['12x16"', '12x18"', '18x24"', '24x36"'];
 // ── Live USD/NGN exchange rate ──────────────────────────────────────────────
 // Fetches from free APIs, caches for 1 hour. Falls back to the manual override
-// in shop_config, then to 1600 as a last resort.
+// in shop_config, then to 1400 as a conservative last resort.
 let _cachedRate = null;
 let _cachedRateAt = 0;
 const RATE_CACHE_MS = 60 * 60 * 1000; // 1 hour
@@ -967,7 +967,7 @@ async function fetchLiveNgnRate() {
 
   // Fallback: use cached or default
   console.warn('[rate] All APIs failed, using fallback');
-  return _cachedRate || 1600;
+  return _cachedRate || 1400;
 }
 
 // Get the current rate (with optional manual override from shop_config)
@@ -982,7 +982,7 @@ async function getNgnPerUsd(supabase) {
 
 // Synchronous fallback for functions that can't be async (uses last cached value)
 function getNgnPerUsdSync() { return _cachedRate || 1400; }
-const NGN_PER_USD_DEFAULT = 1600;
+const NGN_PER_USD_DEFAULT = 1400;
 const SERVER_HIGH_CART_USD = 60;
 const SERVER_COMPLIMENTARY_SHIPPING_USD = 500;
 const SERVER_SHIPPING_DIM_DIVISOR = 5000;
@@ -1025,12 +1025,12 @@ function serverExpectedInternationalZone(countryCode) {
   return SERVER_INTL_COUNTRY_ZONES[code] || 'ROW';
 }
 function serverNormalizedSizeLabel(value) {
-  return String(value || '').replace(/[xX?]/g, 'x');
+  return String(value || '').replace(/[xX×]/g, 'x');
 }
 function serverParsePrintInches(size) {
   const m = serverNormalizedSizeLabel(size).match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
   if (!m) return null;
-  return { max: Math.max(Number(m[1]), Number(m[2])) };
+  return { w: Number(m[1]), h: Number(m[2]), max: Math.max(Number(m[1]), Number(m[2])) };
 }
 function serverOptionShippingMeta(product, type, size) {
   const opts = Array.isArray(product?.variants) ? product.variants : [];
@@ -1040,10 +1040,30 @@ function serverOptionShippingMeta(product, type, size) {
 }
 function serverPrintDefaultProfile(type, size) {
   const parsed = serverParsePrintInches(size);
-  const max = parsed?.max || 10;
-  if (max <= 7) return { weightKg: 0.45, dimsCm: [32, 24, 3], packageType: 'flat mailer', packageClass: 'flat_art' };
-  if (max <= 14) return { weightKg: 0.75, dimsCm: [46, 38, 3], packageType: 'flat mailer', packageClass: 'flat_art' };
-  return { weightKg: 1.35, dimsCm: [76, 10, 10], packageType: 'protective tube', packageClass: 'tube_art' };
+  const wIn = parsed?.w || 8;
+  const hIn = parsed?.h || 10;
+  const max = Math.max(wIn, hIn);
+  const min = Math.min(wIn, hIn);
+  const gsm = /gicl|mini/i.test(String(type || '')) ? 300 : 260;
+  const paperKg = wIn * hIn * 0.00064516 * gsm / 1000;
+  const protectionKg = max <= 7 ? 0.018 : max <= 14 ? 0.03 : 0.045;
+  const weightKg = +(paperKg + protectionKg).toFixed(3);
+  if (max <= 14) {
+    return {
+      weightKg,
+      dimsCm: [Math.ceil(max * 2.54 + 6), Math.ceil(min * 2.54 + 6), 3],
+      rollLengthCm: Math.ceil(min * 2.54 + 8),
+      packageType: 'consolidated rigid mailer',
+      packageClass: 'flat_art',
+    };
+  }
+  return {
+    weightKg,
+    dimsCm: [Math.ceil(max * 2.54), Math.ceil(min * 2.54), 0.12],
+    rollLengthCm: Math.ceil(min * 2.54 + 8),
+    packageType: 'consolidated protective tube',
+    packageClass: 'tube_art',
+  };
 }
 function serverDefaultProductShippingProfile(product, variantLabel) {
   const cat = String(product?.category || '').toLowerCase();
@@ -1070,23 +1090,32 @@ function serverItemShippingProfile(product, item) {
   return {
     weightKg: Number(meta?.weight_kg) || fallback.weightKg,
     dimsCm: dims.every(n => n > 0) ? dims : fallback.dimsCm,
+    rollLengthCm: Number(meta?.roll_length_cm) || fallback.rollLengthCm || 0,
     packageType: meta?.package_type || fallback.packageType,
     packageClass: meta?.package_class || fallback.packageClass || (/tube/i.test(meta?.package_type || fallback.packageType) ? 'tube_art' : 'rigid_parcel'),
     carrierPrice: { ups: Number(meta?.ups_usd) || 0, dhl: Number(meta?.dhl_usd) || 0 },
   };
 }
 function serverMakeShippingPiece(kind, label, entries) {
-  let rawKg = 0, maxL = 0, maxW = 0, maxH = 0;
+  let rawKg = 0, maxL = 0, maxW = 0, maxH = 0, totalQty = 0, maxRollLength = 0;
   const carrierOverride = { ups: 0, dhl: 0 };
   for (const entry of entries) {
     const profile = entry.profile;
     const qty = Math.max(1, Number(entry.qty) || 1);
+    totalQty += qty;
     rawKg += profile.weightKg * qty;
     maxL = Math.max(maxL, profile.dimsCm[0]);
     maxW = Math.max(maxW, profile.dimsCm[1]);
     maxH = Math.max(maxH, profile.dimsCm[2] + Math.max(0, qty - 1) * 0.4);
+    maxRollLength = Math.max(maxRollLength, profile.rollLengthCm || Math.ceil(Math.min(profile.dimsCm[0], profile.dimsCm[1]) + 8));
     carrierOverride.ups = Math.max(carrierOverride.ups, profile.carrierPrice.ups || 0);
     carrierOverride.dhl = Math.max(carrierOverride.dhl, profile.carrierPrice.dhl || 0);
+  }
+  if (kind === 'tube_art') {
+    const diameter = +(10 + Math.min(4, Math.max(0, totalQty - 1) * 0.12)).toFixed(1);
+    maxL = maxRollLength || maxL;
+    maxW = diameter;
+    maxH = diameter;
   }
   const actualKg = +(rawKg * SERVER_SHIPPING_BUFFER).toFixed(2);
   const volumetricKg = maxL && maxW && maxH ? +((maxL * maxW * maxH) / SERVER_SHIPPING_DIM_DIVISOR).toFixed(2) : 0;
@@ -1999,7 +2028,7 @@ async function verifyCardPayment({ provider, reference, expectedTotalNgn }) {
         const cfg = await getSupabase()
           .from('shop_config').select('ngn_per_usd').eq('id', 1).maybeSingle()
           .then(r => r.data);
-        const rate = Number(cfg?.ngn_per_usd || process.env.SHOP_RATE || 1600);
+        const rate = Number(cfg?.ngn_per_usd || process.env.SHOP_RATE || 1400);
         // Convert foreign currency to USD first (approximate), then to NGN
         // Flutterwave's tx.amount_settled is in NGN if available
         paidNgn = Number(tx.amount_settled || paidAmount * rate);
