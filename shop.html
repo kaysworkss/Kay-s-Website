@@ -4855,7 +4855,20 @@ document.getElementById('sizeGuideOverlay').addEventListener('click', e => {
 // International: customers choose UPS or DHL Express.
 // Low carts default to UPS; high carts default to DHL except North America,
 // where UPS stays preferred. Orders $500+ get complimentary shipping.
-// Rates are conservative defaults and can be overridden per print size in admin.
+//
+// Weight-tier pricing: each zone/carrier has a table of weight bands, each
+// with ONE flat rate. A shipment's billable weight (whichever is greater of
+// actual or volumetric) is looked up against the bands — everything within a
+// band costs the same flat fee, no matter how many items are inside it, as
+// long as the combined weight stays under that band's ceiling. This mirrors
+// how DHL/UPS actually publish their published rate cards.
+//
+// Tube prints (rolled artwork) can combine several smaller prints into ONE
+// tube and are billed as a single package. Merch/notebooks/stickers are
+// billed as a separate package from the artwork. Reference figures pulled
+// from DHL/UPS published 2026 rate guides for a Lagos/West-Africa origin and
+// scaled to each destination zone; adjust per-band as live courier quotes
+// come in.
 
 const DELIVERY_RATES = {
   'NG-KD':     { label: 'Kaduna State',             small: { ngn: 2500,  usd: 0 }, large: { ngn: 3800,  usd: 0 } },
@@ -4864,12 +4877,41 @@ const DELIVERY_RATES = {
   'NG-NORTH3': { label: 'North-East / Mid-Belt',    small: { ngn: 5500,  usd: 0 }, large: { ngn: 7500,  usd: 0 } },
   'NG-SW':     { label: 'South-West',               small: { ngn: 7500,  usd: 0 }, large: { ngn: 10000, usd: 0 } },
   'NG-SS':     { label: 'South-South / South-East', small: { ngn: 9000,  usd: 0 }, large: { ngn: 12500, usd: 0 } },
-  WA:  { label: 'West Africa',    ups: { small: 18, large: 28 }, dhl: { small: 20, large: 30 } },
-  EU:  { label: 'Europe / UK',    ups: { small: 34, large: 50 }, dhl: { small: 48, large: 68 } },
-  NA:  { label: 'North America',  ups: { small: 38, large: 55 }, dhl: { small: 52, large: 72 } },
-  AO:  { label: 'Asia / Oceania', ups: { small: 46, large: 64 }, dhl: { small: 56, large: 78 } },
-  ROW: { label: 'Rest of world',  ups: { small: 42, large: 60 }, dhl: { small: 50, large: 70 } },
+  WA:  { label: 'West Africa' },
+  EU:  { label: 'Europe / UK' },
+  NA:  { label: 'North America' },
+  AO:  { label: 'Asia / Oceania' },
+  ROW: { label: 'Rest of world' },
 };
+
+// Weight-tier bands per zone/carrier. `upTo` is the band ceiling in kg
+// (inclusive) — the shipment's billable weight is matched to the first band
+// whose ceiling it doesn't exceed, and that band's flat rate is charged.
+// The final band has no ceiling (covers anything heavier, priced per extra kg
+// past its floor as a fallback for unusually large orders).
+const WEIGHT_TIERS = {
+  WA: {
+    ups: [ { upTo: 0.5, usd: 16 }, { upTo: 1, usd: 19 }, { upTo: 2, usd: 24 }, { upTo: 3, usd: 29 }, { upTo: 5, usd: 38 }, { upTo: 10, usd: 58 }, { upTo: Infinity, usd: 58, perKg: 7 } ],
+    dhl: [ { upTo: 0.5, usd: 18 }, { upTo: 1, usd: 21 }, { upTo: 2, usd: 27 }, { upTo: 3, usd: 32 }, { upTo: 5, usd: 42 }, { upTo: 10, usd: 64 }, { upTo: Infinity, usd: 64, perKg: 8 } ],
+  },
+  EU: {
+    ups: [ { upTo: 0.5, usd: 30 }, { upTo: 1, usd: 36 }, { upTo: 2, usd: 44 }, { upTo: 3, usd: 52 }, { upTo: 5, usd: 66 }, { upTo: 10, usd: 98 }, { upTo: Infinity, usd: 98, perKg: 11 } ],
+    dhl: [ { upTo: 0.5, usd: 42 }, { upTo: 1, usd: 50 }, { upTo: 2, usd: 60 }, { upTo: 3, usd: 70 }, { upTo: 5, usd: 88 }, { upTo: 10, usd: 128 }, { upTo: Infinity, usd: 128, perKg: 14 } ],
+  },
+  NA: {
+    ups: [ { upTo: 0.5, usd: 34 }, { upTo: 1, usd: 40 }, { upTo: 2, usd: 49 }, { upTo: 3, usd: 58 }, { upTo: 5, usd: 73 }, { upTo: 10, usd: 108 }, { upTo: Infinity, usd: 108, perKg: 12 } ],
+    dhl: [ { upTo: 0.5, usd: 46 }, { upTo: 1, usd: 54 }, { upTo: 2, usd: 66 }, { upTo: 3, usd: 78 }, { upTo: 5, usd: 98 }, { upTo: 10, usd: 142 }, { upTo: Infinity, usd: 142, perKg: 15 } ],
+  },
+  AO: {
+    ups: [ { upTo: 0.5, usd: 40 }, { upTo: 1, usd: 47 }, { upTo: 2, usd: 58 }, { upTo: 3, usd: 68 }, { upTo: 5, usd: 86 }, { upTo: 10, usd: 126 }, { upTo: Infinity, usd: 126, perKg: 13 } ],
+    dhl: [ { upTo: 0.5, usd: 50 }, { upTo: 1, usd: 59 }, { upTo: 2, usd: 72 }, { upTo: 3, usd: 85 }, { upTo: 5, usd: 107 }, { upTo: 10, usd: 154 }, { upTo: Infinity, usd: 154, perKg: 16 } ],
+  },
+  ROW: {
+    ups: [ { upTo: 0.5, usd: 38 }, { upTo: 1, usd: 44 }, { upTo: 2, usd: 54 }, { upTo: 3, usd: 64 }, { upTo: 5, usd: 80 }, { upTo: 10, usd: 116 }, { upTo: Infinity, usd: 116, perKg: 12 } ],
+    dhl: [ { upTo: 0.5, usd: 46 }, { upTo: 1, usd: 54 }, { upTo: 2, usd: 66 }, { upTo: 3, usd: 78 }, { upTo: 5, usd: 98 }, { upTo: 10, usd: 140 }, { upTo: Infinity, usd: 140, perKg: 15 } ],
+  },
+};
+
 const HIGH_CART_USD = 60;
 const COMPLIMENTARY_SHIPPING_USD = 500;
 const SHIPPING_DIM_DIVISOR = 5000;
@@ -5005,19 +5047,36 @@ function selectedIntlCarrier(zone) {
   if (!isInternationalZone(zone)) return '';
   return (_deliveryCarrier === 'ups' || _deliveryCarrier === 'dhl') ? _deliveryCarrier : preferredCarrier(zone);
 }
+// Look up the flat rate for a billable weight against a zone/carrier's tier
+// table. Everything up to a band's ceiling costs that band's flat rate —
+// adding another small item that keeps the total under the ceiling doesn't
+// raise the price at all, which is how the real couriers price multi-item
+// shipments.
+function tierRateForWeight(zone, carrier, kg) {
+  const tiers = (WEIGHT_TIERS[zone] || WEIGHT_TIERS.ROW)?.[carrier];
+  if (!tiers || !tiers.length) return 0;
+  for (const band of tiers) {
+    if (kg <= band.upTo) {
+      if (band.perKg && band.upTo !== Infinity) return band.usd; // unreachable, defensive
+      if (band.perKg) {
+        // Final open-ended band: base covers up to its floor, then a flat
+        // per-kg add-on for the excess (only used for unusually heavy orders).
+        const floor = tiers[tiers.length - 2]?.upTo || 0;
+        const extraKg = Math.max(0, Math.ceil(kg - floor));
+        return band.usd + extraKg * band.perKg;
+      }
+      return band.usd;
+    }
+  }
+  const last = tiers[tiers.length - 1];
+  return last ? last.usd : 0;
+}
 function ratePieceForBillableWeight(zone, carrier, piece) {
-  const r = DELIVERY_RATES[zone] || DELIVERY_RATES.ROW;
-  const base = r?.[carrier];
-  if (!base) return 0;
   const override = piece.carrierOverride?.[carrier] || 0;
   if (override > 0) return override;
   const isTube = piece.kind === 'tube_art';
   const kg = piece.billableKg || (isTube ? 1.5 : 0.7);
-  const baseRate = kg > 0.8 || isTube ? base.large : base.small;
-  const includedKg = kg > 0.8 || isTube ? 1.5 : 0.8;
-  const extraKg = Math.max(0, Math.ceil(kg - includedKg));
-  const extraRate = carrier === 'dhl' ? 14 : 12;
-  return baseRate + extraKg * extraRate;
+  return tierRateForWeight(zone, carrier, kg);
 }
 function rateForBillableWeight(zone, carrier) {
   const pieces = cartShippingPieces();
