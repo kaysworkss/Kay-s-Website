@@ -2467,6 +2467,46 @@ document.getElementById('printContent').addEventListener('click', e => {
 initCartLinks();
 load();
 
+// Fetch full product catalogue for cart recommendations
+(function() {
+  fetch('/api/shop/products')
+    .then(function(r) { return r.ok ? r.json() : []; })
+    .catch(function() { return []; })
+    .then(function(rows) {
+      if (!Array.isArray(rows) || !rows.length) return;
+      window._shopProducts = window._shopProducts || [];
+      rows.forEach(function(r) {
+        if (!window._shopProducts.find(function(x) { return x.id === r.id; })) {
+          window._shopProducts.push({
+            id:            r.id,
+            name:          r.name,
+            category:      r.category,
+            print_edition: r.print_edition || '',
+            enquire_only:  r.enquire_only || false,
+            active:        r.active !== false,
+            slug:          r.slug || '',
+            image_url:     r.image_url || '',
+            image:         r.image_url || '',
+            emoji:         r.emoji || '🖼',
+            prices_ngn:    r.prices_ngn || {},
+            prices_usd:    r.prices_usd || {},
+            variants:      r.variants || [],
+            print_type:    r.print_type || '',
+            is_bestseller: r.is_bestseller || false,
+            is_new:        r.is_new || false,
+            sort_order:    r.sort_order || 0,
+          });
+        }
+      });
+      // Re-render recs now that we have the full catalogue
+      const recEl = document.getElementById('cartRecs');
+      if (recEl && getCart().length) {
+        recEl.innerHTML = renderCartRecommendations();
+        initCartCarousel();
+      }
+    });
+}());
+
 /* ─── Share modal ─── */
 function shareUrl() {
   // Canonical product URL. On the deployed site this is /shop/<slug>; on file://
