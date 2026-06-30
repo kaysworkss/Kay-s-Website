@@ -839,18 +839,98 @@ async function applyProductTags(products, supabase) {
 // Delivery rates and carrier rules mirror the checkout in shop.html.
 const SERVER_DELIVERY_RATES = {
   pickup:     { label: 'Kaduna pickup',            small: { ngn: 0,    usd: 0 }, large: { ngn: 0,     usd: 0 } },
-  'NG-KD':     { label: 'Kaduna State',             small: { ngn: 2500, usd: 0 }, large: { ngn: 3800,  usd: 0 } },
-  'NG-ABJ':    { label: 'FCT - Abuja',              small: { ngn: 3800, usd: 0 }, large: { ngn: 5500,  usd: 0 } },
-  'NG-NORTH2': { label: 'North / North-West',       small: { ngn: 4200, usd: 0 }, large: { ngn: 6000,  usd: 0 } },
-  'NG-NORTH3': { label: 'North-East / Mid-Belt',    small: { ngn: 5500, usd: 0 }, large: { ngn: 7500,  usd: 0 } },
-  'NG-SW':     { label: 'South-West',               small: { ngn: 7500, usd: 0 }, large: { ngn: 10000, usd: 0 } },
-  'NG-SS':     { label: 'South-South / South-East', small: { ngn: 9000, usd: 0 }, large: { ngn: 12500, usd: 0 } },
-  WA:  { label: 'West Africa',    ups: { small: 18, large: 28 }, dhl: { small: 20, large: 30 } },
-  EU:  { label: 'Europe / UK',    ups: { small: 34, large: 50 }, dhl: { small: 48, large: 68 } },
-  NA:  { label: 'North America',  ups: { small: 38, large: 55 }, dhl: { small: 52, large: 72 } },
-  AO:  { label: 'Asia / Oceania', ups: { small: 46, large: 64 }, dhl: { small: 56, large: 78 } },
-  ROW: { label: 'Rest of world',  ups: { small: 42, large: 60 }, dhl: { small: 50, large: 70 } },
+  // Zone-level safeguards; current Nigerian checkout requests must also carry
+  // a validated state code and therefore use the exact table below.
+  'NG-KD':     { label: 'Kaduna State',             small: { ngn: 3500,  usd: 0 }, large: { ngn: 5000,  usd: 0 } },
+  'NG-ABJ':    { label: 'FCT - Abuja',              small: { ngn: 6500,  usd: 0 }, large: { ngn: 9000,  usd: 0 } },
+  'NG-NORTH2': { label: 'North / North-West',       small: { ngn: 7000,  usd: 0 }, large: { ngn: 9500,  usd: 0 } },
+  'NG-NORTH3': { label: 'North-East / Mid-Belt',    small: { ngn: 8500,  usd: 0 }, large: { ngn: 11500, usd: 0 } },
+  'NG-SW':     { label: 'South-West',               small: { ngn: 9000,  usd: 0 }, large: { ngn: 12000, usd: 0 } },
+  'NG-SS':     { label: 'South-South / South-East', small: { ngn: 10000, usd: 0 }, large: { ngn: 13500, usd: 0 } },
+  WA:  { label: 'West Africa' },
+  EU:  { label: 'Europe / UK' },
+  NA:  { label: 'North America' },
+  AO:  { label: 'Asia / Oceania' },
+  ROW: { label: 'Rest of world' },
 };
+
+// Must stay identical to WEIGHT_TIERS in shop-gig-pricing.html. Each bracket is
+// one flat shipment price; only the final open bracket adds a per-kg surcharge.
+const SERVER_WEIGHT_TIERS = {
+  WA: {
+    ups: [ { upTo: 0.5, usd: 16 }, { upTo: 1, usd: 19 }, { upTo: 2, usd: 24 }, { upTo: 3, usd: 29 }, { upTo: 5, usd: 38 }, { upTo: 10, usd: 58 }, { upTo: Infinity, usd: 58, perKg: 7 } ],
+    dhl: [ { upTo: 0.5, usd: 18 }, { upTo: 1, usd: 21 }, { upTo: 2, usd: 27 }, { upTo: 3, usd: 32 }, { upTo: 5, usd: 42 }, { upTo: 10, usd: 64 }, { upTo: Infinity, usd: 64, perKg: 8 } ],
+  },
+  EU: {
+    ups: [ { upTo: 0.5, usd: 30 }, { upTo: 1, usd: 36 }, { upTo: 2, usd: 44 }, { upTo: 3, usd: 52 }, { upTo: 5, usd: 66 }, { upTo: 10, usd: 98 }, { upTo: Infinity, usd: 98, perKg: 11 } ],
+    dhl: [ { upTo: 0.5, usd: 42 }, { upTo: 1, usd: 50 }, { upTo: 2, usd: 60 }, { upTo: 3, usd: 70 }, { upTo: 5, usd: 88 }, { upTo: 10, usd: 128 }, { upTo: Infinity, usd: 128, perKg: 14 } ],
+  },
+  NA: {
+    ups: [ { upTo: 0.5, usd: 34 }, { upTo: 1, usd: 40 }, { upTo: 2, usd: 49 }, { upTo: 3, usd: 58 }, { upTo: 5, usd: 73 }, { upTo: 10, usd: 108 }, { upTo: Infinity, usd: 108, perKg: 12 } ],
+    dhl: [ { upTo: 0.5, usd: 46 }, { upTo: 1, usd: 54 }, { upTo: 2, usd: 66 }, { upTo: 3, usd: 78 }, { upTo: 5, usd: 98 }, { upTo: 10, usd: 142 }, { upTo: Infinity, usd: 142, perKg: 15 } ],
+  },
+  AO: {
+    ups: [ { upTo: 0.5, usd: 40 }, { upTo: 1, usd: 47 }, { upTo: 2, usd: 58 }, { upTo: 3, usd: 68 }, { upTo: 5, usd: 86 }, { upTo: 10, usd: 126 }, { upTo: Infinity, usd: 126, perKg: 13 } ],
+    dhl: [ { upTo: 0.5, usd: 50 }, { upTo: 1, usd: 59 }, { upTo: 2, usd: 72 }, { upTo: 3, usd: 85 }, { upTo: 5, usd: 107 }, { upTo: 10, usd: 154 }, { upTo: Infinity, usd: 154, perKg: 16 } ],
+  },
+  ROW: {
+    ups: [ { upTo: 0.5, usd: 38 }, { upTo: 1, usd: 44 }, { upTo: 2, usd: 54 }, { upTo: 3, usd: 64 }, { upTo: 5, usd: 80 }, { upTo: 10, usd: 116 }, { upTo: Infinity, usd: 116, perKg: 12 } ],
+    dhl: [ { upTo: 0.5, usd: 46 }, { upTo: 1, usd: 54 }, { upTo: 2, usd: 66 }, { upTo: 3, usd: 78 }, { upTo: 5, usd: 98 }, { upTo: 10, usd: 140 }, { upTo: Infinity, usd: 140, perKg: 15 } ],
+  },
+};
+
+// State-specific GIG estimates from a Kaduna origin. `zone` remains compatible
+// with existing order records while `delivery_state_code` selects the exact
+// server-authoritative rate used for quotes and payments.
+const SERVER_DOMESTIC_STATE_RATES = Object.freeze({
+  KD: { zone: 'NG-KD',     label: 'Kaduna State',             small: 3500,  large: 5000 },
+  FC: { zone: 'NG-ABJ',    label: 'FCT - Abuja',              small: 6500,  large: 9000 },
+  KN: { zone: 'NG-NORTH2', label: 'Kano',                     small: 6000,  large: 8500 },
+  KT: { zone: 'NG-NORTH2', label: 'Katsina',                  small: 6000,  large: 8500 },
+  NI: { zone: 'NG-NORTH2', label: 'Niger',                    small: 6500,  large: 9000 },
+  PL: { zone: 'NG-NORTH2', label: 'Plateau',                  small: 7000,  large: 9500 },
+  NA: { zone: 'NG-NORTH2', label: 'Nasarawa',                 small: 7000,  large: 9500 },
+  KE: { zone: 'NG-NORTH2', label: 'Kebbi',                    small: 7500,  large: 10000 },
+  SO: { zone: 'NG-NORTH2', label: 'Sokoto',                   small: 8000,  large: 11000 },
+  ZA: { zone: 'NG-NORTH2', label: 'Zamfara',                  small: 7000,  large: 9500 },
+  AD: { zone: 'NG-NORTH3', label: 'Adamawa',                  small: 8500,  large: 11500 },
+  BA: { zone: 'NG-NORTH3', label: 'Bauchi',                   small: 7500,  large: 10000 },
+  BE: { zone: 'NG-NORTH3', label: 'Benue',                    small: 8000,  large: 11000 },
+  BO: { zone: 'NG-NORTH3', label: 'Borno',                    small: 9500,  large: 13000 },
+  GO: { zone: 'NG-NORTH3', label: 'Gombe',                    small: 8000,  large: 11000 },
+  JI: { zone: 'NG-NORTH3', label: 'Jigawa',                   small: 7000,  large: 9500 },
+  KO: { zone: 'NG-NORTH3', label: 'Kogi',                     small: 8000,  large: 11000 },
+  KW: { zone: 'NG-NORTH3', label: 'Kwara',                    small: 8500,  large: 11500 },
+  TA: { zone: 'NG-NORTH3', label: 'Taraba',                   small: 9000,  large: 12000 },
+  YO: { zone: 'NG-NORTH3', label: 'Yobe',                     small: 9000,  large: 12000 },
+  EK: { zone: 'NG-SW',     label: 'Ekiti',                    small: 9000,  large: 12000 },
+  LA: { zone: 'NG-SW',     label: 'Lagos',                    small: 9500,  large: 13000 },
+  OG: { zone: 'NG-SW',     label: 'Ogun',                     small: 9000,  large: 12000 },
+  ON: { zone: 'NG-SW',     label: 'Ondo',                     small: 9000,  large: 12000 },
+  OS: { zone: 'NG-SW',     label: 'Osun',                     small: 8500,  large: 11500 },
+  OY: { zone: 'NG-SW',     label: 'Oyo',                      small: 8500,  large: 11500 },
+  AB: { zone: 'NG-SS',     label: 'Abia',                     small: 9500,  large: 13000 },
+  AK: { zone: 'NG-SS',     label: 'Akwa Ibom',                small: 10500, large: 14000 },
+  AN: { zone: 'NG-SS',     label: 'Anambra',                  small: 9500,  large: 13000 },
+  BY: { zone: 'NG-SS',     label: 'Bayelsa',                  small: 11000, large: 15000 },
+  CR: { zone: 'NG-SS',     label: 'Cross River',              small: 10500, large: 14000 },
+  DE: { zone: 'NG-SS',     label: 'Delta',                    small: 9500,  large: 13000 },
+  EB: { zone: 'NG-SS',     label: 'Ebonyi',                   small: 9500,  large: 13000 },
+  ED: { zone: 'NG-SS',     label: 'Edo',                      small: 9000,  large: 12000 },
+  EN: { zone: 'NG-SS',     label: 'Enugu',                    small: 9500,  large: 13000 },
+  IM: { zone: 'NG-SS',     label: 'Imo',                      small: 10000, large: 13500 },
+  RI: { zone: 'NG-SS',     label: 'Rivers (Port Harcourt)',  small: 11000, large: 15000 },
+});
+
+// Explicit non-ROW country assignments from the checkout. Every other valid
+// ISO alpha-2 country code safely resolves to Rest of World.
+const SERVER_INTL_COUNTRY_ZONES = Object.freeze({
+  GH: 'WA', BJ: 'WA', TG: 'WA', SN: 'WA', CI: 'WA', CM: 'WA',
+  GB: 'EU', DE: 'EU', FR: 'EU', NL: 'EU', IT: 'EU', ES: 'EU', SE: 'EU',
+  NO: 'EU', DK: 'EU', CH: 'EU', BE: 'EU', AT: 'EU', PL: 'EU', PT: 'EU', IE: 'EU',
+  US: 'NA', CA: 'NA',
+  AU: 'AO', NZ: 'AO', JP: 'AO', KR: 'AO', SG: 'AO', IN: 'AO', AE: 'AO',
+});
 const SERVER_LARGE_PRINT_VARIANTS = ['12x16"', '12x18"', '18x24"', '24x36"'];
 // ── Live USD/NGN exchange rate ──────────────────────────────────────────────
 // Fetches from free APIs, caches for 1 hour. Falls back to the manual override
@@ -925,6 +1005,24 @@ function serverVariantPrice(product, variantKey, variant, currency) {
 
 function serverIsInternationalZone(zone) {
   return !!zone && zone !== 'pickup' && !zone.startsWith('NG-');
+}
+function serverDomesticStateRate(zone, stateCode) {
+  const code = String(stateCode || '').trim().toUpperCase();
+  const state = SERVER_DOMESTIC_STATE_RATES[code];
+  if (state && state.zone === zone) {
+    return {
+      label: state.label,
+      small: { ngn: state.small, usd: 0 },
+      large: { ngn: state.large, usd: 0 },
+    };
+  }
+  return SERVER_DELIVERY_RATES[zone] || SERVER_DELIVERY_RATES.ROW;
+}
+function serverExpectedInternationalZone(countryCode) {
+  const code = String(countryCode || '').trim().toUpperCase();
+  if (code === 'OTHER') return 'ROW';
+  if (!/^[A-Z]{2}$/.test(code) || code === 'NG') return '';
+  return SERVER_INTL_COUNTRY_ZONES[code] || 'ROW';
 }
 function serverNormalizedSizeLabel(value) {
   return String(value || '').replace(/[xX?]/g, 'x');
@@ -1033,9 +1131,25 @@ function serverIntlCarrierTier(zone, subtotalUsd, requestedCarrier = '') {
   if (zone === 'NA') return 'ups';
   return Number(subtotalUsd || 0) >= SERVER_HIGH_CART_USD ? 'dhl' : 'ups';
 }
-function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd = 0, requestedCarrier = '', shippingProfile = null) {
+function serverTierRateForWeight(zone, carrier, kg) {
+  const tiers = (SERVER_WEIGHT_TIERS[zone] || SERVER_WEIGHT_TIERS.ROW)?.[carrier];
+  if (!tiers || !tiers.length) return 0;
+  for (const band of tiers) {
+    if (kg <= band.upTo) {
+      if (band.perKg) {
+        const floor = tiers[tiers.length - 2]?.upTo || 0;
+        return band.usd + Math.max(0, Math.ceil(kg - floor)) * band.perKg;
+      }
+      return band.usd;
+    }
+  }
+  return tiers[tiers.length - 1]?.usd || 0;
+}
+function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd = 0, requestedCarrier = '', shippingProfile = null, deliveryStateCode = '') {
   if (subtotalUsd >= SERVER_COMPLIMENTARY_SHIPPING_USD) return 0;
-  const z = SERVER_DELIVERY_RATES[zone] || SERVER_DELIVERY_RATES.ROW;
+  const z = serverIsInternationalZone(zone)
+    ? (SERVER_DELIVERY_RATES[zone] || SERVER_DELIVERY_RATES.ROW)
+    : serverDomesticStateRate(zone, deliveryStateCode);
   const carrierTier = serverIntlCarrierTier(zone, subtotalUsd, requestedCarrier);
   let tier;
   if (carrierTier) {
@@ -1044,11 +1158,7 @@ function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd = 0, requestedC
       const override = piece.carrierOverride?.[carrierTier] || 0;
       if (override > 0) return sum + override;
       const kg = piece.billableKg || (piece.kind === 'tube_art' ? 1.5 : 0.7);
-      const isTube = piece.kind === 'tube_art';
-      const base = z[carrierTier][kg > 0.8 || isTube ? 'large' : 'small'];
-      const includedKg = kg > 0.8 || isTube ? 1.5 : 0.8;
-      const extraKg = Math.max(0, Math.ceil(kg - includedKg));
-      return sum + base + extraKg * (carrierTier === 'dhl' ? 14 : 12);
+      return sum + serverTierRateForWeight(zone, carrierTier, kg);
     }, 0);
     tier = { usd, ngn: 0 };
   } else {
@@ -1161,15 +1271,40 @@ async function computeShopCheckout(body, supabase) {
 
   const zone = String(body.delivery_zone || 'pickup');
   const method = String(body.delivery_method || 'pickup');
+  const deliveryCountryCode = String(body.delivery_country_code || '').trim().toUpperCase().slice(0, 5);
+  let deliveryStateCode = '';
+  let deliveryStateLabel = '';
+  if (method === 'ship' && zone.startsWith('NG-')) {
+    if (deliveryCountryCode !== 'NG') {
+      const err = new Error('Nigerian delivery requires Nigeria as the selected country');
+      err.statusCode = 400;
+      throw err;
+    }
+    deliveryStateCode = String(body.delivery_state_code || '').trim().toUpperCase().slice(0, 2);
+    const stateRate = SERVER_DOMESTIC_STATE_RATES[deliveryStateCode];
+    if (!stateRate || stateRate.zone !== zone) {
+      const err = new Error('Please reselect your Nigerian delivery state');
+      err.statusCode = 400;
+      throw err;
+    }
+    deliveryStateLabel = stateRate.label;
+  } else if (method === 'ship' && serverIsInternationalZone(zone)) {
+    const expectedZone = serverExpectedInternationalZone(deliveryCountryCode);
+    if (!expectedZone || expectedZone !== zone) {
+      const err = new Error('Please reselect your international delivery country');
+      err.statusCode = 400;
+      throw err;
+    }
+  }
   const shippingProfile = serverShippingProfile(trustedItems, productCache);
   hasLarge = hasLarge || shippingProfile.tube;
   const deliveryCarrier = method === 'ship' ? serverIntlCarrierTier(zone, subtotalUsd, body.delivery_carrier) : '';
-  const deliveryNgn = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'ngn', subtotalUsd, deliveryCarrier, shippingProfile) : 0;
+  const deliveryNgn = method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'ngn', subtotalUsd, deliveryCarrier, shippingProfile, deliveryStateCode) : 0;
   // Derive delivery USD from NGN at live rate
   const liveRateForDelivery = getNgnPerUsdSync();
   const deliveryUsd = deliveryNgn > 0 && liveRateForDelivery > 0
     ? +(deliveryNgn / liveRateForDelivery).toFixed(2)
-    : (method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'usd', subtotalUsd, deliveryCarrier, shippingProfile) : 0);
+    : (method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'usd', subtotalUsd, deliveryCarrier, shippingProfile, deliveryStateCode) : 0);
 
   // ── Discount code ────────────────────────────────────────────────────────
   // Resolve and apply a discount code (if provided). The discount is computed
@@ -1201,6 +1336,9 @@ async function computeShopCheckout(body, supabase) {
     shippingProfile,
     zone,
     method,
+    deliveryCountryCode,
+    deliveryStateCode,
+    deliveryStateLabel,
     deliveryCarrier,
     subtotalNgn,
     subtotalUsd: +subtotalUsd.toFixed(2),
@@ -1299,6 +1437,9 @@ function makeShopQuote(checkout, extra = {}) {
     items: checkout.trustedItems.map(i => ({ id: i.id, variantKey: i.variantKey, qty: i.qty })),
     delivery_method: checkout.method,
     delivery_zone: checkout.zone,
+    delivery_country_code: checkout.deliveryCountryCode || '',
+    delivery_state_code: checkout.deliveryStateCode || '',
+    delivery_state: checkout.deliveryStateLabel || '',
     delivery_carrier: checkout.deliveryCarrier,
     shipping_billable_kg: checkout.shippingProfile?.billableKg || 0,
     subtotal_ngn: checkout.subtotalNgn,
@@ -1337,6 +1478,8 @@ function verifyShopQuote(quote, checkout, expected = {}) {
   if (Number(payload.tip_ngn || 0) !== Number(checkout.tipNgn || 0)) return false;
   if (String(payload.delivery_method) !== checkout.method) return false;
   if (String(payload.delivery_zone) !== checkout.zone) return false;
+  if (String(payload.delivery_country_code || '') !== String(checkout.deliveryCountryCode || '')) return false;
+  if (String(payload.delivery_state_code || '') !== String(checkout.deliveryStateCode || '')) return false;
   if (String(payload.delivery_carrier || '') !== String(checkout.deliveryCarrier || '')) return false;
   const quoteItems = JSON.stringify(payload.items || []);
   const trustedItems = JSON.stringify(checkout.trustedItems.map(i => ({ id: i.id, variantKey: i.variantKey, qty: i.qty })));
@@ -2262,6 +2405,9 @@ function shopOrderMetadata(body, checkout, cryptoLock = null) {
     ...(cryptoLock || {}),
     order_note: note || undefined,
     delivery_carrier: checkout.deliveryCarrier || undefined,
+    delivery_country_code: checkout.deliveryCountryCode || undefined,
+    delivery_state_code: checkout.deliveryStateCode || undefined,
+    delivery_state: checkout.deliveryStateLabel || undefined,
     shipping_billable_kg: checkout.shippingProfile?.billableKg || undefined,
     shipping_pieces: checkout.shippingProfile?.pieces || undefined,
   };
