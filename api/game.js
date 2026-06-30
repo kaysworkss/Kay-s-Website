@@ -1218,6 +1218,14 @@ async function computeShopCheckout(body, supabase) {
     err.statusCode = 400;
     throw err;
   }
+  for (const item of items) {
+    const qty = Number(item?.qty);
+    if (!item?.id || !item?.variant || !Number.isInteger(qty) || qty < 1 || qty > 100) {
+      const err = new Error('Invalid product, variant, or quantity in order');
+      err.statusCode = 400;
+      throw err;
+    }
+  }
 
   // Always fetch fresh NGN/USD rate before computing USD amounts for crypto
   try { _cachedRate = await getNgnPerUsd(supabase); } catch(_) {}
@@ -1240,12 +1248,34 @@ async function computeShopCheckout(body, supabase) {
     const product = productCache[item.id];
     if (!product) continue;
 
+    if (product.active === false || product.is_sold === true || product.enquire_only === true) {
+      const err = new Error(`${product.name} is not available for direct checkout`);
+      err.statusCode = 409;
+      err.product_id = item.id;
+      throw err;
+    }
+
     const stockByVariant = product.stock_by_variant || {};
     // Resolve stock with the same fallback the client uses: full key → size → none
     let sv;
     if (stockByVariant[vkey] !== undefined)         sv = stockByVariant[vkey];
     else if (stockByVariant[sizeKey] !== undefined) sv = stockByVariant[sizeKey];
     else if (stockByVariant[item.variant] !== undefined) sv = stockByVariant[item.variant];
+
+    const editionType = String(product.print_edition || product.edition_type || '').toLowerCase();
+    const editionTotals = product.edition_totals || {};
+    if (sv === undefined && product.category === 'prints' && ['limited', 'one_of_one'].includes(editionType)) {
+      if (editionTotals[vkey] !== undefined) sv = editionTotals[vkey];
+      else if (editionTotals[sizeKey] !== undefined) sv = editionTotals[sizeKey];
+      else if (editionTotals[item.variant] !== undefined) sv = editionTotals[item.variant];
+      if (sv === undefined) {
+        const err = new Error(`Edition stock is not configured for ${product.name} · ${item.variant}`);
+        err.statusCode = 409;
+        err.product_id = item.id;
+        err.variant = item.variant;
+        throw err;
+      }
+    }
 
     if (sv !== undefined && Number(sv) < item.qty) {
       const err = new Error(`Only ${sv} left in stock for ${product.name} · ${item.variant}`);
@@ -1277,6 +1307,13 @@ async function computeShopCheckout(body, supabase) {
     const vkey = item.variantKey || item.variant;
     const qty = Math.max(1, Number(item.qty) || 1);
     const priceNgn = serverVariantPrice(product, vkey, item.variant, 'ngn');
+    if (!Number.isFinite(priceNgn) || priceNgn <= 0) {
+      const err = new Error(`Invalid or unavailable variant for ${product.name}`);
+      err.statusCode = 400;
+      err.product_id = item.id;
+      err.variant = String(vkey || item.variant || '').slice(0, 160);
+      throw err;
+    }
     // Derive USD from NGN at live rate — never use stale prices_usd for crypto
     const liveRate = getNgnPerUsdSync(); // uses cached live rate or fallback
     const priceUsd = liveRate > 0 ? +(priceNgn / liveRate).toFixed(4) : serverVariantPrice(product, vkey, item.variant, 'usd');
