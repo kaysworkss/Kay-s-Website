@@ -2126,6 +2126,14 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
 .show-more-btn:hover { border-color: var(--clay); color: var(--clay); }
 
 /* ── Responsive ── */
+/* Country field: search+datalist on desktop, native select on mobile */
+.ck-country-select { display: block; }
+.ck-country-search { display: none; }
+@media(min-width:601px) {
+  .ck-country-select { display: none; }
+  .ck-country-search { display: block; }
+}
+
 @media(max-width:600px){
   .shop-hero {
     min-height: clamp(500px, 68svh, 620px);
@@ -3026,9 +3034,9 @@ body.dark { --text-muted: #b3a392; }
         <div id="shippingFields">
           <div class="form-row">
             <label class="form-label" for="ckCountrySearch">Country</label>
-            <input class="form-input" id="ckCountrySearch" type="search" list="ckCountrySuggestions" placeholder="Search country" autocomplete="country-name" spellcheck="false"/>
+            <input class="form-input ck-country-search" id="ckCountrySearch" type="search" list="ckCountrySuggestions" placeholder="Search country" autocomplete="country-name" spellcheck="false"/>
             <datalist id="ckCountrySuggestions"></datalist>
-            <select id="ckCountry" hidden aria-hidden="true" tabindex="-1">
+            <select id="ckCountry" class="form-select ck-country-select">
               <option value="">— Select country —</option>
               <option value="NG">Nigeria</option>
               <optgroup label="West Africa">
@@ -5085,7 +5093,9 @@ function updateDeliveryEstimate() {
   const isIntl = isInternationalZone(zone);
   if (isIntl && !_deliveryCarrier) _deliveryCarrier = preferredCarrier(zone);
   el.style.display = '';
-  document.getElementById('deliveryZoneLabel').textContent = info.label;
+  const countryEl = document.getElementById('ckCountry');
+  const countryName = countryEl ? (countryEl.options[countryEl.selectedIndex]?.text || '') : '';
+  document.getElementById('deliveryZoneLabel').textContent = (zone === 'ROW' && countryName) ? countryName : info.label;
   document.getElementById('deliveryFeeDisplay').innerHTML = deliveryFeeDisplay();
   const profile = cartShippingProfile();
   // Customer-facing note: describe the packaging reassuringly, without exposing
@@ -5217,6 +5227,14 @@ function updateShippingFieldGroups() {
   }
   searchEl.addEventListener('input', syncTypedCountry);
   searchEl.addEventListener('change', syncTypedCountry);
+
+  // Mobile: the native select is used directly (no search step needed).
+  countryEl.addEventListener('change', () => {
+    userEditedCountry = true;
+    const opt = countryEl.options[countryEl.selectedIndex];
+    searchEl.value = opt ? opt.text : '';
+    refreshCountrySelection();
+  });
 
   function applyLocalizedCountry(code) {
     if (!userEditedCountry && code) selectCountryCode(code);
