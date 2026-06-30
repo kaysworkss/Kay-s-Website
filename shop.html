@@ -4968,10 +4968,30 @@ function parsePrintInches(size) {
 }
 function printDefaultProfile(type, size) {
   const parsed = parsePrintInches(size);
-  const max = parsed?.max || 10;
-  if (max <= 7) return { weightKg: 0.45, dimsCm: [32, 24, 3], packageType: 'flat mailer', packageClass: 'flat_art' };
-  if (max <= 14) return { weightKg: 0.75, dimsCm: [46, 38, 3], packageType: 'flat mailer', packageClass: 'flat_art' };
-  return { weightKg: 1.35, dimsCm: [76, 10, 10], packageType: 'protective tube', packageClass: 'tube_art' };
+  const wIn = parsed?.w || 8;
+  const hIn = parsed?.h || 10;
+  const max = Math.max(wIn, hIn);
+  const min = Math.min(wIn, hIn);
+  const gsm = /gicl|mini/i.test(String(type || '')) ? 300 : 260;
+  const paperKg = wIn * hIn * 0.00064516 * gsm / 1000;
+  const protectionKg = max <= 7 ? 0.018 : max <= 14 ? 0.03 : 0.045;
+  const weightKg = +(paperKg + protectionKg).toFixed(3);
+  if (max <= 14) {
+    return {
+      weightKg,
+      dimsCm: [Math.ceil(max * 2.54 + 6), Math.ceil(min * 2.54 + 6), 3],
+      rollLengthCm: Math.ceil(min * 2.54 + 8),
+      packageType: 'consolidated rigid mailer',
+      packageClass: 'flat_art',
+    };
+  }
+  return {
+    weightKg,
+    dimsCm: [Math.ceil(max * 2.54), Math.ceil(min * 2.54), 0.12],
+    rollLengthCm: Math.ceil(min * 2.54 + 8),
+    packageType: 'consolidated protective tube',
+    packageClass: 'tube_art',
+  };
 }
 function defaultProductShippingProfile(product, variantLabel) {
   const cat = String(product?.category || '').toLowerCase();
@@ -4999,24 +5019,35 @@ function itemShippingProfile(cartItem) {
   return {
     weightKg: Number(meta?.weight_kg) || fallback.weightKg,
     dimsCm: dims.every(n => n > 0) ? dims : fallback.dimsCm,
+    rollLengthCm: Number(meta?.roll_length_cm) || fallback.rollLengthCm || 0,
     packageType: meta?.package_type || fallback.packageType,
     packageClass: meta?.package_class || fallback.packageClass || (/tube/i.test(meta?.package_type || fallback.packageType) ? 'tube_art' : 'rigid_parcel'),
     carrierPrice: { ups: Number(meta?.ups_usd) || 0, dhl: Number(meta?.dhl_usd) || 0 },
   };
 }
 function makeShippingPiece(kind, label, items) {
-  let rawKg = 0, maxL = 0, maxW = 0, maxH = 0;
+  let rawKg = 0, maxL = 0, maxW = 0, maxH = 0, totalQty = 0, maxRollLength = 0;
   const carrierOverride = { ups: 0, dhl: 0 };
   items.forEach(entry => {
     const p = entry.profile;
     const qty = Math.max(1, Number(entry.qty) || 1);
+    totalQty += qty;
     rawKg += p.weightKg * qty;
     maxL = Math.max(maxL, p.dimsCm[0]);
     maxW = Math.max(maxW, p.dimsCm[1]);
     maxH = Math.max(maxH, p.dimsCm[2] + Math.max(0, qty - 1) * 0.4);
+    maxRollLength = Math.max(maxRollLength, p.rollLengthCm || Math.ceil(Math.min(p.dimsCm[0], p.dimsCm[1]) + 8));
     carrierOverride.ups = Math.max(carrierOverride.ups, p.carrierPrice.ups || 0);
     carrierOverride.dhl = Math.max(carrierOverride.dhl, p.carrierPrice.dhl || 0);
   });
+  // A large print creates one tube package. Every smaller print is rolled into
+  // that same tube; its flat dimensions must not inflate the tube diameter.
+  if (kind === 'tube_art') {
+    const diameter = +(10 + Math.min(4, Math.max(0, totalQty - 1) * 0.12)).toFixed(1);
+    maxL = maxRollLength || maxL;
+    maxW = diameter;
+    maxH = diameter;
+  }
   const actualKg = +(rawKg * SHIPPING_BUFFER).toFixed(2);
   const volumetricKg = maxL && maxW && maxH ? +((maxL * maxW * maxH) / SHIPPING_DIM_DIVISOR).toFixed(2) : 0;
   return { kind, label, actualKg, volumetricKg, billableKg: Math.max(actualKg, volumetricKg), dimsCm: [maxL, maxW, maxH], carrierOverride };
@@ -5182,8 +5213,8 @@ function updateDeliveryEstimate() {
   // Customer-facing note: describe the packaging reassuringly, without exposing
   // billable weight or piece counts (internal shipping mechanics).
   const packageNote = isLarge
-    ? 'Shipped in a protective tube with archival art packaging.'
-    : 'Shipped flat in a protective mailer.';
+    ? 'All prints are consolidated in one protective tube with archival art packaging.'
+    : 'All prints are consolidated in one protective rigid mailer.';
   document.getElementById('deliveryFeeNote').textContent = packageNote;
 
   const carrierEl = document.getElementById('deliveryCarrierOptions');
