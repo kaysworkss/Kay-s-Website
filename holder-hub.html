@@ -437,18 +437,20 @@
           <button class="chain-btn" id="connectTez">Tezos Wallet</button>
         </div>
         <div class="status" id="walletStatus"></div>
+        <button type="button" class="btn ghost small" id="showEmailLoginBtn" style="width:auto;margin-top:1.1rem;">Already verified? Sign in with email</button>
       </div>
 
-      <!-- Step 2: email / magic link (only reached after wallet is verified) -->
+      <!-- Step 2: email / magic link (after a fresh wallet verify, or via "sign in with email" for returning holders) -->
       <div class="step" id="stepEmail">
-        <div class="panel-title">Step 2 — Save your access</div>
-        <p class="step-note" style="margin-top:0;margin-bottom:1rem;">Verified. Enter your email and we'll send a one-time link — after this, you sign in with email alone, no wallet needed, until it's time to re-verify.</p>
+        <div class="panel-title" id="emailStepTitle">Step 2 — Save your access</div>
+        <p class="step-note" style="margin-top:0;margin-bottom:1rem;" id="emailStepNote">Verified. Enter your email and we'll send a one-time link — after this, you sign in with email alone, no wallet needed, until it's time to re-verify.</p>
         <div class="field">
           <label for="emailInput">Email address</label>
           <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email" />
         </div>
         <button class="btn" id="sendLinkBtn">Send magic link</button>
         <div class="status" id="emailStatus"></div>
+        <button type="button" class="btn ghost small" id="backToWalletBtn" style="width:auto;margin-top:1.1rem;">Back</button>
       </div>
 
     </div>
@@ -1023,21 +1025,19 @@
 //  CONFIG — fill these in
 // ══════════════════════════════════════════════════════════
 const CONFIG = {
-  supabaseUrl: 'https://YOUR-PROJECT.supabase.co',
-  supabaseAnonKey: 'YOUR-ANON-KEY',
+  configEndpoint: '/api/holder?action=config',
   verifyEndpoint: '/api/holder?action=verify',
   claimEndpoint: '/api/holder?action=claim',
   reverifyDays: 30,                       // how often holdership is re-checked
 };
 
-const sb = supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey, {
-  auth: { persistSession: true, detectSessionInUrl: true, autoRefreshToken: true }
-});
+let sb; // created once /api/holder?action=config resolves — see boot() below
 
 let currentUser = null;
 let currentHolder = null;
 let pendingClaimToken = null;   // set once the wallet check succeeds pre-login
 let isReverifyMode = false;     // true when an already-signed-in holder is reconnecting
+let isEmailLoginFlow = false;   // true when a returning holder chose "sign in with email" directly
 
 const els = {
   stepEmail: document.getElementById('stepEmail'),
@@ -1059,6 +1059,8 @@ const els = {
   connectTezBeacon: document.getElementById('connectTezBeacon'),
   connectTezTemple: document.getElementById('connectTezTemple'),
   dismissTezWallet: document.getElementById('dismissTezWallet'),
+  showEmailLoginBtn: document.getElementById('showEmailLoginBtn'),
+  backToWalletBtn: document.getElementById('backToWalletBtn'),
 };
 
 function setStatus(el, cls, msg) {
@@ -1068,7 +1070,31 @@ function setStatus(el, cls, msg) {
 function shortAddr(a) { return a ? a.slice(0, 6) + '…' + a.slice(-4) : ''; }
 
 // ── Boot ──
-(async function init() {
+(async function boot() {
+  els.connectEth.disabled = true;
+  els.connectTez.disabled = true;
+  els.showEmailLoginBtn.disabled = true;
+  setStatus(els.walletStatus, '', 'Loading…');
+
+  let cfg;
+  try {
+    const res = await fetch(CONFIG.configEndpoint);
+    cfg = await res.json();
+    if (!res.ok) throw new Error(cfg.error || 'Could not load configuration.');
+  } catch (err) {
+    setStatus(els.walletStatus, 'err', 'This page isn\'t configured yet: ' + err.message);
+    return; // sb never gets created — nothing else can safely run
+  }
+
+  sb = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+    auth: { persistSession: true, detectSessionInUrl: true, autoRefreshToken: true }
+  });
+
+  els.connectEth.disabled = false;
+  els.connectTez.disabled = false;
+  els.showEmailLoginBtn.disabled = false;
+  els.walletStatus.classList.remove('show');
+
   const urlParams = new URLSearchParams(window.location.search);
   const claimTokenFromUrl = urlParams.get('vt');
 
@@ -1157,17 +1183,31 @@ function showStep(id) {
   document.getElementById(id).classList.add('show');
 }
 
+// ── Returning holder: sign in with email, no wallet reconnect needed ──
+els.showEmailLoginBtn.addEventListener('click', () => {
+  isEmailLoginFlow = true;
+  document.getElementById('emailStepTitle').textContent = 'Sign in';
+  document.getElementById('emailStepNote').textContent = "Enter the email you used when you first verified — we'll send a one-time link, no wallet needed.";
+  showStep('stepEmail');
+});
+els.backToWalletBtn.addEventListener('click', () => {
+  isEmailLoginFlow = false;
+  showStep('stepWallet');
+});
+
 // ── Step 1: magic link ──
 els.sendLinkBtn.addEventListener('click', async () => {
   const email = els.emailInput.value.trim();
   if (!email) { setStatus(els.emailStatus, 'err', 'Enter your email first.'); return; }
-  if (!pendingClaimToken) {
+  if (!isEmailLoginFlow && !pendingClaimToken) {
     setStatus(els.emailStatus, 'err', 'Wallet verification is missing — please reconnect your wallet first.');
     return;
   }
   els.sendLinkBtn.disabled = true;
   els.sendLinkBtn.textContent = 'Sending…';
-  const redirectUrl = window.location.origin + window.location.pathname + '?vt=' + encodeURIComponent(pendingClaimToken);
+  const redirectUrl = isEmailLoginFlow
+    ? window.location.origin + window.location.pathname
+    : window.location.origin + window.location.pathname + '?vt=' + encodeURIComponent(pendingClaimToken);
   const { error } = await sb.auth.signInWithOtp({
     email,
     options: { emailRedirectTo: redirectUrl }
