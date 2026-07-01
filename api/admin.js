@@ -98,7 +98,8 @@ async function handleUploadImage(req, res, supabase) {
   }
   const buffer = Buffer.from(base64, 'base64');
   const ext    = filename.split('.').pop() || 'jpg';
-  const path   = `challenges/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+  const folder = (req.body && req.body.folder) ? String(req.body.folder).replace(/[^a-z0-9-_]/gi, '').slice(0, 40) : 'challenges';
+  const path   = `${folder}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
   const { error } = await supabase.storage
     .from('puzzle-images')
     .upload(path, buffer, { contentType: mime_type, upsert: false });
@@ -500,6 +501,86 @@ async function handleShopOrderUpdate(req, res, supabase) {
 
 // ── Netlify entry point ───────────────────────────────────────────────────────
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  HOLDER HUB SECTION (Àpótí Ọlọ́wẹ̀ — messages, reservations, participants)
+//  Content (Opa Collection, artworks, chapters, future plans) is hardcoded
+//  directly in holder-hub.html — only genuinely dynamic data (things other
+//  people generate, not you) is managed here.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── holder-reservations (GET inbox) ───────────────────────────────────────────
+async function handleGetHolderReservations(req, res, supabase) {
+  if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
+  const { data, error } = await supabase
+    .from('reservations')
+    .select('*, holders(display_name, wallet_address, chain)')
+    .order('created_at', { ascending: false });
+  if (error) return json(500, { error: error.message });
+  return json(200, data || []);
+}
+
+// ── holder-reservation (PATCH status) ─────────────────────────────────────────
+async function handleHolderReservation(req, res, supabase) {
+  if (req.method !== 'PATCH') return json(405, { error: 'Method not allowed' });
+  const id = req.query.id;
+  if (!id) return json(400, { error: 'id required' });
+  const { status } = req.body || {};
+  if (!['new', 'contacted', 'accepted', 'declined'].includes(status)) return json(422, { error: 'Invalid status' });
+  const { error } = await supabase.from('reservations').update({ status }).eq('id', id);
+  if (error) return json(500, { error: error.message });
+  return json(200, { ok: true });
+}
+
+// ── holder-messages (GET inbox) ───────────────────────────────────────────────
+async function handleGetHolderMessages(req, res, supabase) {
+  if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*, holders(display_name, wallet_address, chain)')
+    .order('created_at', { ascending: false });
+  if (error) return json(500, { error: error.message });
+  return json(200, data || []);
+}
+
+// ── holder-message (PATCH status) ─────────────────────────────────────────────
+async function handleHolderMessage(req, res, supabase) {
+  if (req.method !== 'PATCH') return json(405, { error: 'Method not allowed' });
+  const id = req.query.id;
+  if (!id) return json(400, { error: 'id required' });
+  const { status } = req.body || {};
+  if (!['new', 'read', 'archived'].includes(status)) return json(422, { error: 'Invalid status' });
+  const { error } = await supabase.from('messages').update({ status }).eq('id', id);
+  if (error) return json(500, { error: error.message });
+  return json(200, { ok: true });
+}
+
+// ── holder-participants (GET) ─────────────────────────────────────────────────
+async function handleGetHolderParticipants(req, res, supabase) {
+  if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
+  const { data, error } = await supabase
+    .from('holders')
+    .select('id, wallet_address, chain, display_name, tier, is_public, token_balance, last_verified_at, created_at')
+    .order('created_at', { ascending: true });
+  if (error) return json(500, { error: error.message });
+  return json(200, data || []);
+}
+
+// ── holder-participant (PATCH display_name / is_public) ──────────────────────
+async function handleHolderParticipant(req, res, supabase) {
+  if (req.method !== 'PATCH') return json(405, { error: 'Method not allowed' });
+  const id = req.query.id;
+  if (!id) return json(400, { error: 'id required' });
+  const body = req.body || {};
+  const patch = {};
+  if (body.display_name !== undefined) patch.display_name = body.display_name ? String(body.display_name).slice(0, 100) : null;
+  if (body.is_public     !== undefined) patch.is_public     = Boolean(body.is_public);
+  if (body.tier          !== undefined) patch.tier          = ['gold', 'bronze', 'wood'].includes(body.tier) ? body.tier : null;
+  const { error } = await supabase.from('holders').update(patch).eq('id', id);
+  if (error) return json(500, { error: error.message });
+  return json(200, { ok: true });
+}
+
+
 // ── Vercel entry point ────────────────────────────────────────────────────────
 module.exports = async (req, res) => {
   cors(res);
@@ -540,6 +621,12 @@ module.exports = async (req, res) => {
     case 'shop-config':   return handleShopConfig(req, res, supabase);
     case 'shop-orders':   return handleShopOrders(req, res, supabase);
     case 'shop-order':    return handleShopOrderUpdate(req, res, supabase);
+    case 'holder-messages':     return handleGetHolderMessages(req, res, supabase);
+    case 'holder-message':      return handleHolderMessage(req, res, supabase);
+    case 'holder-reservations': return handleGetHolderReservations(req, res, supabase);
+    case 'holder-reservation':  return handleHolderReservation(req, res, supabase);
+    case 'holder-participants': return handleGetHolderParticipants(req, res, supabase);
+    case 'holder-participant':  return handleHolderParticipant(req, res, supabase);
     default:
       return res.status(404).json({ error: `Unknown admin action: ${action}` });
   }
