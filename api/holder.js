@@ -189,15 +189,40 @@ async function handleClaim(req, res, supabase) {
   return res.status(200).json({ ok: true });
 }
 
+// ── action=config ────────────────────────────────────────────────────────────
+// Public, read-only. Lets the static HTML pull its Supabase connection info
+// from the same env vars your serverless functions already use, instead of
+// a value hardcoded into the page — env vars set in Vercel are only visible
+// to functions like this one, never to a plain static .html file, so this
+// is the bridge between the two. Safe to expose: the anon key is meant to
+// be public (that's what "anon" means) — it's the service role key that
+// must never leave the server.
+async function handleConfig(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+    return res.status(500).json({
+      error: 'SUPABASE_URL and/or SUPABASE_ANON_KEY are not set on this deployment. ' +
+             'SUPABASE_URL likely already exists (used by ./_lib) — SUPABASE_ANON_KEY may need adding, ' +
+             'it is a different value from SUPABASE_SERVICE_ROLE_KEY. Find it in Supabase → Settings → API → anon/public key.'
+    });
+  }
+  return res.status(200).json({
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+  });
+}
+
 // ── entry point ───────────────────────────────────────────────────────────────
 module.exports = async (req, res) => {
   cors(res);
   if (handleOptions(req, res)) return;
 
   const action = req.query && req.query.action;
-  const supabase = getSupabase();
 
   try {
+    if (action === 'config') return await handleConfig(req, res);
+
+    const supabase = getSupabase();
     switch (action) {
       case 'verify': return await handleVerify(req, res, supabase);
       case 'claim':  return await handleClaim(req, res, supabase);
