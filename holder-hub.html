@@ -2011,7 +2011,19 @@ async function enterDashboard() {
   loadParticipants();
   loadMessages();
   document.getElementById('ownedAssetSummary').textContent = 'Confirming the collection assets held by this wallet…';
-  highlightOwnedPieces();
+  // Defer ownership highlight so ethers.js activity doesn't trigger MetaMask's
+  // eager "want to connect?" popup the instant the dashboard renders. The scan
+  // uses a read-only RPC (JsonRpcProvider, not BrowserProvider), but some
+  // MetaMask versions hook into any ethers constructor globally when
+  // window.ethereum exists. A short delay + requestIdleCallback lets the page
+  // settle first, and the user sees the dashboard immediately regardless.
+  setTimeout(() => {
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(() => highlightOwnedPieces());
+    } else {
+      highlightOwnedPieces();
+    }
+  }, 1500);
 }
 
 async function loadFuturePlans() {
