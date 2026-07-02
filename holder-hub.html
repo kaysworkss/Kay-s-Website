@@ -227,6 +227,33 @@
   @media (max-width: 620px) {
     .opa-artwork-grid .card { flex-basis: 100%; max-width: none; }
   }
+  /* Horizontal masonry treatment for every chapter in All Artworks. */
+  #artworksList .grid {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: flex-start;
+    gap: 1.1rem;
+  }
+  #artworksList .grid .card {
+    flex: 1 1 280px;
+    min-width: min(100%, 240px);
+    max-width: 520px;
+  }
+  #artworksList .card-img {
+    width: 100%; height: auto; aspect-ratio: auto;
+    object-fit: contain; object-position: center;
+    cursor: zoom-in;
+  }
+  .token-contents {
+    margin-top: 0.8rem; padding: 0.75rem 0.85rem;
+    border-left: 2px solid var(--gold); border-radius: 0 5px 5px 0;
+    background: rgba(201,153,58,0.07); color: var(--text-muted);
+    font-size: 0.82rem; line-height: 1.55;
+  }
+  .token-contents strong { color: var(--sand); }
+  @media (max-width: 620px) {
+    #artworksList .grid .card { flex-basis: 100%; max-width: none; }
+  }
   .art-lightbox {
     position: fixed; inset: 0; z-index: 120; display: none;
     align-items: center; justify-content: center; padding: 2rem;
@@ -304,6 +331,17 @@
     color:oklch(76% 0.105 60);
   }
   .participant-row .addr { color:var(--text-muted); font-size:0.82rem; font-family:monospace; }
+  .participant-row.is-current {
+    border-color: rgba(201,153,58,0.72);
+    background: rgba(201,153,58,0.11);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+  }
+  .participant-you {
+    margin-left: 0.55rem; padding: 0.18rem 0.5rem; border-radius: 999px;
+    border: 1px solid rgba(201,153,58,0.5); color: var(--gold);
+    font-family: 'Cinzel',serif; font-size: 0.5rem; letter-spacing: 0.12em;
+    text-transform: uppercase; vertical-align: middle;
+  }
   /* Equal visual weight: identical lightness/chroma, hue alone distinguishes tiers. */
   .name.tier-gold { color:oklch(76% 0.105 88); }
   .name.tier-bronze { color:oklch(76% 0.105 48); }
@@ -964,6 +1002,7 @@
           <div class="card-body">
             <div class="card-title">Opa Orisun</div>
             <div class="card-desc">One of Ayo's first staffs — the beginning of his craft.</div>
+            <div class="token-contents"><strong>Included in the token:</strong> interactive GLB model, close-up image set, and rendered turntable video — packaged together as one multi-metadata token, minted on Ethereum or Tezos according to the collector's chosen chain.</div>
             <div class="card-meta">
               <span class="badge available">available</span>
               <span class="card-desc price-live" data-usd-price="220">$220</span>
@@ -987,6 +1026,7 @@
           <div class="card-body">
             <div class="card-title">Opa Iranti</div>
             <div class="card-desc">Carved in memory of his grandfather.</div>
+            <div class="token-contents"><strong>Included in the token:</strong> interactive GLB model, close-up image set, and rendered turntable video — packaged together as one multi-metadata token, minted on Ethereum or Tezos according to the collector's chosen chain.</div>
             <div class="card-meta">
               <span class="badge available">available</span>
               <span class="card-desc price-live" data-usd-price="220">$220</span>
@@ -1010,6 +1050,7 @@
           <div class="card-body">
             <div class="card-title">Opa Ekun</div>
             <div class="card-desc">Commissioned by Chief Adediran through Morenike.</div>
+            <div class="token-contents"><strong>Included in the token:</strong> interactive GLB model, close-up image set, and rendered turntable video — packaged together as one multi-metadata token, minted on Ethereum or Tezos according to the collector's chosen chain.</div>
             <div class="card-meta">
               <span class="badge available">available</span>
               <span class="card-desc price-live" data-usd-price="220">$220</span>
@@ -1909,9 +1950,18 @@ async function loadParticipants() {
     if (!group.tier) group.tier = h.tier;
   });
 
+  const activeAddress = String(currentHolder?.wallet_address || '').toLowerCase();
+  groups.forEach(group => {
+    group.isCurrent = !!activeAddress && group.wallets.some(wallet =>
+      String(wallet.address || '').toLowerCase() === activeAddress
+    );
+  });
+  // Stable sort: move only the connected participant; preserve everyone else's order.
+  groups.sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent));
+
   el.innerHTML = groups.map(g => `
-    <div class="participant-row">
-      <span class="name tier-${g.tier || 'none'}">${g.display_name || 'Anonymous Holder'}</span>
+    <div class="participant-row${g.isCurrent ? ' is-current' : ''}">
+      <span class="name tier-${g.tier || 'none'}">${g.display_name || 'Anonymous Holder'}${g.isCurrent ? '<span class="participant-you">You</span>' : ''}</span>
     </div>
   `).join('');
 }
@@ -1972,7 +2022,10 @@ function closeArtLightbox() {
   document.body.style.overflow = '';
 }
 
-document.querySelectorAll('.opa-artwork-image').forEach(image => {
+document.querySelectorAll('#artworksList .card-img').forEach(image => {
+  image.tabIndex = 0;
+  image.setAttribute('role', 'button');
+  image.setAttribute('aria-label', 'Open ' + image.alt.replace(/\s*[—-]\s*open fullscreen$/i, '') + ' fullscreen');
   image.addEventListener('click', () => openArtLightbox(image));
   image.addEventListener('keydown', event => {
     if (event.key === 'Enter' || event.key === ' ') {
