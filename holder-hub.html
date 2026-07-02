@@ -537,7 +537,7 @@
               auto-rotate-delay="0"
               interaction-prompt="none"
               reveal="auto"
-              environment-image="/environments/studio-rim-1k.hdr?v=1"
+              environment-image="neutral"
               tone-mapping="neutral"
               exposure="0.85"
               shadow-intensity="0.9"
@@ -603,7 +603,7 @@
               auto-rotate-delay="0"
               interaction-prompt="none"
               reveal="auto"
-              environment-image="/environments/studio-rim-1k.hdr?v=1"
+              environment-image="neutral"
               tone-mapping="neutral"
               exposure="0.85"
               shadow-intensity="0.9"
@@ -669,7 +669,7 @@
               auto-rotate-delay="0"
               interaction-prompt="none"
               reveal="auto"
-              environment-image="/environments/studio-rim-1k.hdr?v=1"
+              environment-image="neutral"
               tone-mapping="neutral"
               exposure="0.85"
               shadow-intensity="0.9"
@@ -1890,6 +1890,22 @@ document.getElementById('sendMsgBtn').addEventListener('click', async () => {
   document.getElementById('msgBody').value = '';
   loadMessages();
 });
+</script>
+<script>
+// Keep the models usable if the optional studio-lighting asset has not been
+// deployed yet. Once it is reachable, all viewers upgrade from neutral to HDR.
+(async () => {
+  const studioEnvironment = '/environments/studio-rim-1k.hdr?v=2';
+  try {
+    const response = await fetch(studioEnvironment, { method: 'HEAD', cache: 'no-store' });
+    if (!response.ok) return;
+    document.querySelectorAll('.sculpture-viewer model-viewer').forEach(viewer => {
+      viewer.setAttribute('environment-image', studioEnvironment);
+    });
+  } catch (_) {
+    // Neutral lighting remains active; a missing enhancement must not hide art.
+  }
+})();
 </script>
 </body>
 </html>
