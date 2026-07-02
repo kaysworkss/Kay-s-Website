@@ -512,6 +512,7 @@
   }
   .sculpture-viewer {
     min-height: 380px; position: relative; overflow: hidden;
+    display: flex; flex-direction: column;
     background:
       radial-gradient(ellipse at 50% 26%, rgba(255,255,255,0.96) 0%, rgba(241,243,245,0.78) 46%, transparent 72%),
       radial-gradient(ellipse at 50% 108%, rgba(120,128,138,0.18) 0%, transparent 56%),
@@ -529,6 +530,7 @@
   }
   .sculpture-info { padding: 1.6rem 1.8rem; display: flex; flex-direction: column; }
   .viewer-thumbnails {
+    flex: 0 0 auto;
     display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.7rem 0.75rem;
     background: rgba(255,255,255,0.55); border-top: 1px solid rgba(74,82,92,0.14);
     position: relative; z-index: 2;
@@ -590,7 +592,7 @@
   .sculpture-viewer.viewer-faux-fullscreen .slideshow-img {
     object-fit: contain;
   }
-  .viewer-stage { display: none; width: 100%; height: 100%; min-height: 380px; position: relative; }
+  .viewer-stage { display: none; width: 100%; height: 100%; min-height: 380px; position: relative; flex: 1 1 380px; }
   .viewer-stage.active { display: block; }
   .viewer-stage.photos { }
   .slideshow { position: relative; width: 100%; height: 100%; min-height: 380px; overflow: hidden; background:#120d0a; }
@@ -1777,8 +1779,22 @@ async function connectTezosWith(connector) {
 let holderBeaconClient = null;
 
 function getBeaconSdk() {
-  const candidates = [window.beacon, window.walletbeacon, window.beaconSdk, window.airgapBeaconSdk];
-  return candidates.find(sdk => sdk && typeof sdk.DAppClient === 'function') || null;
+  const candidates = [
+    window.beacon, window.walletbeacon, window.beaconSdk, window.airgapBeaconSdk,
+    window.beacon_sdk, window.Beacon, window.BeaconSDK,
+  ];
+  for (const sdk of candidates) {
+    if (sdk && typeof sdk.DAppClient === 'function') return sdk;
+  }
+  // Fallback: some load orders expose the SDK under a name we didn't
+  // anticipate — scan every global for something shaped like the SDK
+  // rather than failing outright. Matches the working pattern already
+  // proven on the auction page.
+  for (const key of Object.keys(window)) {
+    const value = window[key];
+    if (value && typeof value === 'object' && typeof value.DAppClient === 'function') return value;
+  }
+  return null;
 }
 
 function walletTimeout(promise, ms, message) {
@@ -1834,11 +1850,31 @@ async function resetHolderBeaconClient(client) {
 async function requestHolderBeaconAddress(client) {
   // Beacon 4.x expects scopes at construction time; a bare request works
   // consistently across Temple, Kukai, Umami and mobile WalletConnect.
-  const permission = await walletTimeout(
-    client.requestPermissions(),
-    120000,
-    'Wallet connection timed out. Please reopen your wallet and try again.'
-  );
+  //
+  // Some wallets/relays return a "not accepted" / "unexpected" style error
+  // for what's actually a transient request-shape hiccup, not a genuine
+  // user cancellation — retrying once, bare, on the SAME client recovers
+  // from this reliably. This exact pattern is proven working on the
+  // auction page; do not remove it without testing against real wallets.
+  let permission;
+  try {
+    permission = await walletTimeout(
+      client.requestPermissions(),
+      120000,
+      'Wallet connection timed out. Please reopen your wallet and try again.'
+    );
+  } catch (err) {
+    const msg = err?.message || String(err);
+    if (/not accepted|invalid|unknown|unexpected|rejected/i.test(msg)) {
+      permission = await walletTimeout(
+        client.requestPermissions(),
+        120000,
+        'Wallet connection timed out. Please reopen your wallet and try again.'
+      );
+    } else {
+      throw err;
+    }
+  }
   const account = await client.getActiveAccount?.();
   const address = permission?.address || account?.address;
   if (!address) throw new Error('Beacon connected but returned no Tezos address.');
@@ -1853,8 +1889,11 @@ async function connectBeacon() {
   try {
     return await requestHolderBeaconAddress(client);
   } catch (firstError) {
-    const message = String(firstError?.message || firstError);
-    if (/aborted|closed|cancel|not granted|not accepted|rejected/i.test(message)) throw firstError;
+    // Unconditional single retry with a fresh client — matches the working
+    // auction.html pattern, which does not special-case any error message
+    // here (the message-specific handling already happened one layer down,
+    // in requestHolderBeaconAddress). Bailing out early on "rejected"-style
+    // messages was the actual bug: those aren't always real cancellations.
     await resetHolderBeaconClient(client);
     client = makeHolderBeaconClient(sdk);
     holderBeaconClient = client;
