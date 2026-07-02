@@ -1781,17 +1781,9 @@ async function connectTezosWith(connector) {
 let holderBeaconClient = null;
 
 function getBeaconSdk() {
-  const candidates = [
-    window.beacon, window.walletbeacon, window.beaconSdk, window.airgapBeaconSdk,
-    window.beacon_sdk, window.Beacon, window.BeaconSDK,
-  ];
-  for (const sdk of candidates) {
-    if (sdk && typeof sdk.DAppClient === 'function') return sdk;
-  }
-  // Fallback: some load orders expose the SDK under a name we didn't
-  // anticipate — scan every global for something shaped like the SDK
-  // rather than failing outright. Matches the working pattern already
-  // proven on the auction page.
+  const globalSdk = window.beacon || window.walletbeacon || window.beaconSdk || window.airgapBeaconSdk;
+  if (globalSdk?.DAppClient) return globalSdk;
+  // Fallback: scan all globals for anything shaped like the SDK
   for (const key of Object.keys(window)) {
     const value = window[key];
     if (value && typeof value === 'object' && typeof value.DAppClient === 'function') return value;
@@ -1806,38 +1798,46 @@ function walletTimeout(promise, ms, message) {
   ]);
 }
 
-function makeHolderBeaconClient(sdk) {
-  const DAppClient = sdk.DAppClient;
-  const TransportType = sdk.TransportType || {};
-  const PermissionScope = sdk.PermissionScope || {};
-  const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-  const preferredTransport = mobile
-    ? (TransportType.WALLET_CONNECT || 'walletconnect')
-    : (TransportType.P2P || 'p2p');
+function beaconNetworkConfig(sdk) {
+  const networkTypes = sdk?.NetworkType || {};
+  return { type: networkTypes.MAINNET || 'mainnet' };
+}
 
-  const options = {
-    name: "Kay's Works Holder Hub",
-    iconUrl: location.origin + '/images/kayslogo1.png',
-    appUrl: location.origin,
-    network: { type: sdk.NetworkType?.MAINNET || 'mainnet' },
-    featuredWallets: ['temple', 'kukai', 'umami', 'trust'],
-    matrixNodes: [
+function beaconPermissionScopes(sdk) {
+  const scopes = sdk?.PermissionScope || {};
+  return [
+    scopes.OPERATION_REQUEST || 'operation_request',
+    scopes.SIGN || 'sign'
+  ].filter(Boolean);
+}
+
+function beaconMatrixNodes(sdk) {
+  const regions = sdk?.Regions || {};
+  const region = regions.EUROPE_WEST || 'EUROPE_WEST';
+  return {
+    [region]: [
       'beacon-node-1.octez.io',
       'beacon-node-2.octez.io',
       'beacon-node-3.octez.io',
       'beacon-node-4.octez.io',
-    ],
-    scopes: [
-      PermissionScope.OPERATION_REQUEST || 'operation_request',
-      PermissionScope.SIGN || 'sign',
-    ],
-    walletConnectOptions: { projectId: 'f9a3c36a9a9b8d60f77e64a5a4b8ef7c' },
+      'beacon-node-5.octez.io',
+      'beacon-node-6.octez.io',
+      'beacon-node-7.octez.io',
+      'beacon-node-8.octez.io'
+    ]
   };
+}
 
-  if (TransportType.WALLET_CONNECT || TransportType.P2P) {
-    options.preferredTransport = preferredTransport;
-  }
-  return new DAppClient(options);
+function makeHolderBeaconClient(sdk) {
+  const DAppClient = sdk.DAppClient;
+  return new DAppClient({
+    name: "Kay's Works Holder Hub",
+    iconUrl: location.origin + '/images/kayslogo1.png',
+    appUrl: location.origin,
+    network: beaconNetworkConfig(sdk),
+    featuredWallets: ['temple', 'kukai', 'trust'],
+    matrixNodes: beaconMatrixNodes(sdk)
+  });
 }
 
 async function resetHolderBeaconClient(client) {
@@ -1852,28 +1852,21 @@ async function resetHolderBeaconClient(client) {
   }
 }
 
-async function requestHolderBeaconAddress(client) {
-  // Beacon 4.x expects scopes at construction time; a bare request works
-  // consistently across Temple, Kukai, Umami and mobile WalletConnect.
-  //
-  // Some wallets/relays return a "not accepted" / "unexpected" style error
-  // for what's actually a transient request-shape hiccup, not a genuine
-  // user cancellation — retrying once, bare, on the SAME client recovers
-  // from this reliably. This exact pattern is proven working on the
-  // auction page; do not remove it without testing against real wallets.
+async function requestHolderBeaconAddress(client, sdk) {
+  const permissionRequest = { scopes: beaconPermissionScopes(sdk) };
   let permission;
   try {
     permission = await walletTimeout(
-      client.requestPermissions(),
-      120000,
+      client.requestPermissions(permissionRequest),
+      90000,
       'Wallet connection timed out. Please reopen your wallet and try again.'
     );
   } catch (err) {
     const msg = err?.message || String(err);
-    if (/not accepted|invalid|unknown|unexpected|rejected/i.test(msg)) {
+    if (/not accepted|invalid|unknown|unexpected/i.test(msg)) {
       permission = await walletTimeout(
         client.requestPermissions(),
-        120000,
+        90000,
         'Wallet connection timed out. Please reopen your wallet and try again.'
       );
     } else {
@@ -1888,21 +1881,16 @@ async function requestHolderBeaconAddress(client) {
 
 async function connectBeacon() {
   const sdk = getBeaconSdk();
-  if (!sdk) throw new Error('Beacon SDK did not load. Refresh and try again.');
+  if (!sdk || typeof sdk.DAppClient !== 'function') throw new Error('Beacon SDK did not load. Refresh and try again.');
   let client = holderBeaconClient || makeHolderBeaconClient(sdk);
   holderBeaconClient = client;
   try {
-    return await requestHolderBeaconAddress(client);
+    return await requestHolderBeaconAddress(client, sdk);
   } catch (firstError) {
-    // Unconditional single retry with a fresh client — matches the working
-    // auction.html pattern, which does not special-case any error message
-    // here (the message-specific handling already happened one layer down,
-    // in requestHolderBeaconAddress). Bailing out early on "rejected"-style
-    // messages was the actual bug: those aren't always real cancellations.
     await resetHolderBeaconClient(client);
     client = makeHolderBeaconClient(sdk);
     holderBeaconClient = client;
-    return requestHolderBeaconAddress(client);
+    return requestHolderBeaconAddress(client, sdk);
   }
 }
 
