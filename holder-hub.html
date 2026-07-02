@@ -541,6 +541,7 @@
     transition: border-color 0.2s, transform 0.2s;
   }
   .viewer-thumb:hover, .viewer-thumb:focus-visible { border-color: var(--gold); transform: translateY(-1px); }
+  .viewer-thumb.active { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
   .viewer-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .sculpture-number { font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.24em; color:var(--clay); text-transform:uppercase; margin-bottom:0.5rem; }
   .sculpture-info h3 { font-size: 1.9rem; margin-bottom: 0.5rem; }
@@ -2286,7 +2287,16 @@ function bindSlideshows() {
       current = (index + images.length) % images.length;
       images.forEach((img, i) => img.classList.toggle('active', i === current));
       dotsWrap.querySelectorAll('.slideshow-dot').forEach((d, i) => d.classList.toggle('active', i === current));
+      // Sync thumbnail highlight if the thumbnail strip exists for this viewer
+      const viewer = slideshow.closest('.sculpture-viewer');
+      if (viewer) {
+        viewer.querySelectorAll('.viewer-thumb').forEach((t, i) => t.classList.toggle('active', i === current));
+      }
     }
+
+    // Expose goTo so external code (thumbnail clicks) can jump to a
+    // specific slide and keep the internal counter in sync for prev/next.
+    slideshow._goTo = goTo;
 
     const prevBtn = slideshow.querySelector('.slideshow-nav.prev');
     const nextBtn = slideshow.querySelector('.slideshow-nav.next');
@@ -2725,11 +2735,38 @@ document.querySelectorAll('#artworksList .card-img').forEach(image => {
     }
   });
 });
-document.querySelectorAll('.viewer-thumb').forEach(thumb => {
+document.querySelectorAll('.viewer-thumb').forEach((thumb, thumbIndex) => {
   const image = thumb.querySelector('img');
   if (!image) return;
-  thumb.setAttribute('aria-label', 'Open ' + image.alt + ' fullscreen');
-  thumb.addEventListener('click', () => openArtLightbox(image));
+  thumb.setAttribute('aria-label', 'View ' + image.alt);
+
+  thumb.addEventListener('click', () => {
+    const viewer = thumb.closest('.sculpture-viewer');
+    if (!viewer) { openArtLightbox(image); return; }
+
+    // Switch to Photos mode
+    viewer.querySelectorAll('.viewer-mode-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === 'photos');
+    });
+    viewer.querySelectorAll('.viewer-stage').forEach(stage => {
+      stage.classList.toggle('active', stage.dataset.stage === 'photos');
+    });
+
+    // Jump the slideshow to the matching image
+    const slideshow = viewer.querySelector('[data-slideshow]');
+    if (!slideshow) return;
+    const thumbSrc = image.src;
+    const slides = Array.from(slideshow.querySelectorAll('.slideshow-img'));
+    const dots = Array.from(slideshow.querySelectorAll('.slideshow-dot'));
+    const matchIndex = slides.findIndex(s => s.src === thumbSrc);
+    const targetIndex = matchIndex >= 0 ? matchIndex : 0;
+
+    slides.forEach((s, i) => s.classList.toggle('active', i === targetIndex));
+    dots.forEach((d, i) => d.classList.toggle('active', i === targetIndex));
+
+    // Update the slideshow's internal counter so prev/next work from this position
+    if (slideshow._goTo) slideshow._goTo(targetIndex);
+  });
 });
 
 artLightboxClose.addEventListener('click', closeArtLightbox);
