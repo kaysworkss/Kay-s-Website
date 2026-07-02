@@ -1079,7 +1079,16 @@ function shortAddr(a) { return a ? a.slice(0, 6) + '…' + a.slice(-4) : ''; }
   let cfg;
   try {
     const res = await fetch(CONFIG.configEndpoint);
-    cfg = await res.json();
+    const raw = await res.text();
+    try {
+      cfg = JSON.parse(raw);
+    } catch (parseErr) {
+      // The server didn't return JSON at all — likely a platform-level crash
+      // (e.g. a missing module) rather than our own handleConfig error path,
+      // since that always returns clean JSON even on failure. Show the raw
+      // response instead of a confusing "not valid JSON" message.
+      throw new Error('Server did not return JSON (status ' + res.status + '): ' + raw.slice(0, 200));
+    }
     if (!res.ok) throw new Error(cfg.error || 'Could not load configuration.');
   } catch (err) {
     setStatus(els.walletStatus, 'err', 'This page isn\'t configured yet: ' + err.message);
