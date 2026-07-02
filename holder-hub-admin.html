@@ -137,6 +137,7 @@
       <button class="tab-btn active" data-tab="messages">Messages</button>
       <button class="tab-btn" data-tab="reservations">Reservations</button>
       <button class="tab-btn" data-tab="participants">Participants</button>
+      <button class="tab-btn" data-tab="future-plans">Future Plans</button>
     </div>
 
     <!-- MESSAGES -->
@@ -152,6 +153,19 @@
     <!-- PARTICIPANTS -->
     <div class="panel-view" id="view-participants">
       <div id="part-list"></div>
+    </div>
+
+    <!-- FUTURE PLANS -->
+    <div class="panel-view" id="view-future-plans">
+      <div class="panel">
+        <div class="panel-title">Future Plans shown in the Holder Hub</div>
+        <div class="field">
+          <label for="futurePlansInput">Published text</label>
+          <textarea id="futurePlansInput" style="min-height:260px;" placeholder="Separate paragraphs with a blank line."></textarea>
+        </div>
+        <button class="btn" id="saveFuturePlansBtn" type="button">Save and publish</button>
+        <div class="status" id="futurePlansStatus"></div>
+      </div>
     </div>
 
   </section>
@@ -205,6 +219,7 @@ async function render() {
   loadMessages();
   loadReservations();
   loadParticipants();
+  loadFuturePlans();
 }
 
 els.loginBtn.addEventListener('click', async () => {
@@ -353,6 +368,40 @@ async function saveParticipant(id) {
   await adminFetch('holder-participant', { method: 'PATCH', id, body: { display_name, is_public, tier } });
   loadParticipants();
 }
+
+// ══════════ FUTURE PLANS ══════════
+async function loadFuturePlans() {
+  const input = document.getElementById('futurePlansInput');
+  const status = document.getElementById('futurePlansStatus');
+  const r = await adminFetch('holder-content');
+  if (!r.ok) {
+    setStatus(status, 'err', r.error);
+    return;
+  }
+  input.value = r.future_plans || '';
+  status.className = 'status';
+  status.textContent = '';
+}
+
+document.getElementById('saveFuturePlansBtn').addEventListener('click', async () => {
+  const button = document.getElementById('saveFuturePlansBtn');
+  const status = document.getElementById('futurePlansStatus');
+  button.disabled = true;
+  setStatus(status, '', 'Saving…');
+  try {
+    const r = await adminFetch('holder-content', {
+      method: 'POST',
+      body: { future_plans: document.getElementById('futurePlansInput').value }
+    });
+    if (!r.ok) {
+      setStatus(status, 'err', r.error);
+      return;
+    }
+    setStatus(status, 'ok', 'Future Plans saved and published to the Holder Hub.');
+  } finally {
+    button.disabled = false;
+  }
+});
 
 // ══════════ Shared delete ══════════
 async function deleteRow(action, id, reload) {
