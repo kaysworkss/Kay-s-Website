@@ -10,7 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.1.0/dist/model-viewer.min.js"></script>
 
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -496,7 +496,7 @@
           </div>
           <div class="viewer-stage active" data-stage="3d">
             <model-viewer
-              src="models/Orisun.glb"
+              src="/models/Orisun.glb"
               alt="Opa Orisun"
               poster="images/orisun1.jpg"
               camera-controls
@@ -562,7 +562,7 @@
           </div>
           <div class="viewer-stage active" data-stage="3d">
             <model-viewer
-              src="models/Iranti.glb"
+              src="/models/Iranti.glb"
               alt="Opa Iranti"
               poster="images/iranti1.png"
               camera-controls
@@ -628,7 +628,7 @@
           </div>
           <div class="viewer-stage active" data-stage="3d">
             <model-viewer
-              src="models/ekun.glb"
+              src="/models/ekun.glb"
               alt="Opa Ekun"
               poster="images/ekun1.jpg"
               camera-controls
@@ -1028,6 +1028,7 @@ const CONFIG = {
   configEndpoint: '/api/holder?action=config',
   verifyEndpoint: '/api/holder?action=verify',
   claimEndpoint: '/api/holder?action=claim',
+  emailEndpoint: '/api/holder?action=send-auth-email',
   reverifyDays: 30,                       // how often holdership is re-checked
 };
 
@@ -1214,13 +1215,21 @@ els.sendLinkBtn.addEventListener('click', async () => {
   }
   els.sendLinkBtn.disabled = true;
   els.sendLinkBtn.textContent = 'Sending…';
-  const redirectUrl = isEmailLoginFlow
-    ? window.location.origin + window.location.pathname
-    : window.location.origin + window.location.pathname + '?vt=' + encodeURIComponent(pendingClaimToken);
-  const { error } = await sb.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: redirectUrl }
-  });
+  let error = null;
+  try {
+    const response = await fetch(CONFIG.emailEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        claimToken: isEmailLoginFlow ? null : pendingClaimToken
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) error = new Error(result.error || 'Could not send the sign-in email.');
+  } catch (err) {
+    error = err;
+  }
   els.sendLinkBtn.disabled = false;
   els.sendLinkBtn.textContent = 'Send magic link';
   if (error) {
