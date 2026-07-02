@@ -542,14 +542,25 @@ async function handleGetHolderMessages(req, res, supabase) {
   return json(200, data || []);
 }
 
-// ── holder-message (PATCH status) ─────────────────────────────────────────────
+// ── holder-message (PATCH status and/or private admin reply) ──────────────────
 async function handleHolderMessage(req, res, supabase) {
   if (req.method !== 'PATCH') return json(405, { error: 'Method not allowed' });
   const id = req.query.id;
   if (!id) return json(400, { error: 'id required' });
-  const { status } = req.body || {};
-  if (!['new', 'read', 'archived'].includes(status)) return json(422, { error: 'Invalid status' });
-  const { error } = await supabase.from('messages').update({ status }).eq('id', id);
+  const body = req.body || {};
+  const updates = {};
+  if (body.status !== undefined) {
+    if (!['new', 'read', 'archived'].includes(body.status)) return json(422, { error: 'Invalid status' });
+    updates.status = body.status;
+  }
+  if (body.admin_reply !== undefined) {
+    const reply = String(body.admin_reply || '').trim().slice(0, 12000);
+    updates.admin_reply = reply || null;
+    updates.replied_at = reply ? new Date().toISOString() : null;
+    if (reply) updates.status = 'read';
+  }
+  if (!Object.keys(updates).length) return json(422, { error: 'No update supplied' });
+  const { error } = await supabase.from('messages').update(updates).eq('id', id);
   if (error) return json(500, { error: error.message });
   return json(200, { ok: true });
 }
