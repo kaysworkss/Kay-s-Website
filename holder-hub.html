@@ -520,6 +520,18 @@
     --progress-bar-height: 2px;
   }
   .sculpture-info { padding: 1.6rem 1.8rem; display: flex; flex-direction: column; }
+  .viewer-thumbnails {
+    display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.7rem 0.75rem;
+    background: rgba(255,255,255,0.55); border-top: 1px solid rgba(74,82,92,0.14);
+    position: relative; z-index: 2;
+  }
+  .viewer-thumb {
+    flex: none; width: 52px; height: 52px; border-radius: 6px; overflow: hidden;
+    cursor: zoom-in; border: 1px solid rgba(74,82,92,0.2); padding: 0; background: none;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .viewer-thumb:hover, .viewer-thumb:focus-visible { border-color: var(--gold); transform: translateY(-1px); }
+  .viewer-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .sculpture-number { font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.24em; color:var(--clay); text-transform:uppercase; margin-bottom:0.5rem; }
   .sculpture-info h3 { font-size: 1.9rem; margin-bottom: 0.5rem; }
   .sculpture-meta { display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom: 1rem; }
@@ -832,6 +844,13 @@
               <div class="slideshow-dots"></div>
             </div>
           </div>
+          <div class="viewer-thumbnails">
+            <button class="viewer-thumb" type="button"><img src="images/orisun1.jpg" alt="Opa Orisun close-up 1" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/orisun2.jpg" alt="Opa Orisun close-up 2" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/orisun3.jpg" alt="Opa Orisun close-up 3" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/orisun4.jpg" alt="Opa Orisun close-up 4" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/orisun5.jpg" alt="Opa Orisun close-up 5" /></button>
+          </div>
         </div>
         <div class="sculpture-info">
           <div class="sculpture-number">Opa I — "Opa Orisun"</div>
@@ -899,6 +918,13 @@
               <div class="slideshow-dots"></div>
             </div>
           </div>
+          <div class="viewer-thumbnails">
+            <button class="viewer-thumb" type="button"><img src="images/iranti1.png" alt="Opa Iranti close-up 1" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/iranti2.png" alt="Opa Iranti close-up 2" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/iranti3.png" alt="Opa Iranti close-up 3" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/iranti4.png" alt="Opa Iranti close-up 4" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/iranti5.png" alt="Opa Iranti close-up 5" /></button>
+          </div>
         </div>
         <div class="sculpture-info">
           <div class="sculpture-number">Opa II — "Opa Iranti"</div>
@@ -964,6 +990,12 @@
               <button class="slideshow-nav next" type="button" aria-label="Next image">›</button>
               <div class="slideshow-dots"></div>
             </div>
+          </div>
+          <div class="viewer-thumbnails">
+            <button class="viewer-thumb" type="button"><img src="images/ekun1.jpg" alt="Opa Ekun close-up 1" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/ekun2.jpg" alt="Opa Ekun close-up 2" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/ekun3.jpg" alt="Opa Ekun close-up 3" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/ekun4.jpg" alt="Opa Ekun close-up 4" /></button>
           </div>
         </div>
         <div class="sculpture-info">
@@ -2563,6 +2595,13 @@ document.querySelectorAll('#artworksList .card-img').forEach(image => {
     }
   });
 });
+document.querySelectorAll('.viewer-thumb').forEach(thumb => {
+  const image = thumb.querySelector('img');
+  if (!image) return;
+  thumb.setAttribute('aria-label', 'Open ' + image.alt + ' fullscreen');
+  thumb.addEventListener('click', () => openArtLightbox(image));
+});
+
 artLightboxClose.addEventListener('click', closeArtLightbox);
 artLightbox.addEventListener('click', event => {
   if (event.target === artLightbox) closeArtLightbox();
