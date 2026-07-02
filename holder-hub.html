@@ -21,9 +21,9 @@
   *:focus-visible { outline: 2px solid var(--clay); outline-offset: 3px; border-radius: 2px; }
 
   :root {
-    --clay:#c4845a; --rust:#9e4f2e; --sand:#e8d5b0; --linen:#f5ede0;
+    --clay:#e0a77f; --rust:#9e4f2e; --sand:#e8d5b0; --linen:#f5ede0;
     --bark:#4a3228; --moss:#6b7c5c; --ash:#8a7060; --ink:#1e1410;
-    --gold:#c9993a; --parchment:#ede0c8; --line:rgba(201,153,58,0.28);
+    --gold:#dfb85c; --parchment:#ede0c8; --line:rgba(223,184,92,0.34);
     --bg: var(--bark); --text: var(--sand); --text-muted: rgba(232,213,176,0.74);
   }
 
@@ -31,6 +31,8 @@
   body {
     min-height: 100vh;
     font-family: 'Crimson Pro', serif;
+    font-size: 1rem;
+    line-height: 1.5;
     color: var(--text);
     background:
       radial-gradient(ellipse at 12% 80%, rgba(196,132,90,0.18) 0%, transparent 52%),
@@ -77,7 +79,7 @@
   .signout-btn.show { display:inline-block; }
   .signout-btn:hover { border-color:var(--rust); color:#f0c8bc; }
 
-  .page { max-width:1600px; margin:0 auto; padding:3rem clamp(1.5rem, 4vw, 4rem) 5rem; }
+  .page { width:100%; max-width:1760px; margin:0 auto; padding:3rem clamp(1.25rem, 2vw, 2.5rem) 5rem; }
 
   /* ── GATE (sign-in / verify) ── */
   #gate { max-width:640px; margin:4rem auto; text-align:center; }
@@ -266,6 +268,8 @@
     #artworksList .grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   }
   .artworks-auction-link { width:auto; margin:0 0 1.5rem; display:inline-flex; }
+  .sold-hall-link { width:auto; margin:0 0 1.5rem 0.6rem; display:none; }
+  .sold-hall-link.show { display:inline-flex; }
   .art-lightbox {
     position: fixed; inset: 0; z-index: 120; display: none;
     align-items: center; justify-content: center; padding: 2rem;
@@ -580,6 +584,39 @@
     .signout-btn { grid-column:2; grid-row:2; justify-self:end; padding:0.45rem 0.6rem; font-size:0.54rem; }
     .page { padding:2rem 1.2rem 4rem; }
     .connect-grid { grid-template-columns:1fr; }
+  }
+
+  /* Accessibility sizing pass: keep decorative type readable and controls easy to target. */
+  .eyebrow, .panel-title, .wallet-title { font-size:0.78rem; }
+  label, .nav-back, .signout-btn, .wallet-pill, .chain-btn, .wallet-option,
+  .tab-btn, .artwork-group-label, .chapter-eyebrow, .opa-countdown-label,
+  .sculpture-number, .viewer-mode-btn, .reserve-toggle, .reserve-submit,
+  .reserve-form label, .auction-notes strong, .sculpture-story strong,
+  .msg-reply-label { font-size:0.72rem; }
+  .badge, .owned-ribbon, .sold-sticker, .participant-you,
+  .opa-countdown-unit span { font-size:0.68rem; }
+  .btn { font-size:0.72rem; min-height:44px; }
+  .tab-btn, .nav-back, .signout-btn, .wallet-option, .viewer-mode-btn,
+  .reserve-toggle, .reserve-submit { min-height:44px; }
+  .viewer-hint, .reserve-note, .msg-item .msg-date { font-size:0.88rem; }
+  .token-contents, .participant-row .addr { font-size:0.9rem; }
+
+  @media (min-width:1200px) {
+    nav { padding-left:clamp(1.25rem,2vw,2.5rem); padding-right:clamp(1.25rem,2vw,2.5rem); }
+  }
+
+  @media (max-width:640px) {
+    body { font-size:1rem; }
+    .page { padding:1.6rem 1rem 3.5rem; }
+    .hub-head h1 { font-size:clamp(2rem,11vw,2.75rem); }
+    .hub-head .lead, .drop-intro p, .card-desc, .chapter-body p,
+    .sculpture-story, .auction-notes { font-size:1rem; }
+    .nav-back, .signout-btn, .wallet-pill { font-size:0.68rem; }
+    .tabs { gap:0.6rem; }
+    .tab-btn { flex:1 1 auto; padding:0.7rem 0.9rem; }
+    .viewer-mode-toggle { flex-wrap:wrap; right:12px; }
+    .viewer-mode-btn { padding:0.55rem 0.72rem; }
+    .opa-countdown-unit { min-width:68px; flex:1 1 68px; }
   }
 </style>
 </head>
@@ -900,6 +937,7 @@
         <button class="tab-btn" data-artstatus="sold">Sold</button>
       </div>
       <a class="btn artworks-auction-link" href="https://www.kaysworks.com/auction" target="_blank" rel="noopener">Visit the auction page</a>
+      <a class="btn ghost sold-hall-link" id="soldHallFameLink" href="/hall-of-fame">View past auctions · Hall of Fame</a>
 
       <div id="artworksList">
       <section class="artwork-chapter" data-chapter="precursor">
@@ -1749,6 +1787,7 @@ document.querySelectorAll('[data-artstatus]').forEach(btn => {
 });
 
 function applyArtworkFilter(mode) {
+  document.getElementById('soldHallFameLink')?.classList.toggle('show', mode === 'sold');
   document.querySelectorAll('.artwork-chapter').forEach(section => {
     let anyVisible = false;
     section.querySelectorAll('.card[data-status]').forEach(card => {
