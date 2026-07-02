@@ -171,6 +171,7 @@
   .hub-head { margin-bottom:2.4rem; }
   .hub-head h1 { font-size:clamp(2.2rem,4.4vw,3.2rem); margin:0.5rem 0 0.6rem; }
   .hub-head .lead { color:var(--text-muted); max-width:62ch; line-height:1.7; }
+  .asset-summary { margin-top:0.8rem; color:var(--gold); font-size:0.94rem; min-height:1.4em; }
 
   .reverify-banner {
     display:none; align-items:center; justify-content:space-between; gap:1rem;
@@ -468,7 +469,8 @@
     <div class="hub-head">
       <span class="eyebrow">Holder Hub</span>
       <h1>Welcome back, <em id="holderGreeting">holder</em></h1>
-      <p class="lead">Here's where the project stands — who's in, what's available, what's sold, and what's coming next.</p>
+      <p class="lead">It’s lovely to have you here. This is your place inside the Àpótí Ọlọ́wẹ̀ story — revisit the work you hold, meet the community around it, and see what is taking shape next.</p>
+      <p class="asset-summary" id="ownedAssetSummary" aria-live="polite"></p>
     </div>
 
     <div class="reverify-banner" id="reverifyBanner">
@@ -1344,6 +1346,7 @@ async function enterDashboard() {
   loadParticipants();
   loadMessages();
   loadFuturePlans();
+  document.getElementById('ownedAssetSummary').textContent = 'Confirming the collection assets held by this wallet…';
   highlightOwnedPieces();
 }
 
@@ -1592,6 +1595,7 @@ const ETH_COLLECTION_CONTRACTS = [
   '0xd7066137225cb0e1eb3220a2b814ff228e2c0249',
 ];
 const ETH_READONLY_RPC = 'https://ethereum.publicnode.com';
+const ETH_MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11';
 
 function normalizePieceName(name) {
   return (name || '')
@@ -1640,6 +1644,7 @@ async function scanTezosHoldings(address) {
     const r = await fetch(url);
     if (!r.ok) return;
     const rows = await r.json();
+    setOwnedAssetSummary((rows || []).length);
     (rows || []).forEach(meta => {
       const name = meta && (meta.name || meta['name']);
       if (name) highlightPieceByName(name);
@@ -1649,35 +1654,85 @@ async function scanTezosHoldings(address) {
 
 async function scanEthHoldings(address) {
   if (typeof ethers === 'undefined') return;
-  const abi = [
-    'function balanceOf(address owner) view returns (uint256)',
-    'function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)',
-    'function tokenURI(uint256 tokenId) view returns (string)',
-  ];
   let provider;
   try {
     provider = new ethers.JsonRpcProvider(ETH_READONLY_RPC);
   } catch (err) { return; }
 
+  const nftInterface = new ethers.Interface([
+    'function ownerOf(uint256 tokenId) view returns (address)',
+    'function tokenURI(uint256 tokenId) view returns (string)',
+    'function totalSupply() view returns (uint256)',
+  ]);
+  const multicall = new ethers.Contract(ETH_MULTICALL3, [
+    'function aggregate3((address target,bool allowFailure,bytes callData)[] calls) payable returns ((bool success,bytes returnData)[] returnData)',
+  ], provider);
+  const ownedTokens = [];
+
   for (const contractAddress of ETH_COLLECTION_CONTRACTS) {
     try {
-      const contract = new ethers.Contract(contractAddress, abi, provider);
-      const balance = Number(await contract.balanceOf(address));
-      if (!balance) continue;
+      let scanMax = 1500;
+      try {
+        const raw = await provider.call({
+          to: contractAddress,
+          data: nftInterface.encodeFunctionData('totalSupply'),
+        });
+        const supply = Number(nftInterface.decodeFunctionResult('totalSupply', raw)[0]);
+        if (Number.isFinite(supply)) scanMax = Math.min(5000, Math.max(250, supply + 50));
+      } catch (_) { /* creator contracts often omit totalSupply */ }
 
-      for (let i = 0; i < balance; i++) {
+      for (let start = 0; start <= scanMax; start += 300) {
+        const ids = Array.from({ length: Math.min(300, scanMax - start + 1) }, (_, i) => start + i);
+        const calls = ids.map(id => ({
+          target: contractAddress,
+          allowFailure: true,
+          callData: nftInterface.encodeFunctionData('ownerOf', [id]),
+        }));
+        const results = await multicall.aggregate3.staticCall(calls);
+        results.forEach((result, index) => {
+          if (!result.success) return;
+          try {
+            const owner = nftInterface.decodeFunctionResult('ownerOf', result.returnData)[0];
+            if (String(owner).toLowerCase() === address.toLowerCase()) {
+              ownedTokens.push({ contractAddress, tokenId: ids[index] });
+            }
+          } catch (_) { /* nonexistent token */ }
+        });
+      }
+    } catch (_) { /* one contract failing must not hide assets from the other */ }
+  }
+
+  setOwnedAssetSummary(ownedTokens.length);
+
+  for (let start = 0; start < ownedTokens.length; start += 100) {
+    const batch = ownedTokens.slice(start, start + 100);
+    try {
+      const results = await multicall.aggregate3.staticCall(batch.map(token => ({
+        target: token.contractAddress,
+        allowFailure: true,
+        callData: nftInterface.encodeFunctionData('tokenURI', [token.tokenId]),
+      })));
+      await Promise.all(results.map(async (result, index) => {
+        if (!result.success) return;
         try {
-          const tokenId = await contract.tokenOfOwnerByIndex(address, i);
-          const uri = await contract.tokenURI(tokenId);
+          const uri = nftInterface.decodeFunctionResult('tokenURI', result.returnData)[0];
           const metadata = await fetchTokenMetadata(uri);
           if (metadata && metadata.name) highlightPieceByName(metadata.name);
-        } catch (err) {
-          // tokenOfOwnerByIndex not supported by this contract (non-Enumerable) —
-          // can't pinpoint which token without it, so skip rather than guess.
-          break;
-        }
-      }
-    } catch (err) { /* this contract unreachable or balanceOf failed — skip it */ }
+        } catch (_) { /* metadata is a bonus; the ownership count remains valid */ }
+      }));
+    } catch (_) { /* keep the confirmed count even if metadata lookup fails */ }
+  }
+}
+
+function setOwnedAssetSummary(count) {
+  const el = document.getElementById('ownedAssetSummary');
+  if (!el) return;
+  if (!Number.isFinite(count)) {
+    el.textContent = '';
+  } else if (count === 0) {
+    el.textContent = 'Wallet checked — no collection assets were found on this chain.';
+  } else {
+    el.textContent = `Wallet confirmed — ${count} collection asset${count === 1 ? '' : 's'} held on this chain.`;
   }
 }
 
