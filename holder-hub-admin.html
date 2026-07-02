@@ -95,6 +95,8 @@
   .item-card { border:1px solid var(--line); border-radius:8px; background:rgba(30,20,16,0.3); padding:1rem 1.2rem; margin-bottom:0.8rem; }
   .item-card .item-title { font-family:'Cormorant Garamond',serif; font-size:1.25rem; margin-bottom:0.25rem; }
   .item-card .item-sub { color:var(--text-muted); font-size:0.85rem; margin-bottom:0.6rem; }
+  .future-plan-editor { border:1px solid var(--line); border-radius:8px; background:rgba(30,20,16,0.3); padding:1rem; margin-bottom:0.8rem; }
+  .future-plan-editor textarea { min-height:150px; }
   .badge { font-family:'Cinzel',serif; font-size:0.55rem; letter-spacing:0.1em; text-transform:uppercase; padding:0.25rem 0.55rem; border-radius:12px; border:1px solid var(--line); color:var(--text-muted); }
   .badge.draft { color:#e8c9a8; border-color:rgba(201,153,58,0.5); }
   .badge.live { color:#dce8d0; border-color:rgba(107,124,92,0.7); }
@@ -159,10 +161,9 @@
     <div class="panel-view" id="view-future-plans">
       <div class="panel">
         <div class="panel-title">Future Plans shown in the Holder Hub</div>
-        <div class="field">
-          <label for="futurePlansInput">Published text</label>
-          <textarea id="futurePlansInput" style="min-height:260px;" placeholder="Separate paragraphs with a blank line."></textarea>
-        </div>
+        <p class="item-sub" style="margin-bottom:1rem;">Each heading becomes a collapsible item in the Holder Hub.</p>
+        <div id="futurePlansEditors"></div>
+        <button class="btn ghost small" id="addFuturePlanBtn" type="button" style="margin-bottom:1rem;">Add plan</button>
         <button class="btn" id="saveFuturePlansBtn" type="button">Save and publish</button>
         <div class="status" id="futurePlansStatus"></div>
       </div>
@@ -322,16 +323,32 @@ async function loadMessages() {
       <div class="item-title">${esc(m.subject || '(no subject)')} <span class="badge ${m.status}">${esc(m.status)}</span></div>
       <div class="item-sub">${esc(m.holders?.display_name || m.holders?.wallet_address || 'Unknown holder')} · ${new Date(m.created_at).toLocaleString()}</div>
       <div style="margin:0.5rem 0;">${esc(m.message)}</div>
+      <div class="field" style="margin-top:0.9rem;">
+        <label for="reply-${m.id}">Private reply to this holder</label>
+        <textarea id="reply-${m.id}" placeholder="Write your reply…">${esc(m.admin_reply || '')}</textarea>
+      </div>
       <div class="btn-row">
+        <button class="btn small" onclick="sendHolderReply('${m.id}')">${m.admin_reply ? 'Update reply' : 'Send reply'}</button>
         ${m.status !== 'read' ? `<button class="btn ghost small" onclick="setMsgStatus('${m.id}','read')">Mark read</button>` : ''}
         ${m.status !== 'archived' ? `<button class="btn ghost small" onclick="setMsgStatus('${m.id}','archived')">Archive</button>` : ''}
       </div>
+      <div class="status" id="reply-status-${m.id}"></div>
     </div>
   `).join('') : '<p class="empty-state">No messages yet.</p>';
 }
 async function setMsgStatus(id, status) {
   await adminFetch('holder-message', { method: 'PATCH', id, body: { status } });
   loadMessages();
+}
+async function sendHolderReply(id) {
+  const reply = document.getElementById('reply-' + id).value.trim();
+  const status = document.getElementById('reply-status-' + id);
+  if (!reply) { setStatus(status, 'err', 'Write a reply first.'); return; }
+  setStatus(status, '', 'Sending…');
+  const r = await adminFetch('holder-message', { method: 'PATCH', id, body: { admin_reply: reply } });
+  if (!r.ok) { setStatus(status, 'err', r.error); return; }
+  setStatus(status, 'ok', 'Reply saved. Only this holder can see it.');
+  setTimeout(loadMessages, 700);
 }
 
 // ══════════ PARTICIPANTS ══════════
@@ -370,15 +387,54 @@ async function saveParticipant(id) {
 }
 
 // ══════════ FUTURE PLANS ══════════
+let futurePlanItems = [];
+
+function renderFuturePlanEditors() {
+  const wrap = document.getElementById('futurePlansEditors');
+  wrap.innerHTML = futurePlanItems.map((item, index) => `
+    <div class="future-plan-editor" data-plan-index="${index}">
+      <div class="field"><label>Heading</label><input class="future-plan-heading" value="${esc(item.heading || '')}" placeholder="e.g. Exhibition plans" /></div>
+      <div class="field"><label>Body</label><textarea class="future-plan-body" placeholder="Write the details holders can expand…">${esc(item.body || '')}</textarea></div>
+      <button class="btn danger small" type="button" onclick="removeFuturePlan(${index})">Remove</button>
+    </div>
+  `).join('');
+}
+
+function readFuturePlanEditors() {
+  return Array.from(document.querySelectorAll('.future-plan-editor')).map(editor => ({
+    heading: editor.querySelector('.future-plan-heading').value.trim(),
+    body: editor.querySelector('.future-plan-body').value.trim(),
+  })).filter(item => item.heading || item.body);
+}
+
+function removeFuturePlan(index) {
+  futurePlanItems = readFuturePlanEditors();
+  futurePlanItems.splice(index, 1);
+  renderFuturePlanEditors();
+}
+
+document.getElementById('addFuturePlanBtn').addEventListener('click', () => {
+  futurePlanItems = readFuturePlanEditors();
+  futurePlanItems.push({ heading: '', body: '' });
+  renderFuturePlanEditors();
+});
+
 async function loadFuturePlans() {
-  const input = document.getElementById('futurePlansInput');
   const status = document.getElementById('futurePlansStatus');
   const r = await adminFetch('holder-content');
   if (!r.ok) {
     setStatus(status, 'err', r.error);
     return;
   }
-  input.value = r.future_plans || '';
+  const raw = String(r.future_plans || '').trim();
+  try {
+    const parsed = JSON.parse(raw);
+    futurePlanItems = Array.isArray(parsed.items) ? parsed.items : [];
+  } catch (_) {
+    futurePlanItems = raw ? [{ heading: 'Future plans', body: raw }] : [];
+  }
+  if (!futurePlanItems.length) futurePlanItems.push({ heading: '', body: '' });
+  renderFuturePlanEditors();
   status.className = 'status';
   status.textContent = '';
 }
@@ -391,7 +447,7 @@ document.getElementById('saveFuturePlansBtn').addEventListener('click', async ()
   try {
     const r = await adminFetch('holder-content', {
       method: 'POST',
-      body: { future_plans: document.getElementById('futurePlansInput').value }
+      body: { future_plans: JSON.stringify({ version: 1, items: readFuturePlanEditors() }) }
     });
     if (!r.ok) {
       setStatus(status, 'err', r.error);

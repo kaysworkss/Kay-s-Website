@@ -56,11 +56,6 @@
     font-family:'Montserrat','Cinzel',sans-serif; font-size:1rem; letter-spacing:0.15em;
     text-transform:uppercase; color:var(--sand); display:flex; align-items:center; gap:0.6rem;
   }
-  .nav-logo .tag {
-    font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.12em; color:var(--gold);
-    border:1px solid rgba(201,153,58,0.45); padding:0.25rem 0.6rem; border-radius:3px;
-    background:rgba(201,153,58,0.08);
-  }
   .nav-right { display:flex; align-items:center; gap:1rem; }
   .nav-back {
     font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.14em; text-transform:uppercase;
@@ -226,9 +221,14 @@
     .opa-artwork-grid { grid-template-columns: 1fr; }
   }
   /* Left-to-right gallery: consistent columns, natural image heights. */
+  #artworksList { display:flex; flex-direction:column; }
+  #artworksList [data-chapter="opa"] { order:1; }
+  #artworksList [data-chapter="chapter2"] { order:2; }
+  #artworksList [data-chapter="chapter1"] { order:3; }
+  #artworksList [data-chapter="precursor"] { order:4; }
   #artworksList .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: flex-start;
     gap: 1.1rem;
   }
@@ -250,6 +250,10 @@
   @media (max-width: 620px) {
     #artworksList .grid { grid-template-columns: 1fr; }
   }
+  @media (min-width:621px) and (max-width:960px) {
+    #artworksList .grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
+  .artworks-auction-link { width:auto; margin:0 0 1.5rem; display:inline-flex; }
   .art-lightbox {
     position: fixed; inset: 0; z-index: 120; display: none;
     align-items: center; justify-content: center; padding: 2rem;
@@ -365,11 +369,19 @@
   }
   .plan-card h3 { font-size:1.35rem; margin-bottom:0.4rem; }
   .plan-card p { color:var(--text-muted); line-height:1.65; }
+  .plan-disclosure { border:1px solid var(--line); border-radius:8px; margin-bottom:0.8rem; background:rgba(30,20,16,0.28); overflow:hidden; }
+  .plan-disclosure summary { cursor:pointer; list-style:none; padding:1rem 1.2rem; font-family:'Cormorant Garamond',serif; font-size:1.3rem; color:var(--sand); }
+  .plan-disclosure summary::-webkit-details-marker { display:none; }
+  .plan-disclosure summary::after { content:'+'; float:right; color:var(--gold); }
+  .plan-disclosure[open] summary::after { content:'−'; }
+  .plan-disclosure-body { padding:0 1.2rem 1.1rem; color:var(--text-muted); line-height:1.65; white-space:pre-line; }
 
   .msg-history { margin-top:2rem; }
   .msg-item { border:1px solid var(--line); border-radius:6px; padding:0.9rem 1.1rem; margin-bottom:0.6rem; background:rgba(30,20,16,0.22); }
   .msg-item .msg-subject { font-family:'Cormorant Garamond',serif; font-size:1.1rem; margin-bottom:0.3rem; }
   .msg-item .msg-date { color:var(--text-muted); font-size:0.78rem; margin-top:0.4rem; }
+  .msg-reply { margin-top:0.9rem; padding:0.85rem 1rem; border-left:2px solid var(--gold); border-radius:0 6px 6px 0; background:rgba(201,153,58,0.08); }
+  .msg-reply-label { font-family:'Cinzel',serif; color:var(--gold); font-size:0.54rem; letter-spacing:0.14em; text-transform:uppercase; margin-bottom:0.35rem; }
 
   .empty-state { color:var(--text-muted); font-style:italic; padding:2rem 0; text-align:center; }
 
@@ -378,6 +390,14 @@
   .drop-intro .eyebrow { margin-bottom: 0.6rem; }
   .drop-intro h2 { font-size: clamp(1.8rem,3.6vw,2.6rem); margin-bottom: 0.7rem; }
   .drop-intro p { color: var(--text-muted); line-height: 1.75; max-width: 68ch; }
+  .opa-countdown { margin:1.25rem 0 2rem; padding:1.15rem 1.25rem; border:1px solid rgba(201,153,58,0.42); border-radius:8px; background:rgba(201,153,58,0.07); }
+  .opa-countdown-label { font-family:'Cinzel',serif; color:var(--gold); font-size:0.62rem; letter-spacing:0.18em; text-transform:uppercase; margin-bottom:0.75rem; }
+  .opa-countdown-units { display:flex; flex-wrap:wrap; gap:0.7rem; }
+  .opa-countdown-unit { min-width:72px; padding:0.65rem 0.8rem; text-align:center; border:1px solid var(--line); border-radius:6px; background:rgba(0,0,0,0.12); }
+  .opa-countdown-unit strong { display:block; color:var(--sand); font-family:'Cormorant Garamond',serif; font-size:1.7rem; line-height:1; }
+  .opa-countdown-unit span { display:block; margin-top:0.3rem; color:var(--text-muted); font-family:'Cinzel',serif; font-size:0.48rem; letter-spacing:0.12em; text-transform:uppercase; }
+  .opa-countdown-note { margin-top:0.75rem; color:var(--text-muted); font-size:0.84rem; }
+  .opa-countdown-live { color:#dce8d0; font-size:1rem; }
 
   .drop-feature {
     width: 100%; aspect-ratio: 21/9; object-fit: cover; display: block;
@@ -515,7 +535,18 @@
   .reserve-confirm { font-size: 0.86rem; color: #dce8d0; line-height: 1.55; }
 
   @media (max-width:640px) {
-    nav { padding:1rem 1.2rem; }
+    nav {
+      display:grid; grid-template-columns:minmax(0,1fr) auto;
+      align-items:center; gap:0.75rem 0.8rem; padding:0.85rem 1rem;
+    }
+    .nav-logo { grid-column:1; grid-row:1; font-size:0.88rem; min-width:0; }
+    .nav-right { display:contents; }
+    .nav-back { grid-column:2; grid-row:1; padding:0.45rem 0.6rem; font-size:0.54rem; white-space:nowrap; }
+    .wallet-pill {
+      grid-column:1; grid-row:2; justify-self:start; min-width:0; max-width:100%;
+      overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:0.56rem;
+    }
+    .signout-btn { grid-column:2; grid-row:2; justify-self:end; padding:0.45rem 0.6rem; font-size:0.54rem; }
     .page { padding:2rem 1.2rem 4rem; }
     .connect-grid { grid-template-columns:1fr; }
   }
@@ -524,7 +555,7 @@
 <body>
 
 <nav>
-  <a class="nav-logo" href="/apoti-olowe">KAY'S WORKS <span class="tag">Àpótí Ọlọ́wẹ̀</span></a>
+  <a class="nav-logo" href="/holder-hub" aria-label="Holder Hub home">KAY'S WORKS</a>
   <div class="nav-right">
     <span class="wallet-pill" id="walletPill"></span>
     <button class="signout-btn" id="signoutBtn">Sign out</button>
@@ -612,6 +643,17 @@
         <span class="eyebrow">Now Introducing</span>
         <h2>The Opa Collection</h2>
         <p>Three sculptures, each cast digitally and viewable in the round — rotate, zoom, and look closely at the surface work. Opa means "staff" — each piece carries a different chapter of the Àpótí Ọlọ́wẹ̀ story forward.</p>
+      </div>
+
+      <div class="opa-countdown" id="opaCountdown" data-auction-start="2026-07-03T20:00:00Z">
+        <div class="opa-countdown-label">Opa Collection auction opens</div>
+        <div class="opa-countdown-units" id="opaCountdownUnits">
+          <div class="opa-countdown-unit"><strong data-countdown="days">00</strong><span>Days</span></div>
+          <div class="opa-countdown-unit"><strong data-countdown="hours">00</strong><span>Hours</span></div>
+          <div class="opa-countdown-unit"><strong data-countdown="minutes">00</strong><span>Minutes</span></div>
+          <div class="opa-countdown-unit"><strong data-countdown="seconds">00</strong><span>Seconds</span></div>
+        </div>
+        <div class="opa-countdown-note">3 July 2026 · 9:00 PM GMT+1. This countdown automatically adjusts for each visitor’s timezone.</div>
       </div>
 
       <img class="drop-feature" src="images/opatg.jpg" alt="The Opa Collection" />
@@ -824,6 +866,7 @@
         <button class="tab-btn" data-artstatus="available">Available</button>
         <button class="tab-btn" data-artstatus="sold">Sold</button>
       </div>
+      <a class="btn artworks-auction-link" href="https://www.kaysworks.com/auction" target="_blank" rel="noopener">Visit the auction page</a>
 
       <div id="artworksList">
       <section class="artwork-chapter" data-chapter="precursor">
@@ -1532,14 +1575,24 @@ async function loadFuturePlans() {
     const data = await response.json();
     const text = String(data.future_plans || '').trim();
     if (!text) return;
-    const card = document.createElement('div');
-    card.className = 'plan-card';
-    text.split(/\n\s*\n/).forEach(block => {
-      const paragraph = document.createElement('p');
-      paragraph.textContent = block;
-      card.appendChild(paragraph);
+    let items;
+    try {
+      const parsed = JSON.parse(text);
+      items = Array.isArray(parsed.items) ? parsed.items : [];
+    } catch (_) {
+      items = [{ heading: 'Future plans', body: text }];
+    }
+    items.filter(item => item && (item.heading || item.body)).forEach(item => {
+      const details = document.createElement('details');
+      details.className = 'plan-disclosure';
+      const summary = document.createElement('summary');
+      summary.textContent = item.heading || 'Update';
+      const body = document.createElement('div');
+      body.className = 'plan-disclosure-body';
+      body.textContent = item.body || '';
+      details.append(summary, body);
+      container.appendChild(details);
     });
-    container.appendChild(card);
   } catch (_) { /* blank is the intended fallback */ }
 }
 
@@ -2033,6 +2086,7 @@ async function loadMessages() {
       ${m.subject ? `<div class="msg-subject">${m.subject}</div>` : ''}
       <div>${m.message}</div>
       <div class="msg-date">${new Date(m.created_at).toLocaleString()}</div>
+      ${m.admin_reply ? `<div class="msg-reply"><div class="msg-reply-label">Reply from Kay</div><div>${m.admin_reply}</div><div class="msg-date">${m.replied_at ? new Date(m.replied_at).toLocaleString() : ''}</div></div>` : ''}
     </div>
   `).join('');
 }
@@ -2059,6 +2113,37 @@ document.getElementById('sendMsgBtn').addEventListener('click', async () => {
   document.getElementById('msgBody').value = '';
   loadMessages();
 });
+
+// ── Opa auction countdown ──
+(() => {
+  const countdown = document.getElementById('opaCountdown');
+  if (!countdown) return;
+  const startsAt = Date.parse(countdown.dataset.auctionStart); // 20:00 UTC = 21:00 GMT+1
+  const units = countdown.querySelector('.opa-countdown-units');
+  const values = {
+    days: countdown.querySelector('[data-countdown="days"]'),
+    hours: countdown.querySelector('[data-countdown="hours"]'),
+    minutes: countdown.querySelector('[data-countdown="minutes"]'),
+    seconds: countdown.querySelector('[data-countdown="seconds"]'),
+  };
+  const pad = value => String(value).padStart(2, '0');
+  let timer;
+  function updateCountdown() {
+    const remaining = startsAt - Date.now();
+    if (remaining <= 0) {
+      clearInterval(timer);
+      units.innerHTML = '<a class="opa-countdown-live" href="https://www.kaysworks.com/auction">The Opa Collection auction is now live →</a>';
+      return;
+    }
+    const totalSeconds = Math.floor(remaining / 1000);
+    values.days.textContent = pad(Math.floor(totalSeconds / 86400));
+    values.hours.textContent = pad(Math.floor(totalSeconds % 86400 / 3600));
+    values.minutes.textContent = pad(Math.floor(totalSeconds % 3600 / 60));
+    values.seconds.textContent = pad(totalSeconds % 60);
+  }
+  updateCountdown();
+  timer = setInterval(updateCountdown, 1000);
+})();
 
 // ── Opa artwork fullscreen viewer ──
 const artLightbox = document.getElementById('artLightbox');
