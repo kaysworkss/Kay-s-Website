@@ -45,6 +45,55 @@ const ETH_TOKEN_STANDARD = 'erc1155'; // balanceOf(address, tokenId) - confirmed
 const ETH_RPC_URL = process.env.ETH_RPC_URL || 'https://ethereum.publicnode.com';
 const TEZOS_CONTRACT_ADDRESS = 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8';
 
+const AUTH_EMAIL_FROM = process.env.HOLDER_AUTH_FROM_EMAIL || "Kay's Works <auction@mail.kaysworks.com>";
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[char]);
+}
+
+function holderAuthEmailHtml(actionLink) {
+  const href = escapeHtml(actionLink);
+  return `<!doctype html><html><body style="margin:0;background:#1e1410;padding:28px 12px;color:#392416">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+    <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#ede0c8;border-radius:24px;overflow:hidden">
+      <tr><td style="background:#2a1508;background-image:radial-gradient(ellipse at 50% 110%,rgba(196,140,60,.38),transparent 62%),linear-gradient(180deg,#2a1508,#3d2010 55%,#5a2e14);padding:38px 30px 42px;text-align:center">
+        <div style="font-family:Georgia,serif;color:#e8c45a;font-size:12px;letter-spacing:4px;text-transform:uppercase">Kay's Works</div>
+        <div style="font-family:Georgia,serif;color:#f5ead4;font-size:34px;line-height:1.15;margin-top:18px">The Holder Hub</div>
+        <div style="font-family:Arial,sans-serif;color:#c9aa83;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-top:12px">Àpótí Ọlọ́wẹ̀ · Private holder access</div>
+      </td></tr>
+      <tr><td style="height:5px;background:linear-gradient(90deg,#b8821e,#e8c45a 35%,#f5d878 55%,#b8821e)">&nbsp;</td></tr>
+      <tr><td style="padding:38px 36px 34px;text-align:center">
+        <p style="font-family:Georgia,serif;font-size:20px;line-height:1.5;color:#4a2a18;margin:0 0 12px">Your private door is ready.</p>
+        <p style="font-family:Arial,sans-serif;font-size:14px;line-height:1.75;color:#74543d;margin:0 0 28px">Use this one-time link to enter the Holder Hub. It links your verified wallet to this email, so future visits only need your inbox.</p>
+        <a href="${href}" style="display:inline-block;background:linear-gradient(90deg,#b8821e,#e8c45a 35%,#f5d878 55%,#d4a030 80%,#b8821e);color:#2d1508;text-decoration:none;font-family:Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:15px 32px;border-radius:999px">Enter the Holder Hub</a>
+        <p style="font-family:Arial,sans-serif;font-size:11px;line-height:1.6;color:#93745b;margin:26px 0 0">This link is for you alone. If you did not request it, you can safely ignore this email.</p>
+      </td></tr>
+      <tr><td style="padding:18px 28px 24px;border-top:1px solid rgba(90,55,30,.15);text-align:center;font-family:Arial,sans-serif;font-size:10px;letter-spacing:1px;color:#8a6a50">KAY'S WORKS · ART, MEMORY &amp; MATERIAL</td></tr>
+    </table>
+  </td></tr></table></body></html>`;
+}
+
+async function sendHolderAuthEmail(email, actionLink) {
+  if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is not configured.');
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: AUTH_EMAIL_FROM,
+      to: [email],
+      subject: "Your private link to Kay's Works Holder Hub",
+      html: holderAuthEmailHtml(actionLink),
+      text: `Your private Holder Hub link:\n\n${actionLink}\n\nThis one-time link connects your verified wallet to your email. If you did not request it, ignore this message.`
+    })
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error('Email provider returned ' + response.status + (detail ? ': ' + detail : ''));
+  }
+}
+
 // Ethereum addresses are case-insensitive on-chain but come back checksummed
 // (mixed-case) from wallets - always store lowercase so a pre-seeded holder
 // row (e.g. imported from a spreadsheet) reliably matches on conflict instead
@@ -195,6 +244,64 @@ async function handleClaim(req, res, supabase) {
   return res.status(200).json({ ok: true });
 }
 
+// -- action=send-auth-email ----
+// Sends the magic link through Resend so it matches the shop/auction brand.
+// A link is only delivered after a fresh eligible-wallet check, or to an
+// auth account that is already linked to a holder row.
+async function handleSendAuthEmail(req, res, supabase) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const email = String((req.body && req.body.email) || '').trim().toLowerCase();
+  const claimToken = String((req.body && req.body.claimToken) || '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 320) {
+    return res.status(400).json({ error: 'Please enter a valid email address.' });
+  }
+
+  if (claimToken) {
+    const { data: pending, error: pendingError } = await supabase
+      .from('pending_verifications')
+      .select('id,expires_at')
+      .eq('id', claimToken)
+      .eq('consumed', false)
+      .maybeSingle();
+    if (pendingError) return res.status(500).json({ error: pendingError.message });
+    if (!pending || new Date(pending.expires_at) < new Date()) {
+      return res.status(400).json({ error: 'Wallet verification expired. Please reconnect your wallet.' });
+    }
+  }
+
+  const forwardedHost = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+  const safeHost = /^[a-z0-9.-]+(?::\d+)?$/i.test(forwardedHost) ? forwardedHost : 'kaysworks.com';
+  const protocol = safeHost.includes('localhost') ? 'http' : 'https';
+  const hubUrl = (process.env.HOLDER_HUB_URL || `${protocol}://${safeHost}/holder-hub`).replace(/\/$/, '');
+  const redirectTo = hubUrl + (claimToken ? '?vt=' + encodeURIComponent(claimToken) : '');
+
+  const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+    type: 'magiclink',
+    email,
+    options: { redirectTo }
+  });
+  if (linkError || !linkData || !linkData.properties || !linkData.properties.action_link) {
+    return res.status(500).json({ error: 'Could not create the sign-in link.' });
+  }
+
+  if (!claimToken) {
+    const userId = linkData.user && linkData.user.id;
+    const { data: linkedHolder, error: holderError } = await supabase
+      .from('holders')
+      .select('auth_user_id')
+      .eq('auth_user_id', userId || '00000000-0000-0000-0000-000000000000')
+      .maybeSingle();
+    if (holderError) return res.status(500).json({ error: holderError.message });
+    // Keep the response deliberately generic so this endpoint cannot be used
+    // to discover which email addresses belong to collectors.
+    if (!linkedHolder) return res.status(200).json({ ok: true });
+  }
+
+  await sendHolderAuthEmail(email, linkData.properties.action_link);
+  return res.status(200).json({ ok: true });
+}
+
 // -- action=config ----
 // Public, read-only. Lets the static HTML pull its Supabase connection info
 // from the same env vars your serverless functions already use, instead of
@@ -232,6 +339,7 @@ module.exports = async (req, res) => {
     switch (action) {
       case 'verify': return await handleVerify(req, res, supabase);
       case 'claim':  return await handleClaim(req, res, supabase);
+      case 'send-auth-email': return await handleSendAuthEmail(req, res, supabase);
       default:
         return res.status(404).json({ error: `Unknown holder action: ${action}` });
     }
