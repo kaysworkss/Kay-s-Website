@@ -172,6 +172,12 @@
   .hub-head h1 { font-size:clamp(2.2rem,4.4vw,3.2rem); margin:0.5rem 0 0.6rem; }
   .hub-head .lead { color:var(--text-muted); max-width:62ch; line-height:1.7; }
   .asset-summary { margin-top:0.8rem; color:var(--gold); font-size:0.94rem; min-height:1.4em; }
+  .wallet-email-panel { display:none; margin-bottom:1.6rem; }
+  .wallet-email-panel.show { display:block; }
+  .wallet-email-panel .email-row { display:grid; grid-template-columns:1fr auto; gap:0.7rem; align-items:end; }
+  .wallet-email-panel .email-row .field { margin:0; }
+  .wallet-email-panel .email-row .btn { width:auto; white-space:nowrap; }
+  @media (max-width:620px) { .wallet-email-panel .email-row { grid-template-columns:1fr; } .wallet-email-panel .email-row .btn { width:100%; } }
 
   .reverify-banner {
     display:none; align-items:center; justify-content:space-between; gap:1rem;
@@ -476,6 +482,19 @@
     <div class="reverify-banner" id="reverifyBanner">
       <span>Your wallet verification has aged out. Reconnect to confirm you still hold the token and keep full access.</span>
       <button class="btn ghost" id="reverifyBtn">Reconnect wallet</button>
+    </div>
+
+    <div class="panel wallet-email-panel" id="walletEmailPanel">
+      <div class="panel-title">Save your access for next time</div>
+      <p class="step-note" style="margin:0 0 1rem">You already have full access through your verified wallet. Adding an email is optional—it simply lets you return without reconnecting your wallet.</p>
+      <div class="email-row">
+        <div class="field">
+          <label for="walletEmailInput">Email address</label>
+          <input type="email" id="walletEmailInput" placeholder="you@example.com" autocomplete="email" />
+        </div>
+        <button class="btn" type="button" id="walletEmailBtn">Save email access</button>
+      </div>
+      <div class="status" id="walletEmailStatus"></div>
     </div>
 
     <div class="tabs">
@@ -1066,6 +1085,10 @@ const els = {
   dismissTezWallet: document.getElementById('dismissTezWallet'),
   showEmailLoginBtn: document.getElementById('showEmailLoginBtn'),
   backToWalletBtn: document.getElementById('backToWalletBtn'),
+  walletEmailPanel: document.getElementById('walletEmailPanel'),
+  walletEmailInput: document.getElementById('walletEmailInput'),
+  walletEmailBtn: document.getElementById('walletEmailBtn'),
+  walletEmailStatus: document.getElementById('walletEmailStatus'),
 };
 
 function setStatus(el, cls, msg) {
@@ -1326,11 +1349,45 @@ async function verifyAndLink(chain, address) {
     return;
   }
 
-  // First-time visitor: eligible, but no account yet. Move to the email step.
+  // A freshly verified wallet enters immediately. Email is offered inside the
+  // Hub only as an optional way to make future visits quicker.
   pendingClaimToken = result.claimToken;
   setStatus(els.walletStatus, 'ok', 'Verified — this wallet holds the token.');
-  showStep('stepEmail');
+  currentUser = null;
+  currentHolder = {
+    id: null,
+    wallet_address: address,
+    chain,
+    token_balance: result.balance || 1,
+    display_name: null,
+    last_verified_at: new Date().toISOString(),
+  };
+  els.walletEmailPanel.classList.add('show');
+  await enterDashboard();
 }
+
+els.walletEmailBtn.addEventListener('click', async () => {
+  const email = els.walletEmailInput.value.trim();
+  if (!email) { setStatus(els.walletEmailStatus, 'err', 'Enter your email first.'); return; }
+  if (!pendingClaimToken) { setStatus(els.walletEmailStatus, 'err', 'Reconnect your wallet before saving email access.'); return; }
+  els.walletEmailBtn.disabled = true;
+  els.walletEmailBtn.textContent = 'Sending…';
+  try {
+    const response = await fetch(CONFIG.emailEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, claimToken: pendingClaimToken }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not send the email.');
+    setStatus(els.walletEmailStatus, 'ok', 'Email sent. Your Hub access is already open—you can confirm the link whenever convenient.');
+  } catch (err) {
+    setStatus(els.walletEmailStatus, 'err', err.message);
+  } finally {
+    els.walletEmailBtn.disabled = false;
+    els.walletEmailBtn.textContent = 'Save email access';
+  }
+});
 
 // ── Dashboard entry ──
 async function enterDashboard() {
@@ -1356,9 +1413,10 @@ async function loadFuturePlans() {
   container.replaceChildren();
   try {
     const { data: { session } } = await sb.auth.getSession();
-    const response = await fetch('/api/holder?action=content', {
-      headers: { Authorization: 'Bearer ' + session.access_token }
-    });
+    const headers = {};
+    if (session) headers.Authorization = 'Bearer ' + session.access_token;
+    else if (pendingClaimToken) headers['x-holder-claim'] = pendingClaimToken;
+    const response = await fetch('/api/holder?action=content', { headers });
     if (!response.ok) return;
     const data = await response.json();
     const text = String(data.future_plans || '').trim();
@@ -1438,8 +1496,8 @@ function bindReserveForms() {
         errorEl.style.display = 'block';
         return;
       }
-      if (!currentHolder) {
-        errorEl.textContent = 'Please sign in first.';
+      if (!currentHolder?.id) {
+        errorEl.textContent = 'Save your email access first so I can securely attach this offer to you.';
         errorEl.style.display = 'block';
         return;
       }
@@ -1793,7 +1851,7 @@ async function loadParticipants() {
 
 async function loadMessages() {
   const el = document.getElementById('msgHistory');
-  if (!currentHolder) return;
+  if (!currentHolder?.id) return;
   const { data, error } = await sb.from('messages').select('*').eq('holder_id', currentHolder.id).order('created_at', { ascending: false });
   if (error || !data?.length) { el.innerHTML = ''; return; }
   el.innerHTML = data.map(m => `
@@ -1810,6 +1868,7 @@ document.getElementById('sendMsgBtn').addEventListener('click', async () => {
   const message = document.getElementById('msgBody').value.trim();
   const statusEl = document.getElementById('msgStatus');
   if (!message) { setStatus(statusEl, 'err', 'Write a message first.'); return; }
+  if (!currentHolder?.id) { setStatus(statusEl, 'err', 'Save your email access first so this message can be securely linked to you.'); return; }
   const { error } = await sb.from('messages').insert({ holder_id: currentHolder.id, subject, message });
   if (error) { setStatus(statusEl, 'err', error.message); return; }
 
