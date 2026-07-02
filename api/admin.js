@@ -580,6 +580,26 @@ async function handleHolderParticipant(req, res, supabase) {
   return json(200, { ok: true });
 }
 
+// ── holder-content (GET/POST editable Holder Hub copy) ───────────────────────
+async function handleHolderContent(req, res, supabase) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase.from('holder_content').select('future_plans,updated_at').eq('id', 1).maybeSingle();
+    if (error) return json(500, { error: error.message });
+    return json(200, data || { future_plans: '' });
+  }
+  if (req.method === 'POST') {
+    const futurePlans = String((req.body && req.body.future_plans) || '').slice(0, 12000);
+    const { error } = await supabase.from('holder_content').upsert({
+      id: 1,
+      future_plans: futurePlans,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' });
+    if (error) return json(500, { error: error.message });
+    return json(200, { ok: true });
+  }
+  return json(405, { error: 'Method not allowed' });
+}
+
 
 // ── Vercel entry point ────────────────────────────────────────────────────────
 module.exports = async (req, res) => {
@@ -627,6 +647,7 @@ module.exports = async (req, res) => {
     case 'holder-reservation':  return handleHolderReservation(req, res, supabase);
     case 'holder-participants': return handleGetHolderParticipants(req, res, supabase);
     case 'holder-participant':  return handleHolderParticipant(req, res, supabase);
+    case 'holder-content':      return handleHolderContent(req, res, supabase);
     default:
       return res.status(404).json({ error: `Unknown admin action: ${action}` });
   }

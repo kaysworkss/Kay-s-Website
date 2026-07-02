@@ -302,6 +302,22 @@ async function handleSendAuthEmail(req, res, supabase) {
   return res.status(200).json({ ok: true });
 }
 
+// -- action=content ----
+// Holder-only editable copy. The service-role query bypasses table RLS, but
+// only after the supplied auth user is confirmed as a linked holder.
+async function handleContent(req, res, supabase) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const accessToken = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!accessToken) return res.status(401).json({ error: 'Missing session token.' });
+  const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
+  if (userError || !userData || !userData.user) return res.status(401).json({ error: 'Invalid session.' });
+  const { data: holder } = await supabase.from('holders').select('id').eq('auth_user_id', userData.user.id).maybeSingle();
+  if (!holder) return res.status(403).json({ error: 'Holder access required.' });
+  const { data, error } = await supabase.from('holder_content').select('future_plans').eq('id', 1).maybeSingle();
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json({ future_plans: (data && data.future_plans) || '' });
+}
+
 // -- action=config ----
 // Public, read-only. Lets the static HTML pull its Supabase connection info
 // from the same env vars your serverless functions already use, instead of
@@ -340,6 +356,7 @@ module.exports = async (req, res) => {
       case 'verify': return await handleVerify(req, res, supabase);
       case 'claim':  return await handleClaim(req, res, supabase);
       case 'send-auth-email': return await handleSendAuthEmail(req, res, supabase);
+      case 'content': return await handleContent(req, res, supabase);
       default:
         return res.status(404).json({ error: `Unknown holder action: ${action}` });
     }
