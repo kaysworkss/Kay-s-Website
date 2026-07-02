@@ -4859,14 +4859,21 @@ function _beaconPermissionScopes(sdk) {
   ].filter(Boolean);
 }
 
-function _beaconMatrixNodes() {
-  // Beacon 4.x expects a flat string array, not a region-keyed object
-  return [
-    "beacon-node-1.octez.io",
-    "beacon-node-2.octez.io",
-    "beacon-node-3.octez.io",
-    "beacon-node-4.octez.io"
-  ];
+function _beaconMatrixNodes(sdk) {
+  var regions = sdk?.Regions || {};
+  var region = regions.EUROPE_WEST || 'EUROPE_WEST';
+  return {
+    [region]: [
+      "beacon-node-1.octez.io",
+      "beacon-node-2.octez.io",
+      "beacon-node-3.octez.io",
+      "beacon-node-4.octez.io",
+      "beacon-node-5.octez.io",
+      "beacon-node-6.octez.io",
+      "beacon-node-7.octez.io",
+      "beacon-node-8.octez.io"
+    ]
+  };
 }
 
 function _resolveBeaconWalletParams(p) {
@@ -4928,7 +4935,7 @@ function _makeBeaconClient(DAppClient, sdk, slot = _activeCfg()) {
     appUrl:            location.origin,
     network:           _beaconNetworkConfig(sdk, slot),
     featuredWallets:   ["temple", "kukai", "umami", "trust"],
-    matrixNodes:       _beaconMatrixNodes(),
+    matrixNodes:       _beaconMatrixNodes(sdk),
     // Declare scopes at construction time (Beacon 4.x requirement)
     scopes:            _beaconPermissionScopes(sdk),
   };
