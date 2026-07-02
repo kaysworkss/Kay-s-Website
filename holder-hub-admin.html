@@ -139,7 +139,6 @@
       <button class="tab-btn active" data-tab="messages">Messages</button>
       <button class="tab-btn" data-tab="reservations">Reservations</button>
       <button class="tab-btn" data-tab="participants">Participants</button>
-      <button class="tab-btn" data-tab="future-plans">Future Plans</button>
     </div>
 
     <!-- MESSAGES -->
@@ -155,18 +154,6 @@
     <!-- PARTICIPANTS -->
     <div class="panel-view" id="view-participants">
       <div id="part-list"></div>
-    </div>
-
-    <!-- FUTURE PLANS -->
-    <div class="panel-view" id="view-future-plans">
-      <div class="panel">
-        <div class="panel-title">Future Plans shown in the Holder Hub</div>
-        <p class="item-sub" style="margin-bottom:1rem;">Each heading becomes a collapsible item in the Holder Hub.</p>
-        <div id="futurePlansEditors"></div>
-        <button class="btn ghost small" id="addFuturePlanBtn" type="button" style="margin-bottom:1rem;">Add plan</button>
-        <button class="btn" id="saveFuturePlansBtn" type="button">Save and publish</button>
-        <div class="status" id="futurePlansStatus"></div>
-      </div>
     </div>
 
   </section>
@@ -220,7 +207,6 @@ async function render() {
   loadMessages();
   loadReservations();
   loadParticipants();
-  loadFuturePlans();
 }
 
 els.loginBtn.addEventListener('click', async () => {
@@ -347,7 +333,10 @@ async function sendHolderReply(id) {
   setStatus(status, '', 'Sending…');
   const r = await adminFetch('holder-message', { method: 'PATCH', id, body: { admin_reply: reply } });
   if (!r.ok) { setStatus(status, 'err', r.error); return; }
-  setStatus(status, 'ok', 'Reply saved. Only this holder can see it.');
+  const confirmation = r.emailNotified
+    ? 'Reply saved privately. Email alert sent to the holder.'
+    : (r.notificationNote || 'Reply saved. Only this holder can see it.');
+  setStatus(status, r.emailNotified ? 'ok' : '', confirmation);
   setTimeout(loadMessages, 700);
 }
 
@@ -413,7 +402,7 @@ function removeFuturePlan(index) {
   renderFuturePlanEditors();
 }
 
-document.getElementById('addFuturePlanBtn').addEventListener('click', () => {
+document.getElementById('addFuturePlanBtn')?.addEventListener('click', () => {
   futurePlanItems = readFuturePlanEditors();
   futurePlanItems.push({ heading: '', body: '' });
   renderFuturePlanEditors();
@@ -439,7 +428,7 @@ async function loadFuturePlans() {
   status.textContent = '';
 }
 
-document.getElementById('saveFuturePlansBtn').addEventListener('click', async () => {
+document.getElementById('saveFuturePlansBtn')?.addEventListener('click', async () => {
   const button = document.getElementById('saveFuturePlansBtn');
   const status = document.getElementById('futurePlansStatus');
   button.disabled = true;
