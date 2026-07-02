@@ -308,11 +308,20 @@ async function handleSendAuthEmail(req, res, supabase) {
 async function handleContent(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const accessToken = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  if (!accessToken) return res.status(401).json({ error: 'Missing session token.' });
-  const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
-  if (userError || !userData || !userData.user) return res.status(401).json({ error: 'Invalid session.' });
-  const { data: holder } = await supabase.from('holders').select('id').eq('auth_user_id', userData.user.id).maybeSingle();
-  if (!holder) return res.status(403).json({ error: 'Holder access required.' });
+  const walletClaim = String(req.headers['x-holder-claim'] || '');
+  let authorised = false;
+  if (accessToken) {
+    const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
+    if (!userError && userData && userData.user) {
+      const { data: holder } = await supabase.from('holders').select('id').eq('auth_user_id', userData.user.id).maybeSingle();
+      authorised = Boolean(holder);
+    }
+  } else if (walletClaim) {
+    const { data: pending } = await supabase.from('pending_verifications')
+      .select('id,expires_at').eq('id', walletClaim).eq('consumed', false).maybeSingle();
+    authorised = Boolean(pending && new Date(pending.expires_at) > new Date());
+  }
+  if (!authorised) return res.status(403).json({ error: 'Holder access required.' });
   const { data, error } = await supabase.from('holder_content').select('future_plans').eq('id', 1).maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json({ future_plans: (data && data.future_plans) || '' });
