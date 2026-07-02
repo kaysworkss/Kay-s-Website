@@ -214,30 +214,26 @@
     cursor: zoom-in;
   }
   .opa-artwork-grid {
-    display: flex;
-    flex-flow: row wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     align-items: flex-start;
     gap: 1.1rem;
   }
   .opa-artwork-grid .card {
-    flex: 1 1 280px;
-    min-width: min(100%, 240px);
-    max-width: 520px;
+    width: 100%; min-width: 0; max-width: none;
   }
   @media (max-width: 620px) {
-    .opa-artwork-grid .card { flex-basis: 100%; max-width: none; }
+    .opa-artwork-grid { grid-template-columns: 1fr; }
   }
-  /* Horizontal masonry treatment for every chapter in All Artworks. */
+  /* Left-to-right gallery: consistent columns, natural image heights. */
   #artworksList .grid {
-    display: flex;
-    flex-flow: row wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     align-items: flex-start;
     gap: 1.1rem;
   }
   #artworksList .grid .card {
-    flex: 1 1 280px;
-    min-width: min(100%, 240px);
-    max-width: 520px;
+    width: 100%; min-width: 0; max-width: none;
   }
   #artworksList .card-img {
     width: 100%; height: auto; aspect-ratio: auto;
@@ -252,7 +248,7 @@
   }
   .token-contents strong { color: var(--sand); }
   @media (max-width: 620px) {
-    #artworksList .grid .card { flex-basis: 100%; max-width: none; }
+    #artworksList .grid { grid-template-columns: 1fr; }
   }
   .art-lightbox {
     position: fixed; inset: 0; z-index: 120; display: none;
@@ -439,6 +435,29 @@
     letter-spacing: 0.1em; text-transform: uppercase;
   }
   .viewer-mode-btn.active { color: #fdf0d0; border-color: var(--gold); background: rgba(201,153,58,0.22); }
+  .viewer-fullscreen-btn { white-space: nowrap; }
+  .sculpture-viewer:fullscreen,
+  .sculpture-viewer.viewer-faux-fullscreen {
+    width: 100vw; height: 100vh; min-height: 100vh;
+    border-radius: 0; background:
+      radial-gradient(ellipse at 50% 26%, rgba(255,255,255,0.96) 0%, rgba(241,243,245,0.78) 46%, transparent 72%),
+      linear-gradient(145deg, #eef0f2 0%, #d9dde1 52%, #c8cdd2 100%);
+  }
+  .sculpture-viewer.viewer-faux-fullscreen {
+    position: fixed; inset: 0; z-index: 150;
+  }
+  .sculpture-viewer:fullscreen .viewer-stage,
+  .sculpture-viewer:fullscreen model-viewer,
+  .sculpture-viewer:fullscreen .slideshow,
+  .sculpture-viewer.viewer-faux-fullscreen .viewer-stage,
+  .sculpture-viewer.viewer-faux-fullscreen model-viewer,
+  .sculpture-viewer.viewer-faux-fullscreen .slideshow {
+    width: 100%; height: 100%; min-height: 100vh;
+  }
+  .sculpture-viewer:fullscreen .slideshow-img,
+  .sculpture-viewer.viewer-faux-fullscreen .slideshow-img {
+    object-fit: contain;
+  }
   .viewer-stage { display: none; width: 100%; height: 100%; min-height: 380px; position: relative; }
   .viewer-stage.active { display: block; }
   .viewer-stage.photos { }
@@ -602,6 +621,7 @@
           <div class="viewer-mode-toggle">
             <button class="viewer-mode-btn active" type="button" data-mode="3d">3D View</button>
             <button class="viewer-mode-btn" type="button" data-mode="photos">Photos</button>
+            <button class="viewer-mode-btn viewer-fullscreen-btn" type="button" aria-label="Open viewer fullscreen">Fullscreen</button>
           </div>
           <div class="viewer-stage active" data-stage="3d">
             <model-viewer
@@ -668,6 +688,7 @@
           <div class="viewer-mode-toggle">
             <button class="viewer-mode-btn active" type="button" data-mode="3d">3D View</button>
             <button class="viewer-mode-btn" type="button" data-mode="photos">Photos</button>
+            <button class="viewer-mode-btn viewer-fullscreen-btn" type="button" aria-label="Open viewer fullscreen">Fullscreen</button>
           </div>
           <div class="viewer-stage active" data-stage="3d">
             <model-viewer
@@ -734,6 +755,7 @@
           <div class="viewer-mode-toggle">
             <button class="viewer-mode-btn active" type="button" data-mode="3d">3D View</button>
             <button class="viewer-mode-btn" type="button" data-mode="photos">Photos</button>
+            <button class="viewer-mode-btn viewer-fullscreen-btn" type="button" aria-label="Open viewer fullscreen">Fullscreen</button>
           </div>
           <div class="viewer-stage active" data-stage="3d">
             <model-viewer
@@ -1002,7 +1024,7 @@
           <div class="card-body">
             <div class="card-title">Opa Orisun</div>
             <div class="card-desc">One of Ayo's first staffs — the beginning of his craft.</div>
-            <div class="token-contents"><strong>Included in the token:</strong> interactive GLB model, close-up image set, and rendered turntable video — packaged together as one multi-metadata token, minted on Ethereum or Tezos according to the collector's chosen chain.</div>
+            <div class="token-contents"><strong>Included in the token:</strong> interactive GLB model, close-up image set, and rendered turntable video, packaged together as one multi-metadata token. During the reserve phase, the collector chooses Ethereum or Tezos. If unclaimed, the ETH and Tezos counterparts enter auction as a linked pair; when bidding starts on one chain, the duplicate on the other chain is destroyed.</div>
             <div class="card-meta">
               <span class="badge available">available</span>
               <span class="card-desc price-live" data-usd-price="220">$220</span>
@@ -1026,7 +1048,7 @@
           <div class="card-body">
             <div class="card-title">Opa Iranti</div>
             <div class="card-desc">Carved in memory of his grandfather.</div>
-            <div class="token-contents"><strong>Included in the token:</strong> interactive GLB model, close-up image set, and rendered turntable video — packaged together as one multi-metadata token, minted on Ethereum or Tezos according to the collector's chosen chain.</div>
+            <div class="token-contents"><strong>Included in the token:</strong> interactive GLB model, close-up image set, and rendered turntable video, packaged together as one multi-metadata token. During the reserve phase, the collector chooses Ethereum or Tezos. If unclaimed, the ETH and Tezos counterparts enter auction as a linked pair; when bidding starts on one chain, the duplicate on the other chain is destroyed.</div>
             <div class="card-meta">
               <span class="badge available">available</span>
               <span class="card-desc price-live" data-usd-price="220">$220</span>
@@ -1050,7 +1072,7 @@
           <div class="card-body">
             <div class="card-title">Opa Ekun</div>
             <div class="card-desc">Commissioned by Chief Adediran through Morenike.</div>
-            <div class="token-contents"><strong>Included in the token:</strong> interactive GLB model, close-up image set, and rendered turntable video — packaged together as one multi-metadata token, minted on Ethereum or Tezos according to the collector's chosen chain.</div>
+            <div class="token-contents"><strong>Included in the token:</strong> interactive GLB model, close-up image set, and rendered turntable video, packaged together as one multi-metadata token. During the reserve phase, the collector chooses Ethereum or Tezos. If unclaimed, the ETH and Tezos counterparts enter auction as a linked pair; when bidding starts on one chain, the duplicate on the other chain is destroyed.</div>
             <div class="card-meta">
               <span class="badge available">available</span>
               <span class="card-desc price-live" data-usd-price="220">$220</span>
@@ -1075,14 +1097,13 @@
     <!-- ══════════ NEW CHAPTERS (hardcoded) ══════════ -->
     <div class="panel-view" id="view-chapters">
       <div class="chapter-card">
-        <img src="REPLACE-WITH-IMAGE-URL" alt="" />
         <div class="chapter-body">
           <div class="chapter-eyebrow">Chapter Three</div>
-          <h3>The Second Basket Opens</h3>
-          <p>Write the chapter announcement here.</p>
+          <h3>L’abẹ Igi Oronbo</h3>
+          <p>I will be in touch when the art and scripts are live. June was very hectic for me, and after the Opa Collection drop I will be restructuring the calendar so that the subsequent chapter drops are more sustainable for me.</p>
           <div class="auction-notes">
-            <strong>Note on the auction site</strong>
-            Add whatever holders should know before bidding — timing, gas, wallet requirements, etc.
+            <strong>A note from Kay</strong>
+            Thank you for your patience while I give the next chapter the time and care it deserves. I will share the revised calendar after the Opa Collection drop.
           </div>
         </div>
       </div>
@@ -1649,15 +1670,51 @@ function bindViewerToggles() {
   document.querySelectorAll('.sculpture-viewer').forEach(viewer => {
     if (viewer.dataset.bound) return;
     viewer.dataset.bound = '1';
-    const buttons = viewer.querySelectorAll('.viewer-mode-btn');
-    buttons.forEach(btn => {
+    const modeButtons = viewer.querySelectorAll('.viewer-mode-btn[data-mode]');
+    modeButtons.forEach(btn => {
       btn.addEventListener('click', () => {
-        buttons.forEach(b => b.classList.remove('active'));
+        modeButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         viewer.querySelectorAll('.viewer-stage').forEach(stage => {
           stage.classList.toggle('active', stage.dataset.stage === btn.dataset.mode);
         });
       });
+    });
+
+    const fullscreenBtn = viewer.querySelector('.viewer-fullscreen-btn');
+    const isFullscreen = () => document.fullscreenElement === viewer || viewer.classList.contains('viewer-faux-fullscreen');
+    const updateFullscreenButton = () => {
+      const active = isFullscreen();
+      fullscreenBtn.textContent = active ? 'Exit fullscreen' : 'Fullscreen';
+      fullscreenBtn.setAttribute('aria-label', active ? 'Exit fullscreen viewer' : 'Open viewer fullscreen');
+    };
+
+    fullscreenBtn.addEventListener('click', async () => {
+      if (document.fullscreenElement === viewer) {
+        await document.exitFullscreen();
+      } else if (viewer.classList.contains('viewer-faux-fullscreen')) {
+        viewer.classList.remove('viewer-faux-fullscreen');
+        document.body.style.overflow = '';
+      } else if (viewer.requestFullscreen) {
+        try { await viewer.requestFullscreen(); }
+        catch (_) {
+          viewer.classList.add('viewer-faux-fullscreen');
+          document.body.style.overflow = 'hidden';
+        }
+      } else {
+        viewer.classList.add('viewer-faux-fullscreen');
+        document.body.style.overflow = 'hidden';
+      }
+      updateFullscreenButton();
+    });
+
+    document.addEventListener('fullscreenchange', updateFullscreenButton);
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && viewer.classList.contains('viewer-faux-fullscreen')) {
+        viewer.classList.remove('viewer-faux-fullscreen');
+        document.body.style.overflow = '';
+        updateFullscreenButton();
+      }
     });
   });
 }
