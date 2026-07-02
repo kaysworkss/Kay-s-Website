@@ -396,6 +396,21 @@
   .msg-reply-label { font-family:'Cinzel',serif; color:var(--gold); font-size:0.54rem; letter-spacing:0.14em; text-transform:uppercase; margin-bottom:0.35rem; }
 
   .empty-state { color:var(--text-muted); font-style:italic; padding:2rem 0; text-align:center; }
+  .owned-empty {
+    border:1px solid var(--line); border-radius:10px; padding:2.2rem 1.5rem;
+    background:rgba(30,20,16,0.3); text-align:center;
+  }
+  .owned-empty h3 { font-size:1.8rem; margin-bottom:0.55rem; }
+  .owned-empty p { color:var(--text-muted); line-height:1.65; margin:0 auto 1.2rem; max-width:48ch; }
+  .owned-empty .btn { width:auto; }
+  .owned-works-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1.1rem; align-items:start; }
+  .owned-work-card { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:rgba(30,20,16,0.34); }
+  .owned-work-card img { display:block; width:100%; height:auto; object-fit:contain; background:rgba(0,0,0,0.15); }
+  .owned-work-body { padding:1rem; }
+  .owned-work-body h3 { font-size:1.35rem; margin-bottom:0.35rem; }
+  .owned-work-body p { color:var(--text-muted); line-height:1.55; }
+  @media (max-width:960px) { .owned-works-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:620px) { .owned-works-grid { grid-template-columns:1fr; } }
 
   /* ── OPA COLLECTION — sculpture showcase ── */
   .drop-intro { margin-bottom: 2rem; }
@@ -648,6 +663,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="opa">Opa Collection</button>
       <button class="tab-btn" data-tab="artworks">All Artworks</button>
+      <button class="tab-btn" data-tab="owned">Works You Own (<span id="ownedWorksCount">0</span>)</button>
       <button class="tab-btn" data-tab="chapters">New Chapters</button>
       <button class="tab-btn" data-tab="plans">Future Plans</button>
       <button class="tab-btn" data-tab="participants">Participants</button>
@@ -1152,6 +1168,11 @@
         </div>
       </section>
       </div>
+    </div>
+
+    <!-- ══════════ WORKS OWNED BY THE CONNECTED WALLET ══════════ -->
+    <div class="panel-view" id="view-owned">
+      <div id="ownedWorksList"></div>
     </div>
 
     <!-- ══════════ NEW CHAPTERS (hardcoded) ══════════ -->
@@ -2136,12 +2157,71 @@ async function fetchTokenMetadata(uri) {
   }
 }
 
+function renderOwnedWorks() {
+  const container = document.getElementById('ownedWorksList');
+  const countEl = document.getElementById('ownedWorksCount');
+  if (!container || !countEl) return;
+  const seen = new Set();
+  const ownedCards = Array.from(document.querySelectorAll('#artworksList .card.owned')).filter(card => {
+    const key = card.dataset.ownerPiece || card.querySelector('.card-title')?.textContent || '';
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  countEl.textContent = String(ownedCards.length);
+  container.replaceChildren();
+
+  if (!ownedCards.length) {
+    const empty = document.createElement('div');
+    empty.className = 'owned-empty';
+    const heading = document.createElement('h3');
+    heading.textContent = "You don't own a collection artwork yet";
+    const copy = document.createElement('p');
+    copy.textContent = 'When a work from this collection enters your connected wallet, it will appear here automatically.';
+    const link = document.createElement('a');
+    link.className = 'btn';
+    link.href = 'https://www.kaysworks.com/auction';
+    link.textContent = 'Explore the auction';
+    empty.append(heading, copy, link);
+    container.appendChild(empty);
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'owned-works-grid';
+  ownedCards.forEach(source => {
+    const card = document.createElement('article');
+    card.className = 'owned-work-card';
+    const sourceImage = source.querySelector('.card-img');
+    if (sourceImage) {
+      const image = document.createElement('img');
+      image.src = sourceImage.currentSrc || sourceImage.src;
+      image.alt = sourceImage.alt || 'Owned artwork';
+      card.appendChild(image);
+    }
+    const body = document.createElement('div');
+    body.className = 'owned-work-body';
+    const title = document.createElement('h3');
+    title.textContent = source.querySelector('.card-title')?.textContent || source.dataset.ownerPiece || 'Owned work';
+    const description = document.createElement('p');
+    description.textContent = source.querySelector('.card-desc')?.textContent || 'Held by your connected wallet.';
+    body.append(title, description);
+    card.appendChild(body);
+    grid.appendChild(card);
+  });
+  container.appendChild(grid);
+}
+
 async function highlightOwnedPieces() {
-  if (!currentHolder || !currentHolder.wallet_address) return;
-  if (currentHolder.chain === 'tezos') {
-    await scanTezosHoldings(currentHolder.wallet_address);
-  } else if (currentHolder.chain === 'ethereum') {
-    await scanEthHoldings(currentHolder.wallet_address);
+  if (!currentHolder || !currentHolder.wallet_address) { renderOwnedWorks(); return; }
+  try {
+    if (currentHolder.chain === 'tezos') {
+      await scanTezosHoldings(currentHolder.wallet_address);
+    } else if (currentHolder.chain === 'ethereum') {
+      await scanEthHoldings(currentHolder.wallet_address);
+    }
+  } finally {
+    renderOwnedWorks();
   }
 }
 
