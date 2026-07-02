@@ -167,8 +167,20 @@
   .hub-head h1 { font-size:clamp(2.2rem,4.4vw,3.2rem); margin:0.5rem 0 0.6rem; }
   .hub-head .lead { color:var(--text-muted); max-width:62ch; line-height:1.7; }
   .asset-summary { margin-top:0.8rem; color:var(--gold); font-size:0.94rem; min-height:1.4em; }
-  .wallet-email-panel { display:none; margin-bottom:1.6rem; }
+  .wallet-email-panel {
+    display:none; position:fixed; z-index:110; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:min(560px,calc(100% - 2rem)); margin:0; box-shadow:0 28px 100px rgba(0,0,0,0.6);
+  }
   .wallet-email-panel.show { display:block; }
+  .wallet-email-close {
+    position:absolute; top:0.65rem; right:0.75rem; width:36px; height:36px;
+    border:1px solid var(--line); border-radius:50%; color:var(--sand);
+    background:rgba(20,14,10,0.72); cursor:pointer; font-size:1.2rem;
+  }
+  body.email-prompt-open::after {
+    content:''; position:fixed; inset:0; z-index:109;
+    background:rgba(12,8,6,0.72); backdrop-filter:blur(7px);
+  }
   .wallet-email-panel .email-row { display:grid; grid-template-columns:1fr auto; gap:0.7rem; align-items:end; }
   .wallet-email-panel .email-row .field { margin:0; }
   .wallet-email-panel .email-row .btn { width:auto; white-space:nowrap; }
@@ -396,7 +408,11 @@
   .opa-countdown-unit { min-width:72px; padding:0.65rem 0.8rem; text-align:center; border:1px solid var(--line); border-radius:6px; background:rgba(0,0,0,0.12); }
   .opa-countdown-unit strong { display:block; color:var(--sand); font-family:'Cormorant Garamond',serif; font-size:1.7rem; line-height:1; }
   .opa-countdown-unit span { display:block; margin-top:0.3rem; color:var(--text-muted); font-family:'Cinzel',serif; font-size:0.48rem; letter-spacing:0.12em; text-transform:uppercase; }
-  .opa-countdown-note { margin-top:0.75rem; color:var(--text-muted); font-size:0.84rem; }
+  .opa-countdown-note {
+    margin-top:1rem; color:var(--sand);
+    font-family:'Cormorant Garamond',serif; font-size:clamp(1.35rem,2.6vw,2rem);
+    line-height:1.1; letter-spacing:0.02em;
+  }
   .opa-countdown-live { color:#dce8d0; font-size:1rem; }
 
   .drop-feature {
@@ -616,6 +632,7 @@
     </div>
 
     <div class="panel wallet-email-panel" id="walletEmailPanel">
+      <button class="wallet-email-close" id="walletEmailClose" type="button" aria-label="Not now">×</button>
       <div class="panel-title">Save your access for next time</div>
       <p class="step-note" style="margin:0 0 1rem">You already have full access through your verified wallet. Adding an email is optional—it simply lets you return without reconnecting your wallet.</p>
       <div class="email-row">
@@ -653,7 +670,7 @@
           <div class="opa-countdown-unit"><strong data-countdown="minutes">00</strong><span>Minutes</span></div>
           <div class="opa-countdown-unit"><strong data-countdown="seconds">00</strong><span>Seconds</span></div>
         </div>
-        <div class="opa-countdown-note">3 July 2026 · 9:00 PM GMT+1. This countdown automatically adjusts for each visitor’s timezone.</div>
+        <div class="opa-countdown-note">3 July 2026 · 9:00 PM GMT+1</div>
       </div>
 
       <img class="drop-feature" src="images/opatg.jpg" alt="The Opa Collection" />
@@ -1240,6 +1257,7 @@ const els = {
   showEmailLoginBtn: document.getElementById('showEmailLoginBtn'),
   backToWalletBtn: document.getElementById('backToWalletBtn'),
   walletEmailPanel: document.getElementById('walletEmailPanel'),
+  walletEmailClose: document.getElementById('walletEmailClose'),
   walletEmailInput: document.getElementById('walletEmailInput'),
   walletEmailBtn: document.getElementById('walletEmailBtn'),
   walletEmailStatus: document.getElementById('walletEmailStatus'),
@@ -1458,18 +1476,97 @@ async function connectTezosWith(connector) {
   }
 }
 
+let holderBeaconClient = null;
+
+function getBeaconSdk() {
+  const candidates = [window.beacon, window.walletbeacon, window.beaconSdk, window.airgapBeaconSdk];
+  return candidates.find(sdk => sdk && typeof sdk.DAppClient === 'function') || null;
+}
+
+function walletTimeout(promise, ms, message) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+}
+
+function makeHolderBeaconClient(sdk) {
+  const DAppClient = sdk.DAppClient;
+  const TransportType = sdk.TransportType || {};
+  const PermissionScope = sdk.PermissionScope || {};
+  const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  const options = {
+    name: "Kay's Works Holder Hub",
+    iconUrl: location.origin + '/images/kayslogo1.png',
+    appUrl: location.origin,
+    network: { type: sdk.NetworkType?.MAINNET || 'mainnet' },
+    featuredWallets: ['temple', 'kukai', 'umami', 'naan', 'airgap'],
+    matrixNodes: [
+      'beacon-node-1.octez.io',
+      'beacon-node-2.octez.io',
+      'beacon-node-3.octez.io',
+      'beacon-node-4.octez.io',
+    ],
+    scopes: [
+      PermissionScope.OPERATION_REQUEST || 'operation_request',
+      PermissionScope.SIGN || 'sign',
+    ],
+    walletConnectOptions: { projectId: 'f9a3c36a9a9b8d60f77e64a5a4b8ef7c' },
+  };
+  if (TransportType.WALLET_CONNECT || TransportType.P2P) {
+    options.preferredTransport = mobile
+      ? (TransportType.WALLET_CONNECT || 'walletconnect')
+      : (TransportType.P2P || 'p2p');
+  }
+  return new DAppClient(options);
+}
+
+async function resetHolderBeaconClient(client) {
+  if (!client) return;
+  for (const task of [
+    () => client.removeAllAccounts?.(),
+    () => client.clearActiveAccount?.(),
+    () => client.setActiveAccount?.(),
+    () => client.destroy?.(),
+  ]) {
+    try { await task(); } catch (_) {}
+  }
+}
+
+async function requestHolderBeaconAddress(client) {
+  // Beacon 4.x expects scopes at construction time; a bare request works
+  // consistently across Temple, Kukai, Umami and mobile WalletConnect.
+  const permission = await walletTimeout(
+    client.requestPermissions(),
+    120000,
+    'Wallet connection timed out. Please reopen your wallet and try again.'
+  );
+  const account = await client.getActiveAccount?.();
+  const address = permission?.address || account?.address;
+  if (!address) throw new Error('Beacon connected but returned no Tezos address.');
+  return address;
+}
+
 async function connectBeacon() {
-  const DAppClient = window.beacon?.DAppClient;
-  if (!DAppClient) throw new Error('Beacon SDK did not load.');
-  const client = new DAppClient({ name: "Kay's Works Holder Hub" });
-  const permission = await client.requestPermissions();
-  if (!permission?.address) throw new Error('Beacon connected but returned no address.');
-  return permission.address;
+  const sdk = getBeaconSdk();
+  if (!sdk) throw new Error('Beacon SDK did not load. Refresh and try again.');
+  let client = holderBeaconClient || makeHolderBeaconClient(sdk);
+  holderBeaconClient = client;
+  try {
+    return await requestHolderBeaconAddress(client);
+  } catch (firstError) {
+    const message = String(firstError?.message || firstError);
+    if (/aborted|closed|cancel|not granted|not accepted|rejected/i.test(message)) throw firstError;
+    await resetHolderBeaconClient(client);
+    client = makeHolderBeaconClient(sdk);
+    holderBeaconClient = client;
+    return requestHolderBeaconAddress(client);
+  }
 }
 
 async function connectTemple() {
   // Same pattern as claim-token.html's direct Temple connector.
-  if (!window.tezos && !window.temple) throw new Error('Temple Wallet extension not found.');
+  if (!window.tezos && !window.temple) return connectBeacon();
   const temple = window.temple || window.tezos;
   const permission = await temple.requestPermissions?.();
   const address = permission?.address || permission?.[0]?.address;
@@ -1505,20 +1602,31 @@ async function verifyAndLink(chain, address) {
 
   // A freshly verified wallet enters immediately. Email is offered inside the
   // Hub only as an optional way to make future visits quicker.
-  pendingClaimToken = result.claimToken;
+  pendingClaimToken = result.claimToken || null;
   setStatus(els.walletStatus, 'ok', 'Verified — this wallet holds the token.');
   currentUser = null;
   currentHolder = {
-    id: null,
+    id: result.holderId || null,
     wallet_address: address,
     chain,
     token_balance: result.balance || 1,
-    display_name: null,
+    display_name: result.displayName || null,
     last_verified_at: new Date().toISOString(),
   };
-  els.walletEmailPanel.classList.add('show');
   await enterDashboard();
+  if (!result.emailLinked && pendingClaimToken) {
+    els.walletEmailPanel.classList.add('show');
+    document.body.classList.add('email-prompt-open');
+  } else {
+    els.walletEmailPanel.classList.remove('show');
+    document.body.classList.remove('email-prompt-open');
+  }
 }
+
+els.walletEmailClose.addEventListener('click', () => {
+  els.walletEmailPanel.classList.remove('show');
+  document.body.classList.remove('email-prompt-open');
+});
 
 els.walletEmailBtn.addEventListener('click', async () => {
   const email = els.walletEmailInput.value.trim();
