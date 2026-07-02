@@ -1809,28 +1809,37 @@ function makeHolderBeaconClient(sdk) {
   const TransportType = sdk.TransportType || {};
   const PermissionScope = sdk.PermissionScope || {};
   const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  const preferredTransport = mobile
+    ? (TransportType.WALLET_CONNECT || 'walletconnect')
+    : (TransportType.P2P || 'p2p');
+
   const options = {
     name: "Kay's Works Holder Hub",
     iconUrl: location.origin + '/images/kayslogo1.png',
     appUrl: location.origin,
     network: { type: sdk.NetworkType?.MAINNET || 'mainnet' },
     featuredWallets: ['temple', 'kukai', 'umami', 'naan', 'airgap'],
-    matrixNodes: [
-      'beacon-node-1.octez.io',
-      'beacon-node-2.octez.io',
-      'beacon-node-3.octez.io',
-      'beacon-node-4.octez.io',
-    ],
     scopes: [
       PermissionScope.OPERATION_REQUEST || 'operation_request',
       PermissionScope.SIGN || 'sign',
     ],
     walletConnectOptions: { projectId: 'f9a3c36a9a9b8d60f77e64a5a4b8ef7c' },
   };
+
+  // matrixNodes are P2P relay servers — only relevant for desktop pairing.
+  // Passing them on mobile (WalletConnect transport) triggers a Beacon 4.x
+  // internal bug: "servers.map is not a function".
+  if (!mobile) {
+    options.matrixNodes = [
+      'beacon-node-1.octez.io',
+      'beacon-node-2.octez.io',
+      'beacon-node-3.octez.io',
+      'beacon-node-4.octez.io',
+    ];
+  }
+
   if (TransportType.WALLET_CONNECT || TransportType.P2P) {
-    options.preferredTransport = mobile
-      ? (TransportType.WALLET_CONNECT || 'walletconnect')
-      : (TransportType.P2P || 'p2p');
+    options.preferredTransport = preferredTransport;
   }
   return new DAppClient(options);
 }
