@@ -206,6 +206,44 @@
   }
   .card-img { width:100%; aspect-ratio:1/1; object-fit:cover; background:rgba(0,0,0,0.2); display:block; }
   .card-img-wrap { position: relative; }
+  .opa-artwork-image {
+    width: 100%; height: auto; aspect-ratio: auto;
+    object-fit: contain;
+    object-position: center;
+    background: linear-gradient(145deg, #eef0f2 0%, #d8dde1 100%);
+    cursor: zoom-in;
+  }
+  .opa-artwork-grid {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: flex-start;
+    gap: 1.1rem;
+  }
+  .opa-artwork-grid .card {
+    flex: 1 1 280px;
+    min-width: min(100%, 240px);
+    max-width: 520px;
+  }
+  @media (max-width: 620px) {
+    .opa-artwork-grid .card { flex-basis: 100%; max-width: none; }
+  }
+  .art-lightbox {
+    position: fixed; inset: 0; z-index: 120; display: none;
+    align-items: center; justify-content: center; padding: 2rem;
+    background: rgba(8,8,10,0.94); backdrop-filter: blur(10px);
+  }
+  .art-lightbox.show { display: flex; }
+  .art-lightbox img {
+    display: block; max-width: 96vw; max-height: 92vh;
+    width: auto; height: auto; object-fit: contain;
+    box-shadow: 0 24px 90px rgba(0,0,0,0.55);
+  }
+  .art-lightbox-close {
+    position: fixed; top: 16px; right: 18px; z-index: 1;
+    width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.35); background: rgba(20,20,24,0.72);
+    color: white; font-size: 1.5rem; line-height: 1;
+  }
   .sold-sticker {
     position: absolute; top: 12px; right: 12px; width: 58px; height: 58px; z-index: 2;
     border-radius: 50%; background: radial-gradient(circle at 35% 30%, #d9503a, #8f2417);
@@ -918,10 +956,10 @@
 
       <section class="artwork-chapter" data-chapter="opa">
         <div class="artwork-group-label">The Opa Collection</div>
-        <div class="grid">
+        <div class="grid opa-artwork-grid">
         <div class="card" data-owner-piece="Opa I — Opa Orisun" data-status="available">
           <div class="card-img-wrap">
-            <img class="card-img" src="images/orisun1.jpg" alt="Opa Orisun" />
+            <img class="card-img opa-artwork-image" src="images/orisun5.jpg" alt="Opa Orisun — open fullscreen" tabindex="0" role="button" />
           </div>
           <div class="card-body">
             <div class="card-title">Opa Orisun</div>
@@ -944,7 +982,7 @@
         </div>
         <div class="card" data-owner-piece="Opa II — Opa Iranti" data-status="available">
           <div class="card-img-wrap">
-            <img class="card-img" src="images/iranti1.png" alt="Opa Iranti" />
+            <img class="card-img opa-artwork-image" src="images/iranti5.png" alt="Opa Iranti — open fullscreen" tabindex="0" role="button" />
           </div>
           <div class="card-body">
             <div class="card-title">Opa Iranti</div>
@@ -967,7 +1005,7 @@
         </div>
         <div class="card" data-owner-piece="Opa III — Opa Ekun" data-status="available">
           <div class="card-img-wrap">
-            <img class="card-img" src="images/ekun1.jpg" alt="Opa Ekun" />
+            <img class="card-img opa-artwork-image" src="images/ekun1.jpg" alt="Opa Ekun — open fullscreen" tabindex="0" role="button" />
           </div>
           <div class="card-body">
             <div class="card-title">Opa Ekun</div>
@@ -1035,6 +1073,12 @@
 
   </section>
 
+</div>
+
+<!-- Fullscreen artwork viewer -->
+<div class="art-lightbox" id="artLightbox" role="dialog" aria-modal="true" aria-label="Fullscreen artwork">
+  <button class="art-lightbox-close" id="artLightboxClose" type="button" aria-label="Close fullscreen image">×</button>
+  <img id="artLightboxImage" src="" alt="" />
 </div>
 
 <!-- Tezos wallet choice modal -->
@@ -1646,13 +1690,18 @@ async function initLivePrices() {
 initLivePrices();
 
 // ── Ownership highlight ("You own this") ──
-// Multi-chain auction: sold pieces exist as a single copy on whichever
-// chain sold; unsold pieces exist as parallel instances on both Ethereum
-// and Tezos. So there's no fixed "piece → token ID" map to maintain —
-// instead this scans whatever the holder's wallet actually holds in the
-// collection contract(s) on their chain, and matches each token's on-chain
-// name against the piece names already on this page (Ìjòkòó I, Ìpàdé, etc).
+// Chain ownership is authoritative. Tezos uses a compact, explicit token map;
+// metadata-name matching remains as a fallback for future additions.
 const TEZOS_COLLECTION_CONTRACT = 'KT1RF7ck9WMY6oXQnaZbTyJhwuLx7cPyvbEz';
+const TEZOS_TOKEN_PIECES = {
+  '0': 'Ìjòkòó IV',
+  '1': 'Ìjòkòó I',
+  '2': 'Ìjòkòó II',
+  '3': 'Ìjòkòó III',
+  '4': 'Ìjòkòó V',
+  '5': 'Ìjòkòó VI',
+  '6': 'Ìpàdé I',
+};
 const ETH_COLLECTION_CONTRACTS = [
   '0x824b9144174d0b5c00dbcf39d43d290701e0ffcb',
   '0xd7066137225cb0e1eb3220a2b814ff228e2c0249',
@@ -1661,12 +1710,16 @@ const ETH_READONLY_RPC = 'https://ethereum.publicnode.com';
 const ETH_MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11';
 
 function normalizePieceName(name) {
-  return (name || '')
+  let normalized = (name || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip accents (Ìjòkòó → Ijokoo)
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ') // drop punctuation
     .replace(/\s+/g, ' ')
     .trim();
+  // TzKT metadata spells IJOKOO as "I J O K O O".
+  normalized = normalized.replace(/(?:\b[a-z]\b\s*){2,}/g, run => run.replace(/\s+/g, ''));
+  const roman = { i:'1', ii:'2', iii:'3', iv:'4', v:'5', vi:'6' };
+  return normalized.replace(/\b(vi|iv|iii|ii|v|i)\b/g, value => roman[value]);
 }
 
 // Word-boundary match in both directions, so "Ijokoo I" never matches
@@ -1703,16 +1756,21 @@ async function scanTezosHoldings(address) {
       'https://api.tzkt.io/v1/tokens/balances' +
       '?account=' + encodeURIComponent(address) +
       '&token.contract=' + encodeURIComponent(TEZOS_COLLECTION_CONTRACT) +
-      '&balance.gt=0&select=token.metadata&limit=200';
+      '&balance.gt=0&limit=200';
     const r = await fetch(url);
-    if (!r.ok) return;
+    if (!r.ok) throw new Error('TzKT returned ' + r.status);
     const rows = await r.json();
     setOwnedAssetSummary((rows || []).length);
-    (rows || []).forEach(meta => {
-      const name = meta && (meta.name || meta['name']);
+    (rows || []).forEach(row => {
+      const tokenId = String(row?.token?.tokenId ?? '');
+      const mappedName = TEZOS_TOKEN_PIECES[tokenId];
+      const name = mappedName || row?.token?.metadata?.name;
       if (name) highlightPieceByName(name);
     });
-  } catch (err) { /* fail quiet — ownership highlight is a bonus, not core function */ }
+  } catch (err) {
+    console.warn('Tezos asset recognition failed:', err);
+    setOwnedAssetSummary(null, 'Could not confirm collection assets right now.');
+  }
 }
 
 async function scanEthHoldings(address) {
@@ -1787,9 +1845,13 @@ async function scanEthHoldings(address) {
   }
 }
 
-function setOwnedAssetSummary(count) {
+function setOwnedAssetSummary(count, message = '') {
   const el = document.getElementById('ownedAssetSummary');
   if (!el) return;
+  if (message) {
+    el.textContent = message;
+    return;
+  }
   if (!Number.isFinite(count)) {
     el.textContent = '';
   } else if (count === 0) {
@@ -1889,6 +1951,42 @@ document.getElementById('sendMsgBtn').addEventListener('click', async () => {
   document.getElementById('msgSubject').value = '';
   document.getElementById('msgBody').value = '';
   loadMessages();
+});
+
+// ── Opa artwork fullscreen viewer ──
+const artLightbox = document.getElementById('artLightbox');
+const artLightboxImage = document.getElementById('artLightboxImage');
+const artLightboxClose = document.getElementById('artLightboxClose');
+
+function openArtLightbox(image) {
+  artLightboxImage.src = image.currentSrc || image.src;
+  artLightboxImage.alt = image.alt.replace(/\s*[—-]\s*open fullscreen$/i, '');
+  artLightbox.classList.add('show');
+  document.body.style.overflow = 'hidden';
+  artLightboxClose.focus();
+}
+
+function closeArtLightbox() {
+  artLightbox.classList.remove('show');
+  artLightboxImage.removeAttribute('src');
+  document.body.style.overflow = '';
+}
+
+document.querySelectorAll('.opa-artwork-image').forEach(image => {
+  image.addEventListener('click', () => openArtLightbox(image));
+  image.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openArtLightbox(image);
+    }
+  });
+});
+artLightboxClose.addEventListener('click', closeArtLightbox);
+artLightbox.addEventListener('click', event => {
+  if (event.target === artLightbox) closeArtLightbox();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && artLightbox.classList.contains('show')) closeArtLightbox();
 });
 </script>
 </body>
