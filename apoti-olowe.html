@@ -399,7 +399,7 @@
     box-shadow: 0 0 0 1px rgba(109,179,109,0.1), 0 18px 44px rgba(10,7,5,0.12);
   }
   .ao-chapter-card.chapter-active[role="button"]::after,
-  .ao-chapter-card[role="button"][aria-expanded="true"]::after {
+  .ao-chapter-card[role="button"][aria-expanded="false"]::after {
     content: 'View Chapter';
     grid-column: 2 / 3;
     margin-top: 0.55rem;
@@ -409,16 +409,25 @@
     text-transform: uppercase;
     color: var(--gold);
   }
+  .ao-chapter-card[role="button"][aria-expanded="true"]::after {
+    content: 'Hide Chapter'; grid-column: 2 / 3; margin-top: 0.55rem;
+    font-family: 'Cinzel', serif; font-size: 0.56rem; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--gold);
+  }
   .ao-chapter-reveal {
     display: none;
-    margin-top: 1.35rem;
+    margin: -0.15rem 0 0.6rem;
     padding: 1.35rem;
     border: 1px solid rgba(201,153,58,0.24);
     border-radius: 6px;
     background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(30,20,14,0.15));
     box-shadow: 0 18px 45px rgba(12,8,5,0.16);
   }
-  .ao-chapter-reveal.open { display: block; }
+  .ao-chapter-reveal.open { display: block; animation: aoAccordionOpen 0.28s ease both; }
+  @keyframes aoAccordionOpen {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
   .ao-chapter-reveal-head {
     display: flex;
     align-items: flex-start;
@@ -2720,11 +2729,33 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
 
 // ── PRECURSOR AUCTION TOGGLE ──
 (function() {
+  // Place each chapter reveal directly beneath its schedule card so the
+  // release schedule behaves as a true in-flow accordion.
+  ['ch1', 'ch2'].forEach(function(key) {
+    var card = document.querySelector('#schedule [data-release-card="' + key + '"]');
+    var panel = document.getElementById(key === 'ch1' ? 'chapter-one-panel' : 'chapter-two-panel');
+    if (card && panel) card.insertAdjacentElement('afterend', panel);
+  });
+
+  window.aoCloseOtherReleasePanels = function(exceptPanel) {
+    document.querySelectorAll('#igbaradi-panel, #chapter-one-panel, #chapter-two-panel').forEach(function(panel) {
+      if (panel === exceptPanel) return;
+      panel.classList.remove('open');
+      if (panel.id === 'igbaradi-panel') panel.setAttribute('aria-hidden', 'true');
+      var trigger = document.querySelector('[aria-controls="' + panel.id + '"]');
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    });
+  };
+})();
+
+(function() {
   var trigger = document.querySelector('.ao-prelude-toggle');
   var panel = document.getElementById('igbaradi-panel');
   if (!trigger || !panel) return;
   function togglePrelude() {
-    var isOpen = panel.classList.toggle('open');
+    var isOpen = !panel.classList.contains('open');
+    if (isOpen && window.aoCloseOtherReleasePanels) window.aoCloseOtherReleasePanels(panel);
+    panel.classList.toggle('open', isOpen);
     trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     panel.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
     if (isOpen) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -2782,9 +2813,13 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
     var id = decodeURIComponent(location.hash.slice(1));
     var card = document.getElementById(id);
     if (!card || !card.matches('#schedule [data-release-card]')) return;
-    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     var canExpand = card.matches('.ao-prelude-toggle, .ao-chapter-card[role="button"]');
     if (canExpand && card.getAttribute('aria-expanded') !== 'true') card.click();
+    var panelId = card.getAttribute('aria-controls');
+    var destination = panelId ? document.getElementById(panelId) : card;
+    setTimeout(function() {
+      (destination || card).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, canExpand ? 120 : 0);
   }
 
   window.addEventListener('hashchange', openSharedCard);
@@ -2840,6 +2875,7 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
 
   function openChapterOne(shouldScroll) {
     if (!chapterOnePanel || !chapterOneCard) return;
+    if (window.aoCloseOtherReleasePanels) window.aoCloseOtherReleasePanels(chapterOnePanel);
     chapterOnePanel.classList.add('open');
     chapterOneCard.setAttribute('aria-expanded', 'true');
     if (shouldScroll) chapterOnePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2853,11 +2889,13 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
   }
 
   if (chapterOneCard) {
-    chapterOneCard.addEventListener('click', function() { openChapterOne(true); });
+    chapterOneCard.addEventListener('click', function() {
+      chapterOnePanel.classList.contains('open') ? closeChapterOne() : openChapterOne(true);
+    });
     chapterOneCard.addEventListener('keydown', function(event) {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
-        openChapterOne(true);
+        chapterOnePanel.classList.contains('open') ? closeChapterOne() : openChapterOne(true);
       }
     });
   }
@@ -2871,6 +2909,7 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
 
   function openChapterTwo(shouldScroll) {
     if (!chapterTwoPanel || !chapterTwoCard) return;
+    if (window.aoCloseOtherReleasePanels) window.aoCloseOtherReleasePanels(chapterTwoPanel);
     chapterTwoPanel.classList.add('open');
     chapterTwoCard.setAttribute('aria-expanded', 'true');
     if (shouldScroll) chapterTwoPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2884,11 +2923,13 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
   }
 
   if (chapterTwoCard) {
-    chapterTwoCard.addEventListener('click', function() { openChapterTwo(true); });
+    chapterTwoCard.addEventListener('click', function() {
+      chapterTwoPanel.classList.contains('open') ? closeChapterTwo() : openChapterTwo(true);
+    });
     chapterTwoCard.addEventListener('keydown', function(event) {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
-        openChapterTwo(true);
+        chapterTwoPanel.classList.contains('open') ? closeChapterTwo() : openChapterTwo(true);
       }
     });
   }
