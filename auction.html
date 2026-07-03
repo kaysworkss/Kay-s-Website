@@ -216,17 +216,19 @@ body {
 /* ════════════════════════════════
    UPCOMING VIEW
 ════════════════════════════════ */
-#view-upcoming { display: none; min-height: 100vh; }
+#view-upcoming { display: none; height: 100vh; min-height: 0; overflow: hidden; }
 #view-upcoming.show { display: flex; flex-direction: column; }
-.upcoming-layout { display: grid; grid-template-columns: 1fr 420px; flex: 1; min-height: 0; }
+.upcoming-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 420px); flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 
 /* Upcoming-specific: constrain the artwork frame so square/tall images
    can't push the title / artist / about-toggle panel off-screen on desktop.
    The frame is allowed to grow but is capped to leave room for .art-info.
    !important here is required because loadStaticImage() sets width/height
    as inline styles for the shared <img class="art-img"> element. */
-#view-upcoming .art-frame { max-height: calc(100vh - 240px); padding: 32px; }
+#view-upcoming .art-col   { min-width: 0; min-height: 0; }
+#view-upcoming .art-frame { min-height: 0; max-height: none; padding: clamp(18px, 2vw, 32px); }
 #view-upcoming .art-img   { max-height: 100% !important; height: auto !important; width: auto !important; max-width: 100% !important; }
+#view-upcoming .bid-col   { width: auto; min-width: 0; max-width: none; min-height: 0; }
 
 /* ════════════════════════════════
    LIVE VIEW
@@ -1637,6 +1639,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   /* Unlock page scroll on mobile — layout stacks vertically */
   html, body { height: auto; overflow: auto; overflow-x: hidden; }
   #view-live { height: auto; overflow: visible; }
+  #view-upcoming { height: auto; min-height: 100vh; overflow: visible; }
   #live-flex-wrap { height: auto !important; overflow: visible !important; }
   .live-layout { flex: 0 0 auto; width: 100%; overflow: visible; }
   .bid-col { width: 100%; min-width: 0; max-width: none; height: auto; overflow-y: visible; scrollbar-gutter: auto; }
@@ -1743,7 +1746,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   .wallet-btns { flex-wrap: wrap; gap: 5px; }
 
   /* ── Upcoming view ── */
-  .upcoming-layout { grid-template-columns: 1fr; }
+  .upcoming-layout { grid-template-columns: 1fr; overflow: visible; }
   .bid-inner.upcoming { padding: 18px 16px 48px; }
 
   /* ── Landing nav ── */
@@ -1923,9 +1926,6 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 
 <!-- ── UPCOMING VIEW ── -->
 <div id="view-upcoming">
-  <button type="button" class="series-back-link upcoming-back-live" id="upcoming-back-live" onclick="_returnToLiveAuction()" style="display:none">
-    <span>&larr;</span> Back to live auction
-  </button>
   <!-- Piece selector for upcoming — only shown when multiple auctions are configured -->
   <div class="piece-selector-wrap" id="upcoming-piece-selector-wrap">
     <div class="piece-selector-header">
@@ -1939,6 +1939,9 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
       <div class="piece-selector" id="upcoming-piece-selector"></div>
     </div>
   </div>
+  <button type="button" class="series-back-link upcoming-back-live" id="upcoming-back-live" onclick="_returnToLiveAuction()" style="display:none">
+    <span>&larr;</span> Back to live auction
+  </button>
   <a href="/apoti-olowe" class="series-back-link"><span>&larr;</span> Àpótí Ọlọ́wẹ̀</a>
   <div class="upcoming-layout">
     <div class="art-col" id="upcoming-art-col">
@@ -3640,7 +3643,7 @@ function _cnbGoUpcoming() {
   document.getElementById("view-live").classList.remove("show");
   document.getElementById("view-upcoming").classList.add("show");
   const backBtn = document.getElementById("upcoming-back-live");
-  if (backBtn) backBtn.style.display = _auctions.some(p => _slotMatchesStatus(p, "live")) ? "inline-flex" : "none";
+  if (backBtn) backBtn.style.display = "inline-flex";
   if (!_upcomingInitialised) { _upcomingInitialised = true; initUpcoming(); }
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
