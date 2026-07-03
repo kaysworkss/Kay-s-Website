@@ -349,6 +349,17 @@
     transition: border-color 0.2s, background 0.2s;
   }
   .ao-chapter-card:hover { background: var(--surface-hover); border-color: rgba(196,132,90,0.3); }
+  .ao-chapter-card:target, .ao-precursor-row:target, .ao-post-row:target {
+    border-color: var(--gold); box-shadow: 0 0 0 2px rgba(201,153,58,0.16);
+  }
+  .ao-release-share {
+    grid-column: 2 / 3; justify-self: start; margin-top: 0.55rem;
+    padding: 0.28rem 0.55rem; border: 1px solid rgba(201,153,58,0.38);
+    border-radius: 3px; background: transparent; color: var(--gold);
+    font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.14em;
+    text-transform: uppercase; cursor: pointer;
+  }
+  .ao-release-share:hover { background: rgba(201,153,58,0.1); }
   .ao-chapter-card.chapter-active {
     background: rgba(109,179,109,0.06);
     border-color: rgba(109,179,109,0.32);
@@ -1219,6 +1230,15 @@
   }
   .status-ended { color: var(--ash); }
   .phase-btn { align-self: flex-start; cursor: none; }
+  .ao-card-share {
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-top: 0.85rem; padding: 0.45rem 0.75rem;
+    border: 1px solid rgba(201,153,58,0.42); border-radius: 3px;
+    background: transparent; color: var(--gold); cursor: pointer;
+    font-family: 'Cinzel', serif; font-size: 0.55rem;
+    letter-spacing: 0.15em; text-transform: uppercase;
+  }
+  .ao-card-share:hover { background: rgba(201,153,58,0.1); }
   .token-action-row {
     display: flex;
     flex-wrap: nowrap;
@@ -1811,7 +1831,7 @@
     <p class="ao-section-label">Release schedule</p>
     <p class="ao-chapter-intro">After Chapter 1, the series continues across five more releases. Six chapters across six months, May through September 2026. Each release is a self-contained world that advances Ayo&rsquo;s story, built from a 1/1 digital painting, a set of digital sculptures, written narrative, and optional archival prints. You can follow from the beginning, or step in wherever the story finds you.</p>
     <p class="ao-chapter-intro" style="margin-top:-1.25rem;font-size:0.9rem;font-style:italic;color:var(--text-muted);">Dates are subject to change. I will always announce if any date changes.</p>
-    <div class="ao-precursor-row phase-past ao-prelude-toggle" data-release-card="precursor" role="button" tabindex="0" aria-controls="igbaradi-panel" aria-expanded="false">
+    <div class="ao-precursor-row phase-past ao-prelude-toggle" id="precursor-igbaradi" data-release-card="precursor" role="button" tabindex="0" aria-controls="igbaradi-panel" aria-expanded="false">
       <div><p class="ao-precursor-label">Precursor</p></div>
       <div>
         <p class="ao-precursor-name">Precursor Month</p>
@@ -1831,6 +1851,7 @@
           <li>A bowl of kolanut (Obi)</li>
         </ul>
         <p class="ao-prelude-auction-copy">Each of these objects carries deep cultural meaning within Yoruba traditions, Pitchers keep water cool throughout the day, kolanut is central to ceremonies, greetings, and divination, and Adire represents a celebrated craft with generations of mastery and countless variations. Igbaradi reflects my research into the traditions I aim to honor, remember and showcase. It also serves as the direct precursor to “The Meeting,” the opening chapter of the series, a table prepared for the chief’s council gathering. In every sense, this piece is the first step into the world I am building, and I am deeply excited to share it with you. Every element in the artwork was individually sculpted, painted, and simulated with care to achieve its final form.</p>
+        <button class="ao-card-share" type="button" data-share-fragment="precursor-igbaradi">Copy precursor link</button>
       </div>
     </article>
     <div class="ao-chapter-card" data-release-card="ch1" role="button" tabindex="0" aria-controls="chapter-one-panel" aria-expanded="false">
@@ -1863,7 +1884,7 @@
       <div><p class="ao-chapter-name">Aftermath</p><p class="ao-chapter-yoruba">Narrative resolution, emotional closure. Key elements and characters revealed</p></div>
       <p class="ao-chapter-date" data-release-status>Sep 27</p>
     </div>
-    <div class="ao-post-row">
+    <div class="ao-post-row" data-release-card="post" id="release-post">
       <div><p class="ao-post-label">Post</p></div>
       <div>
         <p class="ao-post-name">Collector Rewards Unlock &amp; World Compendium</p>
@@ -2373,8 +2394,11 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
     </div>
 
     <!-- Mint card with live countdowns -->
-    <div class="precursor-card">
-      <p class="precursor-title">Entry Token Access</p>
+    <div class="precursor-card" id="precursor-entry-token">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
+        <p class="precursor-title" style="margin-bottom:0;">Entry Token Access</p>
+        <button class="ao-card-share" type="button" data-share-fragment="precursor-entry-token" style="margin-top:0;">Copy card link</button>
+      </div>
       <div class="precursor-phases">
         <div class="precursor-phase" id="phase-public">
           <div class="phase-status">
@@ -2724,6 +2748,54 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
       event.preventDefault();
       togglePrelude();
     }
+  });
+})();
+
+// ── SHAREABLE RELEASE SCHEDULE CARDS ──
+(function() {
+  var canonicalPage = 'https://www.kaysworks.com/apoti-olowe';
+  var cards = document.querySelectorAll('#schedule [data-release-card]');
+
+  function copyShareLink(button, fragment) {
+    var url = canonicalPage + '#' + fragment;
+    var original = button.textContent;
+    function copied() {
+      button.textContent = 'Link copied';
+      setTimeout(function() { button.textContent = original; }, 1800);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(copied).catch(function() {
+        window.prompt('Copy this release link:', url);
+      });
+    } else {
+      window.prompt('Copy this release link:', url);
+    }
+  }
+
+  cards.forEach(function(card) {
+    var key = card.getAttribute('data-release-card');
+    if (!key) return;
+    if (!card.id) card.id = 'release-' + key;
+    var share = document.createElement('button');
+    share.type = 'button';
+    share.className = 'ao-release-share';
+    share.textContent = 'Copy release link';
+    share.setAttribute('aria-label', 'Copy link to ' + key + ' release');
+    share.addEventListener('click', function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      copyShareLink(share, card.id);
+    });
+    share.addEventListener('keydown', function(event) { event.stopPropagation(); });
+    card.appendChild(share);
+  });
+
+  document.querySelectorAll('[data-share-fragment]').forEach(function(button) {
+    button.addEventListener('click', function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      copyShareLink(button, button.getAttribute('data-share-fragment'));
+    });
   });
 })();
 // ── RELEASE SCHEDULE STATE ──
