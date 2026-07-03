@@ -2563,6 +2563,18 @@ function _findPairedSlotIndex(pairKey, chain) {
   return _auctions.findIndex(slot => _pairKeyForSlot(slot) === key && _slotChain(slot) === chain);
 }
 
+// A cross-chain pair has one USD anchor, even though the admin stores the
+// value on an individual slot. Resolve it from either half so a refresh or a
+// chain redirect cannot make the configured price disappear.
+function _usdHardCapForPair(pairKey, preferredSlot) {
+  const candidates = [preferredSlot, ..._auctions.filter(slot => _pairKeyForSlot(slot) === pairKey)];
+  for (const candidate of candidates) {
+    const cap = parseFloat(candidate?.usdHardCap);
+    if (Number.isFinite(cap) && cap > 0) return cap;
+  }
+  return null;
+}
+
 function _auctionKeyForSlot(slot) {
   if (!slot) return "";
   if (_slotChain(slot) === "tezos") {
@@ -3940,9 +3952,11 @@ function _refreshChat() {
 
 function _setupCrossChainForSlot(slot) {
   const ccKey = _pairKeyForSlot(slot);
+  window._ccUsdHardCap = null;
+  window._ccEthReserveWei = null;
   if (!ccKey) return;
   _ccPairKey = ccKey;
-  window._ccUsdHardCap = slot.usdHardCap ? parseFloat(slot.usdHardCap) : null;
+  window._ccUsdHardCap = _usdHardCapForPair(ccKey, slot);
   _ccShowChooser();
   // Poll immediately on load so refreshing collectors see current state right away.
   _ccStartPolling(ccKey);
