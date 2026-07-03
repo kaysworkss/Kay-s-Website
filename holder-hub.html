@@ -1935,50 +1935,14 @@ async function verifyAndLink(chain, address) {
     return;
   }
 
-  // First-time wallet-only entry: create an anonymous Supabase session so
-  // that (a) RLS policies work (auth.role() = 'authenticated'), (b) the
-  // session persists in localStorage across page refreshes, and (c) the
-  // holder record gets properly linked to a real auth_user_id via the
-  // claim endpoint, meaning participants/messages/reservations all work
-  // without requiring the email step. Email registration stays available
-  // inside the Hub as a convenience upgrade for cross-device access.
+  // Keep this verification pending until the holder clicks the email link.
+  // Claiming it against an anonymous user here would consume the token and
+  // link the wallet to the wrong auth account, so later email sign-in would
+  // silently produce no email.
   pendingClaimToken = result.claimToken || null;
 
-  if (pendingClaimToken) {
-    try {
-      setStatus(els.walletStatus, '', 'Setting up your session…');
-      const { data: anonData, error: anonErr } = await sb.auth.signInAnonymously();
-      if (anonErr) throw anonErr;
-
-      const anonSession = anonData?.session;
-      if (anonSession) {
-        // Claim the pending verification against this anonymous session,
-        // linking the wallet to the anonymous auth user in the holders table.
-        await fetch(CONFIG.claimEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + anonSession.access_token,
-          },
-          body: JSON.stringify({ token: pendingClaimToken }),
-        });
-        // Re-enter through the normal session path — this picks up the
-        // newly-linked holder record and enters the dashboard properly.
-        setStatus(els.walletStatus, 'ok', 'Verified — welcome in.');
-        await handleSession(anonSession);
-        return;
-      }
-    } catch (anonErr) {
-      console.warn('Anonymous session creation failed, falling back to sessionless mode:', anonErr);
-      // Fall through to the old sessionless entry — not ideal (won't
-      // persist on refresh, RLS reads will be limited), but at least
-      // the user gets into the Hub rather than being stuck at the gate.
-    }
-  }
-
-  // Fallback: sessionless entry (original behavior before this fix).
-  // Works for viewing hardcoded content, but dynamic reads (participants,
-  // messages) may be limited by RLS since there's no auth session.
+  // Let the verified wallet enter immediately. The optional email panel uses
+  // the still-valid pendingClaimToken to attach this wallet to the email user.
   setStatus(els.walletStatus, 'ok', 'Verified — this wallet holds the token.');
   currentUser = null;
   currentHolder = {
