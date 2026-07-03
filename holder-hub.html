@@ -1920,7 +1920,12 @@ async function verifyAndLink(chain, address) {
   const result = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    setStatus(els.walletStatus, 'err', result.error || 'This wallet does not currently hold the token.');
+    if (res.status === 403) {
+      setStatus(els.walletStatus, 'err', '');
+      els.walletStatus.innerHTML = 'This wallet doesn\'t hold an entry token yet. <a href="/claim-token" style="color:var(--gold);text-decoration:underline;">Claim one here</a> to get access.';
+    } else {
+      setStatus(els.walletStatus, 'err', result.error || 'Could not verify this wallet.');
+    }
     return;
   }
 
