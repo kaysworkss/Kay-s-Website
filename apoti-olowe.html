@@ -353,13 +353,13 @@
     border-color: var(--gold); box-shadow: 0 0 0 2px rgba(201,153,58,0.16);
   }
   .ao-release-share {
-    grid-column: 2 / 3; justify-self: start; margin-top: 0.55rem;
-    padding: 0.28rem 0.55rem; border: 1px solid rgba(201,153,58,0.38);
-    border-radius: 3px; background: transparent; color: var(--gold);
-    font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.14em;
-    text-transform: uppercase; cursor: pointer;
+    grid-column: 2 / 3; justify-self: start; margin-top: 0.35rem;
+    padding: 0.08rem 0; border: 0; border-bottom: 1px solid rgba(201,153,58,0.24);
+    background: transparent; color: var(--text-muted); opacity: 0.58;
+    font-family: 'Cinzel', serif; font-size: 0.46rem; letter-spacing: 0.12em;
+    text-transform: uppercase; cursor: pointer; transition: color 0.2s, opacity 0.2s;
   }
-  .ao-release-share:hover { background: rgba(201,153,58,0.1); }
+  .ao-release-share:hover, .ao-release-share:focus-visible { color: var(--gold); opacity: 1; }
   .ao-chapter-card.chapter-active {
     background: rgba(109,179,109,0.06);
     border-color: rgba(109,179,109,0.32);
@@ -1230,15 +1230,6 @@
   }
   .status-ended { color: var(--ash); }
   .phase-btn { align-self: flex-start; cursor: none; }
-  .ao-card-share {
-    display: inline-flex; align-items: center; justify-content: center;
-    margin-top: 0.85rem; padding: 0.45rem 0.75rem;
-    border: 1px solid rgba(201,153,58,0.42); border-radius: 3px;
-    background: transparent; color: var(--gold); cursor: pointer;
-    font-family: 'Cinzel', serif; font-size: 0.55rem;
-    letter-spacing: 0.15em; text-transform: uppercase;
-  }
-  .ao-card-share:hover { background: rgba(201,153,58,0.1); }
   .token-action-row {
     display: flex;
     flex-wrap: nowrap;
@@ -1851,7 +1842,6 @@
           <li>A bowl of kolanut (Obi)</li>
         </ul>
         <p class="ao-prelude-auction-copy">Each of these objects carries deep cultural meaning within Yoruba traditions, Pitchers keep water cool throughout the day, kolanut is central to ceremonies, greetings, and divination, and Adire represents a celebrated craft with generations of mastery and countless variations. Igbaradi reflects my research into the traditions I aim to honor, remember and showcase. It also serves as the direct precursor to “The Meeting,” the opening chapter of the series, a table prepared for the chief’s council gathering. In every sense, this piece is the first step into the world I am building, and I am deeply excited to share it with you. Every element in the artwork was individually sculpted, painted, and simulated with care to achieve its final form.</p>
-        <button class="ao-card-share" type="button" data-share-fragment="precursor-igbaradi">Copy precursor link</button>
       </div>
     </article>
     <div class="ao-chapter-card" data-release-card="ch1" role="button" tabindex="0" aria-controls="chapter-one-panel" aria-expanded="false">
@@ -2395,10 +2385,7 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
 
     <!-- Mint card with live countdowns -->
     <div class="precursor-card" id="precursor-entry-token">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
-        <p class="precursor-title" style="margin-bottom:0;">Entry Token Access</p>
-        <button class="ao-card-share" type="button" data-share-fragment="precursor-entry-token" style="margin-top:0;">Copy card link</button>
-      </div>
+      <p class="precursor-title">Entry Token Access</p>
       <div class="precursor-phases">
         <div class="precursor-phase" id="phase-public">
           <div class="phase-status">
@@ -2779,7 +2766,7 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
     var share = document.createElement('button');
     share.type = 'button';
     share.className = 'ao-release-share';
-    share.textContent = 'Copy release link';
+    share.textContent = 'Copy link';
     share.setAttribute('aria-label', 'Copy link to ' + key + ' release');
     share.addEventListener('click', function(event) {
       event.preventDefault();
@@ -2790,13 +2777,18 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
     card.appendChild(share);
   });
 
-  document.querySelectorAll('[data-share-fragment]').forEach(function(button) {
-    button.addEventListener('click', function(event) {
-      event.preventDefault();
-      event.stopPropagation();
-      copyShareLink(button, button.getAttribute('data-share-fragment'));
-    });
-  });
+  function openSharedCard() {
+    if (!location.hash) return;
+    var id = decodeURIComponent(location.hash.slice(1));
+    var card = document.getElementById(id);
+    if (!card || !card.matches('#schedule [data-release-card]')) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var canExpand = card.matches('.ao-prelude-toggle, .ao-chapter-card[role="button"]');
+    if (canExpand && card.getAttribute('aria-expanded') !== 'true') card.click();
+  }
+
+  window.addEventListener('hashchange', openSharedCard);
+  setTimeout(openSharedCard, 0);
 })();
 // ── RELEASE SCHEDULE STATE ──
 (function() {
