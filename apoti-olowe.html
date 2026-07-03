@@ -614,6 +614,9 @@
   }
   /* Read Script button */
   .ao-read-script-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     font-family: 'Cinzel', serif;
     font-size: 0.62rem;
     letter-spacing: 0.2em;
@@ -1487,7 +1490,19 @@
   .ao-collection-group:first-child { margin-top: 0; }
   .ao-collection-card { border: 1px solid var(--divider); border-radius: 8px; overflow: hidden; background: rgba(0,0,0,0.12); transition: border-color 0.25s; width: 100%; min-width: 0; }
   .ao-collection-card:hover { border-color: var(--gold); }
-  .ao-collection-img-wrap { position: relative; }
+  .ao-collection-img-wrap { position: relative; cursor: zoom-in; }
+  .ao-collection-img-wrap::after {
+    content: 'View full screen'; position: absolute; left: 50%; bottom: 12px;
+    transform: translate(-50%, 8px); opacity: 0; pointer-events: none;
+    padding: 0.38rem 0.7rem; border-radius: 3px;
+    background: rgba(12,8,5,0.78); border: 1px solid rgba(232,192,110,0.45);
+    color: #f4dfb1; font-family: 'Cinzel', serif; font-size: 0.5rem;
+    letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .ao-collection-img-wrap:hover::after,
+  .ao-collection-img-wrap:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+  .ao-collection-img-wrap:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
   .ao-collection-img { width: 100%; height: auto; aspect-ratio: auto; object-fit: contain; object-position: center; display: block; background: radial-gradient(ellipse at 50% 40%, rgba(196,132,90,0.08), rgba(0,0,0,0.22)); }
   .ao-collection-sold-dot {
     position: absolute; top: 10px; right: 10px; width: 50px; height: 50px;
@@ -1649,6 +1664,7 @@
     <li><a href="#gallery">Archive</a></li>
     <li><a href="#research">Research</a></li>
     <li><a href="#schedule">Schedule</a></li>
+    <li><a href="#scripts">Story</a></li>
     <li><a href="#tokens">Auction</a></li>
     <li><a href="#collection">Collection</a></li>
     <li><a href="/holder-hub" style="color:var(--gold)">Holder Hub</a></li>
@@ -1672,6 +1688,7 @@
   <a href="#gallery" class="mobile-link">Visual Archive</a>
   <a href="#research" class="mobile-link">Research</a>
   <a href="#schedule" class="mobile-link">Schedule</a>
+  <a href="#scripts" class="mobile-link">Read the Story</a>
   <a href="#chapter-one-panel" class="mobile-link">Chapter 1</a>
   <a href="#chapter-two-panel" class="mobile-link">Chapter 2</a>
   <a href="#tokens" class="mobile-link">Auction</a>
@@ -1902,7 +1919,7 @@
           <p class="ao-script-kicker">Chapter 1 script</p>
           <h3 class="ao-script-title" style="margin-bottom:0;">The Chiefs&rsquo; Meeting</h3>
         </div>
-        <button class="ao-read-script-btn" type="button" data-script-open="ch1">Read Script</button>
+        <a class="ao-read-script-btn" href="#script-ch1" data-script-open="ch1">Read Script</a>
       </div>
     </div>
   </section>
@@ -1932,7 +1949,7 @@
           <p class="ao-script-kicker">Chapter 2 script</p>
           <h3 class="ao-script-title" style="margin-bottom:0;">Ìpàdé</h3>
         </div>
-        <button class="ao-read-script-btn" type="button" data-script-open="ch2">Read Script</button>
+        <a class="ao-read-script-btn" href="#script-ch2" data-script-open="ch2">Read Script</a>
       </div>
     </div>
   </section>
@@ -2554,7 +2571,10 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
         <p id="scriptModalKicker" class="ao-script-kicker" style="margin-bottom:0.25rem;"></p>
         <h2 id="scriptModalTitle" style="font-family:'Cinzel',serif;font-size:clamp(1.1rem,3vw,1.4rem);font-weight:400;letter-spacing:0.1em;color:var(--text);margin:0;"></h2>
       </div>
-      <button id="scriptModalClose" type="button" aria-label="Close script" style="font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted);background:none;border:1px solid var(--divider);border-radius:3px;padding:0.5rem 1rem;cursor:pointer;flex-shrink:0;margin-left:1rem;margin-top:0.25rem;min-height:44px;">Close</button>
+      <div style="display:flex;gap:0.55rem;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-left:1rem;margin-top:0.25rem;">
+        <button id="scriptShareLink" type="button" aria-label="Copy link to this script" style="font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold);background:none;border:1px solid rgba(201,153,58,0.45);border-radius:3px;padding:0.5rem 0.8rem;cursor:pointer;min-height:44px;">Copy story link</button>
+        <button id="scriptModalClose" type="button" aria-label="Close script" style="font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted);background:none;border:1px solid var(--divider);border-radius:3px;padding:0.5rem 1rem;cursor:pointer;min-height:44px;">Close</button>
+      </div>
     </div>
     <div id="scriptModalBody" style="flex:1;overflow-y:auto;padding:clamp(1.25rem,4vw,2.5rem) clamp(1rem,4vw,2.5rem);-webkit-overflow-scrolling:touch;background:#0f0c09;"></div>
   </div>
@@ -2794,6 +2814,9 @@ document.addEventListener('click', function(event) {
 });
 // ── GALLERY ──
 var IMGS = [
+  {src:"images/orisun5.webp",            title:"Ọ̀pá Orísun",                    sub:"One of Ayo's first staffs — the beginning of his craft."},
+  {src:"images/iranti5.webp",            title:"Ọ̀pá Ìrántí",                    sub:"Carved in memory of his grandfather."},
+  {src:"images/ekun1.webp",              title:"Ọ̀pá Ẹkùn",                      sub:"Commissioned by Chief Adediran through Morenike."},
   {src:"images/ipadeIj.webp",            title:"Ìpàdé I",                       sub:"Chapter 2 painting"},
   {src:"images/CM1.webp",                title:"The Chiefs’ Meeting",            sub:"Chapter 1 painting"},
   {src:"images/preperation.webp",        title:"Igbaradi(preperation)",           sub:"World building reference"},
@@ -2816,6 +2839,7 @@ var IMGS = [
   {src:"images/ijoko 4.webp",             title:"Ìjòkòó IV",                        sub:"The Ìjòkòó set"},
   {src:"images/ijoko 5.webp",             title:"Ìjòkòó V",                         sub:"The Ìjòkòó set"},
   {src:"images/ijoko 6.webp",             title:"Ìjòkòó VI",                        sub:"The Ìjòkòó set"},
+  {src:"images/igbaradi.webp",            title:"Ìgbáradì",                        sub:"The precursor piece — preparing the world of the series."},
 ];
 
 var grid = document.getElementById('galGrid');
@@ -2897,6 +2921,27 @@ lbNext.addEventListener('click',  function(e) { e.stopPropagation(); goNext(); }
 lbPrev.addEventListener('click',  function(e) { e.stopPropagation(); goPrev(); });
 lbClose.addEventListener('click', closeLight);
 lbBg.addEventListener('click',    closeLight);
+
+// ── Collection full-screen viewer ──
+document.querySelectorAll('.ao-collection-img-wrap').forEach(function(wrap) {
+  var collectionImg = wrap.querySelector('.ao-collection-img');
+  if (!collectionImg) return;
+  var imageIndex = IMGS.findIndex(function(item) {
+    return item.src === collectionImg.getAttribute('src');
+  });
+  if (imageIndex < 0) return;
+
+  wrap.setAttribute('tabindex', '0');
+  wrap.setAttribute('role', 'button');
+  wrap.setAttribute('aria-label', 'View ' + (collectionImg.alt || 'collection artwork') + ' full screen');
+  wrap.addEventListener('click', function() { openLight(imageIndex); });
+  wrap.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openLight(imageIndex);
+    }
+  });
+});
 
 // ── Keyboard navigation ──
 document.addEventListener('keydown', function(e) {
@@ -3337,7 +3382,13 @@ lbPanel.addEventListener('touchend', function(e) {
   var titleEl  = document.getElementById('scriptModalTitle');
   var body     = document.getElementById('scriptModalBody');
   var closeBtn = document.getElementById('scriptModalClose');
+  var shareBtn = document.getElementById('scriptShareLink');
   var currentId = null;
+  var canonicalStoryUrl = 'https://www.kaysworks.com/apoti-olowe';
+
+  function setScriptHash(id) {
+    history.replaceState(null, '', '#script-' + id);
+  }
 
   function renderTabs(activeId) {
     tabsEl.innerHTML = '';
@@ -3347,7 +3398,10 @@ lbPanel.addEventListener('touchend', function(e) {
       btn.textContent = s.tab;
       btn.setAttribute('role', 'tab');
       btn.setAttribute('aria-selected', s.id === activeId ? 'true' : 'false');
-      btn.addEventListener('click', function() { loadScript(s.id); });
+      btn.addEventListener('click', function() {
+        loadScript(s.id);
+        setScriptHash(s.id);
+      });
       tabsEl.appendChild(btn);
     });
   }
@@ -3363,8 +3417,9 @@ lbPanel.addEventListener('touchend', function(e) {
     renderTabs(id);
   }
 
-  function openModal(id) {
+  function openModal(id, updateUrl) {
     loadScript(id || scripts[0].id);
+    if (updateUrl) setScriptHash(id || scripts[0].id);
     modal.style.display = 'flex';
     requestAnimationFrame(function() { modal.classList.add('sm-open'); });
     document.body.style.overflow = 'hidden';
@@ -3375,12 +3430,45 @@ lbPanel.addEventListener('touchend', function(e) {
     modal.classList.remove('sm-open');
     modal.style.display = 'none';
     document.body.style.overflow = '';
+    if (location.hash === '#scripts' || location.hash.indexOf('#script-') === 0) {
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+  }
+
+  function openFromHash() {
+    var hash = location.hash.toLowerCase();
+    if (hash === '#scripts' || hash === '#script-ch1') openModal('ch1', false);
+    if (hash === '#script-ch2') openModal('ch2', false);
   }
 
   // ── Wire up all Read Script buttons ──
   document.querySelectorAll('[data-script-open]').forEach(function(btn) {
-    btn.addEventListener('click', function() { openModal(btn.getAttribute('data-script-open')); });
+    btn.addEventListener('click', function(event) {
+      event.preventDefault();
+      openModal(btn.getAttribute('data-script-open'), true);
+    });
   });
+
+  if (shareBtn) {
+    shareBtn.addEventListener('click', function() {
+      var shareUrl = canonicalStoryUrl + '#script-' + (currentId || 'ch1');
+      var originalText = shareBtn.textContent;
+      function showCopied() {
+        shareBtn.textContent = 'Link copied';
+        setTimeout(function() { shareBtn.textContent = originalText; }, 1800);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(showCopied).catch(function() {
+          window.prompt('Copy this story link:', shareUrl);
+        });
+      } else {
+        window.prompt('Copy this story link:', shareUrl);
+      }
+    });
+  }
+
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
 
   // ── Close triggers ──
   closeBtn.addEventListener('click', closeModal);
