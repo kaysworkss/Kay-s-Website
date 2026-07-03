@@ -880,6 +880,13 @@ body {
 .series-back-link:hover { color: var(--clay); }
 .series-back-link span { font-size: 0.75rem; line-height: 1; }
 #view-upcoming > .series-back-link { margin: 18px 0 0 24px; }
+.upcoming-back-live {
+  margin: 18px 0 0 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
 .mode-toggle-bar .series-back-link { align-self:center; }
 .swipe-hint {
   display: none;
@@ -1916,6 +1923,9 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 
 <!-- ── UPCOMING VIEW ── -->
 <div id="view-upcoming">
+  <button type="button" class="series-back-link upcoming-back-live" id="upcoming-back-live" onclick="_returnToLiveAuction()" style="display:none">
+    <span>&larr;</span> Back to live auction
+  </button>
   <!-- Piece selector for upcoming — only shown when multiple auctions are configured -->
   <div class="piece-selector-wrap" id="upcoming-piece-selector-wrap">
     <div class="piece-selector-header">
@@ -3629,7 +3639,16 @@ function _renderComingNextBanner() {
 function _cnbGoUpcoming() {
   document.getElementById("view-live").classList.remove("show");
   document.getElementById("view-upcoming").classList.add("show");
+  const backBtn = document.getElementById("upcoming-back-live");
+  if (backBtn) backBtn.style.display = _auctions.some(p => _slotMatchesStatus(p, "live")) ? "inline-flex" : "none";
   if (!_upcomingInitialised) { _upcomingInitialised = true; initUpcoming(); }
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function _returnToLiveAuction() {
+  document.getElementById("view-upcoming").classList.remove("show");
+  document.getElementById("view-live").classList.add("show");
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 async function _buildPieceSelector() {
