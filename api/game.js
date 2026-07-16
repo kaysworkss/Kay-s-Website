@@ -2,12 +2,12 @@
  * /api/game
  *
  * Single consolidated file replacing:
- *   api/challenges.js              â†’ GET  /api/challenges
- *   api/challenge.js               â†’ GET  /api/challenge?id=<uuid>
- *   api/score.js                   â†’ POST /api/score
- *   api/leaderboard/[challengeId]  â†’ GET  /api/leaderboard?id=<uuid>
- *   api/hall-of-fame.js            â†’ GET  /api/hall-of-fame
- *   api/notify-outbid.js           â†’ POST /api/notify-outbid
+ *   api/challenges.js              Ã¢â€ â€™ GET  /api/challenges
+ *   api/challenge.js               Ã¢â€ â€™ GET  /api/challenge?id=<uuid>
+ *   api/score.js                   Ã¢â€ â€™ POST /api/score
+ *   api/leaderboard/[challengeId]  Ã¢â€ â€™ GET  /api/leaderboard?id=<uuid>
+ *   api/hall-of-fame.js            Ã¢â€ â€™ GET  /api/hall-of-fame
+ *   api/notify-outbid.js           Ã¢â€ â€™ POST /api/notify-outbid
  *
  * Routing via ?action= query param.
  */
@@ -15,7 +15,7 @@
 const crypto = require('crypto');
 const { getSupabase, cors, handleOptions } = require('./_lib');
 
-// â”€â”€ Difficulty tiers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Difficulty tiers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 const DIFF_TIERS = [
   { label: 'Cowrie',   cls: 'demo',   range: [1,    48]   },
   { label: 'Coral',    cls: 'easy',   range: [49,   250]  },
@@ -27,7 +27,7 @@ function tierForCount(n) {
   return DIFF_TIERS.find(t => n >= t.range[0] && n <= t.range[1]) || DIFF_TIERS[1];
 }
 
-// â”€â”€ GET /api/game?action=challenges â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ GET /api/game?action=challenges Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // Returns all currently active challenges (starts_at <= now <= ends_at)
 async function handleChallenges(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -43,7 +43,7 @@ async function handleChallenges(req, res, supabase) {
 }
 
 
-// â”€â”€ GET /api/game?action=upcoming â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ GET /api/game?action=upcoming Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // Returns all future challenges (starts_at > now), ordered soonest first
 async function handleUpcoming(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -57,7 +57,7 @@ async function handleUpcoming(req, res, supabase) {
   return res.status(200).json(data || []);
 }
 
-// â”€â”€ GET /api/game?action=challenge&id=<uuid> â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ GET /api/game?action=challenge&id=<uuid> Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function handleChallenge(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const id = req.query.id;
@@ -71,7 +71,7 @@ async function handleChallenge(req, res, supabase) {
   return res.status(200).json(data);
 }
 
-// â”€â”€ POST /api/game?action=score â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ POST /api/game?action=score Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function handleScore(req, res, supabase) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -85,7 +85,7 @@ async function handleScore(req, res, supabase) {
   }
   const name = String(player_name).trim();
   if (name.length < 1 || name.length > 28) {
-    return res.status(400).json({ error: 'player_name must be 1â€“28 characters.' });
+    return res.status(400).json({ error: 'player_name must be 1Ã¢â‚¬â€œ28 characters.' });
   }
   const wallet = wallet_address && String(wallet_address).trim().length > 0
     ? String(wallet_address).trim().slice(0, 100) : null;
@@ -141,7 +141,7 @@ async function handleScore(req, res, supabase) {
   return res.status(201).json({ id: score.id, rank });
 }
 
-// â”€â”€ GET /api/game?action=leaderboard&id=<challenge_id> â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ GET /api/game?action=leaderboard&id=<challenge_id> Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function handleLeaderboard(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const id = req.query.id;
@@ -183,7 +183,7 @@ async function handleLeaderboard(req, res, supabase) {
   return res.status(200).json(best);
 }
 
-// â”€â”€ GET /api/game?action=hall-of-fame â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ GET /api/game?action=hall-of-fame Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function handleHallOfFame(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const now = new Date().toISOString();
@@ -245,8 +245,8 @@ async function handleHallOfFame(req, res, supabase) {
 
 const _AUCTION_LOGO_URL = process.env.SHOP_LOGO_URL || 'https://www.kaysworks.com/images/kaysworkslogo.svg';
 
-// â”€â”€ Parchment email shell (auction emails) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Hierarchy: eyebrow â†’ logo â†’ hero title â†’ gold trim â†’ body text â†’ rows â†’ CTA
+// Ã¢â€â‚¬Ã¢â€â‚¬ Parchment email shell (auction emails) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// Hierarchy: eyebrow Ã¢â€ â€™ logo Ã¢â€ â€™ hero title Ã¢â€ â€™ gold trim Ã¢â€ â€™ body text Ã¢â€ â€™ rows Ã¢â€ â€™ CTA
 function _emailShell(heroTitle, _unused, _unused2, bodyHtml, rowsHtml, ctaHtml, eyebrow) {
   const eye     = eyebrow || 'Kay\u2019s Works \u00b7 Live Auction';
   const logoTag = _AUCTION_LOGO_URL
@@ -263,7 +263,7 @@ function _emailShell(heroTitle, _unused, _unused2, bodyHtml, rowsHtml, ctaHtml, 
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#ede0c8;border-radius:24px;overflow:hidden;">
 
-        <!-- Hero â€” inset, fully rounded, gold trim inside wrapper -->
+        <!-- Hero Ã¢â‚¬â€ inset, fully rounded, gold trim inside wrapper -->
         <tr><td style="padding:10px">
           <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:20px;overflow:hidden;">
             <tr><td style="background:#2a1508;background-image:radial-gradient(ellipse at 50% 110%,rgba(196,140,60,0.38) 0%,transparent 62%),linear-gradient(180deg,#2a1508 0%,#3d2010 55%,#5a2e14 100%);padding:36px 32px 40px;text-align:center;">
@@ -318,7 +318,7 @@ function _eBtn(href, text, sub) {
     + (sub ? `<p style="margin:12px 0 0;font-size:12px;color:#7a5a40;font-style:italic;font-family:Georgia,serif">${sub}</p>` : '');
 }
 
-// â”€â”€ POST /api/game?action=notify-outbid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ POST /api/game?action=notify-outbid Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function handleNotifyOutbid(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { outbid_wallet, new_bidder, new_amount, auction_id, art_title, auction_url } = req.body || {};
@@ -358,7 +358,7 @@ async function handleNotifyOutbid(req, res) {
   } catch (e) { return res.status(500).json({ error: 'Email send failed: ' + e.message }); }
 }
 
-// â”€â”€ POST /api/game?action=notify-bid-confirm â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ POST /api/game?action=notify-bid-confirm Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function handleNotifyBidConfirm(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { bidder_wallet, amount, auction_id, art_title, auction_url, is_first } = req.body || {};
@@ -405,7 +405,7 @@ async function handleNotifyBidConfirm(req, res) {
   } catch (e) { return res.status(500).json({ error: 'Email send failed: ' + e.message }); }
 }
 
-// â”€â”€ POST /api/game?action=notify-winner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ POST /api/game?action=notify-winner Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function handleNotifyWinner(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { winner_wallet, amount, auction_id, art_title, auction_url } = req.body || {};
@@ -446,7 +446,7 @@ async function handleNotifyWinner(req, res) {
 }
 
 
-// â”€â”€ POST /api/game?action=notify-bid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ POST /api/game?action=notify-bid Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // Sends a bid alert email to the site owner whenever a new bid is placed.
 async function handleNotifyBid(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -459,18 +459,18 @@ async function handleNotifyBid(req, res) {
 
   const RESEND_KEY = process.env.RESEND_API_KEY;
   if (!RESEND_KEY) {
-    return res.status(500).json({ error: 'Server misconfigured â€” missing RESEND_API_KEY' });
+    return res.status(500).json({ error: 'Server misconfigured Ã¢â‚¬â€ missing RESEND_API_KEY' });
   }
 
-  const shortBidder = bidder.slice(0, 6) + 'â€¦' + bidder.slice(-4);
-  const title       = art_title  || 'an Ã€pÃ³tÃ­ á»Œlá»Ìwá»Ì€ piece';
+  const shortBidder = bidder.slice(0, 6) + 'Ã¢â‚¬Â¦' + bidder.slice(-4);
+  const title       = art_title  || 'an Ãƒâ‚¬pÃƒÂ³tÃƒÂ­ Ã¡Â»Å’lÃ¡Â»ÂÃŒÂwÃ¡Â»ÂÃŒâ‚¬ piece';
   const url         = auction_url || 'https://kaysworks.com/auction';
-  const auctionRef  = auction_id  ? ` (${auction_id.slice(0, 8)}â€¦)` : '';
+  const auctionRef  = auction_id  ? ` (${auction_id.slice(0, 8)}Ã¢â‚¬Â¦)` : '';
 
   const emailBody = {
-    from:    'Ã€pÃ³tÃ­ á»Œlá»Ìwá»Ì€ Auction <auction@mail.kaysworks.com>',
+    from:    'Ãƒâ‚¬pÃƒÂ³tÃƒÂ­ Ã¡Â»Å’lÃ¡Â»ÂÃŒÂwÃ¡Â»ÂÃŒâ‚¬ Auction <auction@mail.kaysworks.com>',
     to:      [process.env.AUCTION_ALERT_EMAIL || process.env.CONTACT_EMAIL || 'oyeniyikayode4@gmail.com'],
-    subject: `New bid â€” ${amount} on ${title}`,
+    subject: `New bid Ã¢â‚¬â€ ${amount} on ${title}`,
     html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -484,7 +484,7 @@ async function handleNotifyBid(req, res) {
       <table width="560" cellpadding="0" cellspacing="0" style="background:#2a1c14;border:1px solid rgba(196,132,90,0.25);border-radius:6px;overflow:hidden;max-width:560px;width:100%">
         <tr>
           <td style="padding:28px 32px 20px;border-bottom:1px solid rgba(196,132,90,0.18)">
-            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works Â· Live Auction</p>
+            <p style="margin:0 0 4px;font-family:'Georgia',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c4845a">Kay's Works Ã‚Â· Live Auction</p>
             <h1 style="margin:0;font-family:'Georgia',serif;font-size:26px;font-weight:400;color:#e8d5b0;line-height:1.2">${title}</h1>
           </td>
         </tr>
@@ -528,7 +528,7 @@ async function handleNotifyBid(req, res) {
         </tr>
         <tr>
           <td style="padding:16px 32px;border-top:1px solid rgba(196,132,90,0.18);text-align:center">
-            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">Â© Kay's Works Â· <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
+            <p style="margin:0;font-size:11px;color:#4a3228;font-family:'Georgia',serif">Ã‚Â© Kay's Works Ã‚Â· <a href="https://kaysworks.com" style="color:#4a3228">kaysworks.com</a></p>
           </td>
         </tr>
       </table>
@@ -656,10 +656,10 @@ async function handleCrosschainClaim(req, res, supabase) {
 }
 
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 //  SHOP SECTION (pending-first + price-lock + payment_metadata crypto storage)
 //  Merged into game.js. Uses res-based json helpers below.
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 let _shopRes = null;
 function json(status, obj) { _shopRes.status(status).json(obj); return obj; }
 function jsonError(e) {
@@ -743,7 +743,7 @@ async function markOrderVerificationFailure(supabase, orderRef, error) {
   }).eq('order_ref', orderRef);
   if (updateError) console.warn('[shop-order] could not persist verification failure:', updateError.message);
 }
-// â”€â”€ PRODUCTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ PRODUCTS Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function handleShopProducts(req, res, supabase) {
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
   await maintainShopOrderLifecycle(supabase);
@@ -932,7 +932,7 @@ const SERVER_INTL_COUNTRY_ZONES = Object.freeze({
   AU: 'AO', NZ: 'AO', JP: 'AO', KR: 'AO', SG: 'AO', IN: 'AO', AE: 'AO',
 });
 const SERVER_LARGE_PRINT_VARIANTS = ['12x16"', '12x18"', '18x24"', '24x36"'];
-// â”€â”€ Live USD/NGN exchange rate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Live USD/NGN exchange rate Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // Fetches from free APIs, caches for 1 hour. Falls back to the manual override
 // in shop_config, then to 1400 as a conservative last resort.
 let _cachedRate = null;
@@ -989,8 +989,8 @@ const SERVER_SHIPPING_DIM_DIVISOR = 5000;
 const SERVER_SHIPPING_BUFFER = 1.2;
 // Domestic (Nigeria) weight scaling, modelled on GIG Logistics: the small/large
 // base rate already covers the first couple of kg, then each additional kg adds
-// a per-kg surcharge. GIG examples: Lagosâ†’Ibadan 1kg â‰ˆ â‚¦5,000, 5kg â‰ˆ â‚¦9,500
-// (~â‚¦1,100/kg over the base); Lagosâ†’Abuja 10kg â‰ˆ â‚¦14,500.
+// a per-kg surcharge. GIG examples: LagosÃ¢â€ â€™Ibadan 1kg Ã¢â€°Ë† Ã¢â€šÂ¦5,000, 5kg Ã¢â€°Ë† Ã¢â€šÂ¦9,500
+// (~Ã¢â€šÂ¦1,100/kg over the base); LagosÃ¢â€ â€™Abuja 10kg Ã¢â€°Ë† Ã¢â€šÂ¦14,500.
 const SERVER_DOMESTIC_INCLUDED_KG = 2;      // kg covered by the base rate
 const SERVER_DOMESTIC_PER_KG_NGN = 1000;    // surcharge per extra kg above that
 
@@ -1025,7 +1025,7 @@ function serverExpectedInternationalZone(countryCode) {
   return SERVER_INTL_COUNTRY_ZONES[code] || 'ROW';
 }
 function serverNormalizedSizeLabel(value) {
-  return String(value || '').replace(/[xXÃ—]/g, 'x');
+  return String(value || '').replace(/[xXÃƒâ€”]/g, 'x');
 }
 function serverParsePrintInches(size) {
   const m = serverNormalizedSizeLabel(size).match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
@@ -1192,7 +1192,7 @@ function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd = 0, requestedC
     tier = { usd, ngn: 0 };
   } else {
     // Domestic: base small/large rate + GIG-style per-kg surcharge for weight
-    // above the included allowance. billableKg already accounts for the 1.2Ã—
+    // above the included allowance. billableKg already accounts for the 1.2Ãƒâ€”
     // buffer and volumetric weight, so heavier carts now scale realistically.
     const base = hasLarge ? z.large : z.small;
     const billableKg = Number(shippingProfile?.billableKg) || (hasLarge ? 1.5 : 0.7);
@@ -1215,6 +1215,7 @@ function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd = 0, requestedC
 const APOTI_MERCH_ENTITLEMENT_KEY = 'apoti-olowe-token-2-merch';
 const APOTI_MERCH_PROJECT = 'apoti-olowe';
 const APOTI_MERCH_TOKEN_IDS = [2];
+const APOTI_MERCH_DISCOUNT_TOKEN_IDS = [1, 2];
 const APOTI_MERCH_ETH_CONTRACT = '0x611cca3635b0f05b103031ee8d4f3261633292b4';
 const APOTI_MERCH_TEZOS_CONTRACT = 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8';
 const APOTI_MERCH_DEFAULT_DISCOUNT = 25;
@@ -1306,15 +1307,21 @@ async function resolveServerHolderMerchClaim(rawClaim) {
     throw err;
   }
 
-  const tokenIds = APOTI_MERCH_TOKEN_IDS;
+  const requestedTokenIds = (Array.isArray(rawClaim.token_ids) ? rawClaim.token_ids : rawClaim.tokenIds)
+    || APOTI_MERCH_TOKEN_IDS;
+  const tokenIds = [...new Set(requestedTokenIds.map(id => Number(id)).filter(id => APOTI_MERCH_DISCOUNT_TOKEN_IDS.includes(id)))];
+  if (!tokenIds.length) tokenIds.push(...APOTI_MERCH_TOKEN_IDS);
   const contract = chain === 'tezos' ? APOTI_MERCH_TEZOS_CONTRACT : APOTI_MERCH_ETH_CONTRACT;
-  let tokenBalance = 0;
-  if (chain === 'tezos') tokenBalance = await serverTezosFa2Balance(contract, wallet, tokenIds);
-  else {
-    for (const id of tokenIds) tokenBalance += await serverEth1155Balance(contract, wallet, id);
+  const tokenBalances = {};
+  for (const id of tokenIds) {
+    tokenBalances[id] = chain === 'tezos'
+      ? await serverTezosFa2Balance(contract, wallet, [id])
+      : await serverEth1155Balance(contract, wallet, id);
   }
+  const tokenBalance = Object.values(tokenBalances).reduce((sum, n) => sum + Number(n || 0), 0);
+  const freeToteQty = APOTI_MERCH_TOKEN_IDS.reduce((sum, id) => sum + Number(tokenBalances[id] || 0), 0);
   if (tokenBalance < 1) {
-    const err = new Error('Token #2 was not found in this holder wallet.');
+    const err = new Error('Token #1 or #2 was not found in this holder wallet.');
     err.statusCode = 403;
     throw err;
   }
@@ -1337,7 +1344,7 @@ async function resolveServerHolderMerchClaim(rawClaim) {
 function computeServerHolderMerchBenefit(holderClaim, trustedItems, productCache, appliedProductPercent) {
   const empty = { totalNgn: 0, totalUsd: 0, freeToteNgn: 0, freeToteUsd: 0, addOnNgn: 0, addOnUsd: 0, coveredToteQty: 0, discountExcludedNgn: 0, discountExcludedUsd: 0 };
   if (!holderClaim) return empty;
-  const percent = Number(holderClaim.discountPercent || 0);
+  const fallbackPercent = Number(holderClaim.discountPercent || 0);
   let freeToteRemaining = holderClaim.freeTote ? Number(holderClaim.freeToteQty || 0) : 0;
   const out = { ...empty };
   for (const item of trustedItems) {
@@ -1506,7 +1513,7 @@ async function computeShopCheckout(body, supabase) {
     }
 
     const stockByVariant = product.stock_by_variant || {};
-    // Resolve stock with the same fallback the client uses: full key â†’ size â†’ none
+    // Resolve stock with the same fallback the client uses: full key Ã¢â€ â€™ size Ã¢â€ â€™ none
     let sv;
     if (stockByVariant[vkey] !== undefined)         sv = stockByVariant[vkey];
     else if (stockByVariant[sizeKey] !== undefined) sv = stockByVariant[sizeKey];
@@ -1519,7 +1526,7 @@ async function computeShopCheckout(body, supabase) {
       else if (editionTotals[sizeKey] !== undefined) sv = editionTotals[sizeKey];
       else if (editionTotals[item.variant] !== undefined) sv = editionTotals[item.variant];
       if (sv === undefined) {
-        const err = new Error(`Edition stock is not configured for ${product.name} Â· ${item.variant}`);
+        const err = new Error(`Edition stock is not configured for ${product.name} Ã‚Â· ${item.variant}`);
         err.statusCode = 409;
         err.product_id = item.id;
         err.variant = item.variant;
@@ -1528,7 +1535,7 @@ async function computeShopCheckout(body, supabase) {
     }
 
     if (sv !== undefined && Number(sv) < item.qty) {
-      const err = new Error(`Only ${sv} left in stock for ${product.name} Â· ${item.variant}`);
+      const err = new Error(`Only ${sv} left in stock for ${product.name} Ã‚Â· ${item.variant}`);
       err.statusCode = 409;
       err.product_id = item.id;
       err.variant = item.variant;
@@ -1564,7 +1571,7 @@ async function computeShopCheckout(body, supabase) {
       err.variant = String(vkey || item.variant || '').slice(0, 160);
       throw err;
     }
-    // Derive USD from NGN at live rate â€” never use stale prices_usd for crypto
+    // Derive USD from NGN at live rate Ã¢â‚¬â€ never use stale prices_usd for crypto
     const liveRate = getNgnPerUsdSync(); // uses cached live rate or fallback
     const priceUsd = liveRate > 0 ? +(priceNgn / liveRate).toFixed(4) : serverVariantPrice(product, vkey, item.variant, 'usd');
     subtotalNgn += priceNgn * qty;
@@ -1622,7 +1629,7 @@ async function computeShopCheckout(body, supabase) {
     ? +(deliveryNgn / liveRateForDelivery).toFixed(2)
     : (method === 'ship' ? serverDeliveryFee(zone, hasLarge, 'usd', subtotalUsd, deliveryCarrier, shippingProfile, deliveryStateCode) : 0);
 
-  // â”€â”€ Discount code â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Discount code Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   // Resolve and apply a discount code (if provided). The discount is computed
   // Holder merch benefit is checked before discount totals, so free tote value
   // remains meaningful even when a general open-day discount is active.
@@ -1652,7 +1659,7 @@ async function computeShopCheckout(body, supabase) {
   const discountedDeliveryUsd = Math.max(0, +(deliveryUsd - discount.amountUsd.shipping).toFixed(2));
   // Optional tip (client-supplied, clamped to >= 0). Added on top of the total.
   const tipNgn = Math.max(0, +(Number(body.tip_ngn) || 0).toFixed(2));
-  // Derive tipUsd from tipNgn at live rate â€” don't trust client's stale USD value
+  // Derive tipUsd from tipNgn at live rate Ã¢â‚¬â€ don't trust client's stale USD value
   const tipNgnVal = Math.max(0, +(Number(body.tip_ngn) || 0));
   const tipUsd = tipNgnVal > 0 && getNgnPerUsdSync() > 0
     ? +(tipNgnVal / getNgnPerUsdSync()).toFixed(2)
@@ -1705,7 +1712,7 @@ async function computeShopCheckout(body, supabase) {
   };
 }
 
-// â”€â”€ DISCOUNT CODES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ DISCOUNT CODES Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // Codes live in shop_config.discount_codes as an array of:
 //   { code, percent (10|20|50|100), scope ('products'|'shipping'|'all'), active, note }
 // A code with scope 'all' at 100% (the dev/test code) zeroes the entire order,
@@ -1763,7 +1770,7 @@ async function resolveShopDiscount(rawCode, supabase, amounts) {
   };
 }
 
-// â”€â”€ QUOTE SIGNING (HMAC) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ QUOTE SIGNING (HMAC) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function shopQuoteSecret() {
   return process.env.SHOP_QUOTE_SECRET
       || process.env.ADMIN_SESSION_SECRET
@@ -1819,7 +1826,7 @@ function verifyShopQuote(quote, checkout, expected = {}) {
   const expectedBuf = Buffer.from(expectedSig, 'hex');
   if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return false;
   if (Number(payload.total_ngn) !== checkout.totalNgn) return false;
-  // USD tolerance of 2% â€” rate may drift slightly between quote generation and confirmation
+  // USD tolerance of 2% Ã¢â‚¬â€ rate may drift slightly between quote generation and confirmation
   const quotedUsd = Number(payload.total_usd);
   const computedUsd = checkout.totalUsd;
   if (Math.abs(quotedUsd - computedUsd) > Math.max(0.5, computedUsd * 0.02)) return false;
@@ -1846,7 +1853,7 @@ async function fetchServerCryptoPrice(asset) {
   const symbol = asset === 'xtz' ? 'XTZUSDT' : 'ETHUSDT';
   const coingeckoId = asset === 'xtz' ? 'tezos' : 'ethereum';
   const coinbasePair = asset === 'xtz' ? 'XTZ-USD' : 'ETH-USD';
-  const TIMEOUT_MS = 7000; // raised from 3500 â€” Netlify cold starts + slow upstreams
+  const TIMEOUT_MS = 7000; // raised from 3500 Ã¢â‚¬â€ Netlify cold starts + slow upstreams
   const errors = [];
 
   async function withTimeout(promise, ms) {
@@ -1913,7 +1920,7 @@ async function handleShopQuote(req, res, supabase) {
           console.warn(`[shop-quote] using client-provided ${asset.toUpperCase()} price: $${price} (server sources unavailable)`);
         }
       }
-      if (!price) return json(503, { error: `${asset.toUpperCase()} rate unavailable â€” please try again in a moment` });
+      if (!price) return json(503, { error: `${asset.toUpperCase()} rate unavailable Ã¢â‚¬â€ please try again in a moment` });
       extra.crypto_asset = asset;
       extra.crypto_usd_price = price;
       extra.crypto_amount = asset === 'eth'
@@ -1924,7 +1931,7 @@ async function handleShopQuote(req, res, supabase) {
       extra.crypto_amount = +checkout.totalUsd.toFixed(2);
     }
     // Bake an order reference into the signed quote. This becomes the durable
-    // order handle WITHOUT writing a DB row â€” the pending order is only created
+    // order handle WITHOUT writing a DB row Ã¢â‚¬â€ the pending order is only created
     // when the customer actually initiates payment, so abandoned checkouts
     // leave no rows behind. The ref is signed, so it can't be forged.
     extra.order_ref = String(body.reuse_order_ref || '').trim() || makeOrderRef();
@@ -2024,7 +2031,7 @@ async function handleShopPaymentInit(req, res, supabase) {
   }
 }
 
-// â”€â”€ ON-CHAIN PAYMENT VERIFICATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ ON-CHAIN PAYMENT VERIFICATION Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 const ERC20_CONTRACTS = {
   usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
   usdt: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
@@ -2063,12 +2070,12 @@ async function ethRpc(method, params = []) {
     });
     data = await r.json().catch(() => ({}));
   } catch (networkErr) {
-    const e = new Error('Transaction is not confirmed yet â€” RPC temporarily unreachable');
+    const e = new Error('Transaction is not confirmed yet Ã¢â‚¬â€ RPC temporarily unreachable');
     e.statusCode = 409;
     throw e;
   }
   if (!r.ok || data.error) {
-    const e = new Error('Transaction is not confirmed yet â€” RPC error: ' + (data.error?.message || r.status));
+    const e = new Error('Transaction is not confirmed yet Ã¢â‚¬â€ RPC error: ' + (data.error?.message || r.status));
     e.statusCode = 409;
     throw e;
   }
@@ -2174,16 +2181,16 @@ async function verifyTezosPayment({ opHash, payerAddress, quote, payeeAddress })
     }
     const data = await r.json().catch(() => null);
     if (!r.ok) {
-      // Indexer error â€” treat as "not yet confirmed" so the browser keeps retrying
-      const e = new Error('Transaction is not confirmed yet â€” indexer temporarily unavailable');
+      // Indexer error Ã¢â‚¬â€ treat as "not yet confirmed" so the browser keeps retrying
+      const e = new Error('Transaction is not confirmed yet Ã¢â‚¬â€ indexer temporarily unavailable');
       e.statusCode = 409;
       throw e;
     }
     list = operationRows(data);
   } catch (err) {
     if (err.statusCode) throw err;
-    // Network error or abort (timeout) â€” the op may simply not be indexed yet
-    const e = new Error('Transaction is not confirmed yet â€” waiting for indexer');
+    // Network error or abort (timeout) Ã¢â‚¬â€ the op may simply not be indexed yet
+    const e = new Error('Transaction is not confirmed yet Ã¢â‚¬â€ waiting for indexer');
     e.statusCode = 409;
     throw e;
   } finally {
@@ -2337,7 +2344,7 @@ async function verifyCardPayment({ provider, reference, expectedTotalNgn }) {
     let paidNgn = paidAmount;
 
     if (paidCurrency !== 'NGN') {
-      // Flutterwave charged in the customer's local currency â€” convert to NGN
+      // Flutterwave charged in the customer's local currency Ã¢â‚¬â€ convert to NGN
       // using the rate embedded in the transaction (app_fee / charged_amount ratio
       // gives us the FX rate Flutterwave used). Fallback: use server SHOP_RATE.
       if (tx.charged_amount && tx.app_fee) {
@@ -2359,7 +2366,7 @@ async function verifyCardPayment({ provider, reference, expectedTotalNgn }) {
     // Allow 1% tolerance for FX rounding
     const tolerance = Math.max(0.5, expectedTotalNgn * 0.01);
     if (paidNgn + tolerance < expectedTotalNgn) {
-      const e = new Error(`Flutterwave payment amount (${paidCurrency} ${paidAmount} â‰ˆ â‚¦${Math.round(paidNgn)}) does not match order total (â‚¦${expectedTotalNgn})`);
+      const e = new Error(`Flutterwave payment amount (${paidCurrency} ${paidAmount} Ã¢â€°Ë† Ã¢â€šÂ¦${Math.round(paidNgn)}) does not match order total (Ã¢â€šÂ¦${expectedTotalNgn})`);
       e.statusCode = 402; throw e;
     }
     return { provider, reference, paid_ngn: paidNgn, paid_currency: paidCurrency, gateway_status: tx.status };
@@ -2377,7 +2384,7 @@ function isUuidTextOperatorError(error) {
 
 async function adjustVariantStockDirect(supabase, item, qtyDelta) {
   const vkey = item.variantKey || item.variant;
-  const sizeKey = String(vkey || '').split('|').pop(); // "mini|4Ã—4" â†’ "4Ã—4"
+  const sizeKey = String(vkey || '').split('|').pop(); // "mini|4Ãƒâ€”4" Ã¢â€ â€™ "4Ãƒâ€”4"
   const { data: product, error: loadErr } = await supabase
     .from('shop_products')
     .select('id, name, stock, stock_by_variant')
@@ -2400,8 +2407,8 @@ async function adjustVariantStockDirect(supabase, item, qtyDelta) {
     : null;
 
   // Resolve the variant's stock entry using the same key fallback as the
-  // client: try the full variant key first ("mini|4Ã—4"), then the size-only
-  // key ("4Ã—4"). This is the fix for false "sold out" errors caused by the
+  // client: try the full variant key first ("mini|4Ãƒâ€”4"), then the size-only
+  // key ("4Ãƒâ€”4"). This is the fix for false "sold out" errors caused by the
   // admin storing stock under the size while the cart sends the full key.
   let trackedKey = null;
   if (stockByVariant) {
@@ -2410,20 +2417,20 @@ async function adjustVariantStockDirect(supabase, item, qtyDelta) {
   }
 
   if (trackedKey !== null) {
-    // This variant has an explicit per-variant stock count â€” it governs.
+    // This variant has an explicit per-variant stock count Ã¢â‚¬â€ it governs.
     const current = Number(stockByVariant[trackedKey]);
     const next = current + qtyDelta;
     if (qtyDelta < 0 && next < 0) return { ok: false };
     stockByVariant[trackedKey] = next;
     patch.stock_by_variant = stockByVariant;
   } else if (product.stock !== null && product.stock !== undefined) {
-    // No per-variant tracking â€” fall back to the product-level stock counter.
+    // No per-variant tracking Ã¢â‚¬â€ fall back to the product-level stock counter.
     const current = Number(product.stock);
     const next = current + qtyDelta;
     if (qtyDelta < 0 && next < 0) return { ok: false };
     patch.stock = next;
   }
-  // If neither is tracked, the product is unlimited (open edition) â†’ ok.
+  // If neither is tracked, the product is unlimited (open edition) Ã¢â€ â€™ ok.
 
   if (!Object.keys(patch).length) return { ok: true };
   const { error: updErr } = await supabase
@@ -2493,7 +2500,7 @@ function shopMoney(ngn, usd) {
 async function _sendEmail({ from, to, subject, html, text, reply_to }) {
   const RESEND_KEY = process.env.RESEND_API_KEY;
   if (!RESEND_KEY) {
-    throw new Error('Missing RESEND_API_KEY â€” cannot send email');
+    throw new Error('Missing RESEND_API_KEY Ã¢â‚¬â€ cannot send email');
   }
   const body = {
     from,
@@ -2595,7 +2602,7 @@ async function sendShopSellerNotification({ order, orderRef, checkout, paymentMe
   });
 }
 
-// â”€â”€ ORDER REFERENCE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ ORDER REFERENCE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function sendShopCustomerReceipt({ order, orderRef, checkout, paymentMethod, paymentRef }) {
   const to = String(order.email || '').trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
@@ -2732,7 +2739,7 @@ function makeOrderRef() {
 
 // Pack the crypto lock (asset, exact amount, usd price, and the full signed
 // quote) into a single object stored in the shop_orders.payment_metadata JSONB
-// column â€” no dedicated crypto columns required.
+// column Ã¢â‚¬â€ no dedicated crypto columns required.
 function cryptoOrderLockFromQuote(orderRef, paymentMethod, quote) {
   if (!['eth','tezos','usdc','usdt'].includes(paymentMethod) || !quote || !quote.crypto_amount) return null;
   return {
@@ -2854,12 +2861,12 @@ async function handleShopOrderCreate(req, res, supabase) {
   }
 
   // The order_ref is carried in the signed quote (set at quote/lock time). Use
-  // it so the ref the customer sees matches the one stored â€” and reuse takes
+  // it so the ref the customer sees matches the one stored Ã¢â‚¬â€ and reuse takes
   // priority for in-place updates.
   const quoteOrderRef = (body.checkout_quote && body.checkout_quote.order_ref) || '';
   const orderRef = String(reuseRef || quoteOrderRef || makeOrderRef()).slice(0, 80);
   // For crypto orders, store the exact locked amount + full signed quote in
-  // payment_metadata (JSONB) â€” matches the live schema, no extra columns needed.
+  // payment_metadata (JSONB) Ã¢â‚¬â€ matches the live schema, no extra columns needed.
   const cryptoLock = cryptoOrderLockFromQuote(orderRef, paymentMethod, body.checkout_quote);
   const { data: order, error: orderError } = await supabase
     .from('shop_orders')
@@ -2970,7 +2977,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
       .select('*')
       .single();
     if (createErr) {
-      // A concurrent confirm may have created it â€” re-read before giving up.
+      // A concurrent confirm may have created it Ã¢â‚¬â€ re-read before giving up.
       const reread = await supabase.from('shop_orders').select('*').eq('order_ref', orderRef).maybeSingle();
       if (reread.data) { order = reread.data; }
       else return json(500, { error: createErr.message });
@@ -3076,7 +3083,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
     if (bodyOrderHash && bodyOrderHash !== orderRef) {
       return json(400, { error: 'Order hash does not match this order' });
     }
-    // Read the locked crypto details from payment_metadata â€” the authoritative
+    // Read the locked crypto details from payment_metadata Ã¢â‚¬â€ the authoritative
     // amount + signed quote captured when the pending order was created.
     const cryptoLock = readCryptoOrderLock(order);
     if (!cryptoLock || !cryptoLock.checkout_quote || !cryptoLock.checkout_quote.crypto_amount) {
@@ -3130,9 +3137,9 @@ async function handleShopOrderConfirm(req, res, supabase) {
     }
     if (!result.ok) {
       for (const c of claimed) await releaseVariantStock(supabase, c);
-      await markOrderVerificationFailure(supabase, orderRef, new Error(`Payment verified but sold out: ${item.name} Â· ${item.variant}`));
+      await markOrderVerificationFailure(supabase, orderRef, new Error(`Payment verified but sold out: ${item.name} Ã‚Â· ${item.variant}`));
       return json(409, {
-        error: `Sold out: ${item.name} Â· ${item.variant} is no longer available`,
+        error: `Sold out: ${item.name} Ã‚Â· ${item.variant} is no longer available`,
         product_id: item.id,
         variant: item.variant,
         sold_out: true,
@@ -3230,7 +3237,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
   });
 }
 
-// â”€â”€ ORDER (legacy single-shot â€” kept for backward compatibility) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ ORDER (legacy single-shot Ã¢â‚¬â€ kept for backward compatibility) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // Record a zero-total order (100%-off discount) as paid without any gateway.
 async function finalizeFreeOrder(req, res, supabase, body, checkout) {
   const claimed = [];
@@ -3245,7 +3252,7 @@ async function finalizeFreeOrder(req, res, supabase, body, checkout) {
     if (!result.ok) {
       for (const c of claimed) await releaseVariantStock(supabase, c);
       return json(409, {
-        error: `Sold out: ${item.name} Â· ${item.variant} is no longer available`,
+        error: `Sold out: ${item.name} Ã‚Â· ${item.variant} is no longer available`,
         product_id: item.id, variant: item.variant, sold_out: true,
       });
     }
@@ -3350,7 +3357,7 @@ async function handleShopOrder(req, res, supabase) {
   const paymentRef = String(body.payment_ref || '').slice(0, 200);
   const payerAddress = String(body.payer_address || '').slice(0, 120);
 
-  // â”€â”€ Free order (100%-off discount) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Free order (100%-off discount) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   // When a discount zeroes the total, there is nothing to charge. Skip all
   // gateway/chain verification and record the order as paid directly. The
   // discount is baked into the signed quote, so it can't be forged.
@@ -3451,7 +3458,7 @@ async function handleShopOrder(req, res, supabase) {
     if (!result.ok) {
       for (const c of claimed) await releaseVariantStock(supabase, c);
       return json(409, {
-        error: `Sold out: ${item.name} Â· ${item.variant} is no longer available`,
+        error: `Sold out: ${item.name} Ã‚Â· ${item.variant} is no longer available`,
         product_id: item.id,
         variant: item.variant,
         sold_out: true,
@@ -3562,7 +3569,7 @@ async function handleShopOrder(req, res, supabase) {
   });
 }
 
-// â”€â”€ CONFIG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ CONFIG Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function handleShopConfig(req, res, supabase) {
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
   const { data, error } = await supabase
@@ -3572,7 +3579,7 @@ async function handleShopConfig(req, res, supabase) {
     .limit(1)
     .single();
   if (error && error.code !== 'PGRST116') return json(500, { error: error.message });
-  // Never expose discount codes to the public storefront â€” they're validated
+  // Never expose discount codes to the public storefront Ã¢â‚¬â€ they're validated
   // server-side only. Strip them from the public config response.
   const safe = { ...(data || {}) };
   delete safe.discount_codes;
@@ -3582,15 +3589,15 @@ async function handleShopConfig(req, res, supabase) {
   return json(200, safe);
 }
 
-// â”€â”€ Netlify entry point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Netlify entry point Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-// â”€â”€ Vercel entry point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Vercel entry point Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-// â”€â”€ Main handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Main handler Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// ORDER STATUS â€” single order lookup by email + order_ref
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ORDER STATUS Ã¢â‚¬â€ single order lookup by email + order_ref
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 async function handleShopOrderStatus(req, res, supabase) {
   if (req.method !== 'GET') return json(405, { error: 'GET only' });
   await maintainShopOrderLifecycle(supabase, true);
@@ -3605,9 +3612,9 @@ async function handleShopOrderStatus(req, res, supabase) {
   return json(200, data);
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// ORDER HISTORY â€” magic link: POST to request link, GET to verify token
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ORDER HISTORY Ã¢â‚¬â€ magic link: POST to request link, GET to verify token
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 async function handleShopOrderHistory(req, res, supabase) {
   await maintainShopOrderLifecycle(supabase, true);
   // POST: send a magic link email
@@ -3633,7 +3640,7 @@ async function handleShopOrderHistory(req, res, supabase) {
             body: JSON.stringify({
               from: `Kay's Works <${FROM_EMAIL}>`,
               to: [email],
-              subject: 'Your order history â€” Kay\'s Works',
+              subject: 'Your order history Ã¢â‚¬â€ Kay\'s Works',
               html: `<div style="font-family:Georgia,serif;max-width:580px;margin:0 auto;padding:2rem;background:#1e1410;border-radius:12px;color:#e8d5b0">
                 <p style="font-size:18px;margin:0 0 16px">Hi there,</p>
                 <p style="margin:0 0 20px">Click the link below to view your order history. This link is valid for 24 hours.</p>
@@ -3667,9 +3674,9 @@ async function handleShopOrderHistory(req, res, supabase) {
   return json(405, { error: 'POST or GET only' });
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// ABANDONED CART â€” capture on email blur, clear on purchase
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ABANDONED CART Ã¢â‚¬â€ capture on email blur, clear on purchase
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 async function handleShopAbandonedCart(req, res, supabase) {
   // POST: save or update an abandoned cart
   if (req.method === 'POST') {
@@ -3705,10 +3712,10 @@ async function handleShopAbandonedCart(req, res, supabase) {
   return json(405, { error: 'POST or DELETE only' });
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// CART REMINDER CRON â€” called by Vercel Cron, sends reminder emails for
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// CART REMINDER CRON Ã¢â‚¬â€ called by Vercel Cron, sends reminder emails for
 // carts abandoned >3h ago, <48h ago, not yet reminded.
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 async function handleShopCartReminder(req, res, supabase) {
   // Verify cron secret to prevent abuse
   const cronSecret = process.env.CRON_SECRET;
@@ -3737,7 +3744,7 @@ async function handleShopCartReminder(req, res, supabase) {
   let sent = 0;
   for (const cart of carts) {
     const items = Array.isArray(cart.cart) ? cart.cart : [];
-    const itemList = items.map(i => `${i.name || 'Item'} Ã— ${i.qty || 1}`).join(', ');
+    const itemList = items.map(i => `${i.name || 'Item'} Ãƒâ€” ${i.qty || 1}`).join(', ');
     const name = cart.name || 'there';
     try {
       await fetch('https://api.resend.com/emails', {
@@ -3752,7 +3759,7 @@ async function handleShopCartReminder(req, res, supabase) {
             <p style="font-size:18px;margin:0 0 12px">Hi ${shopEscapeHtml(name)},</p>
             <p style="margin:0 0 16px;line-height:1.7">You were browsing Kay's Works and left a few things in your cart:</p>
             <p style="margin:0 0 20px;color:#c4845a;font-style:italic">${shopEscapeHtml(itemList)}</p>
-            <p style="margin:0 0 24px;line-height:1.7">No pressure â€” your cart is still waiting if you'd like to come back.</p>
+            <p style="margin:0 0 24px;line-height:1.7">No pressure Ã¢â‚¬â€ your cart is still waiting if you'd like to come back.</p>
             <a href="${cart.checkout_url}" style="display:inline-block;padding:14px 28px;background:#9e4f2e;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold">Return to my cart</a>
             <p style="margin:24px 0 0;font-size:12px;color:#8a7060">If you've already completed your purchase, please ignore this. To stop receiving reminders, simply reply and let us know.</p>
           </div>`,
@@ -3766,10 +3773,10 @@ async function handleShopCartReminder(req, res, supabase) {
   return json(200, { ok: true, sent, total: carts.length });
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// COLLECTOR UPSERT â€” called after a successful purchase to add/update the
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// COLLECTOR UPSERT Ã¢â‚¬â€ called after a successful purchase to add/update the
 // customer in the collectors table (only if they consented at checkout).
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 async function _postPurchaseCleanup(supabase, email, name) {
   upsertCollector(supabase, email, name).catch(() => {});
   supabase.from('abandoned_carts').delete().eq('email', email).then(()=>{}).catch(()=>{});
