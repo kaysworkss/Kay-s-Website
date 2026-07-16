@@ -2,20 +2,20 @@
  * /api/admin
  *
  * Single consolidated file replacing:
- *   api/admin/challenge/login.js        → POST   /api/admin/login
- *   api/admin/challenge/challenges.js   → GET    /api/admin/challenges
- *   api/admin/challenge/challenge.js    → POST   /api/admin/challenge
- *   api/admin/challenge/[id].js         → DELETE /api/admin/challenge/:id
- *   api/admin/challenge/upload-image.js → POST   /api/admin/upload-image
- *   api/admin/challenge/wallets.js      → GET    /api/admin/wallets
+ *   api/admin/challenge/login.js        â†’ POST   /api/admin/login
+ *   api/admin/challenge/challenges.js   â†’ GET    /api/admin/challenges
+ *   api/admin/challenge/challenge.js    â†’ POST   /api/admin/challenge
+ *   api/admin/challenge/[id].js         â†’ DELETE /api/admin/challenge/:id
+ *   api/admin/challenge/upload-image.js â†’ POST   /api/admin/upload-image
+ *   api/admin/challenge/wallets.js      â†’ GET    /api/admin/wallets
  */
 
 const { getSupabase, cors, handleOptions } = require('./_lib');
 const crypto = require('crypto');
 
-// ── Auth helpers ─────────────────────────────────────────────────────────────
+// â”€â”€ Auth helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Signed token: HMAC-SHA256(randomId, ADMIN_TOKEN)
-// Stateless — no storage needed. Any request can be verified by re-deriving the HMAC.
+// Stateless â€” no storage needed. Any request can be verified by re-deriving the HMAC.
 
 function generateToken() {
   const id     = crypto.randomBytes(16).toString('hex');
@@ -40,7 +40,7 @@ function checkToken(req) {
   } catch { return false; }
 }
 
-// ── POST /api/admin?action=login ─────────────────────────────────────────────
+// â”€â”€ POST /api/admin?action=login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleLogin(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { password } = req.body || {};
@@ -50,7 +50,7 @@ async function handleLogin(req, res) {
   return res.status(200).json({ token: generateToken() });
 }
 
-// ── GET /api/admin?action=challenges ─────────────────────────────────────────
+// â”€â”€ GET /api/admin?action=challenges â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleGetChallenges(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const { data, error } = await supabase
@@ -61,7 +61,7 @@ async function handleGetChallenges(req, res, supabase) {
   return res.status(200).json(data || []);
 }
 
-// ── POST /api/admin?action=challenge ─────────────────────────────────────────
+// â”€â”€ POST /api/admin?action=challenge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleCreateChallenge(req, res, supabase) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { title, starts_at, ends_at, piece_count, image_url } = req.body || {};
@@ -77,7 +77,7 @@ async function handleCreateChallenge(req, res, supabase) {
   return res.status(201).json({ id: data.id });
 }
 
-// ── DELETE /api/admin?action=challenge&id=<uuid> ──────────────────────────────
+// â”€â”€ DELETE /api/admin?action=challenge&id=<uuid> â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleDeleteChallenge(req, res, supabase) {
   if (req.method !== 'DELETE') return res.status(405).json({ error: 'Method not allowed' });
   const id = req.query.id;
@@ -89,7 +89,7 @@ async function handleDeleteChallenge(req, res, supabase) {
   return res.status(200).json({ ok: true });
 }
 
-// ── POST /api/admin?action=upload-image ──────────────────────────────────────
+// â”€â”€ POST /api/admin?action=upload-image â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleUploadImage(req, res, supabase) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { filename, base64, mime_type } = req.body || {};
@@ -108,12 +108,12 @@ async function handleUploadImage(req, res, supabase) {
   return res.status(200).json({ url: urlData.publicUrl });
 }
 
-// ── GET /api/admin?action=wallets ─────────────────────────────────────────────
+// â”€â”€ GET /api/admin?action=wallets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function normalizePlayerName(name) {
   return String(name || '').trim().toLowerCase();
 }
 
-// ── GET /api/admin?action=wallets ─────────────────────────────────────────────
+// â”€â”€ GET /api/admin?action=wallets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleGetWallets(req, res, supabase) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -168,7 +168,7 @@ async function handleGetWallets(req, res, supabase) {
   return res.status(200).json(rows);
 }
 
-// ── PATCH /api/admin?action=challenge (rename + extend end date) ─────────────
+// â”€â”€ PATCH /api/admin?action=challenge (rename + extend end date) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleExtendChallenge(req, res, supabase) {
   if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
   const { id, title, ends_at } = req.body || {};
@@ -189,9 +189,9 @@ async function handleExtendChallenge(req, res, supabase) {
 }
 
 
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 //  SHOP ADMIN SECTION (filters + restock-delete). Uses res-based json helper.
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 let _shopAdminRes = null;
 function json(status, obj) { _shopAdminRes.status(status).json(obj); return obj; }
 
@@ -238,6 +238,12 @@ async function handleShopProducts(req, res, supabase) {
 
   if (req.method === 'POST') {
     const body = req.body || {};
+    const holderBenefitRole = ['free_tote', 'discount_addon'].includes(String(body.holder_benefit_role || ''))
+      ? String(body.holder_benefit_role)
+      : '';
+    const holderBenefitActive = Boolean(body.holder_benefit_active) && Boolean(holderBenefitRole);
+    const holderBenefitProject = String(body.holder_benefit_project || 'apoti-olowe').slice(0, 80);
+    const holderBenefitEntitlementKey = String(body.holder_benefit_entitlement_key || 'apoti-olowe-token-2-merch').slice(0, 120);
     const { data, error } = await supabase
       .from('shop_products')
       .insert({
@@ -245,7 +251,7 @@ async function handleShopProducts(req, res, supabase) {
         category:           String(body.category || 'prints').slice(0, 40),
         print_type:         String(body.print_type || '').slice(0, 40),
         description:        String(body.description || body.desc || '').slice(0, 1000),
-        emoji:              String(body.emoji || '✦').slice(0, 10),
+        emoji:              String(body.emoji || 'âœ¦').slice(0, 10),
         variants:           body.variants || [],
         available_variants: body.available_variants || [],
         prices_ngn:         body.prices_ngn || {},
@@ -276,6 +282,10 @@ async function handleShopProducts(req, res, supabase) {
         print_edition:      String(body.print_edition || '').slice(0, 40) || null,
         is_sold:            Boolean(body.is_sold),
         enquire_only:       Boolean(body.enquire_only),
+        holder_benefit_active:          holderBenefitActive,
+        holder_benefit_role:            holderBenefitRole,
+        holder_benefit_project:         holderBenefitProject,
+        holder_benefit_entitlement_key: holderBenefitEntitlementKey,
       })
       .select('id')
       .single();
@@ -287,6 +297,12 @@ async function handleShopProducts(req, res, supabase) {
     const id = req.query.id;
     if (!id) return json(400, { error: 'id required' });
     const body = req.body || {};
+    const holderBenefitRole = ['free_tote', 'discount_addon'].includes(String(body.holder_benefit_role || ''))
+      ? String(body.holder_benefit_role)
+      : '';
+    const holderBenefitActive = Boolean(body.holder_benefit_active) && Boolean(holderBenefitRole);
+    const holderBenefitProject = String(body.holder_benefit_project || 'apoti-olowe').slice(0, 80);
+    const holderBenefitEntitlementKey = String(body.holder_benefit_entitlement_key || 'apoti-olowe-token-2-merch').slice(0, 120);
     const patch = {};
     if (body.name               !== undefined) patch.name               = String(body.name).slice(0, 200);
     if (body.category           !== undefined) patch.category           = String(body.category).slice(0, 40);
@@ -324,6 +340,10 @@ async function handleShopProducts(req, res, supabase) {
     if (body.print_edition      !== undefined) patch.print_edition      = String(body.print_edition).slice(0, 40) || null;
     if (body.is_sold            !== undefined) patch.is_sold            = Boolean(body.is_sold);
     if (body.enquire_only       !== undefined) patch.enquire_only       = Boolean(body.enquire_only);
+    if (body.holder_benefit_active          !== undefined) patch.holder_benefit_active          = holderBenefitActive;
+    if (body.holder_benefit_role            !== undefined) patch.holder_benefit_role            = holderBenefitRole;
+    if (body.holder_benefit_project         !== undefined) patch.holder_benefit_project         = holderBenefitProject;
+    if (body.holder_benefit_entitlement_key !== undefined) patch.holder_benefit_entitlement_key = holderBenefitEntitlementKey;
     const { error } = await supabase.from('shop_products').update(patch).eq('id', id);
     if (error) return json(500, { error: error.message });
     return json(200, { ok: true });
@@ -340,7 +360,7 @@ async function handleShopProducts(req, res, supabase) {
   return json(405, { error: 'Method not allowed' });
 }
 
-// ── shop-config (GET/POST) ────────────────────────────────────────────────────
+// â”€â”€ shop-config (GET/POST) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleShopConfig(req, res, supabase) {
   if (req.method === 'GET') {
     const { data, error } = await supabase
@@ -387,7 +407,7 @@ async function handleShopConfig(req, res, supabase) {
   return json(405, { error: 'Method not allowed' });
 }
 
-// ── shop-orders (GET) ─────────────────────────────────────────────────────────
+// â”€â”€ shop-orders (GET) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleShopOrders(req, res, supabase) {
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
   await maintainAdminOrderLifecycle(supabase);
@@ -411,7 +431,7 @@ async function handleShopOrders(req, res, supabase) {
   return json(200, data || []);
 }
 
-// ── shop-order (PATCH / DELETE) ───────────────────────────────────────────────
+// â”€â”€ shop-order (PATCH / DELETE) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleShopOrderUpdate(req, res, supabase) {
   const id = req.query.id;
 
@@ -499,16 +519,16 @@ async function handleShopOrderUpdate(req, res, supabase) {
   return json(200, { ok: true });
 }
 
-// ── Netlify entry point ───────────────────────────────────────────────────────
+// â”€â”€ Netlify entry point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  HOLDER HUB SECTION (Àpótí Ọlọ́wẹ̀ — messages, reservations, participants)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  HOLDER HUB SECTION (Ã€pÃ³tÃ­ á»Œlá»Ìwáº¹Ì€ â€” messages, reservations, participants)
 //  Content (Opa Collection, artworks, chapters, future plans) is hardcoded
-//  directly in holder-hub.html — only genuinely dynamic data (things other
+//  directly in holder-hub.html â€” only genuinely dynamic data (things other
 //  people generate, not you) is managed here.
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-// ── holder-reservations (GET inbox) ───────────────────────────────────────────
+// â”€â”€ holder-reservations (GET inbox) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleGetHolderReservations(req, res, supabase) {
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
   const { data, error } = await supabase
@@ -519,7 +539,7 @@ async function handleGetHolderReservations(req, res, supabase) {
   return json(200, data || []);
 }
 
-// ── holder-reservation (PATCH status) ─────────────────────────────────────────
+// â”€â”€ holder-reservation (PATCH status) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleHolderReservation(req, res, supabase) {
   if (req.method !== 'PATCH') return json(405, { error: 'Method not allowed' });
   const id = req.query.id;
@@ -531,7 +551,7 @@ async function handleHolderReservation(req, res, supabase) {
   return json(200, { ok: true });
 }
 
-// ── holder-messages (GET inbox) ───────────────────────────────────────────────
+// â”€â”€ holder-messages (GET inbox) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleGetHolderMessages(req, res, supabase) {
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
   const { data, error } = await supabase
@@ -542,7 +562,7 @@ async function handleGetHolderMessages(req, res, supabase) {
   return json(200, data || []);
 }
 
-// ── holder-message (PATCH status and/or private admin reply) ──────────────────
+// â”€â”€ holder-message (PATCH status and/or private admin reply) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleHolderMessage(req, res, supabase) {
   if (req.method !== 'PATCH') return json(405, { error: 'Method not allowed' });
   const id = req.query.id;
@@ -565,7 +585,7 @@ async function handleHolderMessage(req, res, supabase) {
   return json(200, { ok: true });
 }
 
-// ── holder-participants (GET) ─────────────────────────────────────────────────
+// â”€â”€ holder-participants (GET) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleGetHolderParticipants(req, res, supabase) {
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
   const { data, error } = await supabase
@@ -576,7 +596,7 @@ async function handleGetHolderParticipants(req, res, supabase) {
   return json(200, data || []);
 }
 
-// ── holder-participant (PATCH display_name / is_public) ──────────────────────
+// â”€â”€ holder-participant (PATCH display_name / is_public) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleHolderParticipant(req, res, supabase) {
   if (req.method !== 'PATCH') return json(405, { error: 'Method not allowed' });
   const id = req.query.id;
@@ -591,7 +611,7 @@ async function handleHolderParticipant(req, res, supabase) {
   return json(200, { ok: true });
 }
 
-// ── holder-content (GET/POST editable Holder Hub copy) ───────────────────────
+// â”€â”€ holder-content (GET/POST editable Holder Hub copy) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function handleHolderContent(req, res, supabase) {
   if (req.method === 'GET') {
     const { data, error } = await supabase.from('holder_content').select('future_plans,updated_at').eq('id', 1).maybeSingle();
@@ -612,7 +632,7 @@ async function handleHolderContent(req, res, supabase) {
 }
 
 
-// ── Vercel entry point ────────────────────────────────────────────────────────
+// â”€â”€ Vercel entry point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 module.exports = async (req, res) => {
   cors(res);
   if (handleOptions(req, res)) return;
