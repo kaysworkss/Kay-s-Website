@@ -1,4 +1,4 @@
-﻿/**
+/**
  * /api/game
  *
  * Single consolidated file replacing:
@@ -972,10 +972,15 @@ async function fetchLiveNgnRate() {
 
 // Get the current rate (with optional manual override from shop_config)
 async function getNgnPerUsd(supabase) {
-  // Check for a manual override in shop_config
+  // Check for a manual override on the single shop_config row.
   try {
-    const { data } = await supabase.from('shop_config').select('value').eq('key', 'ngn_per_usd').maybeSingle();
-    if (data?.value && Number(data.value) > 100) return Number(data.value);
+    const { data } = await supabase
+      .from('shop_config')
+      .select('ngn_per_usd')
+      .order('id', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (data?.ngn_per_usd && Number(data.ngn_per_usd) > 100) return Number(data.ngn_per_usd);
   } catch (_) {}
   return fetchLiveNgnRate();
 }
