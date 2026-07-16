@@ -3044,7 +3044,7 @@ body.dark { --text-muted: #b3a392; }
 
   <!-- MERCH -->
   <!-- APOTI HOLDER MERCH CLAIM -->
-  <section class="holder-merch-panel is-quiet is-holder-context-hidden" id="apotiHolderMerch" aria-hidden="true">
+  <section class="holder-merch-panel is-quiet is-holder-context-hidden" id="apotiHolderMerch" hidden aria-hidden="true">
     <details class="holder-merch-accordion" id="holderMerchAccordion">
       <summary class="holder-merch-summary">
         <span class="holder-merch-summary-main">
@@ -5685,16 +5685,14 @@ let _holderMerchClaim = null;
 function shouldShowHolderMerchAccess() {
   const params = new URLSearchParams(window.location.search || '');
   const holderParam = String(params.get('holder') || params.get('holderAccess') || '').toLowerCase();
-  const hash = String(window.location.hash || '').toLowerCase();
-  return ['apoti', 'apoti-olowe', 'holder', 'true', '1'].includes(holderParam)
-    || hash === '#apotiholdermerch'
-    || hash === '#holder-access';
+  return ['apoti', 'apoti-olowe', 'holder', 'true', '1'].includes(holderParam);
 }
 function applyHolderMerchContext() {
   const panel = document.getElementById('apotiHolderMerch');
   const accordion = document.getElementById('holderMerchAccordion');
   const visible = shouldShowHolderMerchAccess();
   if (!panel) return false;
+  panel.hidden = !visible;
   panel.classList.toggle('is-holder-context-hidden', !visible);
   panel.setAttribute('aria-hidden', visible ? 'false' : 'true');
   if (visible && accordion) accordion.open = true;
