@@ -5648,6 +5648,15 @@ const HIGH_CART_USD = 60;
 const COMPLIMENTARY_SHIPPING_USD = 500;
 const SHIPPING_DIM_DIVISOR = 5000;
 const SHIPPING_BUFFER = 1.2;
+// Per-package packing allowance added before the safety buffer. This covers
+// tubes, rigid mailers, soft parcels, labels, tape, and filler; item weights
+// remain product-only so mixed print/merch carts price sustainably.
+const PACKAGE_WEIGHT_KG = Object.freeze({
+  tube_art: 0.45,
+  flat_art: 0.28,
+  parcel: 0.22,
+});
+const PACKAGE_HANDLING_KG = 0.08;
 // Domestic (Nigeria) weight scaling base small/large rate covers the first
 // 2kg, then 1,000 per additional started kg. Mirror these constants and the
 // option-level state rates in the server quote function before deployment.
@@ -5866,9 +5875,12 @@ function makeShippingPiece(kind, label, items) {
     });
     maxH = Math.max(2, Math.ceil(Math.min(18, foldedStackCm + 1)));
   }
-  const actualKg = +(rawKg * SHIPPING_BUFFER).toFixed(2);
+  const packageKg = +(((PACKAGE_WEIGHT_KG[kind] ?? 0.25) + PACKAGE_HANDLING_KG).toFixed(2));
+  const packedKg = rawKg + packageKg;
+  const actualKg = +(packedKg * SHIPPING_BUFFER).toFixed(2);
   const volumetricKg = maxL && maxW && maxH ? +((maxL * maxW * maxH) / SHIPPING_DIM_DIVISOR).toFixed(2) : 0;
-  return { kind, label, actualKg, volumetricKg, billableKg: Math.max(actualKg, volumetricKg), dimsCm: [maxL, maxW, maxH], carrierOverride };
+  const billableKg = +Math.max(actualKg, volumetricKg).toFixed(2);
+  return { kind, label, productKg: +rawKg.toFixed(2), packageKg, actualKg, volumetricKg, billableKg, dimsCm: [maxL, maxW, maxH], carrierOverride };
 }
 function cartShippingPieces() {
   const entries = cart.map(item => ({ item, qty: item.qty, profile: itemShippingProfile(item) }));
