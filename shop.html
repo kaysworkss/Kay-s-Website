@@ -5662,6 +5662,13 @@ const PACKAGE_HANDLING_KG = 0.08;
 // option-level state rates in the server quote function before deployment.
 const DOMESTIC_INCLUDED_KG = 2;
 const DOMESTIC_PER_KG_NGN = 1000;
+const DOMESTIC_PACKING_BASE_NGN = 1500;
+const DOMESTIC_PACKING_EXTRA_PIECE_NGN = 750;
+const INTL_PACKING_BASE_USD = 8;
+const INTL_PACKING_EXTRA_PIECE_USD = 4;
+// Kaduna-origin safeguard: international courier quotes must still cover
+// inland movement to the Lagos export hub before the packing fee is added.
+const INTL_MIN_TIER_USD = 65;
 function selectedDomesticRate(fallbackRate) {
   const select = document.getElementById('ckState');
   const option = select?.options[select.selectedIndex];
@@ -5678,12 +5685,24 @@ function selectedDomesticRate(fallbackRate) {
 }
 // Compute the domestic NGN delivery fee for a flat-tier zone, with the GIG-style
 // per-kg surcharge applied above the included weight.
+function shippingPieceCount(profile = cartShippingProfile()) {
+  const pieces = Array.isArray(profile?.pieces) ? profile.pieces.length : 0;
+  return Math.max(1, pieces);
+}
+function packingFeeNgn(profile = cartShippingProfile()) {
+  const pieces = shippingPieceCount(profile);
+  return DOMESTIC_PACKING_BASE_NGN + Math.max(0, pieces - 1) * DOMESTIC_PACKING_EXTRA_PIECE_NGN;
+}
+function packingFeeUsd(profile = cartShippingProfile()) {
+  const pieces = shippingPieceCount(profile);
+  return INTL_PACKING_BASE_USD + Math.max(0, pieces - 1) * INTL_PACKING_EXTRA_PIECE_USD;
+}
 function domesticDeliveryNgn(rate, isLarge) {
   const base = (isLarge ? rate.large : rate.small).ngn || 0;
   const prof = cartShippingProfile();
   const billableKg = Number(prof.billableKg) || (isLarge ? 1.5 : 0.7);
   const extraKg = Math.max(0, Math.ceil(billableKg - DOMESTIC_INCLUDED_KG));
-  return base + extraKg * DOMESTIC_PER_KG_NGN;
+  return base + extraKg * DOMESTIC_PER_KG_NGN + packingFeeNgn(prof);
 }
 const LARGE_PRINT_VARIANTS = ['12x16"','12x18"','18x24"','24x36"'];
 let _deliveryMethod = 'ship';
@@ -5936,19 +5955,20 @@ function tierRateForWeight(zone, carrier, kg) {
   if (!tiers || !tiers.length) return 0;
   for (const band of tiers) {
     if (kg <= band.upTo) {
-      if (band.perKg && band.upTo !== Infinity) return band.usd; // unreachable, defensive
+      let usd = band.usd;
+      if (band.perKg && band.upTo !== Infinity) usd = band.usd; // unreachable, defensive
       if (band.perKg) {
         // Final open-ended band: base covers up to its floor, then a flat
         // per-kg add-on for the excess (only used for unusually heavy orders).
         const floor = tiers[tiers.length - 2]?.upTo || 0;
         const extraKg = Math.max(0, Math.ceil(kg - floor));
-        return band.usd + extraKg * band.perKg;
+        usd = band.usd + extraKg * band.perKg;
       }
-      return band.usd;
+      return Math.max(INTL_MIN_TIER_USD, usd);
     }
   }
   const last = tiers[tiers.length - 1];
-  return last ? last.usd : 0;
+  return Math.max(INTL_MIN_TIER_USD, last ? last.usd : 0);
 }
 function rateForBillableWeight(zone, carrier) {
   const profile = cartShippingProfile();
@@ -5963,7 +5983,7 @@ function rateForBillableWeight(zone, carrier) {
 }
 function intlRate(zone, isLarge, carrier = selectedIntlCarrier(zone)) {
   if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 0;
-  return rateForBillableWeight(zone, carrier);
+  return rateForBillableWeight(zone, carrier) + packingFeeUsd();
 }
 function deliveryFeeNgn() {
   if (!_deliveryZone) return 0;
