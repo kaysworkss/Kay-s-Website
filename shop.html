@@ -5646,6 +5646,7 @@ const WEIGHT_TIERS = {
 
 const HIGH_CART_USD = 60;
 const COMPLIMENTARY_SHIPPING_USD = 500;
+const COMPLIMENTARY_SHIPPING_CREDIT_USD = 100;
 const SHIPPING_DIM_DIVISOR = 5000;
 const SHIPPING_BUFFER = 1.2;
 // Per-package packing allowance added before the safety buffer. This covers
@@ -5666,9 +5667,9 @@ const DOMESTIC_PACKING_BASE_NGN = 1500;
 const DOMESTIC_PACKING_EXTRA_PIECE_NGN = 750;
 const INTL_PACKING_BASE_USD = 8;
 const INTL_PACKING_EXTRA_PIECE_USD = 4;
-// Kaduna-origin safeguard: international courier quotes must still cover
-// inland movement to the Lagos export hub before the packing fee is added.
-const INTL_MIN_TIER_USD = Object.freeze({ ups: 50, dhl: 60 });
+// International quote parts: published courier tier, Kaduna-to-export-hub
+// minimum base, then packing/processing. Keep this mirrored in game.js.
+const INTL_KADUNA_EXPORT_BASE_USD = Object.freeze({ ups: 55, dhl: 60 });
 function selectedDomesticRate(fallbackRate) {
   const select = document.getElementById('ckState');
   const option = select?.options[select.selectedIndex];
@@ -5950,6 +5951,9 @@ function selectedIntlCarrier(zone) {
 // adding another small item that keeps the total under the ceiling doesn't
 // raise the price at all, which is how the real couriers price multi-item
 // shipments.
+function intlBaseUsd(carrier, publishedUsd) {
+  return Math.max(INTL_KADUNA_EXPORT_BASE_USD[carrier] || 0, Number(publishedUsd) || 0);
+}
 function tierRateForWeight(zone, carrier, kg) {
   const tiers = (WEIGHT_TIERS[zone] || WEIGHT_TIERS.ROW)?.[carrier];
   if (!tiers || !tiers.length) return 0;
@@ -5964,11 +5968,11 @@ function tierRateForWeight(zone, carrier, kg) {
         const extraKg = Math.max(0, Math.ceil(kg - floor));
         usd = band.usd + extraKg * band.perKg;
       }
-      return Math.max(INTL_MIN_TIER_USD[carrier] || 0, usd);
+      return intlBaseUsd(carrier, usd);
     }
   }
   const last = tiers[tiers.length - 1];
-  return Math.max(INTL_MIN_TIER_USD[carrier] || 0, last ? last.usd : 0);
+  return intlBaseUsd(carrier, last ? last.usd : 0);
 }
 function rateForBillableWeight(zone, carrier) {
   const profile = cartShippingProfile();
@@ -5981,29 +5985,35 @@ function rateForBillableWeight(zone, carrier) {
   // full international base fee unless a configured carrier override is higher.
   return Math.max(tier, override);
 }
+function complimentaryShippingCreditUsd() {
+  return cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD ? COMPLIMENTARY_SHIPPING_CREDIT_USD : 0;
+}
+function applyComplimentaryShippingCreditUsd(usd) {
+  return Math.max(0, +(Number(usd || 0) - complimentaryShippingCreditUsd()).toFixed(2));
+}
+function applyComplimentaryShippingCreditNgn(ngn) {
+  return Math.max(0, Math.round(Number(ngn || 0) - complimentaryShippingCreditUsd() * SHOP_RATE));
+}
 function intlRate(zone, isLarge, carrier = selectedIntlCarrier(zone)) {
-  if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 0;
-  return rateForBillableWeight(zone, carrier) + packingFeeUsd();
+  return applyComplimentaryShippingCreditUsd(rateForBillableWeight(zone, carrier) + packingFeeUsd());
 }
 function deliveryFeeNgn() {
   if (!_deliveryZone) return 0;
-  if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 0;
   let r = DELIVERY_RATES[_deliveryZone];
   if (!r) return 0;
   if (!isInternationalZone(_deliveryZone)) r = selectedDomesticRate(r);
   const isLarge = cartHasLargePrint();
-  if (r.small !== undefined) return domesticDeliveryNgn(r, isLarge);
+  if (r.small !== undefined) return applyComplimentaryShippingCreditNgn(domesticDeliveryNgn(r, isLarge));
   return Math.round(intlRate(_deliveryZone, isLarge) * SHOP_RATE);
 }
 function deliveryFeeUsd() {
   if (!_deliveryZone) return 0;
-  if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 0;
   let r = DELIVERY_RATES[_deliveryZone];
   if (!r) return 0;
   if (!isInternationalZone(_deliveryZone)) r = selectedDomesticRate(r);
   const isLarge = cartHasLargePrint();
   if (r.small !== undefined) {
-    const ngn = domesticDeliveryNgn(r, isLarge);
+    const ngn = applyComplimentaryShippingCreditNgn(domesticDeliveryNgn(r, isLarge));
     return ngn ? +(ngn / SHOP_RATE).toFixed(2) : 0;
   }
   return intlRate(_deliveryZone, isLarge);
@@ -6013,16 +6023,19 @@ function deliveryFeeDisplay(carrier = selectedIntlCarrier(_deliveryZone)) {
   let r = DELIVERY_RATES[_deliveryZone];
   if (!r) return 'TBD';
   if (!isInternationalZone(_deliveryZone)) r = selectedDomesticRate(r);
-  if (cartUsdTotal() >= COMPLIMENTARY_SHIPPING_USD) return 'Complimentary';
   const isLarge = cartHasLargePrint();
-  if (r.small !== undefined) return fmt(domesticDeliveryNgn(r, isLarge));
+  if (r.small !== undefined) {
+    const ngn = applyComplimentaryShippingCreditNgn(domesticDeliveryNgn(r, isLarge));
+    return ngn > 0 ? fmt(ngn) : 'Complimentary';
+  }
   const usd = intlRate(_deliveryZone, isLarge, carrier);
+  if (usd <= 0) return 'Complimentary';
   return '$' + usd.toFixed(0) + ' USD (~' + fmt(Math.round(usd * SHOP_RATE)) + ')';
 }
 function carrierLabel(carrier) { return carrier === 'dhl' ? 'DHL Express' : 'UPS'; }
 function deliveryFeeForCarrier(carrier) {
   const usd = intlRate(_deliveryZone, cartHasLargePrint(), carrier);
-  return '$' + usd.toFixed(0) + ' USD';
+  return usd > 0 ? '$' + usd.toFixed(0) + ' USD' : 'Complimentary';
 }
 
 function selectedDeliveryZone() {
@@ -9031,7 +9044,3 @@ detectVisitorCurrency().finally(initCurrencySelector);
 
 </body>
 </html>
-
-
-
-
