@@ -1013,7 +1013,7 @@ const SERVER_INTL_PACKING_BASE_USD = 8;
 const SERVER_INTL_PACKING_EXTRA_PIECE_USD = 4;
 // Kaduna-origin safeguard: international courier quotes must still cover
 // inland movement to the Lagos export hub before the packing fee is added.
-const SERVER_INTL_MIN_TIER_USD = 65;
+const SERVER_INTL_MIN_TIER_USD = Object.freeze({ ups: 50, dhl: 60 });
 
 function serverVariantPrice(product, variantKey, variant, currency) {
   const prices = currency === 'usd' ? (product.prices_usd || {}) : (product.prices_ngn || {});
@@ -1205,10 +1205,10 @@ function serverTierRateForWeight(zone, carrier, kg) {
         const floor = tiers[tiers.length - 2]?.upTo || 0;
         usd = band.usd + Math.max(0, Math.ceil(kg - floor)) * band.perKg;
       }
-      return Math.max(SERVER_INTL_MIN_TIER_USD, usd);
+      return Math.max(SERVER_INTL_MIN_TIER_USD[carrier] || 0, usd);
     }
   }
-  return Math.max(SERVER_INTL_MIN_TIER_USD, tiers[tiers.length - 1]?.usd || 0);
+  return Math.max(SERVER_INTL_MIN_TIER_USD[carrier] || 0, tiers[tiers.length - 1]?.usd || 0);
 }
 function serverShippingPieceCount(shippingProfile) {
   const pieces = Array.isArray(shippingProfile?.pieces) ? shippingProfile.pieces.length : 0;
