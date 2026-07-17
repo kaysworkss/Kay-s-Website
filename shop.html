@@ -5668,7 +5668,7 @@ const INTL_PACKING_BASE_USD = 8;
 const INTL_PACKING_EXTRA_PIECE_USD = 4;
 // Kaduna-origin safeguard: international courier quotes must still cover
 // inland movement to the Lagos export hub before the packing fee is added.
-const INTL_MIN_TIER_USD = 65;
+const INTL_MIN_TIER_USD = Object.freeze({ ups: 50, dhl: 60 });
 function selectedDomesticRate(fallbackRate) {
   const select = document.getElementById('ckState');
   const option = select?.options[select.selectedIndex];
@@ -5964,11 +5964,11 @@ function tierRateForWeight(zone, carrier, kg) {
         const extraKg = Math.max(0, Math.ceil(kg - floor));
         usd = band.usd + extraKg * band.perKg;
       }
-      return Math.max(INTL_MIN_TIER_USD, usd);
+      return Math.max(INTL_MIN_TIER_USD[carrier] || 0, usd);
     }
   }
   const last = tiers[tiers.length - 1];
-  return Math.max(INTL_MIN_TIER_USD, last ? last.usd : 0);
+  return Math.max(INTL_MIN_TIER_USD[carrier] || 0, last ? last.usd : 0);
 }
 function rateForBillableWeight(zone, carrier) {
   const profile = cartShippingProfile();
