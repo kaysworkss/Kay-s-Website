@@ -1007,6 +1007,13 @@ const SERVER_PACKAGE_HANDLING_KG = 0.08;
 // (~NGN 1,100/kg over the base); Lagos->Abuja 10kg ~ NGN 14,500.
 const SERVER_DOMESTIC_INCLUDED_KG = 2;      // kg covered by the base rate
 const SERVER_DOMESTIC_PER_KG_NGN = 1000;    // surcharge per extra kg above that
+const SERVER_DOMESTIC_PACKING_BASE_NGN = 1500;
+const SERVER_DOMESTIC_PACKING_EXTRA_PIECE_NGN = 750;
+const SERVER_INTL_PACKING_BASE_USD = 8;
+const SERVER_INTL_PACKING_EXTRA_PIECE_USD = 4;
+// Kaduna-origin safeguard: international courier quotes must still cover
+// inland movement to the Lagos export hub before the packing fee is added.
+const SERVER_INTL_MIN_TIER_USD = 65;
 
 function serverVariantPrice(product, variantKey, variant, currency) {
   const prices = currency === 'usd' ? (product.prices_usd || {}) : (product.prices_ngn || {});
@@ -1193,14 +1200,27 @@ function serverTierRateForWeight(zone, carrier, kg) {
   if (!tiers || !tiers.length) return 0;
   for (const band of tiers) {
     if (kg <= band.upTo) {
+      let usd = band.usd;
       if (band.perKg) {
         const floor = tiers[tiers.length - 2]?.upTo || 0;
-        return band.usd + Math.max(0, Math.ceil(kg - floor)) * band.perKg;
+        usd = band.usd + Math.max(0, Math.ceil(kg - floor)) * band.perKg;
       }
-      return band.usd;
+      return Math.max(SERVER_INTL_MIN_TIER_USD, usd);
     }
   }
-  return tiers[tiers.length - 1]?.usd || 0;
+  return Math.max(SERVER_INTL_MIN_TIER_USD, tiers[tiers.length - 1]?.usd || 0);
+}
+function serverShippingPieceCount(shippingProfile) {
+  const pieces = Array.isArray(shippingProfile?.pieces) ? shippingProfile.pieces.length : 0;
+  return Math.max(1, pieces);
+}
+function serverPackingFeeNgn(shippingProfile) {
+  const pieces = serverShippingPieceCount(shippingProfile);
+  return SERVER_DOMESTIC_PACKING_BASE_NGN + Math.max(0, pieces - 1) * SERVER_DOMESTIC_PACKING_EXTRA_PIECE_NGN;
+}
+function serverPackingFeeUsd(shippingProfile) {
+  const pieces = serverShippingPieceCount(shippingProfile);
+  return SERVER_INTL_PACKING_BASE_USD + Math.max(0, pieces - 1) * SERVER_INTL_PACKING_EXTRA_PIECE_USD;
 }
 function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd = 0, requestedCarrier = '', shippingProfile = null, deliveryStateCode = '') {
   if (subtotalUsd >= SERVER_COMPLIMENTARY_SHIPPING_USD) return 0;
@@ -1216,7 +1236,7 @@ function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd = 0, requestedC
     const overrideUsd = Number(shippingProfile?.carrierOverride?.[carrierTier]) || 0;
     // Match the shop: one courier consignment priced from combined billable
     // weight, with any configured carrier override acting as a floor.
-    tier = { usd: Math.max(tierUsd, overrideUsd), ngn: 0 };
+    tier = { usd: Math.max(tierUsd, overrideUsd) + serverPackingFeeUsd(shippingProfile), ngn: 0 };
   } else {
     // Domestic: base small/large rate + GIG-style per-kg surcharge for weight
     // above the included allowance. billableKg already accounts for the 1.2x buffer.
@@ -1226,7 +1246,7 @@ function serverDeliveryFee(zone, hasLarge, currency, subtotalUsd = 0, requestedC
     const extraKg = Math.max(0, Math.ceil(billableKg - SERVER_DOMESTIC_INCLUDED_KG));
     const surchargeNgn = extraKg * SERVER_DOMESTIC_PER_KG_NGN;
     tier = {
-      ngn: (base.ngn || 0) + surchargeNgn,
+      ngn: (base.ngn || 0) + surchargeNgn + serverPackingFeeNgn(shippingProfile),
       usd: base.usd || 0,
     };
   }
