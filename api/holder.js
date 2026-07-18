@@ -366,6 +366,27 @@ async function handleContent(req, res, supabase) {
   return res.status(200).json({ future_plans: (data && data.future_plans) || '' });
 }
 
+// -- action=email-updates ----
+// Holder-controlled opt-in for project update emails from the Holder Hub admin.
+async function handleEmailUpdates(req, res, supabase) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const accessToken = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!accessToken) return res.status(401).json({ error: 'Missing session token.' });
+
+  const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
+  if (userError || !userData || !userData.user) {
+    return res.status(401).json({ error: 'Invalid or expired session.' });
+  }
+
+  const enabled = Boolean(req.body && req.body.enabled);
+  const { error } = await supabase
+    .from('holders')
+    .update({ email_updates_opt_in: enabled })
+    .eq('auth_user_id', userData.user.id);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json({ ok: true, email_updates_opt_in: enabled });
+}
+
 // -- action=config ----
 // Public, read-only. Lets the static HTML pull its Supabase connection info
 // from the same env vars your serverless functions already use, instead of
@@ -405,6 +426,7 @@ module.exports = async (req, res) => {
       case 'claim':  return await handleClaim(req, res, supabase);
       case 'send-auth-email': return await handleSendAuthEmail(req, res, supabase);
       case 'content': return await handleContent(req, res, supabase);
+      case 'email-updates': return await handleEmailUpdates(req, res, supabase);
       default:
         return res.status(404).json({ error: `Unknown holder action: ${action}` });
     }
