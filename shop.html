@@ -4808,6 +4808,15 @@ function normalizeHolderText(value) {
   return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 function holderProductKind(product) {
+  const role = String(product?.holder_benefit_role || '').toLowerCase();
+  if (role === 'free_tote') return 'tote';
+  if (role === 'discount_addon') {
+    const type = normalizeHolderText([product?.clothing_type, product?.name, product?.slug].join(' '));
+    if (type.includes('hoodie')) return 'hoodie';
+    if (type.includes('shirt') || type.includes('tee')) return 'shirt';
+    if (type.includes('tote') || type.includes('bag')) return 'tote';
+    return 'addon';
+  }
   const hay = normalizeHolderText([product?.name, product?.slug, product?.series_slug, product?.category].join(' '));
   if (/tote|bag/.test(hay)) return 'tote';
   if (/hoodie|sweatshirt/.test(hay)) return 'hoodie';
@@ -4821,7 +4830,8 @@ function isApotiMerchProduct(product) {
 }
 function findHolderMerchProduct(kind) {
   const products = SHOP_CONFIG.products || [];
-  return products.find(p => p && p.active !== false && isApotiMerchProduct(p) && holderProductKind(p) === kind)
+  return products.find(p => p && p.active !== false && p.holder_benefit_active === true && isApotiMerchProduct(p) && holderProductKind(p) === kind)
+    || products.find(p => p && p.active !== false && isApotiMerchProduct(p) && holderProductKind(p) === kind)
     || products.find(p => p && p.active !== false && String(p.category || '').toLowerCase() === 'merch' && holderProductKind(p) === kind);
 }
 function firstAvailableChoice(product) {
@@ -4849,14 +4859,15 @@ function holderMerchBenefit(currency) {
     if (String(product.category || '').toLowerCase() !== 'merch') return;
     const kind = holderProductKind(product);
     const unit = liveCartItemPrice(item, currency);
+    let discountableQty = item.qty;
     if (kind === 'tote' && freeToteRemaining > 0) {
       const covered = Math.min(item.qty, freeToteRemaining);
       freeTote += unit * covered;
       freeToteRemaining -= covered;
-      return;
+      discountableQty -= covered;
     }
-    if ((kind === 'shirt' || kind === 'hoodie') && percent > appliedProductPercent && isApotiMerchProduct(product)) {
-      addOn += unit * item.qty * percent / 100;
+    if ((kind === 'tote' || kind === 'shirt' || kind === 'hoodie' || kind === 'addon') && discountableQty > 0 && percent > appliedProductPercent && isApotiMerchProduct(product)) {
+      addOn += unit * discountableQty * percent / 100;
     }
   });
   return {
@@ -4877,14 +4888,16 @@ function holderDiscountExcludedSubtotal(currency) {
     if (String(product.category || '').toLowerCase() !== 'merch') return;
     const kind = holderProductKind(product);
     const unit = liveCartItemPrice(item, currency);
+    let discountableQty = item.qty;
     if (kind === 'tote' && freeToteRemaining > 0) {
       const covered = Math.min(item.qty, freeToteRemaining);
       excluded += unit * covered;
       freeToteRemaining -= covered;
+      discountableQty -= covered;
     }
     const itemPercent = holderProductDiscountPercent(product);
-    if ((kind === 'shirt' || kind === 'hoodie' || kind === 'addon') && isApotiMerchProduct(product) && itemPercent > appliedProductPercent) {
-      excluded += unit * item.qty;
+    if ((kind === 'tote' || kind === 'shirt' || kind === 'hoodie' || kind === 'addon') && discountableQty > 0 && isApotiMerchProduct(product) && itemPercent > appliedProductPercent) {
+      excluded += unit * discountableQty;
     }
   });
   return +excluded.toFixed(2);
@@ -5669,7 +5682,7 @@ const INTL_PACKING_BASE_USD = 8;
 const INTL_PACKING_EXTRA_PIECE_USD = 4;
 // International quote parts: published courier tier, Kaduna-to-export-hub
 // minimum base, then packing/processing. Keep this mirrored in game.js.
-const INTL_KADUNA_EXPORT_BASE_USD = Object.freeze({ ups: 55, dhl: 60 });
+const INTL_KADUNA_EXPORT_BASE_USD = Object.freeze({ ups: 55, dhl: 75 });
 function selectedDomesticRate(fallbackRate) {
   const select = document.getElementById('ckState');
   const option = select?.options[select.selectedIndex];
