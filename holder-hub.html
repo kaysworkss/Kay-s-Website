@@ -1787,13 +1787,14 @@ async function handleSession(session) {
   }
   currentUser = session.user;
 
-  const { data: holderRow } = await sb
+  const { data: holderRows } = await sb
     .from('holders')
     .select('*')
     .eq('auth_user_id', currentUser.id)
-    .maybeSingle();
+    .order('last_verified_at', { ascending: false });
 
-  currentHolder = holderRow || null;
+  const rows = Array.isArray(holderRows) ? holderRows : [];
+  currentHolder = rows[0] ? { ...rows[0], linked_wallets: rows } : null;
 
   const needsVerify = !currentHolder || isStale(currentHolder.last_verified_at);
 
@@ -2087,6 +2088,7 @@ async function verifyAndLink(chain, address) {
     token_balance: result.balance || 1,
     tier: result.tier || result.tokenTier || result.token_tier || null,
     token_id: result.tokenId || result.token_id || result.gateTokenId || result.gate_token_id || result.holdingTokenId || result.holding_token_id || null,
+    balancesByTokenId: result.balancesByTokenId || result.balances_by_token_id || result.tokenBalances || null,
     display_name: result.displayName || null,
     last_verified_at: new Date().toISOString(),
   };
@@ -2158,56 +2160,149 @@ async function enterDashboard() {
   }, 1500);
 }
 
-function renderMerchEntitlement() {
-  const el = document.getElementById('merchEntitlementText');
-  if (!el || !currentHolder) return;
-  const tokenId = String(
-    currentHolder.token_id ??
-    currentHolder.tokenId ??
-    currentHolder.gate_token_id ??
-    currentHolder.gateTokenId ??
-    currentHolder.holding_token_id ??
-    currentHolder.holdingTokenId ??
-    currentHolder.entry_token_id ??
-    currentHolder.entryTokenId ??
+const HOLDER_GATE_TOKEN_IDS = ['1', '2'];
+const HOLDER_GATE_TOKEN_TIERS = { '1': 'wood', '2': 'bronze' };
+const HOLDER_GATE_ETH_CONTRACT = '0x611cca3635b0f05b103031ee8d4f3261633292b4';
+const HOLDER_GATE_ETH_RPC = 'https://ethereum.publicnode.com';
+const HOLDER_GATE_TEZOS_CONTRACT = 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8';
+
+function normalizeGateBalances(rawBalances) {
+  const balances = { '1': 0, '2': 0 };
+  if (!rawBalances) return balances;
+  HOLDER_GATE_TOKEN_IDS.forEach(id => {
+    const value = Number(rawBalances[id] ?? rawBalances[Number(id)] ?? 0);
+    balances[id] = Number.isFinite(value) && value > 0 ? value : 0;
+  });
+  return balances;
+}
+
+function addGateBalances(target, source) {
+  HOLDER_GATE_TOKEN_IDS.forEach(id => {
+    target[id] = Math.max(Number(target[id] || 0), Number(source[id] || 0));
+  });
+}
+
+function holderWalletsForEntitlement(holder) {
+  const wallets = [];
+  const seen = new Set();
+  const addWallet = row => {
+    const address = row?.wallet_address || row?.walletAddress || row?.address;
+    const chain = row?.chain;
+    if (!address || !chain) return;
+    const key = chain + ':' + String(address).toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    wallets.push({ ...row, wallet_address: address, chain });
+  };
+  addWallet(holder);
+  (holder?.linked_wallets || holder?.linkedWallets || holder?.wallets || []).forEach(addWallet);
+  return wallets;
+}
+
+async function fetchTezosGateBalances(address) {
+  const url =
+    'https://api.tzkt.io/v1/tokens/balances' +
+    '?account=' + encodeURIComponent(address) +
+    '&token.contract=' + encodeURIComponent(HOLDER_GATE_TEZOS_CONTRACT) +
+    '&token.tokenId.in=' + HOLDER_GATE_TOKEN_IDS.join(',') +
+    '&limit=10';
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('TzKT returned ' + response.status);
+  const rows = await response.json();
+  const balances = { '1': 0, '2': 0 };
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    const tokenId = String(row?.token?.tokenId ?? '');
+    if (!Object.prototype.hasOwnProperty.call(balances, tokenId)) return;
+    balances[tokenId] += Number(row?.balance || 0);
+  });
+  return balances;
+}
+
+async function fetchEthGateBalances(address) {
+  if (typeof ethers === 'undefined') throw new Error('ethers.js is unavailable');
+  const provider = new ethers.JsonRpcProvider(HOLDER_GATE_ETH_RPC);
+  const gate = new ethers.Contract(HOLDER_GATE_ETH_CONTRACT, [
+    'function balanceOf(address account,uint256 id) view returns (uint256)',
+  ], provider);
+  const pairs = await Promise.all(HOLDER_GATE_TOKEN_IDS.map(async id => {
+    const balance = await gate.balanceOf(address, BigInt(id));
+    return [id, Number(balance)];
+  }));
+  return Object.fromEntries(pairs);
+}
+
+async function fetchWalletGateBalances(wallet) {
+  if (wallet.chain === 'tezos') return fetchTezosGateBalances(wallet.wallet_address);
+  if (wallet.chain === 'ethereum') return fetchEthGateBalances(wallet.wallet_address);
+  return { '1': 0, '2': 0 };
+}
+
+async function resolveMerchEntitlement(holder) {
+  const balances = normalizeGateBalances(
+    holder.balances_by_token_id || holder.balancesByTokenId || holder.tokenBalances
+  );
+  const wallets = holderWalletsForEntitlement(holder);
+
+  wallets.forEach(wallet => {
+    addGateBalances(balances, normalizeGateBalances(
+      wallet.balances_by_token_id || wallet.balancesByTokenId || wallet.tokenBalances
+    ));
+  });
+
+  await Promise.all(wallets.map(async wallet => {
+    try {
+      const walletBalances = await fetchWalletGateBalances(wallet);
+      addGateBalances(balances, normalizeGateBalances(walletBalances));
+    } catch (err) {
+      console.warn('Gate entitlement lookup failed:', wallet.chain, wallet.wallet_address, err);
+    }
+  }));
+
+  const tokenIdFromHolder = String(
+    holder.token_id ??
+    holder.tokenId ??
+    holder.gate_token_id ??
+    holder.gateTokenId ??
+    holder.holding_token_id ??
+    holder.holdingTokenId ??
+    holder.entry_token_id ??
+    holder.entryTokenId ??
     ''
   ).trim();
   let tier = String(
-    currentHolder.tier ||
-    currentHolder.token_tier ||
-    currentHolder.tokenTier ||
-    currentHolder.holder_tier ||
-    currentHolder.access_tier ||
-    currentHolder.token_type ||
+    holder.tier ||
+    holder.token_tier ||
+    holder.tokenTier ||
+    holder.holder_tier ||
+    holder.access_tier ||
+    holder.token_type ||
     ''
   ).toLowerCase();
-  if (!tier && tokenId === '1') tier = 'wood';
-  if (!tier && tokenId === '2') tier = 'bronze';
-  const explicitBronzeBalance = Number(
-    currentHolder.bronze_balance ??
-    currentHolder.bronzeBalance ??
-    currentHolder.bronze_count ??
-    currentHolder.bronzeCount ??
-    currentHolder.token_2_balance ??
-    currentHolder.token2Balance ??
-    currentHolder.balance_token_2 ??
-    NaN
-  );
-  const balancesById = currentHolder.balances_by_token_id || currentHolder.balancesByTokenId || currentHolder.tokenBalances || null;
-  const bronzeBalanceFromMap = balancesById ? Number(balancesById['2'] ?? balancesById[2] ?? NaN) : NaN;
-  const balance = Math.max(1, Number.isFinite(explicitBronzeBalance)
-    ? explicitBronzeBalance
-    : Number.isFinite(bronzeBalanceFromMap)
-      ? bronzeBalanceFromMap
-      : Number(currentHolder.token_balance || currentHolder.balance || 1) || 1);
-  const toteText = balance === 1 ? '1 tote bag available to redeem' : `${balance} tote bags available to redeem`;
+
+  if (balances['2'] > 0) tier = 'bronze';
+  else if (balances['1'] > 0) tier = 'wood';
+  else if (!tier && HOLDER_GATE_TOKEN_TIERS[tokenIdFromHolder]) tier = HOLDER_GATE_TOKEN_TIERS[tokenIdFromHolder];
+
+  return { tier, balances };
+}
+
+async function renderMerchEntitlement() {
+  const el = document.getElementById('merchEntitlementText');
+  if (!el || !currentHolder) return;
+  el.textContent = 'Checking your merch entitlement...';
+  const { tier, balances } = await resolveMerchEntitlement(currentHolder);
+  currentHolder.balancesByTokenId = balances;
+  currentHolder.tier = tier || currentHolder.tier;
+  currentHolder.token_id = balances['2'] > 0 ? 2 : balances['1'] > 0 ? 1 : currentHolder.token_id;
+  const bronzeBalance = Math.max(1, Number(balances['2'] || 0));
+  const toteText = bronzeBalance === 1 ? '1 tote bag available to redeem' : `${bronzeBalance} tote bags available to redeem`;
 
   if (tier.includes('bronze')) {
     el.innerHTML = `<strong>Bronze holder benefit:</strong> ${toteText}. Each Bronze token qualifies for one free tote bag, plus up to 25% off available merch such as totes, hoodies, and T-shirts.`;
   } else if (tier.includes('wood')) {
     el.innerHTML = '<strong>Wooden holder benefit:</strong> you qualify for up to 15% off available merch such as totes, hoodies, and T-shirts.';
   } else {
-    el.innerHTML = '<strong>Holder benefit:</strong> your token is verified. Merch claims are coming soon.';
+    el.innerHTML = '<strong>Merch entitlement:</strong> reconnect the wallet that holds your gate token so this section can show the correct tote and discount benefit before claims open.';
   }
 }
 
