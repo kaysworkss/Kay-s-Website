@@ -1,0 +1,3131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Holder Hub | Àpótí Ọlọ́wẹ̀ — Kay's Works</title>
+<link rel="icon" type="image/svg+xml" href="images/kaysworkslogo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>self.ModelViewerElement = { dracoDecoderLocation: '/draco/' };</script>
+<script type="module" src="/model-viewer.min.js"></script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  a { color: inherit; text-decoration: none; }
+  ul { list-style: none; }
+  button, input, textarea { font: inherit; }
+  *:focus-visible { outline: 2px solid var(--clay); outline-offset: 3px; border-radius: 2px; }
+
+  :root {
+    --clay:#e0a77f; --rust:#9e4f2e; --sand:#e8d5b0; --linen:#f5ede0;
+    --bark:#4a3228; --moss:#6b7c5c; --ash:#8a7060; --ink:#1e1410;
+    --gold:#dfb85c; --parchment:#ede0c8; --line:rgba(223,184,92,0.34);
+    --bg: var(--bark); --text: var(--sand); --text-muted: rgba(232,213,176,0.74);
+  }
+
+  html { scroll-behavior: smooth; }
+  body {
+    min-height: 100vh;
+    font-family: 'Crimson Pro', serif;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--text);
+    background:
+      radial-gradient(ellipse at 12% 80%, rgba(196,132,90,0.18) 0%, transparent 52%),
+      radial-gradient(ellipse at 92% 16%, rgba(107,124,92,0.16) 0%, transparent 50%),
+      var(--bg);
+  }
+
+  .eyebrow {
+    font-family:'Cinzel',serif; letter-spacing:0.38em; text-transform:uppercase;
+    color:var(--clay); font-size:0.7rem;
+  }
+  h1, h2, h3 { font-family:'Cormorant Garamond', serif; font-weight:300; color:var(--sand); }
+  em { color:var(--gold); font-style:italic; }
+
+  /* ── NAV ── */
+  nav {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:1.2rem clamp(1.5rem, 4vw, 4rem); border-bottom:1px solid var(--line);
+    position:sticky; top:0; z-index:50;
+    background:rgba(20,14,10,0.86); backdrop-filter:blur(12px);
+  }
+  .nav-logo {
+    font-family:'Montserrat','Cinzel',sans-serif; font-size:1rem; letter-spacing:0.15em;
+    text-transform:uppercase; color:var(--sand); display:flex; align-items:center; gap:0.6rem;
+  }
+  .nav-right { display:flex; align-items:center; gap:1rem; }
+  .nav-back {
+    font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--text-muted); border:1px solid var(--line); border-radius:4px; padding:0.5rem 0.8rem;
+  }
+  .nav-back:hover { color: var(--sand); border-color: var(--gold); }
+  .wallet-pill {
+    display:none; align-items:center; gap:0.5rem;
+    font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.1em;
+    border:1px solid var(--line); border-radius:20px; padding:0.4rem 0.8rem;
+    color: var(--text-muted);
+  }
+  .wallet-pill.show { display:flex; }
+  .signout-btn {
+    display:none; cursor:pointer; background:transparent; border:1px solid var(--line);
+    border-radius:4px; padding:0.5rem 0.8rem; color:var(--text-muted);
+    font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.14em; text-transform:uppercase;
+  }
+  .signout-btn.show { display:inline-block; }
+  .signout-btn:hover { border-color:var(--rust); color:#f0c8bc; }
+
+  .page { width:100%; max-width:1720px; margin:0 auto; padding:3rem clamp(3rem, 5vw, 6.25rem) 5rem; }
+
+  /* ── GATE (sign-in / verify) ── */
+  #gate { max-width:640px; margin:4rem auto; text-align:center; }
+  #gate .eyebrow { display:block; margin-bottom:1rem; }
+  #gate h1 { font-size:clamp(2.4rem,5vw,3.6rem); line-height:1.02; margin-bottom:1rem; }
+  #gate .lead { color:var(--text-muted); font-size:1.05rem; line-height:1.7; margin-bottom:2.4rem; }
+
+  .panel {
+    background:rgba(30,20,16,0.4); border:1px solid var(--line); border-radius:8px;
+    box-shadow:0 22px 70px rgba(0,0,0,0.22); padding:1.6rem; text-align:left;
+  }
+  .panel-title {
+    font-family:'Cinzel',serif; letter-spacing:0.26em; text-transform:uppercase;
+    color:var(--gold); font-size:0.7rem; margin-bottom:1rem;
+  }
+  .field { margin-bottom:0.9rem; }
+  label {
+    display:block; font-family:'Cinzel',serif; letter-spacing:0.16em; text-transform:uppercase;
+    font-size:0.6rem; color:var(--clay); margin-bottom:0.4rem;
+  }
+  input[type=email], input[type=text], textarea {
+    width:100%; border:1px solid rgba(232,213,176,0.2); border-radius:5px;
+    background:rgba(245,237,224,0.07); color:var(--sand); padding:0.85rem 0.95rem; outline:none;
+  }
+  input:focus, textarea:focus { border-color:var(--gold); }
+  textarea { min-height:100px; resize:vertical; }
+
+  .btn {
+    display:inline-flex; align-items:center; justify-content:center; gap:0.5rem;
+    cursor:pointer; border-radius:5px; padding:0.85rem 1.2rem;
+    font-family:'Cinzel',serif; letter-spacing:0.16em; text-transform:uppercase; font-size:0.66rem;
+    border:1px solid rgba(200,146,42,0.55); width:100%;
+    background:linear-gradient(135deg,#c8922a 0%,#a97430 42%,#7a5020 68%,#d4a84b 100%);
+    color:#fdf0d0; transition:transform 0.2s, filter 0.2s;
+  }
+  .btn:hover { transform:translateY(-2px); filter:brightness(1.08); }
+  .btn:disabled { opacity:0.55; cursor:default; transform:none; }
+  .btn.ghost {
+    background:rgba(232,213,176,0.06); color:var(--sand); border:1px solid rgba(201,153,58,0.42);
+  }
+
+  .connect-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.7rem; margin-bottom:1rem; }
+  .chain-btn {
+    border:1px solid rgba(201,153,58,0.46); border-radius:5px; min-height:58px;
+    color:var(--sand); background:rgba(232,213,176,0.06); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    font-family:'Cinzel',serif; letter-spacing:0.14em; text-transform:uppercase; font-size:0.64rem;
+    transition:transform 0.2s, border-color 0.2s, background 0.2s;
+  }
+  .chain-btn:hover { transform:translateY(-2px); border-color:var(--gold); background:rgba(201,153,58,0.13); }
+
+  .status {
+    border:1px solid rgba(232,213,176,0.18); border-radius:6px; padding:0.85rem 1rem;
+    color:var(--text-muted); line-height:1.5; background:rgba(0,0,0,0.13); font-size:0.94rem;
+    margin-top:0.8rem; display:none;
+  }
+  .status.show { display:block; }
+  .status.ok { border-color:rgba(107,124,92,0.85); color:#dce8d0; }
+  .status.err { border-color:rgba(196,90,48,0.75); color:#f0c8bc; }
+
+  .step { display:none; }
+  .step.show { display:block; }
+  .step-note { color:var(--text-muted); font-size:0.9rem; line-height:1.6; margin-top:1rem; }
+
+  .wallet-modal {
+    position:fixed; inset:0; z-index:80; display:none; align-items:center; justify-content:center;
+    padding:1rem; background:rgba(18,10,6,0.72); backdrop-filter:blur(10px);
+  }
+  .wallet-modal.show { display:flex; }
+  .wallet-box {
+    width:min(420px,100%); border:1px solid var(--line); border-radius:8px;
+    background:#231510; box-shadow:0 24px 80px rgba(0,0,0,0.38); padding:1.25rem;
+  }
+  .wallet-title { font-family:'Cinzel',serif; letter-spacing:0.24em; text-transform:uppercase; color:var(--gold); font-size:0.78rem; margin-bottom:0.6rem; }
+  .wallet-sub { color:var(--text-muted); line-height:1.55; margin-bottom:1rem; }
+  .wallet-option {
+    width:100%; min-height:50px; margin-top:0.55rem; border-radius:5px;
+    border:1px solid rgba(201,153,58,0.42); color:var(--sand); background:rgba(232,213,176,0.07);
+    cursor:pointer; font-family:'Cinzel',serif; letter-spacing:0.14em; text-transform:uppercase; font-size:0.64rem;
+  }
+  .wallet-option:hover { border-color:var(--gold); }
+
+  /* ── DASHBOARD ── */
+  #dashboard { display:none; }
+  #dashboard.show { display:block; }
+  .hub-head { margin:0 auto 2.4rem; text-align:center; }
+  .hub-head h1 { font-size:clamp(2.2rem,4.4vw,3.2rem); margin:0.5rem 0 0.6rem; }
+  .hub-head .lead { color:var(--text-muted); max-width:62ch; line-height:1.7; margin-left:auto; margin-right:auto; }
+  .asset-summary { margin-top:0.8rem; color:var(--gold); font-size:0.94rem; min-height:1.4em; }
+  .merch-section { margin-bottom:2.4rem; }
+  .merch-head { text-align:center; max-width:64ch; margin:0 auto 1.6rem; }
+  .merch-head h2 { font-size:clamp(1.7rem,3.4vw,2.4rem); margin:0.5rem 0 0.7rem; }
+  .merch-lead { color:var(--text-muted); line-height:1.65; }
+  .merch-grid {
+    columns:3 280px; column-gap:0.9rem; margin-bottom:1.6rem;
+  }
+  .merch-card {
+    border:1px solid var(--line); border-radius:8px; background:rgba(30,20,16,0.34);
+    overflow:hidden; text-align:center; break-inside:avoid; margin:0 0 0.9rem;
+  }
+  .merch-img { width:100%; height:auto; object-fit:contain; display:block; background:rgba(0,0,0,0.2); cursor:zoom-in; }
+  .merch-img:hover { filter:brightness(1.06); }
+  .merch-card-archive .merch-img { height:auto; object-fit:contain; }
+  .merch-card figcaption {
+    padding:0.6rem 0.5rem; font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.1em;
+    text-transform:uppercase; color:var(--text-muted);
+  }
+  .merch-entitlement {
+    max-width:820px; margin:0 auto 1.4rem; padding:1.15rem 1.25rem;
+    border:1px solid rgba(223,184,92,0.38); border-radius:8px;
+    background:rgba(30,20,16,0.32); text-align:center;
+  }
+  .merch-entitlement-title {
+    font-family:'Cinzel',serif; color:var(--gold); font-size:0.68rem;
+    letter-spacing:0.16em; text-transform:uppercase; margin-bottom:0.55rem;
+  }
+  .merch-entitlement p { color:var(--text-muted); line-height:1.65; margin:0 auto; max-width:66ch; }
+  .merch-entitlement strong { color:var(--sand); }
+  .merch-cta { display:flex; width:max-content; margin:0 auto; padding:0.85rem 1.6rem; }
+  .merch-cta:disabled {
+    cursor:not-allowed; transform:none; filter:none; opacity:0.62;
+    background:rgba(232,213,176,0.08); color:rgba(232,213,176,0.62);
+    border-color:rgba(232,213,176,0.22);
+  }
+  .merch-cta-note { margin-top:0.75rem; text-align:center; color:var(--text-muted); font-size:0.95rem; }
+  @media (max-width:900px) {
+    .merch-grid { columns:2 260px; }
+  }
+  @media (max-width:700px) {
+    .merch-grid { columns:1; }
+  }
+  .wallet-email-panel {
+    display:none; position:fixed; z-index:110; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:min(560px,calc(100% - 2rem)); margin:0; box-shadow:0 28px 100px rgba(0,0,0,0.6);
+  }
+  .wallet-email-panel.show { display:block; }
+  .wallet-email-close {
+    position:absolute; top:0.65rem; right:0.75rem; width:36px; height:36px;
+    border:1px solid var(--line); border-radius:50%; color:var(--sand);
+    background:rgba(20,14,10,0.72); cursor:pointer; font-size:1.2rem;
+  }
+  body.email-prompt-open::after {
+    content:''; position:fixed; inset:0; z-index:109;
+    background:rgba(12,8,6,0.72); backdrop-filter:blur(7px);
+  }
+  .wallet-email-panel .email-row { display:grid; grid-template-columns:1fr auto; gap:0.7rem; align-items:end; }
+  .wallet-email-panel .email-row .field { margin:0; }
+  .wallet-email-panel .email-row .btn { width:auto; white-space:nowrap; }
+  @media (max-width:620px) { .wallet-email-panel .email-row { grid-template-columns:1fr; } .wallet-email-panel .email-row .btn { width:100%; } }
+
+  .reverify-banner {
+    display:none; align-items:center; justify-content:space-between; gap:1rem;
+    border:1px solid rgba(196,90,48,0.55); background:rgba(196,90,48,0.08);
+    border-radius:6px; padding:0.9rem 1.1rem; margin-bottom:1.6rem; color:#f0c8bc; font-size:0.92rem;
+  }
+  .reverify-banner.show { display:flex; }
+  .reverify-banner button { width:auto; padding:0.6rem 1rem; }
+  .email-updates-panel {
+    display:none; align-items:center; justify-content:space-between; gap:1rem;
+    border:1px solid rgba(223,184,92,0.34); background:rgba(201,153,58,0.07);
+    border-radius:6px; padding:0.9rem 1.1rem; margin-bottom:1.4rem; color:var(--text-muted); font-size:0.92rem;
+  }
+  .email-updates-panel.show { display:flex; }
+  .email-updates-panel strong { color:var(--sand); }
+  .email-updates-toggle { display:flex; align-items:center; gap:0.55rem; white-space:nowrap; cursor:pointer; }
+  .email-updates-toggle input { width:auto; accent-color:var(--gold); }
+  @media (max-width:720px) {
+    .email-updates-panel { align-items:flex-start; flex-direction:column; }
+  }
+
+  .tabs { display:flex; flex-wrap:wrap; justify-content:center; gap:0.5rem; border-bottom:1px solid var(--line); margin-bottom:2rem; padding-bottom:0.9rem; }
+  .tab-btn {
+    cursor:pointer; background:transparent; border:1px solid var(--line); border-radius:20px;
+    padding:0.55rem 1.05rem; font-family:'Cinzel',serif; letter-spacing:0.12em; text-transform:uppercase;
+    font-size:0.62rem; color:var(--text-muted);
+  }
+  .tab-btn.active { color:#fdf0d0; border-color:var(--gold); background:rgba(201,153,58,0.16); }
+
+  .panel-view { display:none; }
+  .panel-view.show { display:block; }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:1.1rem; }
+
+  .card {
+    border:1px solid var(--line); border-radius:8px; background:rgba(30,20,16,0.34);
+    overflow:hidden; display:flex; flex-direction:column;
+  }
+  .card-img { width:100%; aspect-ratio:1/1; object-fit:cover; background:rgba(0,0,0,0.2); display:block; }
+  .card-img-wrap { position: relative; }
+  .opa-artwork-image {
+    width: 100%; height: auto; aspect-ratio: auto;
+    object-fit: contain;
+    object-position: center;
+    background: linear-gradient(145deg, #eef0f2 0%, #d8dde1 100%);
+    cursor: zoom-in;
+  }
+  .opa-artwork-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    align-items: flex-start;
+    gap: 1.1rem;
+  }
+  .opa-artwork-grid .card {
+    width: 100%; min-width: 0; max-width: none;
+  }
+  @media (max-width: 620px) {
+    .opa-artwork-grid { grid-template-columns: 1fr; }
+  }
+  /* Left-to-right gallery: consistent columns, natural image heights. */
+  #artworksList { display:flex; flex-direction:column; }
+  #artworksList [data-chapter="opa"] { order:1; }
+  #artworksList [data-chapter="chapter2"] { order:2; }
+  #artworksList [data-chapter="chapter1"] { order:3; }
+  #artworksList [data-chapter="precursor"] { order:4; }
+  #artworksList .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: flex-start;
+    gap: 1.1rem;
+  }
+  #artworksList .grid .card {
+    width: 100%; min-width: 0; max-width: none;
+  }
+  #artworksList .card-img {
+    width: 100%; height: auto; aspect-ratio: auto;
+    object-fit: contain; object-position: center;
+    cursor: zoom-in;
+  }
+  .token-contents {
+    margin-top: 0.8rem; padding: 0.6rem 0.85rem;
+    border-left: 2px solid var(--gold); border-radius: 0 5px 5px 0;
+    background: rgba(201,153,58,0.07); color: var(--text-muted);
+    font-size: 0.82rem; line-height: 1.55;
+  }
+  .token-contents summary {
+    cursor: pointer; list-style: none; color: var(--gold);
+    font-family: 'Cinzel', serif; font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .token-contents summary::-webkit-details-marker { display: none; }
+  .token-contents summary::after { content: '+'; float: right; }
+  .token-contents[open] summary::after { content: '\2212'; }
+  .token-contents p { margin-top: 0.55rem; }
+  .token-contents strong { color: var(--sand); }
+  @media (max-width: 620px) {
+    #artworksList .grid { grid-template-columns: 1fr; }
+  }
+  @media (min-width:621px) and (max-width:960px) {
+    #artworksList .grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
+  .artworks-auction-link { width:auto; margin:0 0 1.5rem; display:inline-flex; }
+  .sold-hall-link { width:auto; margin:0 0 1.5rem 0.6rem; display:none; }
+  .sold-hall-link.show { display:inline-flex; }
+  .art-lightbox {
+    position: fixed; inset: 0; z-index: 120; display: none;
+    align-items: center; justify-content: center; padding: 2rem;
+    background: rgba(8,8,10,0.94); backdrop-filter: blur(10px);
+  }
+  .art-lightbox.show { display: flex; }
+  .art-lightbox.scrollable { align-items:flex-start; overflow:auto; }
+  .art-lightbox img {
+    display: block; max-width: 96vw; max-height: 92vh;
+    width: auto; height: auto; object-fit: contain;
+    box-shadow: 0 24px 90px rgba(0,0,0,0.55);
+  }
+  .art-lightbox.scrollable img { max-height:none; margin:auto 0; }
+  .art-lightbox-close {
+    position: fixed; top: 16px; right: 18px; z-index: 1;
+    width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.35); background: rgba(20,20,24,0.72);
+    color: white; font-size: 1.5rem; line-height: 1;
+  }
+  .sold-sticker {
+    position: absolute; top: 12px; right: 12px; width: 58px; height: 58px; z-index: 2;
+    border-radius: 50%; background: radial-gradient(circle at 35% 30%, #d9503a, #8f2417);
+    border: 2px solid rgba(255,245,235,0.9);
+    display: flex; align-items: center; justify-content: center;
+    transform: rotate(-13deg);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+    font-family: 'Cinzel', serif; font-size: 0.56rem; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: #fff2e8;
+  }
+  .artwork-group-label {
+    grid-column: 1 / -1;
+    font-family: 'Cinzel', serif; font-size: 0.64rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--clay); border-bottom: 1px solid var(--line); padding-bottom: 0.5rem;
+    margin: 0.4rem 0 0.2rem;
+  }
+  .artwork-chapter { margin-bottom: 2.2rem; }
+  .artwork-chapter.hidden { display: none; }
+  .artwork-chapter .artwork-group-label { grid-column: unset; margin: 0 0 1rem; }
+  .artwork-chapter .grid { margin-bottom: 0; }
+  .artwork-group-label:first-child { margin-top: 0; }
+
+  /* ── Ownership highlight ── */
+  .card.owned, .sculpture-block.owned {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1px var(--gold), 0 14px 34px rgba(201,153,58,0.18);
+  }
+  .owned-ribbon {
+    position: absolute; top: 12px; left: 12px; z-index: 2;
+    background: rgba(201,153,58,0.94); color: #241608;
+    font-family: 'Cinzel', serif; font-size: 0.56rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 0.32rem 0.7rem; border-radius: 4px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+  }
+  .sculpture-block .owned-ribbon { top: 12px; left: auto; right: 12px; }
+  .card-body { padding:1rem 1.1rem 1.2rem; display:flex; flex-direction:column; gap:0.4rem; flex:1; }
+  .card-title { font-family:'Cormorant Garamond',serif; font-size:1.3rem; color:var(--sand); }
+  .card-desc { color:var(--text-muted); font-size:0.92rem; line-height:1.55; }
+  .card-meta { margin-top:auto; display:flex; align-items:center; justify-content:space-between; padding-top:0.6rem; }
+  .badge {
+    font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.12em; text-transform:uppercase;
+    padding:0.28rem 0.6rem; border-radius:12px; border:1px solid var(--line); color:var(--text-muted);
+  }
+  .badge.available { color:#dce8d0; border-color:rgba(107,124,92,0.7); }
+  .badge.sold { color:#e8c9a8; border-color:rgba(201,153,58,0.5); }
+  .badge.auction { color:#ffd9b8; border-color:rgba(196,90,48,0.7); background:rgba(196,90,48,0.14); }
+  .auction-cta { margin-top: 1.1rem; border-top: 1px solid var(--line); padding-top: 1.1rem; }
+  .auction-cta .btn { width: auto; padding: 0.7rem 1.3rem; display: inline-flex; }
+  .auction-cta .reserve-note { margin-top: 0.7rem; }
+
+  .participant-row {
+    display:flex; align-items:center; justify-content:space-between;
+    border:1px solid var(--line); border-radius:6px; padding:0.85rem 1.1rem; margin-bottom:0.6rem;
+    background:rgba(30,20,16,0.28);
+  }
+  .participant-row .name {
+    font-family:'Cormorant Garamond',serif; font-size:1.15rem;
+    color:oklch(76% 0.105 60);
+  }
+  .participant-row .addr { color:var(--text-muted); font-size:0.82rem; font-family:monospace; }
+  .participant-row.is-current {
+    border-color: rgba(201,153,58,0.72);
+    background: rgba(201,153,58,0.11);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+  }
+  .participant-you {
+    margin-left: 0.55rem; padding: 0.18rem 0.5rem; border-radius: 999px;
+    border: 1px solid rgba(201,153,58,0.5); color: var(--gold);
+    font-family: 'Cinzel',serif; font-size: 0.5rem; letter-spacing: 0.12em;
+    text-transform: uppercase; vertical-align: middle;
+  }
+  /* Equal visual weight: identical lightness/chroma, hue alone distinguishes tiers. */
+  .name.tier-gold { color:oklch(76% 0.105 88); }
+  .name.tier-bronze { color:oklch(76% 0.105 48); }
+  .name.tier-wood { color:oklch(76% 0.105 25); }
+  .name.tier-none { color:oklch(76% 0.105 60); }
+
+  .chapter-card {
+    border:1px solid var(--line); border-radius:8px; background:rgba(30,20,16,0.34);
+    margin-bottom:1.4rem; overflow:hidden;
+  }
+  .chapter-card img { width:100%; max-height:320px; object-fit:cover; display:block; }
+  .chapter-body { padding:1.4rem 1.5rem; }
+  .chapter-eyebrow { font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.22em; color:var(--clay); text-transform:uppercase; margin-bottom:0.5rem; }
+  .chapter-body h3 { font-size:1.7rem; margin-bottom:0.6rem; }
+  .chapter-body p { color:var(--text-muted); line-height:1.7; margin-bottom:1rem; }
+  .auction-notes {
+    border-left:2px solid var(--gold); padding:0.9rem 1.1rem; background:rgba(201,153,58,0.07);
+    border-radius:0 6px 6px 0; color:rgba(232,213,176,0.86); font-size:0.94rem; line-height:1.6;
+  }
+  .auction-notes strong { display:block; font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold); margin-bottom:0.45rem; }
+
+  .holder-update-card {
+    border:1px solid var(--line); border-radius:8px;
+    background:linear-gradient(145deg,rgba(44,27,20,0.72),rgba(30,20,16,0.34));
+    padding:clamp(1.35rem,3vw,2rem); margin-bottom:1.3rem;
+    box-shadow:0 18px 55px rgba(0,0,0,0.16);
+  }
+  .holder-update-meta {
+    display:flex; flex-wrap:wrap; align-items:center; gap:0.55rem 0.8rem; margin-bottom:0.8rem;
+    color:var(--clay); font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.16em; text-transform:uppercase;
+  }
+  .holder-update-meta span {
+    border:1px solid rgba(223,184,92,0.32); border-radius:999px; padding:0.24rem 0.55rem;
+    color:var(--gold); background:rgba(223,184,92,0.07);
+  }
+  .holder-update-card h3 { font-size:clamp(1.9rem,3.2vw,2.55rem); line-height:1.04; margin-bottom:0.85rem; }
+  .holder-update-card p { color:var(--text-muted); line-height:1.72; margin-bottom:0.95rem; max-width:82ch; }
+  .holder-update-card p:last-child { margin-bottom:0; }
+  .holder-update-note {
+    margin:1.15rem 0; padding:1rem 1.1rem; border-left:2px solid var(--gold); border-radius:0 6px 6px 0;
+    background:rgba(201,153,58,0.08); color:var(--sand); line-height:1.65;
+  }
+  .holder-update-card h4 {
+    margin:1.35rem 0 0.55rem; color:var(--gold); font-family:'Cinzel',serif;
+    font-size:0.72rem; letter-spacing:0.16em; text-transform:uppercase;
+  }
+  .holder-update-list { list-style:disc; padding-left:1.25rem; margin:0.75rem 0 1rem; color:var(--text-muted); }
+  .holder-update-list li { margin-bottom:0.65rem; line-height:1.65; }
+  .holder-update-list strong { color:var(--sand); }
+  .holder-update-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0.8rem; margin:1.2rem 0; }
+  .holder-update-point {
+    border:1px solid rgba(223,184,92,0.28); border-radius:8px; padding:0.95rem 1rem;
+    background:rgba(20,14,10,0.22);
+  }
+  .holder-update-point strong {
+    display:block; margin-bottom:0.4rem; color:var(--gold); font-family:'Cinzel',serif;
+    font-size:0.62rem; letter-spacing:0.14em; text-transform:uppercase;
+  }
+  .holder-update-point span { display:block; color:var(--text-muted); line-height:1.55; }
+  @media (max-width:900px) { .holder-update-grid { grid-template-columns:1fr; } }
+
+  .plan-card {
+    border:1px solid var(--line); border-radius:8px; padding:1.2rem 1.4rem; margin-bottom:0.9rem;
+    background:rgba(30,20,16,0.28);
+  }
+  .plan-card h3 { font-size:1.35rem; margin-bottom:0.4rem; }
+  .plan-card p { color:var(--text-muted); line-height:1.65; }
+  .future-intro-note {
+    max-width:76ch; margin:0 0 1.4rem; padding:1.2rem 1.35rem;
+    border-left:3px solid var(--gold); border-radius:0 8px 8px 0;
+    background:rgba(223,184,92,0.08); color:var(--sand); font-size:1.06rem; line-height:1.7;
+  }
+  .future-plan-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+  .future-plan-card {
+    position:relative; min-height:220px; border:1px solid var(--line); border-radius:8px;
+    padding:1.45rem 1.5rem; background:linear-gradient(145deg,rgba(44,27,20,0.72),rgba(30,20,16,0.34));
+    overflow:hidden;
+  }
+  .future-plan-card::after {
+    content:''; position:absolute; width:150px; height:150px; right:-75px; bottom:-85px;
+    border:1px solid rgba(223,184,92,0.16); border-radius:50%;
+  }
+  .future-plan-card.featured { grid-column:1 / -1; min-height:auto; }
+  .future-plan-kicker {
+    display:block; margin-bottom:0.75rem; color:var(--gold); font-family:'Cinzel',serif;
+    font-size:0.72rem; letter-spacing:0.18em; text-transform:uppercase;
+  }
+  .future-plan-card h4 { font-family:'Cormorant Garamond',serif; font-weight:300; color:var(--sand); font-size:1.65rem; line-height:1.12; margin-bottom:0.55rem; }
+  .future-plan-card p { position:relative; z-index:1; max-width:68ch; color:var(--text-muted); font-size:1rem; line-height:1.68; }
+  .future-closing {
+    margin-top:1rem; padding:1.4rem 1.5rem; border:1px solid rgba(223,184,92,0.46);
+    border-radius:8px; text-align:center; background:rgba(223,184,92,0.07);
+    color:var(--sand); font-family:'Cormorant Garamond',serif; font-size:clamp(1.35rem,2.4vw,1.8rem); line-height:1.35;
+  }
+  .plan-disclosure { border:1px solid var(--line); border-radius:8px; margin-bottom:0.8rem; background:rgba(30,20,16,0.28); overflow:hidden; }
+  .plan-disclosure summary { cursor:pointer; list-style:none; padding:1rem 1.2rem; font-family:'Cormorant Garamond',serif; font-size:1.3rem; color:var(--sand); }
+  .plan-disclosure summary::-webkit-details-marker { display:none; }
+  .plan-disclosure summary::after { content:'+'; float:right; color:var(--gold); }
+  .plan-disclosure[open] summary::after { content:'−'; }
+  .plan-disclosure-body { padding:0 1.2rem 1.1rem; color:var(--text-muted); line-height:1.65; white-space:pre-line; }
+  .milestone-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; margin-bottom:2.6rem; }
+  .milestone-card {
+    position:relative; border:1px solid var(--line); border-radius:8px;
+    padding:1.35rem 1.4rem 1.4rem; background:rgba(30,20,16,0.3);
+  }
+  .milestone-number {
+    display:block; margin-bottom:0.65rem; color:var(--gold); font-family:'Cinzel',serif;
+    font-size:0.72rem; letter-spacing:0.18em; text-transform:uppercase;
+  }
+  .milestone-card h3 { font-size:1.45rem; line-height:1.12; margin-bottom:0.45rem; }
+  .milestone-card p { color:var(--text-muted); line-height:1.65; }
+  .milestone-first {
+    display:inline-block; margin-top:0.8rem; padding:0.25rem 0.55rem; border:1px solid rgba(223,184,92,0.42);
+    border-radius:999px; color:var(--gold); font-family:'Cinzel',serif; font-size:0.68rem;
+    letter-spacing:0.1em; text-transform:uppercase;
+  }
+  .future-plans-heading { margin:0 0 1rem; padding-top:2rem; border-top:1px solid var(--line); }
+  .future-plans-heading h3 { font-size:1.75rem; }
+
+  .msg-history { margin-top:2rem; }
+  .msg-item { border:1px solid var(--line); border-radius:6px; padding:0.9rem 1.1rem; margin-bottom:0.6rem; background:rgba(30,20,16,0.22); }
+  .msg-item .msg-subject { font-family:'Cormorant Garamond',serif; font-size:1.1rem; margin-bottom:0.3rem; }
+  .msg-item .msg-date { color:var(--text-muted); font-size:0.78rem; margin-top:0.4rem; }
+  .msg-reply { margin-top:0.9rem; padding:0.85rem 1rem; border-left:2px solid var(--gold); border-radius:0 6px 6px 0; background:rgba(201,153,58,0.08); }
+  .msg-reply-label { font-family:'Cinzel',serif; color:var(--gold); font-size:0.54rem; letter-spacing:0.14em; text-transform:uppercase; margin-bottom:0.35rem; }
+
+  .empty-state { color:var(--text-muted); font-style:italic; padding:2rem 0; text-align:center; }
+  .owned-empty {
+    border:1px solid var(--line); border-radius:10px; padding:2.2rem 1.5rem;
+    background:rgba(30,20,16,0.3); text-align:center;
+  }
+  .owned-empty h3 { font-size:1.8rem; margin-bottom:0.55rem; }
+  .owned-empty p { color:var(--text-muted); line-height:1.65; margin:0 auto 1.2rem; max-width:48ch; }
+  .owned-empty .btn { width:auto; }
+  .owned-works-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1.1rem; align-items:start; }
+  .owned-work-card { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:rgba(30,20,16,0.34); }
+  .owned-work-card img { display:block; width:100%; height:auto; object-fit:contain; background:rgba(0,0,0,0.15); }
+  .owned-work-body { padding:1rem; }
+  .owned-work-body h3 { font-size:1.35rem; margin-bottom:0.35rem; }
+  .owned-work-body p { color:var(--text-muted); line-height:1.55; }
+  @media (max-width:960px) { .owned-works-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:620px) { .owned-works-grid { grid-template-columns:1fr; } }
+
+  /* ── OPA COLLECTION — sculpture showcase ── */
+  .drop-intro { margin:0 auto 2rem; text-align:center; }
+  .drop-intro .eyebrow { margin-bottom: 0.6rem; }
+  .drop-intro h2 { font-size: clamp(1.8rem,3.6vw,2.6rem); margin-bottom: 0.7rem; }
+  .drop-intro p { color: var(--text-muted); line-height: 1.75; max-width: 68ch; margin-left:auto; margin-right:auto; }
+  .section-intro { max-width:76ch; margin:0 0 2.4rem; }
+  .section-intro .eyebrow { display:block; margin-bottom:0.65rem; }
+  .section-intro h2 {
+    font-size:clamp(2rem,3.4vw,3rem); line-height:1.02; letter-spacing:-0.015em;
+    margin-bottom:0.8rem;
+  }
+  .section-intro p { max-width:64ch; color:var(--text-muted); font-size:1.05rem; line-height:1.7; }
+  .panel-view { padding-top:0.25rem; }
+  .panel-view > .section-intro + .tabs { margin-top:-0.4rem; }
+  .artwork-group-label { padding-top:0.35rem; font-weight:600; }
+  .card-title { line-height:1.12; }
+  .card-desc { max-width:68ch; }
+  .opa-countdown { margin:1rem 0 1.6rem; padding:0.9rem 1rem; border:1px solid rgba(201,153,58,0.42); border-radius:8px; background:rgba(201,153,58,0.07); text-align:center; }
+  .opa-countdown-label { font-family:'Cinzel',serif; color:var(--gold); font-size:0.62rem; letter-spacing:0.18em; text-transform:uppercase; margin-bottom:0.6rem; }
+  .opa-countdown-units { display:flex; flex-wrap:wrap; justify-content:center; gap:0.5rem; }
+  .opa-countdown-unit { min-width:60px; padding:0.5rem 0.6rem; text-align:center; border:1px solid var(--line); border-radius:6px; background:rgba(0,0,0,0.12); }
+  .opa-countdown-unit strong { display:block; color:var(--sand); font-family:'Cormorant Garamond',serif; font-size:1.4rem; line-height:1; }
+  .opa-countdown-unit span { display:block; margin-top:0.25rem; color:var(--text-muted); font-family:'Cinzel',serif; font-size:0.44rem; letter-spacing:0.08em; text-transform:uppercase; white-space:nowrap; }
+  .opa-countdown-note {
+    margin-top:1rem; color:var(--sand);
+    font-family:'Cormorant Garamond',serif; font-size:clamp(1.35rem,2.6vw,2rem);
+    line-height:1.1; letter-spacing:0.02em;
+  }
+  .opa-countdown-live { color:#dce8d0; font-size:1rem; }
+
+  .drop-feature {
+    width: 100%; aspect-ratio: 21/9; object-fit: cover; display: block;
+    border: 1px solid var(--line); border-radius: 8px; margin-bottom: 2.2rem;
+  }
+  @media (max-width: 820px) { .drop-feature { aspect-ratio: 4/3; } }
+
+  .sculpture-block {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0; align-items: stretch;
+    border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+    margin-bottom: 1.6rem; background: rgba(30,20,16,0.34);
+  }
+  .sculpture-viewer {
+    min-height: 380px; position: relative; overflow: hidden;
+    display: flex; flex-direction: column;
+    background:
+      radial-gradient(ellipse at 50% 26%, rgba(255,255,255,0.96) 0%, rgba(241,243,245,0.78) 46%, transparent 72%),
+      radial-gradient(ellipse at 50% 108%, rgba(120,128,138,0.18) 0%, transparent 56%),
+      linear-gradient(145deg, #eef0f2 0%, #d9dde1 52%, #c8cdd2 100%);
+  }
+  .sculpture-viewer::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    box-shadow: inset 0 0 70px rgba(74,82,92,0.16);
+  }
+  .sculpture-viewer model-viewer {
+    width: 100%; height: 100%; min-height: 380px; position: relative; z-index: 1;
+    --poster-color: transparent;
+    --progress-bar-color: var(--gold);
+    --progress-bar-height: 2px;
+  }
+  .sculpture-info { padding: 1.6rem 1.8rem; display: flex; flex-direction: column; }
+  .viewer-thumbnails {
+    flex: 0 0 auto;
+    display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.7rem 0.75rem;
+    background: rgba(255,255,255,0.55); border-top: 1px solid rgba(74,82,92,0.14);
+    position: relative; z-index: 2;
+  }
+  .viewer-thumb {
+    flex: none; width: 52px; height: 52px; border-radius: 6px; overflow: hidden;
+    cursor: zoom-in; border: 1px solid rgba(74,82,92,0.2); padding: 0; background: none;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .viewer-thumb:hover, .viewer-thumb:focus-visible { border-color: var(--gold); transform: translateY(-1px); }
+  .viewer-thumb.active { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+  .viewer-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sculpture-number { font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.24em; color:var(--clay); text-transform:uppercase; margin-bottom:0.5rem; }
+  .sculpture-info h3 { font-size: 1.9rem; margin-bottom: 0.5rem; }
+  .sculpture-meta { display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom: 1rem; }
+  .sculpture-story {
+    border-left: 2px solid var(--gold); padding: 0.9rem 1.1rem; background: rgba(201,153,58,0.06);
+    border-radius: 0 6px 6px 0; color: rgba(232,213,176,0.86); font-size: 0.94rem; line-height: 1.65; margin-top: auto;
+  }
+  .sculpture-story strong { display:block; font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold); margin-bottom:0.4rem; }
+  .viewer-hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.7rem; font-style: italic; }
+  .viewer-hint-mobile { display: none; }
+  @media (hover: none), (pointer: coarse) {
+    .viewer-hint-desktop { display: none; }
+    .viewer-hint-mobile { display: inline; }
+  }
+
+  /* ── 3D / Photos toggle + close-up slideshow ── */
+  .viewer-mode-toggle {
+    position: absolute; top: 12px; left: 12px; z-index: 3;
+    display: flex; gap: 0.35rem;
+  }
+  .viewer-mode-btn {
+    cursor: pointer; border: 1px solid rgba(232,213,176,0.3); border-radius: 20px;
+    padding: 0.4rem 0.85rem; background: rgba(20,14,10,0.72); backdrop-filter: blur(6px);
+    color: var(--text-muted); font-family: 'Cinzel', serif; font-size: 0.56rem;
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .viewer-mode-btn.active { color: #fdf0d0; border-color: var(--gold); background: rgba(201,153,58,0.22); }
+  .viewer-fullscreen-btn { white-space: nowrap; }
+  .sculpture-viewer:fullscreen,
+  .sculpture-viewer.viewer-faux-fullscreen {
+    width: 100vw; height: 100vh; min-height: 100vh;
+    border-radius: 0; background:
+      radial-gradient(ellipse at 50% 26%, rgba(255,255,255,0.96) 0%, rgba(241,243,245,0.78) 46%, transparent 72%),
+      linear-gradient(145deg, #eef0f2 0%, #d9dde1 52%, #c8cdd2 100%);
+  }
+  .sculpture-viewer.viewer-faux-fullscreen {
+    position: fixed; inset: 0; z-index: 150;
+  }
+  .sculpture-viewer:fullscreen .viewer-stage,
+  .sculpture-viewer:fullscreen model-viewer,
+  .sculpture-viewer:fullscreen .slideshow,
+  .sculpture-viewer.viewer-faux-fullscreen .viewer-stage,
+  .sculpture-viewer.viewer-faux-fullscreen model-viewer,
+  .sculpture-viewer.viewer-faux-fullscreen .slideshow {
+    width: 100%; height: 100%; min-height: 100vh;
+  }
+  .sculpture-viewer:fullscreen .slideshow-img,
+  .sculpture-viewer.viewer-faux-fullscreen .slideshow-img {
+    object-fit: contain;
+  }
+  .viewer-stage { display: none; width: 100%; height: 100%; min-height: 380px; position: relative; flex: 1 1 380px; }
+  .viewer-stage.active { display: block; }
+  .viewer-stage.photos { }
+  .slideshow { position: relative; width: 100%; height: 100%; min-height: 380px; overflow: hidden; background:#120d0a; }
+  .slideshow-img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+    object-position: center center;
+    opacity: 0; transition: opacity 0.35s ease; z-index: 0;
+  }
+  .slideshow-img.active { opacity: 1; z-index: 1; }
+  .slideshow-nav {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
+    width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+    border: 1px solid rgba(232,213,176,0.35); background: rgba(20,14,10,0.6); backdrop-filter: blur(6px);
+    color: var(--sand); font-size: 1.1rem; line-height: 1; display: flex; align-items: center; justify-content: center;
+  }
+  .slideshow-nav:hover { border-color: var(--gold); }
+  .slideshow-nav.prev { left: 12px; }
+  .slideshow-nav.next { right: 12px; }
+  .slideshow-dots { position: absolute; bottom: 14px; left: 0; right: 0; z-index: 2; display: flex; justify-content: center; gap: 0.4rem; }
+  .slideshow-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(232,213,176,0.35); cursor: pointer; border: none; padding: 0; }
+  .slideshow-dot.active { background: var(--gold); }
+
+  @media (max-width: 820px) {
+    .sculpture-block { grid-template-columns: 1fr; }
+    .sculpture-viewer, .sculpture-viewer model-viewer { min-height: 300px; }
+  }
+
+  /* ── RESERVE-A-PIECE ── */
+  .reserve-block { margin-top: 1.1rem; border-top: 1px solid var(--line); padding-top: 1.1rem; }
+  .reserve-toggle {
+    width: auto; cursor: pointer; border-radius: 5px; padding: 0.7rem 1.3rem;
+    font-family: 'Cinzel', serif; letter-spacing: 0.16em; text-transform: uppercase; font-size: 0.66rem;
+    border: 1px solid rgba(200,146,42,0.55);
+    background: linear-gradient(135deg,#c8922a 0%,#a97430 42%,#7a5020 68%,#d4a84b 100%); color: #fdf0d0;
+    display: inline-flex;
+  }
+  .reserve-toggle:hover { filter: brightness(1.08); }
+  .reserve-form { display: none; margin-top: 0.9rem; }
+  .reserve-form.show { display: block; }
+  .reserve-form .field { margin-bottom: 0.7rem; }
+  .reserve-form label {
+    display: block; font-family: 'Cinzel', serif; letter-spacing: 0.14em; text-transform: uppercase;
+    font-size: 0.56rem; color: var(--clay); margin-bottom: 0.35rem;
+  }
+  .reserve-form input, .reserve-form textarea { font-size: 0.9rem; padding: 0.65rem 0.8rem; }
+  .reserve-form textarea { min-height: 64px; }
+  .reserve-submit {
+    width: auto; cursor: pointer; border-radius: 5px; padding: 0.6rem 1rem;
+    font-family: 'Cinzel', serif; letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.6rem;
+    border: 1px solid rgba(200,146,42,0.55);
+    background: linear-gradient(135deg,#c8922a 0%,#a97430 42%,#7a5020 68%,#d4a84b 100%); color: #fdf0d0;
+  }
+  .reserve-submit:disabled { opacity: 0.55; cursor: default; }
+  .reserve-note { font-size: 0.78rem; color: var(--text-muted); line-height: 1.55; margin-top: 0.7rem; font-style: italic; }
+  .reserve-error { display: none; font-size: 0.8rem; color: #f0c8bc; margin-top: 0.5rem; }
+  .reserve-confirm { font-size: 0.86rem; color: #dce8d0; line-height: 1.55; }
+
+  @media (max-width:640px) {
+    .page { padding:2rem 1.2rem 4rem; }
+    .connect-grid { grid-template-columns:1fr; }
+  }
+
+  /* Accessibility sizing pass: keep decorative type readable and controls easy to target. */
+  .eyebrow, .panel-title, .wallet-title { font-size:0.78rem; }
+  label, .nav-back, .signout-btn, .wallet-pill, .chain-btn, .wallet-option,
+  .tab-btn, .artwork-group-label, .chapter-eyebrow, .opa-countdown-label,
+  .sculpture-number, .viewer-mode-btn, .reserve-toggle, .reserve-submit,
+  .reserve-form label, .auction-notes strong, .sculpture-story strong,
+  .msg-reply-label { font-size:0.72rem; }
+  .badge, .owned-ribbon, .sold-sticker, .participant-you { font-size:0.68rem; }
+  .btn { font-size:0.72rem; min-height:44px; }
+  .tab-btn, .nav-back, .signout-btn, .wallet-option, .viewer-mode-btn,
+  .reserve-toggle, .reserve-submit { min-height:44px; }
+  .viewer-hint, .reserve-note, .msg-item .msg-date { font-size:0.88rem; }
+  .token-contents, .participant-row .addr { font-size:0.9rem; }
+
+  @media (min-width:1200px) {
+    nav { padding-left:clamp(3rem,5vw,6.25rem); padding-right:clamp(3rem,5vw,6.25rem); }
+  }
+
+  @media (max-width:640px) {
+    body { font-size:1rem; }
+    .page { padding:1.6rem 1rem 3.5rem; }
+
+    /* Nav: one compact row instead of two bulky ones. Back-to-project link
+       drops off on mobile — it's the least essential control here, and the
+       browser back button already covers it. */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.7rem 0.9rem; gap: 0.6rem;
+    }
+    .nav-logo { font-size: 0.78rem; }
+    .nav-right { display: flex; align-items: center; gap: 0.5rem; }
+    .nav-back { display: none; }
+    .wallet-pill {
+      font-size: 0.56rem; padding: 0.3rem 0.55rem; min-height: auto;
+      max-width: 34vw; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    }
+    .signout-btn { font-size: 0.56rem; padding: 0.4rem 0.6rem; min-height: auto; }
+
+    /* Hub head: shorter, gets out of the way faster */
+    .hub-head { margin-bottom: 1.2rem; }
+    .hub-head h1 { font-size: clamp(1.7rem, 9vw, 2.3rem); margin: 0.35rem 0 0.5rem; }
+    .hub-head .lead { display: none; } /* nice on desktop, just delays content on mobile */
+    .asset-summary { font-size: 0.82rem; margin-top: 0.3rem; }
+
+    /* Tabs: one scrollable row instead of wrapping into a 3-row block */
+    .tabs {
+      flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; justify-content: flex-start;
+      margin: 0 -1rem 1.2rem; padding: 0 1rem 0.7rem;
+      mask-image: linear-gradient(90deg, transparent 0, #000 1.2rem, #000 calc(100% - 1.2rem), transparent 100%);
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      flex: 0 0 auto; white-space: nowrap; min-height: 32px;
+      padding: 0.4rem 0.65rem; font-size: 0.58rem;
+    }
+
+    .drop-intro { margin-bottom: 1.2rem; }
+    .drop-intro h2 { font-size: 1.5rem; margin-bottom: 0.4rem; }
+    .drop-intro p { line-height: 1.55; }
+
+    .hub-head .lead, .drop-intro p, .card-desc, .chapter-body p,
+    .sculpture-story, .auction-notes { font-size: 1rem; }
+    .viewer-mode-toggle { flex-wrap: wrap; right: 12px; }
+    .viewer-mode-btn { padding: 0.55rem 0.72rem; }
+    .opa-countdown { margin: 0.8rem 0 1.2rem; padding: 0.7rem 0.6rem; }
+    .opa-countdown-unit { min-width: 0; flex: 1 1 0; padding: 0.4rem 0.3rem; }
+    .opa-countdown-unit strong { font-size: 1.15rem; }
+    .opa-countdown-note { margin-top: 0.6rem; font-size: 0.9rem !important; }
+    .drop-feature { aspect-ratio: 16/9; margin-bottom: 1.4rem; }
+    .section-intro { margin-bottom: 1.7rem; }
+    .section-intro h2 { font-size: clamp(1.9rem, 10vw, 2.45rem); }
+    .section-intro p { font-size: 1rem; line-height: 1.65; }
+    .milestone-grid { grid-template-columns: 1fr; }
+    .future-plan-grid { grid-template-columns: 1fr; }
+    .future-plan-card.featured { grid-column: auto; }
+    .future-plan-card { min-height: auto; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/holder-hub" aria-label="Holder Hub home">KAY'S WORKS</a>
+  <div class="nav-right">
+    <span class="wallet-pill" id="walletPill"></span>
+    <button class="signout-btn" id="signoutBtn">Sign out</button>
+    <a class="nav-back" href="/apoti-olowe">← Project page</a>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- ══════════ GATE: sign in + verify wallet ══════════ -->
+  <section id="gate">
+    <span class="eyebrow">For Verified Holders</span>
+    <h1>The Holder <em>Hub</em></h1>
+    <p class="lead">Track the project's progress, see who's holding, browse available and sold pieces, and hear about new chapters first. Sign in with your email, then verify the wallet that holds your token.</p>
+
+    <div class="panel">
+
+      <!-- Step 1: connect + verify wallet -->
+      <div class="step show" id="stepWallet">
+        <div class="panel-title" id="walletStepTitle">Step 1 — Verify your token</div>
+        <p class="step-note" style="margin-top:0;margin-bottom:1rem;" id="walletStepNote">Connect the wallet that holds your Àpótí Ọlọ́wẹ̀ token. If it checks out, you'll set up email sign-in next so you don't need the wallet every visit.</p>
+        <div class="connect-grid">
+          <button class="chain-btn" id="connectEth">Ethereum Wallet</button>
+          <button class="chain-btn" id="connectTez">Tezos Wallet</button>
+        </div>
+        <div class="status" id="walletStatus"></div>
+        <button type="button" class="btn ghost small" id="showEmailLoginBtn" style="width:auto;margin-top:1.1rem;">Already verified? Sign in with email</button>
+      </div>
+
+      <!-- Step 2: email / magic link (after a fresh wallet verify, or via "sign in with email" for returning holders) -->
+      <div class="step" id="stepEmail">
+        <div class="panel-title" id="emailStepTitle">Step 2 — Save your access</div>
+        <p class="step-note" style="margin-top:0;margin-bottom:1rem;" id="emailStepNote">Verified. Enter your email and we'll send a one-time link — after this, you sign in with email alone, no wallet needed, until it's time to re-verify.</p>
+        <div class="field">
+          <label for="emailInput">Email address</label>
+          <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email" />
+        </div>
+        <button class="btn" id="sendLinkBtn">Send magic link</button>
+        <div class="status" id="emailStatus"></div>
+        <p class="step-note" id="emailRecoveryNote"><strong style="color:var(--gold)">Already registered but no email arrives?</strong> Go back, reconnect the wallet that holds your token, and submit the same email address once more. Open the new link we send; after that, email-only sign-in will work normally.</p>
+        <button type="button" class="btn ghost small" id="backToWalletBtn" style="width:auto;margin-top:1.1rem;">Back</button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ══════════ DASHBOARD ══════════ -->
+  <section id="dashboard">
+    <div class="hub-head">
+      <span class="eyebrow">Holder Hub</span>
+      <h1>Welcome back, <em id="holderGreeting">holder</em></h1>
+      <p class="lead">It’s lovely to have you here. This is your place inside the Àpótí Ọlọ́wẹ̀ story — revisit the work you hold, meet the community around it, and see what is taking shape next.</p>
+      <p class="asset-summary" id="ownedAssetSummary" aria-live="polite"></p>
+    </div>
+
+    <div class="reverify-banner" id="reverifyBanner">
+      <span>Your wallet verification has aged out. Reconnect to confirm you still hold the token and keep full access.</span>
+      <button class="btn ghost" id="reverifyBtn">Reconnect wallet</button>
+    </div>
+
+    <div class="email-updates-panel" id="emailUpdatesPanel">
+      <span id="emailUpdatesCopy"><strong>Project update emails</strong> Let me email you when there is a new Holder Hub update to check.</span>
+      <label class="email-updates-toggle" for="emailUpdatesOptIn">
+        <input type="checkbox" id="emailUpdatesOptIn" />
+        <span id="emailUpdatesLabel">Off</span>
+      </label>
+    </div>
+
+    <div class="panel wallet-email-panel" id="walletEmailPanel">
+      <button class="wallet-email-close" id="walletEmailClose" type="button" aria-label="Not now">×</button>
+      <div class="panel-title">Save your access for next time</div>
+      <p class="step-note" style="margin:0 0 1rem">You already have full access through your verified wallet. Adding an email is optional—it lets you return without reconnecting your wallet, and it can also be used for Holder Hub update notices if you opt in later.</p>
+      <div class="email-row">
+        <div class="field">
+          <label for="walletEmailInput">Email address</label>
+          <input type="email" id="walletEmailInput" placeholder="you@example.com" autocomplete="email" />
+        </div>
+        <button class="btn" type="button" id="walletEmailBtn">Save email access</button>
+      </div>
+      <div class="status" id="walletEmailStatus"></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="opa">Opa Collection</button>
+      <button class="tab-btn" data-tab="updates">Updates</button>
+      <button class="tab-btn" data-tab="merch">Merch</button>
+      <button class="tab-btn" data-tab="artworks">All Artworks</button>
+      <button class="tab-btn" data-tab="owned">Works You Own (<span id="ownedWorksCount">0</span>)</button>
+      <button class="tab-btn" data-tab="chapters">New Chapters</button>
+      <button class="tab-btn" data-tab="plans">Milestones &amp; Future Plans</button>
+      <button class="tab-btn" data-tab="participants">Participants</button>
+      <button class="tab-btn" data-tab="messages">Messages</button>
+    </div>
+
+    <div class="panel-view" id="view-merch">
+      <section class="merch-section" aria-label="Holder merch">
+      <div class="merch-head">
+        <span class="eyebrow">For Wooden &amp; Bronze Token Holders</span>
+        <h2>Wear the story</h2>
+        <p class="lead merch-lead">Merch redemption is being prepared. For now, this section confirms what your token tier qualifies you for.</p>
+      </div>
+      <div class="merch-entitlement" id="merchEntitlement">
+        <div class="merch-entitlement-title">Holder merch entitlement</div>
+        <p id="merchEntitlementText">Your merch entitlement will appear here after holder verification.</p>
+      </div>
+      <div class="merch-grid">
+        <figure class="merch-card">
+          <img class="merch-img" src="/images/tote bag front.webp" alt="Apoti Olowe tote bag front view" loading="lazy" />
+          <figcaption>Tote bag front view</figcaption>
+        </figure>
+        <figure class="merch-card">
+          <img class="merch-img" src="/images/tote bag front2.webp" alt="Apoti Olowe tote bag rear view" loading="lazy" />
+          <figcaption>Tote bag rear view</figcaption>
+        </figure>
+        <figure class="merch-card">
+          <img class="merch-img" src="/images/apoti-merch-front-lineup.webp" alt="Apoti Olowe shirts and hoodies, front designs" loading="lazy" />
+          <figcaption>Front designs</figcaption>
+        </figure>
+        <figure class="merch-card">
+          <img class="merch-img" src="/images/apoti-merch-back-lineup.webp" alt="Apoti Olowe shirts and hoodies, back designs" loading="lazy" />
+          <figcaption>Back designs</figcaption>
+        </figure>
+        <figure class="merch-card">
+          <img class="merch-img" src="/images/apoti-merch-front-fit.webp" alt="Apoti Olowe front-print tees and hoodies on models" loading="lazy" />
+          <figcaption>Front fit preview</figcaption>
+        </figure>
+        <figure class="merch-card">
+          <img class="merch-img" src="/images/apoti-merch-back-fit.webp" alt="Apoti Olowe back-print tees and hoodies on models" loading="lazy" />
+          <figcaption>Back fit preview</figcaption>
+        </figure>
+      </div>
+      <button class="btn merch-cta" type="button" disabled>Claim coming soon</button>
+      <p class="merch-cta-note">Redemption will open after the merch details are finalized.</p>
+      </section>
+    </div>
+
+    <!-- ══════════ OPA COLLECTION (hardcoded — edit directly per drop) ══════════ -->
+    <div class="panel-view show" id="view-opa">
+      <div class="drop-intro">
+        <span class="eyebrow">Now Introducing</span>
+        <h2>The Opa Collection</h2>
+        <p>Three digitally sculpted works, each viewable in the round — rotate, zoom, and look closely at the surface work. Opa means "staff" — each piece carries a different chapter of the Àpótí Ọlọ́wẹ̀ story forward.</p>
+      </div>
+
+      <div class="opa-countdown" id="opaCountdown" data-auction-start="2026-07-03T20:00:00Z">
+        <div class="opa-countdown-label">Opa Collection auction opens</div>
+        <div class="opa-countdown-units" id="opaCountdownUnits">
+          <div class="opa-countdown-unit"><strong data-countdown="days">00</strong><span>Days</span></div>
+          <div class="opa-countdown-unit"><strong data-countdown="hours">00</strong><span>Hours</span></div>
+          <div class="opa-countdown-unit"><strong data-countdown="minutes">00</strong><span>Minutes</span></div>
+          <div class="opa-countdown-unit"><strong data-countdown="seconds">00</strong><span>Seconds</span></div>
+        </div>
+        <div class="opa-countdown-note">3 July 2026 · 9:00 PM GMT+1</div>
+      </div>
+
+      <img class="drop-feature" src="images/opatg.jpg" alt="The Opa Collection" />
+
+      <div class="sculpture-block">
+        <div class="sculpture-viewer">
+          <div class="viewer-mode-toggle">
+            <button class="viewer-mode-btn active" type="button" data-mode="3d">3D View</button>
+            <button class="viewer-mode-btn" type="button" data-mode="photos">Photos</button>
+            <button class="viewer-mode-btn viewer-fullscreen-btn" type="button" aria-label="Open viewer fullscreen">Fullscreen</button>
+          </div>
+          <div class="viewer-stage active" data-stage="3d">
+            <model-viewer
+              src="/models/Orisun-textured-20260702.glb?v=3"
+              alt="Ọ̀pá Orísun"
+              poster="images/orisun1.jpg"
+              camera-controls
+              auto-rotate
+              auto-rotate-delay="0"
+              interaction-prompt="none"
+              reveal="auto"
+              environment-image="neutral"
+              tone-mapping="neutral"
+              exposure="0.85"
+              shadow-intensity="0.9"
+              shadow-softness="0.85"
+              field-of-view="30deg"
+              camera-orbit="0deg 75deg 105%"
+              min-camera-orbit="auto 35deg auto"
+              max-camera-orbit="auto 115deg auto"
+            ></model-viewer>
+          </div>
+          <div class="viewer-stage photos" data-stage="photos">
+            <div class="slideshow" data-slideshow>
+              <img class="slideshow-img active" src="images/orisun1.jpg" alt="Ọ̀pá Orísun close-up 1" />
+              <img class="slideshow-img" src="images/orisun2.jpg" alt="Ọ̀pá Orísun close-up 2" />
+              <img class="slideshow-img" src="images/orisun3.jpg" alt="Ọ̀pá Orísun close-up 3" />
+              <img class="slideshow-img" src="images/orisun4.jpg" alt="Ọ̀pá Orísun close-up 4" />
+              <img class="slideshow-img" src="images/orisun5.jpg" alt="Ọ̀pá Orísun close-up 5" />
+              <button class="slideshow-nav prev" type="button" aria-label="Previous image">‹</button>
+              <button class="slideshow-nav next" type="button" aria-label="Next image">›</button>
+              <div class="slideshow-dots"></div>
+            </div>
+          </div>
+          <div class="viewer-thumbnails">
+            <button class="viewer-thumb" type="button"><img src="images/orisun1.jpg" alt="Ọ̀pá Orísun close-up 1" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/orisun2.jpg" alt="Ọ̀pá Orísun close-up 2" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/orisun3.jpg" alt="Ọ̀pá Orísun close-up 3" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/orisun4.jpg" alt="Ọ̀pá Orísun close-up 4" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/orisun5.jpg" alt="Ọ̀pá Orísun close-up 5" /></button>
+          </div>
+        </div>
+        <div class="sculpture-info">
+          <div class="sculpture-number">Ọ̀pá I — "Ọ̀pá Orísun"</div>
+          <h3>Ọ̀pá Orísun</h3>
+          <div class="sculpture-meta">
+            <span class="badge auction">In auction</span>
+            <span class="card-desc price-live" data-usd-price="220">$220</span> <span class="card-desc">· Edition of 1</span>
+          </div>
+          <p class="card-desc" style="margin-bottom:1rem;">Digitally sculpted.</p>
+          <div class="sculpture-story">
+            <strong>How it ties into the story</strong>
+            One of the very first staffs Ayo ever carved — Orisun means "source" or "origin." It marks the beginning of his craft, before the mastery seen in later chapters.
+          </div>
+          <div class="viewer-hint"><span class="viewer-hint-desktop">3D view: drag to rotate · scroll to zoom · Shift + drag to pan</span><span class="viewer-hint-mobile">3D view: drag with one finger to rotate · pinch to zoom · drag with two fingers to pan</span></div>
+          <div class="auction-cta">
+            <a class="btn" href="https://www.kaysworks.com/auction" target="_blank" rel="noopener">Start Auction</a>
+            <p class="reserve-note">This piece is now in auction.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="sculpture-block">
+        <div class="sculpture-viewer">
+          <div class="viewer-mode-toggle">
+            <button class="viewer-mode-btn active" type="button" data-mode="3d">3D View</button>
+            <button class="viewer-mode-btn" type="button" data-mode="photos">Photos</button>
+            <button class="viewer-mode-btn viewer-fullscreen-btn" type="button" aria-label="Open viewer fullscreen">Fullscreen</button>
+          </div>
+          <div class="viewer-stage active" data-stage="3d">
+            <model-viewer
+              src="/models/Iranti-textured-20260702.glb?v=3"
+              alt="Ọ̀pá Ìrántí"
+              poster="images/iranti1.png"
+              camera-controls
+              auto-rotate
+              auto-rotate-delay="0"
+              interaction-prompt="none"
+              reveal="auto"
+              environment-image="neutral"
+              tone-mapping="neutral"
+              exposure="0.85"
+              shadow-intensity="0.9"
+              shadow-softness="0.85"
+              field-of-view="30deg"
+              camera-orbit="0deg 75deg 105%"
+              min-camera-orbit="auto 35deg auto"
+              max-camera-orbit="auto 115deg auto"
+            ></model-viewer>
+          </div>
+          <div class="viewer-stage photos" data-stage="photos">
+            <div class="slideshow" data-slideshow>
+              <img class="slideshow-img active" src="images/iranti1.png" alt="Ọ̀pá Ìrántí close-up 1" />
+              <img class="slideshow-img" src="images/iranti2.png" alt="Ọ̀pá Ìrántí close-up 2" />
+              <img class="slideshow-img" src="images/iranti3.png" alt="Ọ̀pá Ìrántí close-up 3" />
+              <img class="slideshow-img" src="images/iranti4.png" alt="Ọ̀pá Ìrántí close-up 4" />
+              <img class="slideshow-img" src="images/iranti5.png" alt="Ọ̀pá Ìrántí close-up 5" />
+              <button class="slideshow-nav prev" type="button" aria-label="Previous image">‹</button>
+              <button class="slideshow-nav next" type="button" aria-label="Next image">›</button>
+              <div class="slideshow-dots"></div>
+            </div>
+          </div>
+          <div class="viewer-thumbnails">
+            <button class="viewer-thumb" type="button"><img src="images/iranti1.png" alt="Ọ̀pá Ìrántí close-up 1" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/iranti2.png" alt="Ọ̀pá Ìrántí close-up 2" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/iranti3.png" alt="Ọ̀pá Ìrántí close-up 3" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/iranti4.png" alt="Ọ̀pá Ìrántí close-up 4" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/iranti5.png" alt="Ọ̀pá Ìrántí close-up 5" /></button>
+          </div>
+        </div>
+        <div class="sculpture-info">
+          <div class="sculpture-number">Ọ̀pá II — "Ọ̀pá Ìrántí"</div>
+          <h3>Ọ̀pá Ìrántí</h3>
+          <div class="sculpture-meta">
+            <span class="badge auction">In auction</span>
+            <span class="card-desc price-live" data-usd-price="220">$220</span> <span class="card-desc">· Edition of 1</span>
+          </div>
+          <p class="card-desc" style="margin-bottom:1rem;">Digitally sculpted.</p>
+          <div class="sculpture-story">
+            <strong>How it ties into the story</strong>
+            Carved in memory of his grandfather — a quiet act of remembrance held in wood. Where Ọ̀pá Orísun marks a beginning, this staff marks what Ayo carries forward from those who came before him.
+          </div>
+          <div class="viewer-hint"><span class="viewer-hint-desktop">3D view: drag to rotate · scroll to zoom · Shift + drag to pan</span><span class="viewer-hint-mobile">3D view: drag with one finger to rotate · pinch to zoom · drag with two fingers to pan</span></div>
+          <div class="auction-cta">
+            <a class="btn" href="https://www.kaysworks.com/auction" target="_blank" rel="noopener">Start Auction</a>
+            <p class="reserve-note">This piece is now in auction.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="sculpture-block">
+        <div class="sculpture-viewer">
+          <div class="viewer-mode-toggle">
+            <button class="viewer-mode-btn active" type="button" data-mode="3d">3D View</button>
+            <button class="viewer-mode-btn" type="button" data-mode="photos">Photos</button>
+            <button class="viewer-mode-btn viewer-fullscreen-btn" type="button" aria-label="Open viewer fullscreen">Fullscreen</button>
+          </div>
+          <div class="viewer-stage active" data-stage="3d">
+            <model-viewer
+              src="/models/ekun-textured-20260702.glb?v=3"
+              alt="Ọ̀pá Ẹkùn"
+              poster="images/ekun1.jpg"
+              camera-controls
+              auto-rotate
+              auto-rotate-delay="0"
+              interaction-prompt="none"
+              reveal="auto"
+              environment-image="neutral"
+              tone-mapping="neutral"
+              exposure="0.85"
+              shadow-intensity="0.9"
+              shadow-softness="0.85"
+              field-of-view="30deg"
+              camera-orbit="0deg 75deg 105%"
+              min-camera-orbit="auto 35deg auto"
+              max-camera-orbit="auto 115deg auto"
+            ></model-viewer>
+          </div>
+          <div class="viewer-stage photos" data-stage="photos">
+            <div class="slideshow" data-slideshow>
+              <img class="slideshow-img active" src="images/ekun1.jpg" alt="Ọ̀pá Ẹkùn close-up 1" />
+              <img class="slideshow-img" src="images/ekun2.jpg" alt="Ọ̀pá Ẹkùn close-up 2" />
+              <img class="slideshow-img" src="images/ekun3.jpg" alt="Ọ̀pá Ẹkùn close-up 3" />
+              <img class="slideshow-img" src="images/ekun4.jpg" alt="Ọ̀pá Ẹkùn close-up 4" />
+              <button class="slideshow-nav prev" type="button" aria-label="Previous image">‹</button>
+              <button class="slideshow-nav next" type="button" aria-label="Next image">›</button>
+              <div class="slideshow-dots"></div>
+            </div>
+          </div>
+          <div class="viewer-thumbnails">
+            <button class="viewer-thumb" type="button"><img src="images/ekun1.jpg" alt="Ọ̀pá Ẹkùn close-up 1" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/ekun2.jpg" alt="Ọ̀pá Ẹkùn close-up 2" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/ekun3.jpg" alt="Ọ̀pá Ẹkùn close-up 3" /></button>
+            <button class="viewer-thumb" type="button"><img src="images/ekun4.jpg" alt="Ọ̀pá Ẹkùn close-up 4" /></button>
+          </div>
+        </div>
+        <div class="sculpture-info">
+          <div class="sculpture-number">Ọ̀pá III — "Ọ̀pá Ẹkùn"</div>
+          <h3>Ọ̀pá Ẹkùn</h3>
+          <div class="sculpture-meta">
+            <span class="badge auction">In auction</span>
+            <span class="card-desc price-live" data-usd-price="220">$220</span> <span class="card-desc">· Edition of 1</span>
+          </div>
+          <p class="card-desc" style="margin-bottom:1rem;">Digitally sculpted.</p>
+          <div class="sculpture-story">
+            <strong>How it ties into the story</strong>
+            Commissioned by Chief Adediran, and delivered through Morenike — the staff that indirectly set Ayo and Morenike's story in motion. The catalyst piece of their love story.
+          </div>
+          <div class="viewer-hint"><span class="viewer-hint-desktop">3D view: drag to rotate · scroll to zoom · Shift + drag to pan</span><span class="viewer-hint-mobile">3D view: drag with one finger to rotate · pinch to zoom · drag with two fingers to pan</span></div>
+          <div class="auction-cta">
+            <a class="btn" href="https://www.kaysworks.com/auction" target="_blank" rel="noopener">Start Auction</a>
+            <p class="reserve-note">This piece is now in auction.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ ALL ARTWORKS (hardcoded) ══════════ -->
+    <div class="panel-view" id="view-updates">
+      <header class="section-intro">
+        <span class="eyebrow">Holder Update</span>
+        <h2>Auction Access Going Forward</h2>
+        <p>A note on phased auction access and the collector privileges that continue with your token.</p>
+      </header>
+      <article class="holder-update-card">
+        <div class="holder-update-meta">
+          <span>Project note</span>
+          July 2026
+        </div>
+        <h3>A note to holders</h3>
+        <p>Dear Àpótí Ọlọ́wẹ̀ holders,</p>
+        <p>First, thank you. Your belief in this project has meant a great deal. By collecting and holding these access tokens, you helped support the foundation of Àpótí Ọlọ́wẹ̀ at a very important stage, and I do not take that lightly.</p>
+        <h4>What's changing</h4>
+        <p>Until now, holding a token has meant bid-and-buy access to the chapter auctions, alongside benefits like your name on the project monolith — with Bronze also granting merch access. Going forward, auctions will follow a phased format, and that access becomes a real head start rather than just an entry ticket.</p>
+        <p>Token holders will always be given the first opportunity to bid before an auction opens to the wider public. This holder-first window will run for a full week, giving you real time to act rather than a token gesture. It is designed to protect the value of your early support while still giving each work a clear private window before it continues into public access.</p>
+        <ul class="holder-update-list">
+          <li>For selected main painting auctions, the private holder phase may open with a lower reserve than the public phase. This means holders can receive a meaningful early advantage if they choose to bid during their access window.</li>
+          <li>For sculpture sets and certain special works, the reserve will remain the same in both phases, but holders still get first access before the public.</li>
+          <li>I'll indicate ahead of each auction which category it falls into, so you know what to expect going in.</li>
+        </ul>
+        <div class="holder-update-note">If, for any reason, the private window closes without a bid, the work will simply continue its journey into public access.</div>
+        <p>This change is not about reducing the role of the tokens. It is the opposite. The tokens continue to carry their privileges, and this phased structure is designed to make that early access count for more.</p>
+        <h4>Collector benefits</h4>
+        <p>Your tokens also carry tiered merch benefits:</p>
+        <ul class="holder-update-list">
+          <li><strong>Bronze token</strong> holders receive one free tote per Bronze token held, plus up to 25% off available merch such as totes, hoodies, and T-shirts.</li>
+          <li><strong>Wood token</strong> holders receive up to 15% off available merch.</li>
+        </ul>
+        <p>And beyond the auctions and merch, your tokens remain part of the long-term structure of the project: the project monolith, the key pieces, and the end-stage vision of Àpótí Ọlọ́wẹ̀.</p>
+        <p>The intention is simple: your tokens should give you priority, access, and recognition, while each work is given the chance to find its owner.</p>
+        <p>Thank you again for being part of this from the inside. I am grateful for the trust, the patience, and the belief you have shown. As Àpótí Ọlọ́wẹ̀ continues to unfold, holders will remain part of its core story.</p>
+        <p>With respect,<br>Kay</p>
+      </article>
+    </div>
+
+    <div class="panel-view" id="view-artworks">
+      <header class="section-intro">
+        <span class="eyebrow">The Archive</span>
+        <h2>All Artworks</h2>
+        <p>Explore the story in sequence, from recent releases to the works that opened the series.</p>
+      </header>
+      <div class="tabs" style="border-bottom:none;margin-bottom:1.2rem;padding-bottom:0;">
+        <button class="tab-btn active" data-artstatus="all">All</button>
+        <button class="tab-btn" data-artstatus="available">Available</button>
+        <button class="tab-btn" data-artstatus="sold">Sold</button>
+      </div>
+      <a class="btn artworks-auction-link" href="https://www.kaysworks.com/auction" target="_blank" rel="noopener">Visit the auction page</a>
+      <a class="btn ghost sold-hall-link" id="soldHallFameLink" href="/hall-of-fame">View past auctions · Hall of Fame</a>
+
+      <div id="artworksList">
+      <section class="artwork-chapter" data-chapter="precursor">
+        <div class="artwork-group-label">Precursor</div>
+        <div class="grid">
+        <div class="card" data-owner-piece="Ìgbáradì" data-status="sold">
+          <div class="card-img-wrap">
+            <img class="card-img" src="https://www.kaysworks.com/images/igbaradi.jpg" alt="Ìgbáradì" />
+            <span class="sold-sticker" aria-label="Sold">Sold</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Ìgbáradì</div>
+            <div class="card-desc">The precursor piece — pitchers, adire cloth, and kolanut, preparing the world of the series.</div>
+            <div class="card-meta">
+              <span class="card-desc">Sold</span>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+
+      <section class="artwork-chapter" data-chapter="chapter1">
+        <div class="artwork-group-label">Chapter 1 — The Chiefs' Meeting &amp; The Ìjòkòó Set</div>
+        <div class="grid">
+        <div class="card" data-owner-piece="The Chiefs' Meeting" data-status="sold">
+          <div class="card-img-wrap">
+            <img class="card-img" src="https://www.kaysworks.com/images/CM1.jpg" alt="The Chiefs' Meeting" />
+            <span class="sold-sticker" aria-label="Sold">Sold</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">The Chiefs' Meeting</div>
+            <div class="card-desc">Chapter 1's central painting — a gathering of elders that shapes Ayo's fate.</div>
+            <div class="card-meta">
+              <span class="card-desc">Sold</span>
+            </div>
+          </div>
+        </div>
+        <div class="card" data-owner-piece="Ìjòkòó I" data-status="available">
+          <div class="card-img-wrap">
+            <img class="card-img" src="images/ijoko 1.png" alt="Ìjòkòó I" />
+          </div>
+          <div class="card-body">
+            <div class="card-title">Ìjòkòó I</div>
+            <div class="card-desc">One of the six carved stools from the Chiefs' Meeting — quiet evidence of Ayo's hand and discipline.</div>
+            <div class="card-meta">
+              <span class="badge available">available</span>
+              <span class="card-desc price-live" data-usd-price="220">$220</span>
+            </div>
+            <div class="reserve-block" data-piece="Ìjòkòó I">
+              <button class="reserve-toggle" type="button">Ask to reserve</button>
+              <div class="reserve-form">
+                <div class="field"><label>Your offer</label><input type="text" class="reserve-offer" placeholder="e.g. 0.5 ETH" /></div>
+                <div class="field"><label>Note (optional)</label><textarea class="reserve-note-input" placeholder="Anything you'd like to add"></textarea></div>
+                <button class="reserve-submit" type="button">Submit offer</button>
+                <p class="reserve-error"></p>
+                <p class="reserve-note">I'll reach out directly if I'd like to accept your offer and reserve this piece for you.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card" data-owner-piece="Ìjòkòó II" data-status="available">
+          <div class="card-img-wrap">
+            <img class="card-img" src="images/ijoko 2.png" alt="Ìjòkòó II" />
+          </div>
+          <div class="card-body">
+            <div class="card-title">Ìjòkòó II</div>
+            <div class="card-desc">One of the six carved stools from the Chiefs' Meeting — quiet evidence of Ayo's hand and discipline.</div>
+            <div class="card-meta">
+              <span class="badge available">available</span>
+              <span class="card-desc price-live" data-usd-price="220">$220</span>
+            </div>
+            <div class="reserve-block" data-piece="Ìjòkòó II">
+              <button class="reserve-toggle" type="button">Ask to reserve</button>
+              <div class="reserve-form">
+                <div class="field"><label>Your offer</label><input type="text" class="reserve-offer" placeholder="e.g. 0.5 ETH" /></div>
+                <div class="field"><label>Note (optional)</label><textarea class="reserve-note-input" placeholder="Anything you'd like to add"></textarea></div>
+                <button class="reserve-submit" type="button">Submit offer</button>
+                <p class="reserve-error"></p>
+                <p class="reserve-note">I'll reach out directly if I'd like to accept your offer and reserve this piece for you.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card" data-owner-piece="Ìjòkòó III" data-status="available">
+          <div class="card-img-wrap">
+            <img class="card-img" src="images/ijoko 3.png" alt="Ìjòkòó III" />
+          </div>
+          <div class="card-body">
+            <div class="card-title">Ìjòkòó III</div>
+            <div class="card-desc">One of the six carved stools from the Chiefs' Meeting — quiet evidence of Ayo's hand and discipline.</div>
+            <div class="card-meta">
+              <span class="badge available">available</span>
+              <span class="card-desc price-live" data-usd-price="220">$220</span>
+            </div>
+            <div class="reserve-block" data-piece="Ìjòkòó III">
+              <button class="reserve-toggle" type="button">Ask to reserve</button>
+              <div class="reserve-form">
+                <div class="field"><label>Your offer</label><input type="text" class="reserve-offer" placeholder="e.g. 0.5 ETH" /></div>
+                <div class="field"><label>Note (optional)</label><textarea class="reserve-note-input" placeholder="Anything you'd like to add"></textarea></div>
+                <button class="reserve-submit" type="button">Submit offer</button>
+                <p class="reserve-error"></p>
+                <p class="reserve-note">I'll reach out directly if I'd like to accept your offer and reserve this piece for you.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card" data-owner-piece="Ìjòkòó IV" data-status="sold">
+          <div class="card-img-wrap">
+            <img class="card-img" src="images/ijoko 4.png" alt="Ìjòkòó IV" />
+            <span class="sold-sticker" aria-label="Sold">Sold</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Ìjòkòó IV</div>
+            <div class="card-desc">One of the six carved stools from the Chiefs' Meeting — quiet evidence of Ayo's hand and discipline.</div>
+            <div class="card-meta">
+              <span class="card-desc">Sold</span>
+            </div>
+          </div>
+        </div>
+        <div class="card" data-owner-piece="Ìjòkòó V" data-status="available">
+          <div class="card-img-wrap">
+            <img class="card-img" src="images/ijoko 5.png" alt="Ìjòkòó V" />
+          </div>
+          <div class="card-body">
+            <div class="card-title">Ìjòkòó V</div>
+            <div class="card-desc">One of the six carved stools from the Chiefs' Meeting — quiet evidence of Ayo's hand and discipline.</div>
+            <div class="card-meta">
+              <span class="badge available">available</span>
+              <span class="card-desc price-live" data-usd-price="220">$220</span>
+            </div>
+            <div class="reserve-block" data-piece="Ìjòkòó V">
+              <button class="reserve-toggle" type="button">Ask to reserve</button>
+              <div class="reserve-form">
+                <div class="field"><label>Your offer</label><input type="text" class="reserve-offer" placeholder="e.g. 0.5 ETH" /></div>
+                <div class="field"><label>Note (optional)</label><textarea class="reserve-note-input" placeholder="Anything you'd like to add"></textarea></div>
+                <button class="reserve-submit" type="button">Submit offer</button>
+                <p class="reserve-error"></p>
+                <p class="reserve-note">I'll reach out directly if I'd like to accept your offer and reserve this piece for you.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card" data-owner-piece="Ìjòkòó VI" data-status="available">
+          <div class="card-img-wrap">
+            <img class="card-img" src="images/ijoko 6.png" alt="Ìjòkòó VI" />
+          </div>
+          <div class="card-body">
+            <div class="card-title">Ìjòkòó VI</div>
+            <div class="card-desc">One of the six carved stools from the Chiefs' Meeting — quiet evidence of Ayo's hand and discipline.</div>
+            <div class="card-meta">
+              <span class="badge available">available</span>
+              <span class="card-desc price-live" data-usd-price="220">$220</span>
+            </div>
+            <div class="reserve-block" data-piece="Ìjòkòó VI">
+              <button class="reserve-toggle" type="button">Ask to reserve</button>
+              <div class="reserve-form">
+                <div class="field"><label>Your offer</label><input type="text" class="reserve-offer" placeholder="e.g. 0.5 ETH" /></div>
+                <div class="field"><label>Note (optional)</label><textarea class="reserve-note-input" placeholder="Anything you'd like to add"></textarea></div>
+                <button class="reserve-submit" type="button">Submit offer</button>
+                <p class="reserve-error"></p>
+                <p class="reserve-note">I'll reach out directly if I'd like to accept your offer and reserve this piece for you.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+
+      <section class="artwork-chapter" data-chapter="chapter2">
+        <div class="artwork-group-label">Chapter 2 — Ìpàdé I</div>
+        <div class="grid">
+        <div class="card" data-owner-piece="Ìpàdé I" data-status="available">
+          <div class="card-img-wrap">
+            <img class="card-img" src="https://www.kaysworks.com/images/ipadeIj.jpg" alt="Ìpàdé I" />
+          </div>
+          <div class="card-body">
+            <div class="card-title">Ìpàdé I</div>
+            <div class="card-desc">Chapter 2's central painting — the moment Ayo and Morenike first cross paths.</div>
+            <div class="card-meta">
+              <span class="badge auction">in auction</span>
+            </div>
+            <div class="auction-cta">
+              <a class="btn" href="https://www.kaysworks.com/auction" target="_blank" rel="noopener">Start Auction</a>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+
+      <section class="artwork-chapter" data-chapter="opa">
+        <div class="artwork-group-label">The Opa Collection</div>
+        <div class="grid opa-artwork-grid">
+        <div class="card" data-owner-piece="Ọ̀pá I — Ọ̀pá Orísun" data-status="auction">
+          <div class="card-img-wrap">
+            <img class="card-img opa-artwork-image" src="images/orisun5.jpg" alt="Ọ̀pá Orísun — open fullscreen" tabindex="0" role="button" />
+          </div>
+          <div class="card-body">
+            <div class="card-title">Ọ̀pá Orísun</div>
+            <div class="card-desc">One of Ayo's first staffs — the beginning of his craft.</div>
+            <details class="token-contents">
+              <summary>What's included in the token</summary>
+              <p>interactive GLB model, close-up image set, and rendered turntable video, packaged together as one multi-metadata token. The ETH and Tezos counterparts are now in auction as a linked pair; when bidding starts on one chain, the duplicate on the other chain is destroyed.</p>
+            </details>
+            <div class="card-meta">
+              <span class="badge auction">in auction</span>
+              <span class="card-desc price-live" data-usd-price="220">$220</span>
+            </div>
+            <div class="auction-cta">
+              <a class="btn" href="https://www.kaysworks.com/auction" target="_blank" rel="noopener">Start Auction</a>
+              <p class="reserve-note">This piece is now in auction.</p>
+            </div>
+          </div>
+        </div>
+        <div class="card" data-owner-piece="Ọ̀pá II — Ọ̀pá Ìrántí" data-status="auction">
+          <div class="card-img-wrap">
+            <img class="card-img opa-artwork-image" src="images/iranti5.png" alt="Ọ̀pá Ìrántí — open fullscreen" tabindex="0" role="button" />
+          </div>
+          <div class="card-body">
+            <div class="card-title">Ọ̀pá Ìrántí</div>
+            <div class="card-desc">Carved in memory of his grandfather.</div>
+            <details class="token-contents">
+              <summary>What's included in the token</summary>
+              <p>interactive GLB model, close-up image set, and rendered turntable video, packaged together as one multi-metadata token. The ETH and Tezos counterparts are now in auction as a linked pair; when bidding starts on one chain, the duplicate on the other chain is destroyed.</p>
+            </details>
+            <div class="card-meta">
+              <span class="badge auction">in auction</span>
+              <span class="card-desc price-live" data-usd-price="220">$220</span>
+            </div>
+            <div class="auction-cta">
+              <a class="btn" href="https://www.kaysworks.com/auction" target="_blank" rel="noopener">Start Auction</a>
+              <p class="reserve-note">This piece is now in auction.</p>
+            </div>
+          </div>
+        </div>
+        <div class="card" data-owner-piece="Ọ̀pá III — Ọ̀pá Ẹkùn" data-status="auction">
+          <div class="card-img-wrap">
+            <img class="card-img opa-artwork-image" src="images/ekun1.jpg" alt="Ọ̀pá Ẹkùn — open fullscreen" tabindex="0" role="button" />
+          </div>
+          <div class="card-body">
+            <div class="card-title">Ọ̀pá Ẹkùn</div>
+            <div class="card-desc">Commissioned by Chief Adediran through Morenike.</div>
+            <details class="token-contents">
+              <summary>What's included in the token</summary>
+              <p>interactive GLB model, close-up image set, and rendered turntable video, packaged together as one multi-metadata token. The ETH and Tezos counterparts are now in auction as a linked pair; when bidding starts on one chain, the duplicate on the other chain is destroyed.</p>
+            </details>
+            <div class="card-meta">
+              <span class="badge auction">in auction</span>
+              <span class="card-desc price-live" data-usd-price="220">$220</span>
+            </div>
+            <div class="auction-cta">
+              <a class="btn" href="https://www.kaysworks.com/auction" target="_blank" rel="noopener">Start Auction</a>
+              <p class="reserve-note">This piece is now in auction.</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      </div>
+    </div>
+
+    <!-- ══════════ WORKS OWNED BY THE CONNECTED WALLET ══════════ -->
+    <div class="panel-view" id="view-owned">
+      <header class="section-intro">
+        <span class="eyebrow">Your Collection</span>
+        <h2>Works You Own</h2>
+        <p>The pieces confirmed in your connected wallet, gathered in one place.</p>
+      </header>
+      <div id="ownedWorksList"></div>
+    </div>
+
+    <!-- ══════════ NEW CHAPTERS (hardcoded) ══════════ -->
+    <div class="panel-view" id="view-chapters">
+      <header class="section-intro">
+        <span class="eyebrow">The Story Continues</span>
+        <h2>New Chapters</h2>
+        <p>Updates from the unfolding story and the work currently taking shape.</p>
+      </header>
+      <div class="chapter-card">
+        <div class="chapter-body">
+          <div class="chapter-eyebrow">Chapter Three</div>
+          <h3>L’abẹ Igi Oronbo</h3>
+          <p>I will be in touch when the art and scripts are live. June was very hectic for me, and after the Opa Collection drop I will be restructuring the calendar so that the subsequent chapter drops are more sustainable for me.</p>
+          <div class="auction-notes">
+            <strong>A note from Kay</strong>
+            Thank you for your patience while I give the next chapter the time and care it deserves. I will share the revised calendar after the Opa Collection drop.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Future Plans is intentionally blank until content is published in admin. -->
+    <div class="panel-view" id="view-plans">
+      <header class="section-intro">
+        <span class="eyebrow">Built for Collectors</span>
+        <h2>Milestones &amp; Future Plans</h2>
+        <p>What the Àpótí Ọlọ́wẹ̀ Project has already shipped—and where the collector experience goes next.</p>
+      </header>
+      <div class="milestone-grid">
+        <article class="milestone-card">
+          <span class="milestone-number">Milestone 01</span>
+          <h3>Live Collector Chatrooms</h3>
+          <p>Collectors can speak with one another in real time while bidding, turning each auction into a shared live experience.</p>
+          <span class="milestone-first">A first in the NFT space</span>
+        </article>
+        <article class="milestone-card">
+          <span class="milestone-number">Milestone 02</span>
+          <h3>Holder-Gated Auctions</h3>
+          <p>Dedicated auctions can be reserved for verified token holders of the project.</p>
+        </article>
+        <article class="milestone-card">
+          <span class="milestone-number">Milestone 03</span>
+          <h3>Cross-Chain Auctions</h3>
+          <p>Ethereum and Tezos collectors can participate in the same artwork auctions without being divided by chain.</p>
+          <span class="milestone-first">A first of its kind</span>
+        </article>
+        <article class="milestone-card">
+          <span class="milestone-number">Milestone 04</span>
+          <h3>Price Lock</h3>
+          <p>Reserve bid values remain consistent even when the market price of the underlying coin fluctuates.</p>
+        </article>
+        <article class="milestone-card">
+          <span class="milestone-number">Milestone 05</span>
+          <h3>Private Offers</h3>
+          <p>Collectors can propose ownership terms outside the standard auction mechanism.</p>
+        </article>
+        <article class="milestone-card">
+          <span class="milestone-number">Milestone 06</span>
+          <h3>Auction Hall of Fame</h3>
+          <p>Past bidding histories and auction interactions are preserved for every piece as part of the project archive.</p>
+        </article>
+      </div>
+      <div class="future-plans-heading">
+        <span class="eyebrow">What Comes Next</span>
+        <h3>Future Plans</h3>
+      </div>
+      <p class="future-intro-note">Thank you for being part of Àpótí Ọlọ́wẹ̀. Whether you’ve collected a piece, followed the story, or simply spent time with the work, it genuinely means a lot. My focus now is seeing this project through and making sure it lives beyond the blockchain.</p>
+      <div class="future-plan-grid">
+        <article class="future-plan-card">
+          <span class="future-plan-kicker">Next 01 · Physical Editions</span>
+          <h4>Fine Art Prints</h4>
+          <p>High-quality fine art prints will allow the work to live in people’s homes and physical collections—not only on-chain.</p>
+        </article>
+        <article class="future-plan-card">
+          <span class="future-plan-kicker">Next 02 · The Complete Story</span>
+          <h4>The Àpótí Ọlọ́wẹ̀ Book</h4>
+          <p>A book bringing the story, paintings, sculptures and creative process together in one place—something collectors can return to long after the final chapter.</p>
+        </article>
+        <article class="future-plan-card">
+          <span class="future-plan-kicker">Next 03 · Limited Edition Collectibles</span>
+          <h4>Àpótí Ọlọ́wẹ̀ Puzzle Set</h4>
+          <p>Limited edition puzzle sets of selected paintings will be available to collect, extending the work into a tactile format. Sample coming soon.</p>
+        </article>
+        <article class="future-plan-card">
+          <span class="future-plan-kicker">Next 04 · Physical Rewards</span>
+          <h4>Project Merchandise</h4>
+          <p>Merchandise will be distributed toward the end of the series, allowing orders to be consolidated for smarter, more efficient and considered production.</p>
+        </article>
+        <article class="future-plan-card">
+          <span class="future-plan-kicker">Next 05 · Collector Tools</span>
+          <h4>A Better Collecting Experience</h4>
+          <p>I’ll continue refining the auction platform and exploring thoughtful ways to make collecting feel more engaging, personal and rewarding.</p>
+        </article>
+        <article class="future-plan-card featured">
+          <span class="future-plan-kicker">Beyond the Roadmap</span>
+          <h4>Letting the Work Lead</h4>
+          <p>I’m leaving room to discover where the project wants to go next. Rather than making promises today, I’d rather let the work lead me there.</p>
+        </article>
+      </div>
+      <div class="future-closing">Thank you for coming along on this journey. I’m looking forward to sharing the next chapter with you.</div>
+    </div>
+
+    <div class="panel-view" id="view-participants">
+      <header class="section-intro">
+        <span class="eyebrow">The Community</span>
+        <h2>Participants</h2>
+        <p>The collectors helping this story travel, grow and find a life beyond the studio.</p>
+      </header>
+      <div id="participantsList"></div>
+    </div>
+
+    <div class="panel-view" id="view-messages">
+      <header class="section-intro">
+        <span class="eyebrow">Private Correspondence</span>
+        <h2>Messages</h2>
+        <p>Write directly to Kay and return here to continue the conversation.</p>
+      </header>
+      <div class="panel">
+        <div class="panel-title">Send a message or suggestion</div>
+        <div class="field">
+          <label for="msgSubject">Subject (optional)</label>
+          <input type="text" id="msgSubject" placeholder="What's this about?" />
+        </div>
+        <div class="field">
+          <label for="msgBody">Message</label>
+          <textarea id="msgBody" placeholder="Your thoughts, questions, or suggestions..."></textarea>
+        </div>
+        <button class="btn" id="sendMsgBtn">Send</button>
+        <div class="status" id="msgStatus"></div>
+      </div>
+      <div class="msg-history" id="msgHistory"></div>
+    </div>
+
+  </section>
+
+</div>
+
+<!-- Fullscreen artwork viewer -->
+<div class="art-lightbox" id="artLightbox" role="dialog" aria-modal="true" aria-label="Fullscreen artwork">
+  <button class="art-lightbox-close" id="artLightboxClose" type="button" aria-label="Close fullscreen image">×</button>
+  <img id="artLightboxImage" src="" alt="" />
+</div>
+
+<!-- Tezos wallet choice modal -->
+<div class="wallet-modal" id="tezosWalletModal">
+  <div class="wallet-box">
+    <div class="wallet-title">Connect Tezos Wallet</div>
+    <div class="wallet-sub">Choose how you'd like to connect.</div>
+    <button class="wallet-option" id="connectTezBeacon">Beacon (mobile / most wallets)</button>
+    <button class="wallet-option" id="connectTezTemple">Temple Wallet (browser extension)</button>
+    <button class="wallet-option" id="dismissTezWallet">Cancel</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+//  CONFIG — fill these in
+// ══════════════════════════════════════════════════════════
+const CONFIG = {
+  configEndpoint: '/api/holder?action=config',
+  verifyEndpoint: '/api/holder?action=verify',
+  claimEndpoint: '/api/holder?action=claim',
+  emailEndpoint: '/api/holder?action=send-auth-email',
+  reverifyDays: 30,                       // how often holdership is re-checked
+};
+
+let sb; // created once /api/holder?action=config resolves — see boot() below
+
+let currentUser = null;
+let currentHolder = null;
+let pendingClaimToken = null;   // set once the wallet check succeeds pre-login
+let isReverifyMode = false;     // true when an already-signed-in holder is reconnecting
+let isEmailLoginFlow = false;   // true when a returning holder chose "sign in with email" directly
+
+const els = {
+  stepEmail: document.getElementById('stepEmail'),
+  stepWallet: document.getElementById('stepWallet'),
+  emailInput: document.getElementById('emailInput'),
+  sendLinkBtn: document.getElementById('sendLinkBtn'),
+  emailStatus: document.getElementById('emailStatus'),
+  connectEth: document.getElementById('connectEth'),
+  connectTez: document.getElementById('connectTez'),
+  walletStatus: document.getElementById('walletStatus'),
+  gate: document.getElementById('gate'),
+  dashboard: document.getElementById('dashboard'),
+  walletPill: document.getElementById('walletPill'),
+  signoutBtn: document.getElementById('signoutBtn'),
+  holderGreeting: document.getElementById('holderGreeting'),
+  reverifyBanner: document.getElementById('reverifyBanner'),
+  reverifyBtn: document.getElementById('reverifyBtn'),
+  emailUpdatesPanel: document.getElementById('emailUpdatesPanel'),
+  emailUpdatesOptIn: document.getElementById('emailUpdatesOptIn'),
+  emailUpdatesLabel: document.getElementById('emailUpdatesLabel'),
+  emailUpdatesCopy: document.getElementById('emailUpdatesCopy'),
+  tezosWalletModal: document.getElementById('tezosWalletModal'),
+  connectTezBeacon: document.getElementById('connectTezBeacon'),
+  connectTezTemple: document.getElementById('connectTezTemple'),
+  dismissTezWallet: document.getElementById('dismissTezWallet'),
+  showEmailLoginBtn: document.getElementById('showEmailLoginBtn'),
+  backToWalletBtn: document.getElementById('backToWalletBtn'),
+  walletEmailPanel: document.getElementById('walletEmailPanel'),
+  walletEmailClose: document.getElementById('walletEmailClose'),
+  walletEmailInput: document.getElementById('walletEmailInput'),
+  walletEmailBtn: document.getElementById('walletEmailBtn'),
+  walletEmailStatus: document.getElementById('walletEmailStatus'),
+};
+
+function setStatus(el, cls, msg) {
+  el.className = 'status show' + (cls ? ' ' + cls : '');
+  el.textContent = msg;
+}
+function shortAddr(a) { return a ? a.slice(0, 6) + '…' + a.slice(-4) : ''; }
+
+// ── Boot ──
+(async function boot() {
+  els.connectEth.disabled = true;
+  els.connectTez.disabled = true;
+  els.showEmailLoginBtn.disabled = true;
+  setStatus(els.walletStatus, '', 'Loading…');
+
+  let cfg;
+  try {
+    const res = await fetch(CONFIG.configEndpoint);
+    const raw = await res.text();
+    try {
+      cfg = JSON.parse(raw);
+    } catch (parseErr) {
+      // The server didn't return JSON at all — likely a platform-level crash
+      // (e.g. a missing module) rather than our own handleConfig error path,
+      // since that always returns clean JSON even on failure. Show the raw
+      // response instead of a confusing "not valid JSON" message.
+      throw new Error('Server did not return JSON (status ' + res.status + '): ' + raw.slice(0, 200));
+    }
+    if (!res.ok) throw new Error(cfg.error || 'Could not load configuration.');
+  } catch (err) {
+    setStatus(els.walletStatus, 'err', 'This page isn\'t configured yet: ' + err.message);
+    return; // sb never gets created — nothing else can safely run
+  }
+
+  sb = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+    auth: { persistSession: true, detectSessionInUrl: true, autoRefreshToken: true }
+  });
+
+  els.connectEth.disabled = false;
+  els.connectTez.disabled = false;
+  els.showEmailLoginBtn.disabled = false;
+  els.walletStatus.classList.remove('show');
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const claimTokenFromUrl = urlParams.get('vt');
+
+  const { data: { session } } = await sb.auth.getSession();
+
+  if (session && claimTokenFromUrl) {
+    // Returning from the magic-link email with a wallet already verified —
+    // finalize the link, then clean the token out of the URL.
+    await claimPendingVerification(session, claimTokenFromUrl);
+    urlParams.delete('vt');
+    const cleanUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+    window.history.replaceState({}, '', cleanUrl);
+  }
+
+  await handleSession(session);
+
+  sb.auth.onAuthStateChange(async (_event, session) => {
+    await handleSession(session);
+  });
+})();
+
+async function claimPendingVerification(session, token) {
+  try {
+    const res = await fetch(CONFIG.claimEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+      body: JSON.stringify({ token })
+    });
+    if (!res.ok) {
+      const result = await res.json().catch(() => ({}));
+      setStatus(els.walletStatus, 'err', result.error || 'Could not finish linking your wallet — please reconnect.');
+    }
+  } catch (_) { /* handled by the fresh holder-row check right after */ }
+}
+
+async function handleSession(session) {
+  if (!session) {
+    currentUser = null;
+    els.gate.style.display = 'block';
+    els.dashboard.classList.remove('show');
+    isReverifyMode = false;
+    setWalletStepCopy(false);
+    showStep('stepWallet');
+    return;
+  }
+  currentUser = session.user;
+
+  const { data: holderRows } = await sb
+    .from('holders')
+    .select('*')
+    .eq('auth_user_id', currentUser.id)
+    .order('last_verified_at', { ascending: false });
+
+  currentHolder = mergeLinkedHolderRows(holderRows);
+
+  const needsVerify = !currentHolder || isStale(currentHolder.last_verified_at);
+
+  if (needsVerify) {
+    els.gate.style.display = 'block';
+    els.dashboard.classList.remove('show');
+    isReverifyMode = true;   // signed in already → wallet check should link directly, no email step
+    setWalletStepCopy(true);
+    showStep('stepWallet');
+  } else {
+    enterDashboard();
+  }
+}
+
+function setWalletStepCopy(reverify) {
+  document.getElementById('walletStepTitle').textContent = reverify
+    ? 'Reconnect your wallet'
+    : 'Step 1 — Verify your token';
+  document.getElementById('walletStepNote').textContent = reverify
+    ? "Just confirming you still hold the token — you're already signed in, so this takes you straight back to the hub."
+    : 'Connect the wallet that holds your Àpótí Ọlọ́wẹ̀ token. If it checks out, you\'ll set up email sign-in next so you don\'t need the wallet every visit.';
+}
+
+function isStale(ts) {
+  if (!ts) return true;
+  const days = (Date.now() - new Date(ts).getTime()) / 86400000;
+  return days > CONFIG.reverifyDays;
+}
+
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('show'));
+  document.getElementById(id).classList.add('show');
+}
+
+function holderDisplayName(row) {
+  return String(row?.display_name || row?.displayName || row?.name || row?.full_name || row?.fullName || '').trim();
+}
+
+function mergeLinkedHolderRows(rows) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const newest = rows[0];
+  const named = rows.find(row => holderDisplayName(row)) || newest;
+  return {
+    ...newest,
+    display_name: holderDisplayName(named) || holderDisplayName(newest) || null,
+    tier: newest?.tier || named?.tier || null,
+    token_id: newest?.token_id || named?.token_id || null,
+    balancesByTokenId: newest?.balancesByTokenId || newest?.balances_by_token_id || named?.balancesByTokenId || named?.balances_by_token_id || null,
+    linked_wallets: rows,
+  };
+}
+
+// ── Returning holder: sign in with email, no wallet reconnect needed ──
+els.showEmailLoginBtn.addEventListener('click', () => {
+  isEmailLoginFlow = true;
+  document.getElementById('emailStepTitle').textContent = 'Sign in';
+  document.getElementById('emailStepNote').textContent = "Enter the email you used when you first verified — we'll send a one-time link, no wallet needed.";
+  showStep('stepEmail');
+});
+els.backToWalletBtn.addEventListener('click', () => {
+  isEmailLoginFlow = false;
+  showStep('stepWallet');
+});
+
+// ── Step 1: magic link ──
+els.sendLinkBtn.addEventListener('click', async () => {
+  const email = els.emailInput.value.trim();
+  if (!email) { setStatus(els.emailStatus, 'err', 'Enter your email first.'); return; }
+  if (!isEmailLoginFlow && !pendingClaimToken) {
+    setStatus(els.emailStatus, 'err', 'Wallet verification is missing — please reconnect your wallet first.');
+    return;
+  }
+  els.sendLinkBtn.disabled = true;
+  els.sendLinkBtn.textContent = 'Sending…';
+  let error = null;
+  try {
+    const response = await fetch(CONFIG.emailEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        claimToken: isEmailLoginFlow ? null : pendingClaimToken
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) error = new Error(result.error || 'Could not send the sign-in email.');
+  } catch (err) {
+    error = err;
+  }
+  els.sendLinkBtn.disabled = false;
+  els.sendLinkBtn.textContent = 'Send magic link';
+  if (error) {
+    setStatus(els.emailStatus, 'err', error.message);
+  } else {
+    setStatus(els.emailStatus, 'ok', 'Check your email for the sign-in link.');
+  }
+});
+
+// ── Step 2: wallet connect + verify ──
+els.connectEth.addEventListener('click', connectEth);
+els.connectTez.addEventListener('click', () => els.tezosWalletModal.classList.add('show'));
+els.dismissTezWallet.addEventListener('click', () => els.tezosWalletModal.classList.remove('show'));
+els.connectTezBeacon.addEventListener('click', () => connectTezosWith(connectBeacon));
+els.connectTezTemple.addEventListener('click', () => connectTezosWith(connectTemple));
+els.reverifyBtn.addEventListener('click', () => {
+  els.gate.style.display = 'block';
+  els.dashboard.classList.remove('show');
+  isReverifyMode = true;
+  setWalletStepCopy(true);
+  showStep('stepWallet');
+});
+
+async function connectEth() {
+  try {
+    if (!window.ethereum) throw new Error('No Ethereum wallet found in this browser.');
+    setStatus(els.walletStatus, '', 'Connecting…');
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const accounts = await provider.send('eth_requestAccounts', []);
+    const address = accounts[0];
+    await verifyAndLink('ethereum', address);
+  } catch (err) {
+    setStatus(els.walletStatus, 'err', err.message || 'Could not connect Ethereum wallet.');
+  }
+}
+
+async function connectTezosWith(connector) {
+  els.tezosWalletModal.classList.remove('show');
+  try {
+    setStatus(els.walletStatus, '', 'Connecting Tezos wallet…');
+    const address = await connector();
+    await verifyAndLink('tezos', address);
+  } catch (err) {
+    const msg = err?.message || err?.description || String(err);
+    console.error('Tezos connect error:', err);
+    setStatus(els.walletStatus, 'err', 'Tezos: ' + msg);
+  }
+}
+
+let holderBeaconClient = null;
+
+function getBeaconSdk() {
+  const globalSdk = window.beacon || window.walletbeacon || window.beaconSdk || window.airgapBeaconSdk;
+  if (globalSdk?.DAppClient) return globalSdk;
+  // Fallback: scan all globals for anything shaped like the SDK
+  for (const key of Object.keys(window)) {
+    const value = window[key];
+    if (value && typeof value === 'object' && typeof value.DAppClient === 'function') return value;
+  }
+  return null;
+}
+
+function walletTimeout(promise, ms, message) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+}
+
+function beaconNetworkConfig(sdk) {
+  const networkTypes = sdk?.NetworkType || {};
+  return { type: networkTypes.MAINNET || 'mainnet' };
+}
+
+function beaconPermissionScopes(sdk) {
+  const scopes = sdk?.PermissionScope || {};
+  return [
+    scopes.OPERATION_REQUEST || 'operation_request',
+    scopes.SIGN || 'sign'
+  ].filter(Boolean);
+}
+
+function beaconMatrixNodes(sdk) {
+  const regions = sdk?.Regions || {};
+  const region = regions.EUROPE_WEST || 'EUROPE_WEST';
+  return {
+    [region]: [
+      'beacon-node-1.octez.io',
+      'beacon-node-2.octez.io',
+      'beacon-node-3.octez.io',
+      'beacon-node-4.octez.io',
+      'beacon-node-5.octez.io',
+      'beacon-node-6.octez.io',
+      'beacon-node-7.octez.io',
+      'beacon-node-8.octez.io'
+    ]
+  };
+}
+
+function makeHolderBeaconClient(sdk) {
+  const DAppClient = sdk.DAppClient;
+  return new DAppClient({
+    name: "Kay's Works Holder Hub",
+    iconUrl: location.origin + '/images/kayslogo1.png',
+    appUrl: location.origin,
+    network: beaconNetworkConfig(sdk),
+    featuredWallets: ['temple', 'kukai', 'trust'],
+    matrixNodes: beaconMatrixNodes(sdk)
+  });
+}
+
+async function resetHolderBeaconClient(client) {
+  if (!client) return;
+  for (const task of [
+    () => client.removeAllAccounts?.(),
+    () => client.clearActiveAccount?.(),
+    () => client.setActiveAccount?.(),
+    () => client.destroy?.(),
+  ]) {
+    try { await task(); } catch (_) {}
+  }
+}
+
+async function requestHolderBeaconAddress(client, sdk) {
+  const permissionRequest = { scopes: beaconPermissionScopes(sdk) };
+  let permission;
+  try {
+    permission = await walletTimeout(
+      client.requestPermissions(permissionRequest),
+      90000,
+      'Wallet connection timed out. Please reopen your wallet and try again.'
+    );
+  } catch (err) {
+    const msg = err?.message || String(err);
+    if (/not accepted|invalid|unknown|unexpected/i.test(msg)) {
+      permission = await walletTimeout(
+        client.requestPermissions(),
+        90000,
+        'Wallet connection timed out. Please reopen your wallet and try again.'
+      );
+    } else {
+      throw err;
+    }
+  }
+  const account = await client.getActiveAccount?.();
+  const address = permission?.address || account?.address;
+  if (!address) throw new Error('Beacon connected but returned no Tezos address.');
+  return address;
+}
+
+async function connectBeacon() {
+  const sdk = getBeaconSdk();
+  if (!sdk || typeof sdk.DAppClient !== 'function') throw new Error('Beacon SDK did not load. Refresh and try again.');
+  let client = holderBeaconClient || makeHolderBeaconClient(sdk);
+  holderBeaconClient = client;
+  try {
+    return await requestHolderBeaconAddress(client, sdk);
+  } catch (firstError) {
+    await resetHolderBeaconClient(client);
+    client = makeHolderBeaconClient(sdk);
+    holderBeaconClient = client;
+    return requestHolderBeaconAddress(client, sdk);
+  }
+}
+
+async function connectTemple() {
+  // Same pattern as claim-token.html's direct Temple connector.
+  if (!window.tezos && !window.temple) return connectBeacon();
+  const temple = window.temple || window.tezos;
+  const permission = await temple.requestPermissions?.();
+  const address = permission?.address || permission?.[0]?.address;
+  if (!address) throw new Error('Temple connected but returned no address.');
+  return address;
+}
+
+async function verifyAndLink(chain, address) {
+  setStatus(els.walletStatus, '', 'Verifying token ownership for ' + shortAddr(address) + '…');
+
+  const { data: { session } } = await sb.auth.getSession();
+  const headers = { 'Content-Type': 'application/json' };
+  if (isReverifyMode && session) headers['Authorization'] = 'Bearer ' + session.access_token;
+
+  const res = await fetch(CONFIG.verifyEndpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ chain, address })
+  });
+  const result = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    if (res.status === 403) {
+      setStatus(els.walletStatus, 'err', '');
+      els.walletStatus.innerHTML = 'This wallet doesn\'t hold an entry token yet. <a href="/claim-token" style="color:var(--gold);text-decoration:underline;">Claim one here</a> to get access.';
+    } else {
+      setStatus(els.walletStatus, 'err', result.error || 'Could not verify this wallet.');
+    }
+    return;
+  }
+
+  if (isReverifyMode && session) {
+    setStatus(els.walletStatus, 'ok', 'Verified — welcome back.');
+    await handleSession(session);
+    return;
+  }
+
+  // Keep this verification pending until the holder clicks the email link.
+  // Claiming it against an anonymous user here would consume the token and
+  // link the wallet to the wrong auth account, so later email sign-in would
+  // silently produce no email.
+  pendingClaimToken = result.claimToken || null;
+
+  // Let the verified wallet enter immediately. The optional email panel uses
+  // the still-valid pendingClaimToken to attach this wallet to the email user.
+  setStatus(els.walletStatus, 'ok', 'Verified — this wallet holds the token.');
+  currentUser = null;
+  currentHolder = {
+    id: result.holderId || null,
+    wallet_address: address,
+    chain,
+    token_balance: result.balance || 1,
+    tier: result.tier || result.tokenTier || result.token_tier || null,
+    token_id: result.tokenId || result.token_id || result.gateTokenId || result.gate_token_id || result.holdingTokenId || result.holding_token_id || null,
+    balancesByTokenId: result.balancesByTokenId || result.balances_by_token_id || result.tokenBalances || null,
+    display_name: result.displayName || null,
+    last_verified_at: new Date().toISOString(),
+  };
+  await enterDashboard();
+  if (!result.emailLinked && pendingClaimToken) {
+    els.walletEmailPanel.classList.add('show');
+    document.body.classList.add('email-prompt-open');
+  } else {
+    els.walletEmailPanel.classList.remove('show');
+    document.body.classList.remove('email-prompt-open');
+  }
+}
+
+els.walletEmailClose.addEventListener('click', () => {
+  els.walletEmailPanel.classList.remove('show');
+  document.body.classList.remove('email-prompt-open');
+});
+
+els.walletEmailBtn.addEventListener('click', async () => {
+  const email = els.walletEmailInput.value.trim();
+  if (!email) { setStatus(els.walletEmailStatus, 'err', 'Enter your email first.'); return; }
+  if (!pendingClaimToken) { setStatus(els.walletEmailStatus, 'err', 'Reconnect your wallet before saving email access.'); return; }
+  els.walletEmailBtn.disabled = true;
+  els.walletEmailBtn.textContent = 'Sending…';
+  try {
+    const response = await fetch(CONFIG.emailEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, claimToken: pendingClaimToken }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not send the email.');
+    setStatus(els.walletEmailStatus, 'ok', 'Email sent. Your Hub access is already open—you can confirm the link whenever convenient.');
+  } catch (err) {
+    setStatus(els.walletEmailStatus, 'err', err.message);
+  } finally {
+    els.walletEmailBtn.disabled = false;
+    els.walletEmailBtn.textContent = 'Save email access';
+  }
+});
+
+function renderEmailUpdatesPreference() {
+  if (!els.emailUpdatesPanel || !els.emailUpdatesOptIn) return;
+  const canEmail = Boolean(currentUser?.id && currentHolder?.auth_user_id);
+  els.emailUpdatesPanel.classList.toggle('show', canEmail);
+  if (!canEmail) return;
+  const enabled = Boolean(currentHolder.email_updates_opt_in);
+  if (els.emailUpdatesCopy) {
+    els.emailUpdatesCopy.innerHTML = '<strong>Project update emails</strong> Notices will be sent to your saved sign-in email. Toggle this on if you want me to email you when there is a new Holder Hub update to check.';
+  }
+  els.emailUpdatesOptIn.checked = enabled;
+  els.emailUpdatesLabel.textContent = enabled ? 'On' : 'Off';
+}
+
+els.emailUpdatesOptIn?.addEventListener('change', async () => {
+  const checked = els.emailUpdatesOptIn.checked;
+  els.emailUpdatesOptIn.disabled = true;
+  els.emailUpdatesLabel.textContent = checked ? 'Saving...' : 'Saving...';
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) throw new Error('Sign in with email before choosing update emails.');
+    const response = await fetch('/api/holder?action=email-updates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+      body: JSON.stringify({ enabled: checked }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not save this preference.');
+    currentHolder.email_updates_opt_in = checked;
+    (currentHolder.linked_wallets || []).forEach(row => { row.email_updates_opt_in = checked; });
+    els.emailUpdatesLabel.textContent = checked ? 'On' : 'Off';
+  } catch (err) {
+    els.emailUpdatesOptIn.checked = !checked;
+    els.emailUpdatesLabel.textContent = !checked ? 'On' : 'Off';
+    alert(err.message || 'Could not save this preference.');
+  } finally {
+    els.emailUpdatesOptIn.disabled = false;
+  }
+});
+
+// ── Dashboard entry ──
+async function enterDashboard() {
+  els.gate.style.display = 'none';
+  els.dashboard.classList.add('show');
+
+  els.walletPill.textContent = shortAddr(currentHolder.wallet_address) + ' · ' + currentHolder.chain;
+  els.walletPill.classList.add('show');
+  els.signoutBtn.classList.add('show');
+  els.holderGreeting.textContent = currentHolder.display_name || shortAddr(currentHolder.wallet_address);
+  els.reverifyBanner.classList.toggle('show', isStale(currentHolder.last_verified_at));
+  renderEmailUpdatesPreference();
+
+  renderMerchEntitlement();
+  loadParticipants();
+  loadMessages();
+  document.getElementById('ownedAssetSummary').textContent = 'Confirming the collection assets held by this wallet…';
+  // Defer ownership highlight so ethers.js activity doesn't trigger MetaMask's
+  // eager "want to connect?" popup the instant the dashboard renders. The scan
+  // uses a read-only RPC (JsonRpcProvider, not BrowserProvider), but some
+  // MetaMask versions hook into any ethers constructor globally when
+  // window.ethereum exists. A short delay + requestIdleCallback lets the page
+  // settle first, and the user sees the dashboard immediately regardless.
+  setTimeout(() => {
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(() => highlightOwnedPieces());
+    } else {
+      highlightOwnedPieces();
+    }
+  }, 1500);
+}
+
+const HOLDER_GATE_TOKEN_IDS = ['1', '2'];
+const HOLDER_GATE_TOKEN_TIERS = { '1': 'wood', '2': 'bronze' };
+const HOLDER_GATE_ETH_CONTRACT = '0x611cca3635b0f05b103031ee8d4f3261633292b4';
+const HOLDER_GATE_ETH_RPC = 'https://ethereum.publicnode.com';
+const HOLDER_GATE_TEZOS_CONTRACT = 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8';
+
+function normalizeGateBalances(rawBalances) {
+  const balances = { '1': 0, '2': 0 };
+  if (!rawBalances) return balances;
+  HOLDER_GATE_TOKEN_IDS.forEach(id => {
+    const value = Number(rawBalances[id] ?? rawBalances[Number(id)] ?? 0);
+    balances[id] = Number.isFinite(value) && value > 0 ? value : 0;
+  });
+  return balances;
+}
+
+function addGateBalances(target, source) {
+  HOLDER_GATE_TOKEN_IDS.forEach(id => {
+    target[id] = Math.max(Number(target[id] || 0), Number(source[id] || 0));
+  });
+}
+
+function holderWalletsForEntitlement(holder) {
+  const wallets = [];
+  const seen = new Set();
+  const addWallet = row => {
+    const address = row?.wallet_address || row?.walletAddress || row?.address;
+    const chain = row?.chain;
+    if (!address || !chain) return;
+    const key = chain + ':' + String(address).toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    wallets.push({ ...row, wallet_address: address, chain });
+  };
+  addWallet(holder);
+  (holder?.linked_wallets || holder?.linkedWallets || holder?.wallets || []).forEach(addWallet);
+  return wallets;
+}
+
+async function fetchTezosGateBalances(address) {
+  const url =
+    'https://api.tzkt.io/v1/tokens/balances' +
+    '?account=' + encodeURIComponent(address) +
+    '&token.contract=' + encodeURIComponent(HOLDER_GATE_TEZOS_CONTRACT) +
+    '&token.tokenId.in=' + HOLDER_GATE_TOKEN_IDS.join(',') +
+    '&limit=10';
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('TzKT returned ' + response.status);
+  const rows = await response.json();
+  const balances = { '1': 0, '2': 0 };
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    const tokenId = String(row?.token?.tokenId ?? '');
+    if (!Object.prototype.hasOwnProperty.call(balances, tokenId)) return;
+    balances[tokenId] += Number(row?.balance || 0);
+  });
+  return balances;
+}
+
+async function fetchEthGateBalances(address) {
+  if (typeof ethers === 'undefined') throw new Error('ethers.js is unavailable');
+  const provider = new ethers.JsonRpcProvider(HOLDER_GATE_ETH_RPC);
+  const gate = new ethers.Contract(HOLDER_GATE_ETH_CONTRACT, [
+    'function balanceOf(address account,uint256 id) view returns (uint256)',
+  ], provider);
+  const pairs = await Promise.all(HOLDER_GATE_TOKEN_IDS.map(async id => {
+    const balance = await gate.balanceOf(address, BigInt(id));
+    return [id, Number(balance)];
+  }));
+  return Object.fromEntries(pairs);
+}
+
+async function fetchWalletGateBalances(wallet) {
+  if (wallet.chain === 'tezos') return fetchTezosGateBalances(wallet.wallet_address);
+  if (wallet.chain === 'ethereum') return fetchEthGateBalances(wallet.wallet_address);
+  return { '1': 0, '2': 0 };
+}
+
+async function resolveMerchEntitlement(holder) {
+  const balances = normalizeGateBalances(
+    holder.balances_by_token_id || holder.balancesByTokenId || holder.tokenBalances
+  );
+  const wallets = holderWalletsForEntitlement(holder);
+
+  wallets.forEach(wallet => {
+    addGateBalances(balances, normalizeGateBalances(
+      wallet.balances_by_token_id || wallet.balancesByTokenId || wallet.tokenBalances
+    ));
+  });
+
+  await Promise.all(wallets.map(async wallet => {
+    try {
+      const walletBalances = await fetchWalletGateBalances(wallet);
+      addGateBalances(balances, normalizeGateBalances(walletBalances));
+    } catch (err) {
+      console.warn('Gate entitlement lookup failed:', wallet.chain, wallet.wallet_address, err);
+    }
+  }));
+
+  const tokenIdFromHolder = String(
+    holder.token_id ??
+    holder.tokenId ??
+    holder.gate_token_id ??
+    holder.gateTokenId ??
+    holder.holding_token_id ??
+    holder.holdingTokenId ??
+    holder.entry_token_id ??
+    holder.entryTokenId ??
+    ''
+  ).trim();
+  let tier = String(
+    holder.tier ||
+    holder.token_tier ||
+    holder.tokenTier ||
+    holder.holder_tier ||
+    holder.access_tier ||
+    holder.token_type ||
+    ''
+  ).toLowerCase();
+
+  if (balances['2'] > 0) tier = 'bronze';
+  else if (balances['1'] > 0) tier = 'wood';
+  else if (!tier && HOLDER_GATE_TOKEN_TIERS[tokenIdFromHolder]) tier = HOLDER_GATE_TOKEN_TIERS[tokenIdFromHolder];
+
+  return { tier, balances };
+}
+
+async function renderMerchEntitlement() {
+  const el = document.getElementById('merchEntitlementText');
+  if (!el || !currentHolder) return;
+  el.textContent = 'Checking your merch entitlement...';
+  const { tier, balances } = await resolveMerchEntitlement(currentHolder);
+  currentHolder.balancesByTokenId = balances;
+  currentHolder.tier = tier || currentHolder.tier;
+  currentHolder.token_id = balances['2'] > 0 ? 2 : balances['1'] > 0 ? 1 : currentHolder.token_id;
+  const bronzeBalance = Math.max(1, Number(balances['2'] || 0));
+  const toteText = bronzeBalance === 1 ? '1 tote bag available to redeem' : `${bronzeBalance} tote bags available to redeem`;
+
+  if (tier.includes('bronze')) {
+    el.innerHTML = `<strong>Bronze holder benefit:</strong> ${toteText}. Each Bronze token qualifies for one free tote bag, plus up to 25% off available merch such as totes, hoodies, and T-shirts.`;
+  } else if (tier.includes('wood')) {
+    el.innerHTML = '<strong>Wooden holder benefit:</strong> you qualify for up to 15% off available merch such as totes, hoodies, and T-shirts.';
+  } else {
+    el.innerHTML = '<strong>Merch entitlement:</strong> reconnect the wallet that holds your gate token so this section can show the correct tote and discount benefit before claims open.';
+  }
+}
+
+async function loadFuturePlans() {
+  const container = document.getElementById('futurePlansContent');
+  if (!container || !currentUser) return;
+  container.replaceChildren();
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const headers = {};
+    if (session) headers.Authorization = 'Bearer ' + session.access_token;
+    else if (pendingClaimToken) headers['x-holder-claim'] = pendingClaimToken;
+    const response = await fetch('/api/holder?action=content', { headers });
+    if (!response.ok) return;
+    const data = await response.json();
+    const text = String(data.future_plans || '').trim();
+    if (!text) return;
+    let items;
+    try {
+      const parsed = JSON.parse(text);
+      items = Array.isArray(parsed.items) ? parsed.items : [];
+    } catch (_) {
+      items = [{ heading: 'Future plans', body: text }];
+    }
+    items.filter(item => item && (item.heading || item.body)).forEach(item => {
+      const details = document.createElement('details');
+      details.className = 'plan-disclosure';
+      const summary = document.createElement('summary');
+      summary.textContent = item.heading || 'Update';
+      const body = document.createElement('div');
+      body.className = 'plan-disclosure-body';
+      body.textContent = item.body || '';
+      details.append(summary, body);
+      container.appendChild(details);
+    });
+  } catch (_) { /* blank is the intended fallback */ }
+}
+
+els.signoutBtn.addEventListener('click', async () => {
+  await sb.auth.signOut();
+  window.location.reload();
+});
+
+// ── Tabs ──
+document.querySelectorAll('.tabs .tab-btn[data-tab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabs .tab-btn[data-tab]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.panel-view').forEach(v => v.classList.remove('show'));
+    document.getElementById('view-' + btn.dataset.tab).classList.add('show');
+  });
+});
+
+document.querySelectorAll('[data-artstatus]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-artstatus]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyArtworkFilter(btn.dataset.artstatus);
+  });
+});
+
+function applyArtworkFilter(mode) {
+  document.getElementById('soldHallFameLink')?.classList.toggle('show', mode === 'sold');
+  document.querySelectorAll('.artwork-chapter').forEach(section => {
+    let anyVisible = false;
+    section.querySelectorAll('.card[data-status]').forEach(card => {
+      const show = mode === 'all' || card.dataset.status === mode;
+      card.style.display = show ? '' : 'none';
+      if (show) anyVisible = true;
+    });
+    section.classList.toggle('hidden', !anyVisible);
+  });
+}
+applyArtworkFilter('all');
+
+// ── Reserve-a-piece (all content below is hardcoded; only reserve offers and
+//    messages/participants stay dynamic — see the architecture note in the README) ──
+function bindReserveForms() {
+  document.querySelectorAll('.reserve-toggle').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      btn.nextElementSibling.classList.toggle('show');
+    });
+  });
+  document.querySelectorAll('.reserve-submit').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', async () => {
+      const block = btn.closest('.reserve-block');
+      const pieceName = block.dataset.piece || 'this piece';
+      const offerInput = block.querySelector('.reserve-offer');
+      const noteInput = block.querySelector('.reserve-note-input');
+      const errorEl = block.querySelector('.reserve-error');
+      const offer_amount = offerInput.value.trim();
+      const note = noteInput.value.trim();
+
+      errorEl.style.display = 'none';
+      if (!offer_amount) {
+        errorEl.textContent = 'Enter an offer amount first.';
+        errorEl.style.display = 'block';
+        return;
+      }
+      if (!currentHolder?.id) {
+        errorEl.textContent = 'Save your email access first so I can securely attach this offer to you.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      const { error } = await sb.from('reservations').insert({
+        holder_id: currentHolder.id,
+        piece_name: pieceName,
+        offer_amount,
+        note: note || null,
+      });
+
+      if (error) {
+        errorEl.textContent = error.message;
+        errorEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Submit offer';
+        return;
+      }
+
+      notifySiteForm({
+        form_type: 'private-offer',
+        name: currentHolder.display_name || shortAddr(currentHolder.wallet_address),
+        email: currentUser?.email || '',
+        offer_amount,
+        offer_currency: '',
+        artwork: pieceName,
+        chain: currentHolder.chain,
+        wallet_address: currentHolder.wallet_address,
+        message: note,
+      });
+
+      block.innerHTML = `<p class="reserve-confirm">Offer sent for ${pieceName}. I'll reach out directly if I'd like to accept it and reserve the piece for you.</p>`;
+    });
+  });
+}
+
+// Fire-and-forget notification to the existing site-form intake endpoint —
+// this is what gets you (and the holder, for offers) an actual email, on
+// top of the Supabase row that the admin panel reads from. If this call
+// fails, the reservation/message is still safely saved via Supabase above;
+// this only affects the email side-channel.
+async function notifySiteForm(payload) {
+  try {
+    await fetch('/api/site-form', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.warn('site-form notification failed (non-fatal):', err.message);
+  }
+}
+bindReserveForms();
+
+// ── 3D View / Photos toggle + close-up slideshow ──
+function bindViewerToggles() {
+  document.querySelectorAll('.sculpture-viewer').forEach(viewer => {
+    if (viewer.dataset.bound) return;
+    viewer.dataset.bound = '1';
+    const modeButtons = viewer.querySelectorAll('.viewer-mode-btn[data-mode]');
+    modeButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        modeButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        viewer.querySelectorAll('.viewer-stage').forEach(stage => {
+          stage.classList.toggle('active', stage.dataset.stage === btn.dataset.mode);
+        });
+      });
+    });
+
+    const fullscreenBtn = viewer.querySelector('.viewer-fullscreen-btn');
+    const isFullscreen = () => document.fullscreenElement === viewer || viewer.classList.contains('viewer-faux-fullscreen');
+    const updateFullscreenButton = () => {
+      const active = isFullscreen();
+      fullscreenBtn.textContent = active ? 'Exit fullscreen' : 'Fullscreen';
+      fullscreenBtn.setAttribute('aria-label', active ? 'Exit fullscreen viewer' : 'Open viewer fullscreen');
+    };
+
+    fullscreenBtn.addEventListener('click', async () => {
+      if (document.fullscreenElement === viewer) {
+        await document.exitFullscreen();
+      } else if (viewer.classList.contains('viewer-faux-fullscreen')) {
+        viewer.classList.remove('viewer-faux-fullscreen');
+        document.body.style.overflow = '';
+      } else if (viewer.requestFullscreen) {
+        try { await viewer.requestFullscreen(); }
+        catch (_) {
+          viewer.classList.add('viewer-faux-fullscreen');
+          document.body.style.overflow = 'hidden';
+        }
+      } else {
+        viewer.classList.add('viewer-faux-fullscreen');
+        document.body.style.overflow = 'hidden';
+      }
+      updateFullscreenButton();
+    });
+
+    document.addEventListener('fullscreenchange', updateFullscreenButton);
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && viewer.classList.contains('viewer-faux-fullscreen')) {
+        viewer.classList.remove('viewer-faux-fullscreen');
+        document.body.style.overflow = '';
+        updateFullscreenButton();
+      }
+    });
+  });
+}
+bindViewerToggles();
+
+function bindSlideshows() {
+  document.querySelectorAll('[data-slideshow]').forEach(slideshow => {
+    if (slideshow.dataset.bound) return;
+    slideshow.dataset.bound = '1';
+
+    const images = Array.from(slideshow.querySelectorAll('.slideshow-img'));
+    const dotsWrap = slideshow.querySelector('.slideshow-dots');
+    let current = images.findIndex(img => img.classList.contains('active'));
+    if (current < 0) current = 0;
+
+    images.forEach((img, i) => {
+      const dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = 'slideshow-dot' + (i === current ? ' active' : '');
+      dot.setAttribute('aria-label', 'Show image ' + (i + 1));
+      dot.addEventListener('click', () => goTo(i));
+      dotsWrap.appendChild(dot);
+    });
+
+    function goTo(index) {
+      current = (index + images.length) % images.length;
+      images.forEach((img, i) => img.classList.toggle('active', i === current));
+      dotsWrap.querySelectorAll('.slideshow-dot').forEach((d, i) => d.classList.toggle('active', i === current));
+      // Sync thumbnail highlight if the thumbnail strip exists for this viewer
+      const viewer = slideshow.closest('.sculpture-viewer');
+      if (viewer) {
+        viewer.querySelectorAll('.viewer-thumb').forEach((t, i) => t.classList.toggle('active', i === current));
+      }
+    }
+
+    // Expose goTo so external code (thumbnail clicks) can jump to a
+    // specific slide and keep the internal counter in sync for prev/next.
+    slideshow._goTo = goTo;
+
+    const prevBtn = slideshow.querySelector('.slideshow-nav.prev');
+    const nextBtn = slideshow.querySelector('.slideshow-nav.next');
+    if (prevBtn) prevBtn.addEventListener('click', () => goTo(current - 1));
+    if (nextBtn) nextBtn.addEventListener('click', () => goTo(current + 1));
+  });
+}
+bindSlideshows();
+
+// ── Live price conversion (USD → ETH / XTZ) ──
+// Every element with data-usd-price="N" gets its USD figure supplemented
+// with the current ETH and Tezos equivalents, pulled from CoinGecko's
+// public price endpoint. Falls back to USD-only if the fetch fails.
+async function initLivePrices() {
+  const priceEls = document.querySelectorAll('[data-usd-price]');
+  if (!priceEls.length) return;
+
+  priceEls.forEach(el => {
+    el.textContent = '$' + el.dataset.usdPrice + ' · fetching live rate…';
+  });
+
+  try {
+    const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum,tezos&vs_currencies=usd');
+    if (!res.ok) throw new Error('rate fetch failed');
+    const data = await res.json();
+    const ethUsd = data?.ethereum?.usd;
+    const xtzUsd = data?.tezos?.usd;
+
+    priceEls.forEach(el => {
+      const usd = Number(el.dataset.usdPrice);
+      const parts = ['$' + usd];
+      if (ethUsd) parts.push('≈' + (usd / ethUsd).toFixed(3) + ' ETH');
+      if (xtzUsd) parts.push('≈' + Math.round(usd / xtzUsd) + ' XTZ');
+      el.textContent = parts.join(' · ');
+    });
+  } catch (err) {
+    priceEls.forEach(el => {
+      el.textContent = '$' + el.dataset.usdPrice + ' (live rate unavailable)';
+    });
+  }
+}
+initLivePrices();
+
+// ── Ownership highlight ("You own this") ──
+// Chain ownership is authoritative. Tezos uses a compact, explicit token map;
+// metadata-name matching remains as a fallback for future additions.
+const TEZOS_COLLECTION_CONTRACT = 'KT1RF7ck9WMY6oXQnaZbTyJhwuLx7cPyvbEz';
+const TEZOS_TOKEN_PIECES = {
+  '0': 'Ìjòkòó IV',
+  '1': 'Ìjòkòó I',
+  '2': 'Ìjòkòó II',
+  '3': 'Ìjòkòó III',
+  '4': 'Ìjòkòó V',
+  '5': 'Ìjòkòó VI',
+  '6': 'Ìpàdé I',
+};
+const ETH_COLLECTION_CONTRACTS = [
+  '0x824b9144174d0b5c00dbcf39d43d290701e0ffcb',
+  '0xd7066137225cb0e1eb3220a2b814ff228e2c0249',
+];
+const ETH_READONLY_RPC = 'https://ethereum.publicnode.com';
+const ETH_MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11';
+
+function normalizePieceName(name) {
+  let normalized = (name || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip accents (Ìjòkòó → Ijokoo)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ') // drop punctuation
+    .replace(/\s+/g, ' ')
+    .trim();
+  // TzKT metadata spells IJOKOO as "I J O K O O".
+  normalized = normalized.replace(/(?:\b[a-z]\b\s*){2,}/g, run => run.replace(/\s+/g, ''));
+  const roman = { i:'1', ii:'2', iii:'3', iv:'4', v:'5', vi:'6' };
+  return normalized.replace(/\b(vi|iv|iii|ii|v|i)\b/g, value => roman[value]);
+}
+
+// Word-boundary match in both directions, so "Ijokoo I" never matches
+// "Ijokoo II" (plain substring matching would false-positive on that).
+function namesMatch(a, b) {
+  if (!a || !b) return false;
+  const na = normalizePieceName(a), nb = normalizePieceName(b);
+  if (!na || !nb) return false;
+  const escape = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('\\b' + escape(na) + '\\b').test(nb) || new RegExp('\\b' + escape(nb) + '\\b').test(na);
+}
+
+function highlightPieceByName(onChainName) {
+  const known = document.querySelectorAll('[data-owner-piece], [data-piece]');
+  known.forEach(el => {
+    const key = el.dataset.ownerPiece || el.dataset.piece;
+    if (!namesMatch(key, onChainName)) return;
+    const target = el.classList.contains('reserve-block') ? el.closest('.card, .sculpture-block') : el;
+    if (!target || target.classList.contains('owned')) return;
+    target.classList.add('owned');
+    const anchor = target.querySelector('.card-img-wrap, .sculpture-viewer');
+    if (anchor && !anchor.querySelector('.owned-ribbon')) {
+      const ribbon = document.createElement('span');
+      ribbon.className = 'owned-ribbon';
+      ribbon.textContent = 'You own this';
+      anchor.appendChild(ribbon);
+    }
+  });
+}
+
+async function scanTezosHoldings(address) {
+  try {
+    const url =
+      'https://api.tzkt.io/v1/tokens/balances' +
+      '?account=' + encodeURIComponent(address) +
+      '&token.contract=' + encodeURIComponent(TEZOS_COLLECTION_CONTRACT) +
+      '&balance.gt=0&limit=200';
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('TzKT returned ' + r.status);
+    const rows = await r.json();
+    setOwnedAssetSummary((rows || []).length);
+    (rows || []).forEach(row => {
+      const tokenId = String(row?.token?.tokenId ?? '');
+      const mappedName = TEZOS_TOKEN_PIECES[tokenId];
+      const name = mappedName || row?.token?.metadata?.name;
+      if (name) highlightPieceByName(name);
+    });
+  } catch (err) {
+    console.warn('Tezos asset recognition failed:', err);
+    setOwnedAssetSummary(null, 'Could not confirm collection assets right now.');
+  }
+}
+
+async function scanEthHoldings(address) {
+  if (typeof ethers === 'undefined') return;
+  let provider;
+  try {
+    provider = new ethers.JsonRpcProvider(ETH_READONLY_RPC);
+  } catch (err) { return; }
+
+  const nftInterface = new ethers.Interface([
+    'function ownerOf(uint256 tokenId) view returns (address)',
+    'function tokenURI(uint256 tokenId) view returns (string)',
+    'function totalSupply() view returns (uint256)',
+  ]);
+  const multicall = new ethers.Contract(ETH_MULTICALL3, [
+    'function aggregate3((address target,bool allowFailure,bytes callData)[] calls) payable returns ((bool success,bytes returnData)[] returnData)',
+  ], provider);
+  const ownedTokens = [];
+
+  for (const contractAddress of ETH_COLLECTION_CONTRACTS) {
+    try {
+      let scanMax = 1500;
+      try {
+        const raw = await provider.call({
+          to: contractAddress,
+          data: nftInterface.encodeFunctionData('totalSupply'),
+        });
+        const supply = Number(nftInterface.decodeFunctionResult('totalSupply', raw)[0]);
+        if (Number.isFinite(supply)) scanMax = Math.min(5000, Math.max(250, supply + 50));
+      } catch (_) { /* creator contracts often omit totalSupply */ }
+
+      for (let start = 0; start <= scanMax; start += 300) {
+        const ids = Array.from({ length: Math.min(300, scanMax - start + 1) }, (_, i) => start + i);
+        const calls = ids.map(id => ({
+          target: contractAddress,
+          allowFailure: true,
+          callData: nftInterface.encodeFunctionData('ownerOf', [id]),
+        }));
+        const results = await multicall.aggregate3.staticCall(calls);
+        results.forEach((result, index) => {
+          if (!result.success) return;
+          try {
+            const owner = nftInterface.decodeFunctionResult('ownerOf', result.returnData)[0];
+            if (String(owner).toLowerCase() === address.toLowerCase()) {
+              ownedTokens.push({ contractAddress, tokenId: ids[index] });
+            }
+          } catch (_) { /* nonexistent token */ }
+        });
+      }
+    } catch (_) { /* one contract failing must not hide assets from the other */ }
+  }
+
+  setOwnedAssetSummary(ownedTokens.length);
+
+  for (let start = 0; start < ownedTokens.length; start += 100) {
+    const batch = ownedTokens.slice(start, start + 100);
+    try {
+      const results = await multicall.aggregate3.staticCall(batch.map(token => ({
+        target: token.contractAddress,
+        allowFailure: true,
+        callData: nftInterface.encodeFunctionData('tokenURI', [token.tokenId]),
+      })));
+      await Promise.all(results.map(async (result, index) => {
+        if (!result.success) return;
+        try {
+          const uri = nftInterface.decodeFunctionResult('tokenURI', result.returnData)[0];
+          const metadata = await fetchTokenMetadata(uri);
+          if (metadata && metadata.name) highlightPieceByName(metadata.name);
+        } catch (_) { /* metadata is a bonus; the ownership count remains valid */ }
+      }));
+    } catch (_) { /* keep the confirmed count even if metadata lookup fails */ }
+  }
+}
+
+function setOwnedAssetSummary(count, message = '') {
+  const el = document.getElementById('ownedAssetSummary');
+  if (!el) return;
+  if (message) {
+    el.textContent = message;
+    return;
+  }
+  if (!Number.isFinite(count)) {
+    el.textContent = '';
+  } else if (count === 0) {
+    el.textContent = 'Wallet checked — no collection assets were found on this chain.';
+  } else {
+    el.textContent = `Wallet confirmed — ${count} collection asset${count === 1 ? '' : 's'} held on this chain.`;
+  }
+}
+
+async function fetchTokenMetadata(uri) {
+  try {
+    if (uri.startsWith('data:application/json;base64,')) {
+      return JSON.parse(atob(uri.split(',')[1]));
+    }
+    const httpUrl = uri.startsWith('ipfs://')
+      ? 'https://ipfs.io/ipfs/' + uri.replace('ipfs://', '')
+      : uri;
+    const r = await fetch(httpUrl);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+function renderOwnedWorks() {
+  const container = document.getElementById('ownedWorksList');
+  const countEl = document.getElementById('ownedWorksCount');
+  if (!container || !countEl) return;
+  const seen = new Set();
+  const ownedCards = Array.from(document.querySelectorAll('#artworksList .card.owned')).filter(card => {
+    const key = card.dataset.ownerPiece || card.querySelector('.card-title')?.textContent || '';
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  countEl.textContent = String(ownedCards.length);
+  container.replaceChildren();
+
+  if (!ownedCards.length) {
+    const empty = document.createElement('div');
+    empty.className = 'owned-empty';
+    const heading = document.createElement('h3');
+    heading.textContent = "You don't own a collection artwork yet";
+    const copy = document.createElement('p');
+    copy.textContent = 'When a work from this collection enters your connected wallet, it will appear here automatically.';
+    const link = document.createElement('a');
+    link.className = 'btn';
+    link.href = 'https://www.kaysworks.com/auction';
+    link.textContent = 'Explore the auction';
+    empty.append(heading, copy, link);
+    container.appendChild(empty);
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'owned-works-grid';
+  ownedCards.forEach(source => {
+    const card = document.createElement('article');
+    card.className = 'owned-work-card';
+    const sourceImage = source.querySelector('.card-img');
+    if (sourceImage) {
+      const image = document.createElement('img');
+      image.src = sourceImage.currentSrc || sourceImage.src;
+      image.alt = sourceImage.alt || 'Owned artwork';
+      card.appendChild(image);
+    }
+    const body = document.createElement('div');
+    body.className = 'owned-work-body';
+    const title = document.createElement('h3');
+    title.textContent = source.querySelector('.card-title')?.textContent || source.dataset.ownerPiece || 'Owned work';
+    const description = document.createElement('p');
+    description.textContent = source.querySelector('.card-desc')?.textContent || 'Held by your connected wallet.';
+    body.append(title, description);
+    card.appendChild(body);
+    grid.appendChild(card);
+  });
+  container.appendChild(grid);
+}
+
+async function highlightOwnedPieces() {
+  if (!currentHolder || !currentHolder.wallet_address) { renderOwnedWorks(); return; }
+  try {
+    if (currentHolder.chain === 'tezos') {
+      await scanTezosHoldings(currentHolder.wallet_address);
+    } else if (currentHolder.chain === 'ethereum') {
+      await scanEthHoldings(currentHolder.wallet_address);
+    }
+  } finally {
+    renderOwnedWorks();
+  }
+}
+
+// ── Data loading (only what's genuinely dynamic: participants + messages) ──
+
+async function loadParticipants() {
+  const el = document.getElementById('participantsList');
+  const { data, error } = await sb.from('holder_public').select('*').order('created_at', { ascending: true });
+  if (error || !data?.length) { el.innerHTML = '<p class="empty-state">No participants to show yet.</p>'; return; }
+
+  // Group by display_name so a holder with both an ETH and a Tezos wallet
+  // shows once, not twice. Anonymous holders (no display_name) stay separate.
+  const groups = [];
+  const byName = new Map();
+  data.forEach(h => {
+    const key = h.display_name || null;
+    let group = key ? byName.get(key) : null;
+    if (!group) {
+      group = { display_name: h.display_name, tier: h.tier, wallets: [] };
+      if (key) byName.set(key, group);
+      groups.push(group);
+    }
+    group.wallets.push({ address: h.wallet_address, chain: h.chain });
+    if (!group.tier) group.tier = h.tier;
+  });
+
+  const activeAddress = String(currentHolder?.wallet_address || '').toLowerCase();
+  groups.forEach(group => {
+    group.isCurrent = !!activeAddress && group.wallets.some(wallet =>
+      String(wallet.address || '').toLowerCase() === activeAddress
+    );
+  });
+  // Stable sort: move only the connected participant; preserve everyone else's order.
+  groups.sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent));
+
+  el.innerHTML = groups.map(g => `
+    <div class="participant-row${g.isCurrent ? ' is-current' : ''}">
+      <span class="name tier-${g.tier || 'none'}">${g.display_name || 'Anonymous Holder'}${g.isCurrent ? '<span class="participant-you">You</span>' : ''}</span>
+    </div>
+  `).join('');
+}
+
+async function loadMessages() {
+  const el = document.getElementById('msgHistory');
+  if (!currentHolder?.id) return;
+  const { data, error } = await sb.from('messages').select('*').eq('holder_id', currentHolder.id).order('created_at', { ascending: false });
+  if (error || !data?.length) { el.innerHTML = ''; return; }
+  el.innerHTML = data.map(m => `
+    <div class="msg-item">
+      ${m.subject ? `<div class="msg-subject">${m.subject}</div>` : ''}
+      <div>${m.message}</div>
+      <div class="msg-date">${new Date(m.created_at).toLocaleString()}</div>
+      ${m.admin_reply ? `<div class="msg-reply"><div class="msg-reply-label">Reply from Kay</div><div>${m.admin_reply}</div><div class="msg-date">${m.replied_at ? new Date(m.replied_at).toLocaleString() : ''}</div></div>` : ''}
+    </div>
+  `).join('');
+}
+
+document.getElementById('sendMsgBtn').addEventListener('click', async () => {
+  const subject = document.getElementById('msgSubject').value.trim();
+  const message = document.getElementById('msgBody').value.trim();
+  const statusEl = document.getElementById('msgStatus');
+  if (!message) { setStatus(statusEl, 'err', 'Write a message first.'); return; }
+  if (!currentHolder?.id) { setStatus(statusEl, 'err', 'Save your email access first so this message can be securely linked to you.'); return; }
+  const { error } = await sb.from('messages').insert({ holder_id: currentHolder.id, subject, message });
+  if (error) { setStatus(statusEl, 'err', error.message); return; }
+
+  notifySiteForm({
+    form_type: 'commission',
+    name: currentHolder.display_name || shortAddr(currentHolder.wallet_address),
+    email: currentUser?.email || '',
+    commission_type: 'holder-note',
+    message: (subject ? subject + ' — ' : '') + message,
+  });
+
+  setStatus(statusEl, 'ok', 'Sent — thank you.');
+  document.getElementById('msgSubject').value = '';
+  document.getElementById('msgBody').value = '';
+  loadMessages();
+});
+
+// ── Opa auction countdown ──
+(() => {
+  const countdown = document.getElementById('opaCountdown');
+  if (!countdown) return;
+  const startsAt = Date.parse(countdown.dataset.auctionStart); // 20:00 UTC = 21:00 GMT+1
+  const units = countdown.querySelector('.opa-countdown-units');
+  const values = {
+    days: countdown.querySelector('[data-countdown="days"]'),
+    hours: countdown.querySelector('[data-countdown="hours"]'),
+    minutes: countdown.querySelector('[data-countdown="minutes"]'),
+    seconds: countdown.querySelector('[data-countdown="seconds"]'),
+  };
+  const pad = value => String(value).padStart(2, '0');
+  let timer;
+  function updateCountdown() {
+    const remaining = startsAt - Date.now();
+    if (remaining <= 0) {
+      clearInterval(timer);
+      units.innerHTML = '<a class="opa-countdown-live" href="https://www.kaysworks.com/auction">The Opa Collection auction is now live →</a>';
+      return;
+    }
+    const totalSeconds = Math.floor(remaining / 1000);
+    values.days.textContent = pad(Math.floor(totalSeconds / 86400));
+    values.hours.textContent = pad(Math.floor(totalSeconds % 86400 / 3600));
+    values.minutes.textContent = pad(Math.floor(totalSeconds % 3600 / 60));
+    values.seconds.textContent = pad(totalSeconds % 60);
+  }
+  updateCountdown();
+  timer = setInterval(updateCountdown, 1000);
+})();
+
+// ── Opa artwork fullscreen viewer ──
+const artLightbox = document.getElementById('artLightbox');
+const artLightboxImage = document.getElementById('artLightboxImage');
+const artLightboxClose = document.getElementById('artLightboxClose');
+
+function openArtLightbox(image) {
+  artLightboxImage.src = image.currentSrc || image.src;
+  artLightboxImage.alt = image.alt.replace(/\s*[—-]\s*open fullscreen$/i, '');
+  artLightbox.classList.toggle('scrollable', !!image.closest('#view-merch'));
+  artLightbox.classList.add('show');
+  document.body.style.overflow = 'hidden';
+  artLightboxClose.focus();
+}
+
+function closeArtLightbox() {
+  artLightbox.classList.remove('show');
+  artLightbox.classList.remove('scrollable');
+  artLightboxImage.removeAttribute('src');
+  document.body.style.overflow = '';
+}
+
+document.querySelectorAll('#artworksList .card-img').forEach(image => {
+  image.tabIndex = 0;
+  image.setAttribute('role', 'button');
+  image.setAttribute('aria-label', 'Open ' + image.alt.replace(/\s*[—-]\s*open fullscreen$/i, '') + ' fullscreen');
+  image.addEventListener('click', () => openArtLightbox(image));
+  image.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openArtLightbox(image);
+    }
+  });
+});
+document.querySelectorAll('#view-merch .merch-img').forEach(image => {
+  image.tabIndex = 0;
+  image.setAttribute('role', 'button');
+  image.setAttribute('aria-label', 'Open ' + image.alt + ' fullscreen');
+  image.addEventListener('click', () => openArtLightbox(image));
+  image.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openArtLightbox(image);
+    }
+  });
+});
+document.querySelectorAll('.viewer-thumb').forEach((thumb, thumbIndex) => {
+  const image = thumb.querySelector('img');
+  if (!image) return;
+  thumb.setAttribute('aria-label', 'View ' + image.alt);
+
+  thumb.addEventListener('click', () => {
+    const viewer = thumb.closest('.sculpture-viewer');
+    if (!viewer) { openArtLightbox(image); return; }
+
+    // Switch to Photos mode
+    viewer.querySelectorAll('.viewer-mode-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === 'photos');
+    });
+    viewer.querySelectorAll('.viewer-stage').forEach(stage => {
+      stage.classList.toggle('active', stage.dataset.stage === 'photos');
+    });
+
+    // Jump the slideshow to the matching image
+    const slideshow = viewer.querySelector('[data-slideshow]');
+    if (!slideshow) return;
+    const thumbSrc = image.src;
+    const slides = Array.from(slideshow.querySelectorAll('.slideshow-img'));
+    const dots = Array.from(slideshow.querySelectorAll('.slideshow-dot'));
+    const matchIndex = slides.findIndex(s => s.src === thumbSrc);
+    const targetIndex = matchIndex >= 0 ? matchIndex : 0;
+
+    slides.forEach((s, i) => s.classList.toggle('active', i === targetIndex));
+    dots.forEach((d, i) => d.classList.toggle('active', i === targetIndex));
+
+    // Update the slideshow's internal counter so prev/next work from this position
+    if (slideshow._goTo) slideshow._goTo(targetIndex);
+  });
+});
+
+artLightboxClose.addEventListener('click', closeArtLightbox);
+artLightbox.addEventListener('click', event => {
+  if (event.target === artLightbox) closeArtLightbox();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && artLightbox.classList.contains('show')) closeArtLightbox();
+});
+</script>
+</body>
+</html>
