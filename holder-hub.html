@@ -2197,7 +2197,13 @@ els.emailUpdatesOptIn?.addEventListener('change', async () => {
       body: JSON.stringify({ enabled: checked }),
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || 'Could not save this preference.');
+    if (!response.ok) {
+      const message = String(result.error || '');
+      if (/unknown holder action/i.test(message)) {
+        throw new Error('The update-email preference API has not been deployed yet. Please try again after the latest holder.js is live.');
+      }
+      throw new Error(message || 'Could not save this preference.');
+    }
     currentHolder.email_updates_opt_in = checked;
     (currentHolder.linked_wallets || []).forEach(row => { row.email_updates_opt_in = checked; });
     els.emailUpdatesLabel.textContent = checked ? 'On' : 'Off';
