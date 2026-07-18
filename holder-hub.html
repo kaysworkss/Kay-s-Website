@@ -174,12 +174,11 @@
   .merch-head h2 { font-size:clamp(1.7rem,3.4vw,2.4rem); margin:0.5rem 0 0.7rem; }
   .merch-lead { color:var(--text-muted); line-height:1.65; }
   .merch-grid {
-    display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:0.9rem;
-    align-items:start; margin-bottom:1.6rem;
+    columns:3 280px; column-gap:0.9rem; margin-bottom:1.6rem;
   }
   .merch-card {
     border:1px solid var(--line); border-radius:8px; background:rgba(30,20,16,0.34);
-    overflow:hidden; text-align:center;
+    overflow:hidden; text-align:center; break-inside:avoid; margin:0 0 0.9rem;
   }
   .merch-img { width:100%; height:auto; object-fit:contain; display:block; background:rgba(0,0,0,0.2); cursor:zoom-in; }
   .merch-img:hover { filter:brightness(1.06); }
@@ -207,10 +206,10 @@
   }
   .merch-cta-note { margin-top:0.75rem; text-align:center; color:var(--text-muted); font-size:0.95rem; }
   @media (max-width:900px) {
-    .merch-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .merch-grid { columns:2 260px; }
   }
   @media (max-width:700px) {
-    .merch-grid { grid-template-columns:1fr; }
+    .merch-grid { columns:1; }
   }
   .wallet-email-panel {
     display:none; position:fixed; z-index:110; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -920,7 +919,7 @@
       </div>
       <div class="merch-entitlement" id="merchEntitlement">
         <div class="merch-entitlement-title">Holder merch entitlement</div>
-        <p id="merchEntitlementText">Bronze token holders qualify for one free tote per Bronze token held and up to 25% off available merch. Wooden token holders qualify for up to 15% off available merch.</p>
+        <p id="merchEntitlementText">Your merch entitlement will appear here after holder verification.</p>
       </div>
       <div class="merch-grid">
         <figure class="merch-card">
@@ -2161,16 +2160,33 @@ async function enterDashboard() {
 function renderMerchEntitlement() {
   const el = document.getElementById('merchEntitlementText');
   if (!el || !currentHolder) return;
-  const tier = String(currentHolder.tier || currentHolder.token_tier || '').toLowerCase();
-  const balance = Math.max(1, Number(currentHolder.token_balance || currentHolder.balance || 1) || 1);
+  const tier = String(
+    currentHolder.tier ||
+    currentHolder.token_tier ||
+    currentHolder.tokenTier ||
+    currentHolder.holder_tier ||
+    currentHolder.access_tier ||
+    currentHolder.token_type ||
+    ''
+  ).toLowerCase();
+  const explicitBronzeBalance = Number(
+    currentHolder.bronze_balance ??
+    currentHolder.bronzeBalance ??
+    currentHolder.bronze_count ??
+    currentHolder.bronzeCount ??
+    NaN
+  );
+  const balance = Math.max(1, Number.isFinite(explicitBronzeBalance)
+    ? explicitBronzeBalance
+    : Number(currentHolder.token_balance || currentHolder.balance || 1) || 1);
   const toteText = balance === 1 ? '1 tote bag available to redeem' : `${balance} tote bags available to redeem`;
 
   if (tier.includes('bronze')) {
-    el.innerHTML = `<strong>Bronze holder benefit:</strong> ${toteText}. Each Bronze token qualifies for one free tote bag, plus up to 25% off available merch such as totes, hoodies, and T-shirts. Claiming is coming soon.`;
+    el.innerHTML = `<strong>Bronze holder benefit:</strong> ${toteText}. Each Bronze token qualifies for one free tote bag, plus up to 25% off available merch such as totes, hoodies, and T-shirts.`;
   } else if (tier.includes('wood')) {
-    el.innerHTML = '<strong>Wooden holder benefit:</strong> you qualify for up to 15% off available merch such as totes, hoodies, and T-shirts. Claiming is coming soon.';
+    el.innerHTML = '<strong>Wooden holder benefit:</strong> you qualify for up to 15% off available merch such as totes, hoodies, and T-shirts.';
   } else {
-    el.innerHTML = 'Bronze token holders qualify for one free tote per Bronze token held and up to 25% off available merch. Wooden token holders qualify for up to 15% off available merch. Claiming is coming soon.';
+    el.innerHTML = '<strong>Holder benefit:</strong> your token is verified. Your exact merch tier could not be identified here, so I will confirm the correct merch entitlement before claims open.';
   }
 }
 
