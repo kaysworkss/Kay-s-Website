@@ -13,6 +13,9 @@
 const { getSupabase, cors, handleOptions } = require('./_lib');
 const crypto = require('crypto');
 
+const HOLDER_UPDATE_EMAIL_FROM = process.env.HOLDER_AUTH_FROM_EMAIL || "Kay's Works <auction@mail.kaysworks.com>";
+const HOLDER_HUB_URL = (process.env.HOLDER_HUB_URL || 'https://www.kaysworks.com/holder-hub').replace(/\/$/, '');
+
 // Auth helpers
 // Signed token: HMAC-SHA256(randomId, ADMIN_TOKEN)
 // Stateless - no storage needed. Any request can be verified by re-deriving the HMAC.
@@ -38,6 +41,50 @@ function checkToken(req) {
       Buffer.from(expected, 'hex')
     );
   } catch { return false; }
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[char]);
+}
+
+async function sendHolderUpdateEmail({ email, name, subject, preview }) {
+  if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is not configured.');
+  const safeName = escapeHtml(name || 'holder');
+  const safePreview = escapeHtml(preview || 'A new Holder Hub update is ready for you.');
+  const safeSubject = String(subject || 'New Holder Hub update').slice(0, 120);
+  const html = `<!doctype html><html><body style="margin:0;background:#1e1410;padding:28px 12px;color:#392416">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+    <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#ede0c8;border-radius:22px;overflow:hidden">
+      <tr><td style="background:#2a1508;padding:34px 30px;text-align:center">
+        <div style="font-family:Georgia,serif;color:#e8c45a;font-size:12px;letter-spacing:4px;text-transform:uppercase">Kay's Works</div>
+        <div style="font-family:Georgia,serif;color:#f5ead4;font-size:30px;line-height:1.15;margin-top:16px">Holder Hub Update</div>
+      </td></tr>
+      <tr><td style="height:5px;background:linear-gradient(90deg,#b8821e,#e8c45a 35%,#f5d878 55%,#b8821e)">&nbsp;</td></tr>
+      <tr><td style="padding:34px 34px 32px;text-align:center">
+        <p style="font-family:Georgia,serif;font-size:19px;line-height:1.5;color:#4a2a18;margin:0 0 12px">Dear ${safeName},</p>
+        <p style="font-family:Arial,sans-serif;font-size:14px;line-height:1.75;color:#74543d;margin:0 0 26px">${safePreview}</p>
+        <a href="${HOLDER_HUB_URL}" style="display:inline-block;background:linear-gradient(90deg,#b8821e,#e8c45a 35%,#f5d878 55%,#d4a030 80%,#b8821e);color:#2d1508;text-decoration:none;font-family:Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:14px 28px;border-radius:999px">Open the Holder Hub</a>
+        <p style="font-family:Arial,sans-serif;font-size:11px;line-height:1.6;color:#93745b;margin:24px 0 0">You are receiving this because you opted in to Holder Hub update emails.</p>
+      </td></tr>
+    </table>
+  </td></tr></table></body></html>`;
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: HOLDER_UPDATE_EMAIL_FROM,
+      to: [email],
+      subject: safeSubject,
+      html,
+      text: `Dear ${name || 'holder'},\n\n${preview || 'A new Holder Hub update is ready for you.'}\n\nOpen the Holder Hub:\n${HOLDER_HUB_URL}\n\nYou are receiving this because you opted in to Holder Hub update emails.`
+    })
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error('Email provider returned ' + response.status + (detail ? ': ' + detail : ''));
+  }
 }
 
 // POST /api/admin?action=login 
@@ -594,7 +641,7 @@ async function handleGetHolderParticipants(req, res, supabase) {
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
   const { data, error } = await supabase
     .from('holders')
-    .select('id, wallet_address, chain, display_name, tier, is_public, token_balance, last_verified_at, created_at')
+    .select('id, wallet_address, chain, display_name, tier, is_public, email_updates_opt_in, token_balance, last_verified_at, created_at')
     .order('created_at', { ascending: true });
   if (error) return json(500, { error: error.message });
   return json(200, data || []);
@@ -609,10 +656,56 @@ async function handleHolderParticipant(req, res, supabase) {
   const patch = {};
   if (body.display_name !== undefined) patch.display_name = body.display_name ? String(body.display_name).slice(0, 100) : null;
   if (body.is_public     !== undefined) patch.is_public     = Boolean(body.is_public);
+  if (body.email_updates_opt_in !== undefined) patch.email_updates_opt_in = Boolean(body.email_updates_opt_in);
   if (body.tier          !== undefined) patch.tier          = ['gold', 'bronze', 'wood'].includes(body.tier) ? body.tier : null;
   const { error } = await supabase.from('holders').update(patch).eq('id', id);
   if (error) return json(500, { error: error.message });
   return json(200, { ok: true });
+}
+
+// holder-update-notify (POST email alert to opted-in holders)
+async function handleHolderUpdateNotify(req, res, supabase) {
+  if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
+  const subject = String(req.body?.subject || 'New Holder Hub update').trim().slice(0, 120);
+  const preview = String(req.body?.preview || 'A new Holder Hub update is ready for you.').trim().slice(0, 700);
+  if (!subject) return json(422, { error: 'Subject is required.' });
+  if (!preview) return json(422, { error: 'Message is required.' });
+
+  const { data: holders, error } = await supabase
+    .from('holders')
+    .select('auth_user_id, display_name, wallet_address, email_updates_opt_in')
+    .eq('email_updates_opt_in', true)
+    .not('auth_user_id', 'is', null);
+  if (error) return json(500, { error: error.message });
+
+  const byUser = new Map();
+  (holders || []).forEach(holder => {
+    if (!holder.auth_user_id || byUser.has(holder.auth_user_id)) return;
+    byUser.set(holder.auth_user_id, holder);
+  });
+
+  let sent = 0;
+  const failures = [];
+  for (const [userId, holder] of byUser.entries()) {
+    try {
+      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
+      if (userError || !userData?.user?.email) {
+        failures.push({ userId, error: userError?.message || 'No email on auth user.' });
+        continue;
+      }
+      await sendHolderUpdateEmail({
+        email: userData.user.email,
+        name: holder.display_name || 'holder',
+        subject,
+        preview,
+      });
+      sent += 1;
+    } catch (err) {
+      failures.push({ userId, error: err.message || 'Email failed.' });
+    }
+  }
+
+  return json(200, { ok: true, sent, attempted: byUser.size, failed: failures.length, failures: failures.slice(0, 10) });
 }
 
 // holder-content (GET/POST editable Holder Hub copy)
@@ -682,6 +775,7 @@ module.exports = async (req, res) => {
     case 'holder-reservation':  return handleHolderReservation(req, res, supabase);
     case 'holder-participants': return handleGetHolderParticipants(req, res, supabase);
     case 'holder-participant':  return handleHolderParticipant(req, res, supabase);
+    case 'holder-update-notify': return handleHolderUpdateNotify(req, res, supabase);
     case 'holder-content':      return handleHolderContent(req, res, supabase);
     default:
       return res.status(404).json({ error: `Unknown admin action: ${action}` });
