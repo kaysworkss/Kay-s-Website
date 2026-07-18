@@ -2129,17 +2129,6 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 }
-.show-more-btn {
-  display: block; margin: 1.5rem auto 0;
-  font-family: 'Cinzel', serif; font-size: 0.56rem;
-  letter-spacing: 0.18em; text-transform: uppercase;
-  padding: 0.75rem 2.2rem; background: transparent;
-  border: 1px solid var(--border); border-radius: 10px;
-  color: var(--text-muted); cursor: pointer;
-  transition: border-color 0.2s, color 0.2s;
-}
-.show-more-btn:hover { border-color: var(--clay); color: var(--clay); }
-
 /* Responsive */
 /* Country field: search+datalist on desktop, native select on mobile */
 .ck-country-select { display: block; }
@@ -4703,45 +4692,17 @@ function renderProductViews(activeFilter = 'all') {
   // Reflect any stock already consumed by the saved cart on first paint.
   SHOP_CONFIG.products.forEach(p => syncCardStock(p.id, selectedVariants[p.id]));
 
-  // Paginate: show first batch, hide the rest with a "Show more" button.
-  applyShowMore();
+  revealAllShopCards();
 }
 
-/* Show More pagination */
-const PRODUCTS_PER_BATCH = 8;
-function applyShowMore() {
+function revealAllShopCards() {
   document.querySelectorAll('#shopGrid .show-more-btn').forEach(btn => btn.remove());
   document.querySelectorAll('.shop-grid').forEach(grid => {
-    const cards = Array.from(grid.children);
-    if (cards.length <= PRODUCTS_PER_BATCH) {
-      cards.forEach(c => c.style.display = '');
-      if (grid.classList.contains('masonry-grid')) {
-        watchMasonryImages(grid);
-        scheduleMasonryLayout();
-      }
-      return;
-    }
-    let shown = PRODUCTS_PER_BATCH;
-    cards.forEach((c, i) => { c.style.display = i < shown ? '' : 'none'; });
+    Array.from(grid.children).forEach(card => { card.style.display = ''; });
     if (grid.classList.contains('masonry-grid')) {
       watchMasonryImages(grid);
       scheduleMasonryLayout();
     }
-    const btn = document.createElement('button');
-    btn.className = 'show-more-btn';
-    btn.textContent = 'Show more (' + (cards.length - shown) + ' remaining)';
-    btn.addEventListener('click', () => {
-      const next = shown + PRODUCTS_PER_BATCH;
-      cards.forEach((c, i) => { if (i < next) c.style.display = ''; });
-      shown = next;
-      if (shown >= cards.length) { btn.remove(); }
-      else { btn.textContent = 'Show more (' + (cards.length - shown) + ' remaining)'; }
-      if (grid.classList.contains('masonry-grid')) {
-        watchMasonryImages(grid);
-        scheduleMasonryLayout();
-      }
-    });
-    grid.parentElement.insertBefore(btn, grid.nextSibling);
   });
 }
 
