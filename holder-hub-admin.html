@@ -138,6 +138,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="messages">Messages</button>
       <button class="tab-btn" data-tab="reservations">Reservations</button>
+      <button class="tab-btn" data-tab="notifications">Notifications</button>
       <button class="tab-btn" data-tab="participants">Participants</button>
     </div>
 
@@ -149,6 +150,24 @@
     <!-- RESERVATIONS -->
     <div class="panel-view" id="view-reservations">
       <div id="res-list"></div>
+    </div>
+
+    <!-- NOTIFICATIONS -->
+    <div class="panel-view" id="view-notifications">
+      <div class="panel">
+        <div class="panel-title">Notify holders</div>
+        <p style="color:var(--text-muted);line-height:1.6;margin-bottom:1rem;">Send a short email to holders who opted in, asking them to check the Holder Hub for project updates.</p>
+        <div class="field">
+          <label for="notifySubject">Subject</label>
+          <input id="notifySubject" value="New Holder Hub update" />
+        </div>
+        <div class="field">
+          <label for="notifyPreview">Message</label>
+          <textarea id="notifyPreview">A new Holder Hub update is ready for you. Please sign in when you have a moment to read the latest project note.</textarea>
+        </div>
+        <button class="btn" id="sendUpdateNoticeBtn" type="button">Notify opted-in holders</button>
+        <div class="status" id="updateNoticeStatus"></div>
+      </div>
     </div>
 
     <!-- PARTICIPANTS -->
@@ -349,11 +368,11 @@ async function loadParticipants() {
   const tierOption = (h, val, label) => `<option value="${val}" ${h.tier === val ? 'selected' : ''}>${label}</option>`;
   listEl.innerHTML = rows.length ? rows.map(h => `
     <div class="item-card">
-      <div class="item-sub">${h.wallet_address} · ${esc(h.chain)} · balance ${h.token_balance} · joined ${new Date(h.created_at).toLocaleDateString()}</div>
+      <div class="item-sub">${h.wallet_address} - ${esc(h.chain)} - balance ${h.token_balance} - joined ${new Date(h.created_at).toLocaleDateString()} - updates ${h.email_updates_opt_in ? 'on' : 'off'}</div>
       <div class="field" style="margin-top:0.6rem;"><label>Display name</label><input value="${esc(h.display_name || '')}" id="pname-${h.id}" /></div>
       <div class="field"><label>Tier</label>
         <select id="ptier-${h.id}">
-          <option value="" ${!h.tier ? 'selected' : ''}>— none —</option>
+          <option value="" ${!h.tier ? 'selected' : ''}>- none -</option>
           ${tierOption(h, 'gold', 'Gold')}
           ${tierOption(h, 'bronze', 'Bronze')}
           ${tierOption(h, 'wood', 'Wood')}
@@ -363,6 +382,10 @@ async function loadParticipants() {
         <input type="checkbox" id="ppub-${h.id}" ${h.is_public ? 'checked' : ''} />
         <label for="ppub-${h.id}">Show on public Participants list</label>
       </div>
+      <div class="checkbox-row" style="margin-bottom:0.6rem;">
+        <input type="checkbox" id="pupdates-${h.id}" ${h.email_updates_opt_in ? 'checked' : ''} />
+        <label for="pupdates-${h.id}">Opted in to Holder Hub update emails</label>
+      </div>
       <button class="btn ghost small" onclick="saveParticipant('${h.id}')">Save</button>
     </div>
   `).join('') : '<p class="empty-state">No holders yet.</p>';
@@ -370,11 +393,30 @@ async function loadParticipants() {
 async function saveParticipant(id) {
   const display_name = document.getElementById('pname-' + id).value.trim();
   const is_public = document.getElementById('ppub-' + id).checked;
+  const email_updates_opt_in = document.getElementById('pupdates-' + id).checked;
   const tier = document.getElementById('ptier-' + id).value || null;
-  await adminFetch('holder-participant', { method: 'PATCH', id, body: { display_name, is_public, tier } });
+  await adminFetch('holder-participant', { method: 'PATCH', id, body: { display_name, is_public, tier, email_updates_opt_in } });
   loadParticipants();
 }
 
+document.getElementById('sendUpdateNoticeBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('sendUpdateNoticeBtn');
+  const status = document.getElementById('updateNoticeStatus');
+  const subject = document.getElementById('notifySubject').value.trim();
+  const preview = document.getElementById('notifyPreview').value.trim();
+  if (!subject || !preview) { setStatus(status, 'err', 'Write a subject and message first.'); return; }
+  btn.disabled = true;
+  setStatus(status, '', 'Sending update notice...');
+  try {
+    const r = await adminFetch('holder-update-notify', { method: 'POST', body: { subject, preview } });
+    if (!r.ok) { setStatus(status, 'err', r.error); return; }
+    const sent = Number(r.sent || 0);
+    const failed = Number(r.failed || 0);
+    setStatus(status, failed ? '' : 'ok', `Sent ${sent} update email${sent === 1 ? '' : 's'} to opted-in holders.${failed ? ' ' + failed + ' failed.' : ''}`);
+  } finally {
+    btn.disabled = false;
+  }
+});
 // ══════════ FUTURE PLANS ══════════
 let futurePlanItems = [];
 
