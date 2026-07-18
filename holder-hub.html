@@ -165,9 +165,10 @@
   /* ── DASHBOARD ── */
   #dashboard { display:none; }
   #dashboard.show { display:block; }
-  .hub-head { margin:0 auto 2.4rem; text-align:center; }
-  .hub-head h1 { font-size:clamp(2.2rem,4.4vw,3.2rem); margin:0.5rem 0 0.6rem; }
-  .hub-head .lead { color:var(--text-muted); max-width:62ch; line-height:1.7; margin-left:auto; margin-right:auto; }
+  .hub-head { display:none; margin:0 auto 2.8rem; text-align:center; }
+  #dashboard.first-tab-active .hub-head { display:block; }
+  .hub-head h1 { font-size:clamp(3rem,6.2vw,5.25rem); line-height:1.02; margin:0.5rem 0 0.8rem; }
+  .hub-head .lead { color:var(--text-muted); max-width:68ch; line-height:1.72; font-size:1.14rem; margin-left:auto; margin-right:auto; }
   .asset-summary { margin-top:0.8rem; color:var(--gold); font-size:0.94rem; min-height:1.4em; }
   .merch-section { margin-bottom:2.4rem; }
   .merch-head { text-align:center; max-width:64ch; margin:0 auto 1.6rem; }
@@ -250,13 +251,30 @@
     .email-updates-panel { align-items:flex-start; flex-direction:column; }
   }
 
-  .tabs { display:flex; flex-wrap:wrap; justify-content:center; gap:0.5rem; border-bottom:1px solid var(--line); margin-bottom:2rem; padding-bottom:0.9rem; }
-  .tab-btn {
-    cursor:pointer; background:transparent; border:1px solid var(--line); border-radius:20px;
-    padding:0.55rem 1.05rem; font-family:'Cinzel',serif; letter-spacing:0.12em; text-transform:uppercase;
-    font-size:0.62rem; color:var(--text-muted);
+  .hub-tab-toggle {
+    display:none; width:100%; align-items:center; justify-content:space-between; gap:0.8rem;
+    border:1px solid rgba(201,153,58,0.42); border-radius:6px; padding:0.75rem 0.9rem;
+    background:rgba(232,213,176,0.06); color:var(--sand); cursor:pointer;
+    font-family:'Cinzel',serif; letter-spacing:0.16em; text-transform:uppercase; font-size:0.62rem;
   }
-  .tab-btn.active { color:#fdf0d0; border-color:var(--gold); background:rgba(201,153,58,0.16); }
+  .hub-tab-toggle-icon { font-size:1.1rem; line-height:1; color:var(--gold); }
+  .tabs {
+    display:flex; flex-wrap:nowrap; justify-content:center; gap:0;
+    border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+    margin:0 auto 2.4rem; padding:0; max-width:1180px;
+  }
+  .tab-btn {
+    position:relative; cursor:pointer; background:transparent; border:0; border-radius:0;
+    padding:0.92rem 0.95rem; font-family:'Cinzel',serif; letter-spacing:0.12em; text-transform:uppercase;
+    font-size:0.58rem; color:var(--text-muted); white-space:nowrap;
+  }
+  .tab-btn::after {
+    content:''; position:absolute; left:0.9rem; right:0.9rem; bottom:-1px; height:2px;
+    background:var(--gold); transform:scaleX(0); transform-origin:center; transition:transform 0.18s ease;
+  }
+  .tab-btn:hover,
+  .tab-btn.active { color:#fdf0d0; }
+  .tab-btn.active::after { transform:scaleX(1); }
 
   .panel-view { display:none; }
   .panel-view.show { display:block; }
@@ -334,22 +352,40 @@
   .sold-hall-link.show { display:inline-flex; }
   .art-lightbox {
     position: fixed; inset: 0; z-index: 120; display: none;
-    align-items: center; justify-content: center; padding: 2rem;
+    align-items: center; justify-content: center; padding: clamp(1rem,3vw,2.4rem);
     background: rgba(8,8,10,0.94); backdrop-filter: blur(10px);
+    overflow:hidden;
   }
   .art-lightbox.show { display: flex; }
-  .art-lightbox.scrollable { align-items:flex-start; overflow:auto; }
+  .art-lightbox.scrollable { align-items:center; overflow:hidden; }
   .art-lightbox img {
-    display: block; max-width: 96vw; max-height: 92vh;
+    display: block; max-width: min(96vw, 1500px); max-height: calc(100vh - 4.5rem);
     width: auto; height: auto; object-fit: contain;
     box-shadow: 0 24px 90px rgba(0,0,0,0.55);
   }
-  .art-lightbox.scrollable img { max-height:none; margin:auto 0; }
+  .art-lightbox.scrollable img { max-width: calc(100vw - 2rem); max-height: calc(100vh - 5.25rem); margin:auto; }
   .art-lightbox-close {
     position: fixed; top: 16px; right: 18px; z-index: 1;
     width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
     border: 1px solid rgba(255,255,255,0.35); background: rgba(20,20,24,0.72);
     color: white; font-size: 1.5rem; line-height: 1;
+  }
+  .art-lightbox-nav {
+    position:fixed; top:50%; transform:translateY(-50%); z-index:1;
+    width:46px; height:58px; border-radius:999px; display:none; place-items:center;
+    border:1px solid rgba(255,255,255,0.3); background:rgba(20,20,24,0.68);
+    color:#fff; font-size:2rem; line-height:1; cursor:pointer;
+  }
+  .art-lightbox.has-nav .art-lightbox-nav { display:grid; }
+  .art-lightbox-prev { left:18px; }
+  .art-lightbox-next { right:18px; }
+  @media (max-width:620px) {
+    .art-lightbox { padding:0.75rem; }
+    .art-lightbox img,
+    .art-lightbox.scrollable img { max-width:calc(100vw - 1.5rem); max-height:calc(100vh - 5rem); }
+    .art-lightbox-nav { width:40px; height:48px; font-size:1.6rem; }
+    .art-lightbox-prev { left:8px; }
+    .art-lightbox-next { right:8px; }
   }
   .sold-sticker {
     position: absolute; top: 12px; right: 12px; width: 58px; height: 58px; z-index: 2;
@@ -444,32 +480,32 @@
   .auction-notes strong { display:block; font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold); margin-bottom:0.45rem; }
 
   .holder-update-card {
-    max-width:980px; margin:0 auto 1.3rem;
+    max-width:880px; margin:0 auto 1.3rem;
     border:1px solid var(--line); border-radius:8px;
     background:linear-gradient(145deg,rgba(44,27,20,0.72),rgba(30,20,16,0.34));
     padding:clamp(1.45rem,3.2vw,2.65rem);
     box-shadow:0 18px 55px rgba(0,0,0,0.16);
   }
   .holder-update-meta {
-    display:flex; flex-wrap:wrap; align-items:center; gap:0.55rem 0.8rem; margin-bottom:0.8rem;
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:0.55rem 0.8rem; margin-bottom:0.8rem;
     color:var(--clay); font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.16em; text-transform:uppercase;
   }
   .holder-update-meta span {
     border:1px solid rgba(223,184,92,0.32); border-radius:999px; padding:0.24rem 0.55rem;
     color:var(--gold); background:rgba(223,184,92,0.07);
   }
-  .holder-update-card h3 { font-size:clamp(1.9rem,3.2vw,2.55rem); line-height:1.04; margin-bottom:1rem; max-width:20ch; }
-  .holder-update-card p { color:var(--text-muted); line-height:1.74; margin-bottom:1.05rem; max-width:78ch; }
+  .holder-update-card h3 { font-size:clamp(2.1rem,3.4vw,2.8rem); line-height:1.04; margin:0 auto 1.25rem; text-align:center; max-width:20ch; }
+  .holder-update-card p { color:var(--text-muted); line-height:1.74; margin:0 auto 1.05rem; max-width:76ch; }
   .holder-update-card p:last-child { margin-bottom:0; }
   .holder-update-note {
-    margin:1.15rem 0; padding:1rem 1.1rem; border-left:2px solid var(--gold); border-radius:0 6px 6px 0;
+    max-width:76ch; margin:1.15rem auto; padding:1rem 1.1rem; border-left:2px solid var(--gold); border-radius:0 6px 6px 0;
     background:rgba(201,153,58,0.08); color:var(--sand); line-height:1.65;
   }
   .holder-update-card h4 {
-    margin:1.35rem 0 0.55rem; color:var(--gold); font-family:'Cinzel',serif;
+    max-width:76ch; margin:1.35rem auto 0.55rem; color:var(--gold); font-family:'Cinzel',serif;
     font-size:0.72rem; letter-spacing:0.16em; text-transform:uppercase;
   }
-  .holder-update-list { list-style:disc; padding-left:1.25rem; margin:0.9rem 0 1.15rem; color:var(--text-muted); max-width:78ch; }
+  .holder-update-list { list-style:disc; padding-left:1.25rem; margin:0.9rem auto 1.15rem; color:var(--text-muted); max-width:76ch; }
   .holder-update-list li { margin-bottom:0.72rem; line-height:1.72; padding-left:0.1rem; }
   .holder-update-list strong { color:var(--sand); }
   .holder-update-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0.8rem; margin:1.2rem 0; }
@@ -584,6 +620,8 @@
   .drop-intro h2 { font-size: clamp(1.8rem,3.6vw,2.6rem); margin-bottom: 0.7rem; }
   .drop-intro p { color: var(--text-muted); line-height: 1.75; max-width: 68ch; margin-left:auto; margin-right:auto; }
   .section-intro { max-width:76ch; margin:0 0 2.4rem; }
+  #view-updates > .section-intro { margin-left:auto; margin-right:auto; text-align:center; }
+  #view-updates > .section-intro p { margin-left:auto; margin-right:auto; }
   .section-intro .eyebrow { display:block; margin-bottom:0.65rem; }
   .section-intro h2 {
     font-size:clamp(2rem,3.4vw,3rem); line-height:1.02; letter-spacing:-0.015em;
@@ -809,18 +847,21 @@
     .hub-head .lead { display: none; } /* nice on desktop, just delays content on mobile */
     .asset-summary { font-size: 0.82rem; margin-top: 0.3rem; }
 
-    /* Tabs: one scrollable row instead of wrapping into a 3-row block */
+    /* Hub navigation: compact menu on mobile */
+    .hub-tab-toggle { display:flex; margin:0 0 0.7rem; }
     .tabs {
-      flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
-      scrollbar-width: none; justify-content: flex-start;
-      margin: 0 -1rem 1.2rem; padding: 0 1rem 0.7rem;
-      mask-image: linear-gradient(90deg, transparent 0, #000 1.2rem, #000 calc(100% - 1.2rem), transparent 100%);
+      display:none; flex-direction:column; align-items:stretch; justify-content:flex-start;
+      gap:0; margin:0 0 1.25rem; padding:0.35rem 0;
+      border:1px solid var(--line); border-radius:8px; background:rgba(30,20,16,0.42);
+      max-width:none;
     }
-    .tabs::-webkit-scrollbar { display: none; }
+    .tabs.open { display:flex; }
     .tab-btn {
-      flex: 0 0 auto; white-space: nowrap; min-height: 32px;
-      padding: 0.4rem 0.65rem; font-size: 0.58rem;
+      width:100%; text-align:left; min-height:42px;
+      padding:0.72rem 0.95rem; font-size:0.6rem;
     }
+    .tab-btn::after { left:0; right:auto; top:0.55rem; bottom:0.55rem; width:2px; height:auto; transform:scaleY(0); }
+    .tab-btn.active::after { transform:scaleY(1); }
 
     .drop-intro { margin-bottom: 1.2rem; }
     .drop-intro h2 { font-size: 1.5rem; margin-bottom: 0.4rem; }
@@ -896,7 +937,7 @@
   </section>
 
   <!-- ══════════ DASHBOARD ══════════ -->
-  <section id="dashboard">
+  <section id="dashboard" class="first-tab-active">
     <div class="hub-head">
       <span class="eyebrow">Holder Hub</span>
       <h1>Welcome back, <em id="holderGreeting">holder</em></h1>
@@ -931,7 +972,8 @@
       <div class="status" id="walletEmailStatus"></div>
     </div>
 
-    <div class="tabs">
+    <button class="hub-tab-toggle" id="hubTabToggle" type="button" aria-expanded="false" aria-controls="hubTabs"><span id="hubTabCurrent">Opa Collection</span><span class="hub-tab-toggle-icon">☰</span></button>
+    <div class="tabs" id="hubTabs">
       <button class="tab-btn active" data-tab="opa">Opa Collection</button>
       <button class="tab-btn" data-tab="updates">Updates</button>
       <button class="tab-btn" data-tab="merch">Merch</button>
@@ -1669,7 +1711,9 @@
 <!-- Fullscreen artwork viewer -->
 <div class="art-lightbox" id="artLightbox" role="dialog" aria-modal="true" aria-label="Fullscreen artwork">
   <button class="art-lightbox-close" id="artLightboxClose" type="button" aria-label="Close fullscreen image">×</button>
+  <button class="art-lightbox-nav art-lightbox-prev" id="artLightboxPrev" type="button" aria-label="Previous merch mockup">‹</button>
   <img id="artLightboxImage" src="" alt="" />
+  <button class="art-lightbox-nav art-lightbox-next" id="artLightboxNext" type="button" aria-label="Next merch mockup">›</button>
 </div>
 
 <!-- Tezos wallet choice modal -->
@@ -2447,12 +2491,25 @@ els.signoutBtn.addEventListener('click', async () => {
 });
 
 // ── Tabs ──
+const hubTabs = document.getElementById('hubTabs');
+const hubTabToggle = document.getElementById('hubTabToggle');
+const hubTabCurrent = document.getElementById('hubTabCurrent');
+
+hubTabToggle?.addEventListener('click', () => {
+  const open = hubTabs.classList.toggle('open');
+  hubTabToggle.setAttribute('aria-expanded', String(open));
+});
+
 document.querySelectorAll('.tabs .tab-btn[data-tab]').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tabs .tab-btn[data-tab]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     document.querySelectorAll('.panel-view').forEach(v => v.classList.remove('show'));
     document.getElementById('view-' + btn.dataset.tab).classList.add('show');
+    els.dashboard.classList.toggle('first-tab-active', btn.dataset.tab === 'opa');
+    if (hubTabCurrent) hubTabCurrent.textContent = btn.textContent.trim();
+    hubTabs?.classList.remove('open');
+    hubTabToggle?.setAttribute('aria-expanded', 'false');
   });
 });
 
@@ -3059,15 +3116,34 @@ document.getElementById('sendMsgBtn').addEventListener('click', async () => {
   timer = setInterval(updateCountdown, 1000);
 })();
 
-// ── Opa artwork fullscreen viewer ──
+// Fullscreen artwork and merch mockup viewer
 const artLightbox = document.getElementById('artLightbox');
 const artLightboxImage = document.getElementById('artLightboxImage');
 const artLightboxClose = document.getElementById('artLightboxClose');
+const artLightboxPrev = document.getElementById('artLightboxPrev');
+const artLightboxNext = document.getElementById('artLightboxNext');
+let artLightboxImages = [];
+let artLightboxIndex = -1;
+
+function cleanFullscreenAlt(text) {
+  return String(text || '').replace(/\s*[—-]\s*open fullscreen$/i, '');
+}
+
+function showArtLightboxImage(index) {
+  if (!artLightboxImages.length) return;
+  artLightboxIndex = (index + artLightboxImages.length) % artLightboxImages.length;
+  const image = artLightboxImages[artLightboxIndex];
+  artLightboxImage.src = image.currentSrc || image.src;
+  artLightboxImage.alt = cleanFullscreenAlt(image.alt);
+}
 
 function openArtLightbox(image) {
-  artLightboxImage.src = image.currentSrc || image.src;
-  artLightboxImage.alt = image.alt.replace(/\s*[—-]\s*open fullscreen$/i, '');
-  artLightbox.classList.toggle('scrollable', !!image.closest('#view-merch'));
+  const isMerch = !!image.closest('#view-merch');
+  artLightboxImages = isMerch ? Array.from(document.querySelectorAll('#view-merch .merch-img')) : [image];
+  const foundIndex = artLightboxImages.indexOf(image);
+  showArtLightboxImage(foundIndex >= 0 ? foundIndex : 0);
+  artLightbox.classList.toggle('scrollable', isMerch);
+  artLightbox.classList.toggle('has-nav', isMerch && artLightboxImages.length > 1);
   artLightbox.classList.add('show');
   document.body.style.overflow = 'hidden';
   artLightboxClose.focus();
@@ -3076,14 +3152,25 @@ function openArtLightbox(image) {
 function closeArtLightbox() {
   artLightbox.classList.remove('show');
   artLightbox.classList.remove('scrollable');
+  artLightbox.classList.remove('has-nav');
   artLightboxImage.removeAttribute('src');
+  artLightboxImages = [];
+  artLightboxIndex = -1;
   document.body.style.overflow = '';
 }
+
+function stepArtLightbox(direction) {
+  if (!artLightbox.classList.contains('show') || !artLightboxImages.length) return;
+  showArtLightboxImage(artLightboxIndex + direction);
+}
+
+artLightboxPrev?.addEventListener('click', () => stepArtLightbox(-1));
+artLightboxNext?.addEventListener('click', () => stepArtLightbox(1));
 
 document.querySelectorAll('#artworksList .card-img').forEach(image => {
   image.tabIndex = 0;
   image.setAttribute('role', 'button');
-  image.setAttribute('aria-label', 'Open ' + image.alt.replace(/\s*[—-]\s*open fullscreen$/i, '') + ' fullscreen');
+  image.setAttribute('aria-label', 'Open ' + cleanFullscreenAlt(image.alt) + ' fullscreen');
   image.addEventListener('click', () => openArtLightbox(image));
   image.addEventListener('keydown', event => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -3143,7 +3230,10 @@ artLightbox.addEventListener('click', event => {
   if (event.target === artLightbox) closeArtLightbox();
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && artLightbox.classList.contains('show')) closeArtLightbox();
+  if (!artLightbox.classList.contains('show')) return;
+  if (event.key === 'Escape') closeArtLightbox();
+  if (event.key === 'ArrowLeft') stepArtLightbox(-1);
+  if (event.key === 'ArrowRight') stepArtLightbox(1);
 });
 </script>
 </body>
