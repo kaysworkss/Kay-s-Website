@@ -2086,6 +2086,7 @@ async function verifyAndLink(chain, address) {
     chain,
     token_balance: result.balance || 1,
     tier: result.tier || result.tokenTier || result.token_tier || null,
+    token_id: result.tokenId || result.token_id || result.gateTokenId || result.gate_token_id || result.holdingTokenId || result.holding_token_id || null,
     display_name: result.displayName || null,
     last_verified_at: new Date().toISOString(),
   };
@@ -2160,7 +2161,18 @@ async function enterDashboard() {
 function renderMerchEntitlement() {
   const el = document.getElementById('merchEntitlementText');
   if (!el || !currentHolder) return;
-  const tier = String(
+  const tokenId = String(
+    currentHolder.token_id ??
+    currentHolder.tokenId ??
+    currentHolder.gate_token_id ??
+    currentHolder.gateTokenId ??
+    currentHolder.holding_token_id ??
+    currentHolder.holdingTokenId ??
+    currentHolder.entry_token_id ??
+    currentHolder.entryTokenId ??
+    ''
+  ).trim();
+  let tier = String(
     currentHolder.tier ||
     currentHolder.token_tier ||
     currentHolder.tokenTier ||
@@ -2169,16 +2181,25 @@ function renderMerchEntitlement() {
     currentHolder.token_type ||
     ''
   ).toLowerCase();
+  if (!tier && tokenId === '1') tier = 'wood';
+  if (!tier && tokenId === '2') tier = 'bronze';
   const explicitBronzeBalance = Number(
     currentHolder.bronze_balance ??
     currentHolder.bronzeBalance ??
     currentHolder.bronze_count ??
     currentHolder.bronzeCount ??
+    currentHolder.token_2_balance ??
+    currentHolder.token2Balance ??
+    currentHolder.balance_token_2 ??
     NaN
   );
+  const balancesById = currentHolder.balances_by_token_id || currentHolder.balancesByTokenId || currentHolder.tokenBalances || null;
+  const bronzeBalanceFromMap = balancesById ? Number(balancesById['2'] ?? balancesById[2] ?? NaN) : NaN;
   const balance = Math.max(1, Number.isFinite(explicitBronzeBalance)
     ? explicitBronzeBalance
-    : Number(currentHolder.token_balance || currentHolder.balance || 1) || 1);
+    : Number.isFinite(bronzeBalanceFromMap)
+      ? bronzeBalanceFromMap
+      : Number(currentHolder.token_balance || currentHolder.balance || 1) || 1);
   const toteText = balance === 1 ? '1 tote bag available to redeem' : `${balance} tote bags available to redeem`;
 
   if (tier.includes('bronze')) {
@@ -2186,7 +2207,7 @@ function renderMerchEntitlement() {
   } else if (tier.includes('wood')) {
     el.innerHTML = '<strong>Wooden holder benefit:</strong> you qualify for up to 15% off available merch such as totes, hoodies, and T-shirts.';
   } else {
-    el.innerHTML = '<strong>Holder benefit:</strong> your token is verified. Your exact merch tier could not be identified here, so I will confirm the correct merch entitlement before claims open.';
+    el.innerHTML = '<strong>Holder benefit:</strong> your token is verified. Merch claims are coming soon.';
   }
 }
 
