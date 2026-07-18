@@ -39,6 +39,7 @@ const PENDING_TTL_MINUTES = 60;
 
 // Both chains gate on the same two token IDs - holding either one qualifies.
 const HOLDER_TOKEN_IDS = [1, 2];
+const HOLDER_TOKEN_TIERS = { 1: 'wood', 2: 'bronze' };
 
 const ETH_CONTRACT_ADDRESS = '0x611cca3635b0f05b103031ee8d4f3261633292b4';
 const ETH_TOKEN_STANDARD = 'erc1155'; // balanceOf(address, tokenId) - confirmed from claim-token.html
@@ -103,13 +104,28 @@ function normalizeAddress(chain, address) {
   return chain === 'ethereum' ? address.toLowerCase() : address;
 }
 
-async function checkTezosBalance(address) {
+function summarizeTokenBalances(balancesByTokenId) {
+  const normalized = {};
+  HOLDER_TOKEN_IDS.forEach(id => {
+    normalized[String(id)] = Number(balancesByTokenId && balancesByTokenId[String(id)] || 0);
+  });
+  const totalBalance = Object.values(normalized).reduce((sum, value) => sum + value, 0);
+  const tokenId = normalized['2'] > 0 ? 2 : normalized['1'] > 0 ? 1 : null;
+  return {
+    totalBalance,
+    tokenId,
+    tier: tokenId ? HOLDER_TOKEN_TIERS[tokenId] : null,
+    balancesByTokenId: normalized,
+  };
+}
+
+async function checkTezosBalances(address) {
   const url =
     'https://api.tzkt.io/v1/tokens/balances' +
     '?account=' + encodeURIComponent(address) +
     '&token.contract=' + encodeURIComponent(TEZOS_CONTRACT_ADDRESS) +
     '&token.tokenId.in=' + HOLDER_TOKEN_IDS.join(',') +
-    '&select=balance&limit=10';
+    '&limit=10';
   const r = await fetch(url);
   if (!r.ok) {
     const body = await r.text().catch(() => '');
@@ -117,24 +133,28 @@ async function checkTezosBalance(address) {
   }
   const data = await r.json();
   const rows = Array.isArray(data) ? data : [];
-  return rows.reduce((sum, raw) => {
-    const val = raw && typeof raw === 'object' ? raw.balance : raw;
-    return sum + (val === undefined || val === null ? 0 : Number(val));
-  }, 0);
+  const balances = {};
+  HOLDER_TOKEN_IDS.forEach(id => { balances[String(id)] = 0; });
+  rows.forEach(row => {
+    const tokenId = String(row?.token?.tokenId ?? '');
+    if (!Object.prototype.hasOwnProperty.call(balances, tokenId)) return;
+    balances[tokenId] += Number(row?.balance || 0);
+  });
+  return balances;
 }
 
-async function checkEthBalance(address) {
+async function checkEthBalances(address) {
   const paddedAddress = address.toLowerCase().replace('0x', '').padStart(64, '0');
 
-  // ERC-1155: balanceOf(address,uint256) - one call per token ID, summed.
-  const balances = await Promise.all(
+  // ERC-1155: balanceOf(address,uint256) - one call per token ID.
+  const results = await Promise.all(
     HOLDER_TOKEN_IDS.map(id => {
       const tokenIdHex = BigInt(id).toString(16).padStart(64, '0');
       const data = '0x00fdd58e' + paddedAddress + tokenIdHex;
-      return ethCallBalance(ETH_RPC_URL, ETH_CONTRACT_ADDRESS, data);
+      return ethCallBalance(ETH_RPC_URL, ETH_CONTRACT_ADDRESS, data).then(balance => [String(id), balance]);
     })
   );
-  return balances.reduce((sum, b) => sum + b, 0);
+  return Object.fromEntries(results);
 }
 
 async function ethCallBalance(rpcUrl, contract, data) {
@@ -164,9 +184,11 @@ async function handleVerify(req, res, supabase) {
   if (chain !== 'tezos' && chain !== 'ethereum') return res.status(400).json({ error: 'Unsupported chain.' });
   const normalizedAddress = normalizeAddress(chain, address);
 
-  let balance = 0;
-  if (chain === 'tezos') balance = await checkTezosBalance(normalizedAddress);
-  else balance = await checkEthBalance(normalizedAddress);
+  const balancesByTokenId = chain === 'tezos'
+    ? await checkTezosBalances(normalizedAddress)
+    : await checkEthBalances(normalizedAddress);
+  const holderTokens = summarizeTokenBalances(balancesByTokenId);
+  const balance = holderTokens.totalBalance;
 
   if (balance < 1) return res.status(403).json({ error: 'This wallet does not currently hold the token.' });
 
@@ -186,7 +208,14 @@ async function handleVerify(req, res, supabase) {
       last_verified_at: new Date().toISOString(),
     }, { onConflict: 'wallet_address,chain' });
     if (upsertErr) return res.status(500).json({ error: 'Could not save holder record: ' + upsertErr.message });
-    return res.status(200).json({ ok: true, mode: 'linked', balance });
+    return res.status(200).json({
+      ok: true,
+      mode: 'linked',
+      balance,
+      tokenId: holderTokens.tokenId,
+      tier: holderTokens.tier,
+      balancesByTokenId: holderTokens.balancesByTokenId,
+    });
   }
 
   const expiresAt = new Date(Date.now() + PENDING_TTL_MINUTES * 60000).toISOString();
@@ -197,7 +226,15 @@ async function handleVerify(req, res, supabase) {
     .single();
   if (insertErr) return res.status(500).json({ error: 'Could not record verification: ' + insertErr.message });
 
-  return res.status(200).json({ ok: true, mode: 'pending', balance, claimToken: pending.id });
+  return res.status(200).json({
+    ok: true,
+    mode: 'pending',
+    balance,
+    tokenId: holderTokens.tokenId,
+    tier: holderTokens.tier,
+    balancesByTokenId: holderTokens.balancesByTokenId,
+    claimToken: pending.id,
+  });
 }
 
 // -- action=claim ----
