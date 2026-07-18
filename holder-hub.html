@@ -237,6 +237,18 @@
   }
   .reverify-banner.show { display:flex; }
   .reverify-banner button { width:auto; padding:0.6rem 1rem; }
+  .email-updates-panel {
+    display:none; align-items:center; justify-content:space-between; gap:1rem;
+    border:1px solid rgba(223,184,92,0.34); background:rgba(201,153,58,0.07);
+    border-radius:6px; padding:0.9rem 1.1rem; margin-bottom:1.4rem; color:var(--text-muted); font-size:0.92rem;
+  }
+  .email-updates-panel.show { display:flex; }
+  .email-updates-panel strong { color:var(--sand); }
+  .email-updates-toggle { display:flex; align-items:center; gap:0.55rem; white-space:nowrap; cursor:pointer; }
+  .email-updates-toggle input { width:auto; accent-color:var(--gold); }
+  @media (max-width:720px) {
+    .email-updates-panel { align-items:flex-start; flex-direction:column; }
+  }
 
   .tabs { display:flex; flex-wrap:wrap; justify-content:center; gap:0.5rem; border-bottom:1px solid var(--line); margin-bottom:2rem; padding-bottom:0.9rem; }
   .tab-btn {
@@ -837,20 +849,20 @@
   <section id="gate">
     <span class="eyebrow">For Verified Holders</span>
     <h1>The Holder <em>Hub</em></h1>
-    <p class="lead">Track the project's progress, see who's holding, browse available and sold pieces, and hear about new chapters first. Sign in with your email, then verify the wallet that holds your token.</p>
+    <p class="lead">Track the project's progress, see who's holding, browse available and sold pieces, and hear about new chapters first. New here? Verify the wallet that holds your token. Already saved email access? Sign in with email.</p>
 
     <div class="panel">
 
       <!-- Step 1: connect + verify wallet -->
       <div class="step show" id="stepWallet">
         <div class="panel-title" id="walletStepTitle">Step 1 — Verify your token</div>
-        <p class="step-note" style="margin-top:0;margin-bottom:1rem;" id="walletStepNote">Connect the wallet that holds your Àpótí Ọlọ́wẹ̀ token. If it checks out, you'll set up email sign-in next so you don't need the wallet every visit.</p>
+        <p class="step-note" style="margin-top:0;margin-bottom:1rem;" id="walletStepNote">Connect the wallet that holds your Àpótí Ọlọ́wẹ̀ token. If this is your first time here, you can add email access after verification.</p>
         <div class="connect-grid">
           <button class="chain-btn" id="connectEth">Ethereum Wallet</button>
           <button class="chain-btn" id="connectTez">Tezos Wallet</button>
         </div>
         <div class="status" id="walletStatus"></div>
-        <button type="button" class="btn ghost small" id="showEmailLoginBtn" style="width:auto;margin-top:1.1rem;">Already verified? Sign in with email</button>
+        <button type="button" class="btn ghost small" id="showEmailLoginBtn" style="width:auto;margin-top:1.1rem;">Already saved email access?</button>
       </div>
 
       <!-- Step 2: email / magic link (after a fresh wallet verify, or via "sign in with email" for returning holders) -->
@@ -884,10 +896,18 @@
       <button class="btn ghost" id="reverifyBtn">Reconnect wallet</button>
     </div>
 
+    <div class="email-updates-panel" id="emailUpdatesPanel">
+      <span id="emailUpdatesCopy"><strong>Project update emails</strong> Let me email you when there is a new Holder Hub update to check.</span>
+      <label class="email-updates-toggle" for="emailUpdatesOptIn">
+        <input type="checkbox" id="emailUpdatesOptIn" />
+        <span id="emailUpdatesLabel">Off</span>
+      </label>
+    </div>
+
     <div class="panel wallet-email-panel" id="walletEmailPanel">
       <button class="wallet-email-close" id="walletEmailClose" type="button" aria-label="Not now">×</button>
       <div class="panel-title">Save your access for next time</div>
-      <p class="step-note" style="margin:0 0 1rem">You already have full access through your verified wallet. Adding an email is optional—it simply lets you return without reconnecting your wallet.</p>
+      <p class="step-note" style="margin:0 0 1rem">You already have full access through your verified wallet. Adding an email is optional—it lets you return without reconnecting your wallet, and it can also be used for Holder Hub update notices if you opt in later.</p>
       <div class="email-row">
         <div class="field">
           <label for="walletEmailInput">Email address</label>
@@ -1686,6 +1706,10 @@ const els = {
   holderGreeting: document.getElementById('holderGreeting'),
   reverifyBanner: document.getElementById('reverifyBanner'),
   reverifyBtn: document.getElementById('reverifyBtn'),
+  emailUpdatesPanel: document.getElementById('emailUpdatesPanel'),
+  emailUpdatesOptIn: document.getElementById('emailUpdatesOptIn'),
+  emailUpdatesLabel: document.getElementById('emailUpdatesLabel'),
+  emailUpdatesCopy: document.getElementById('emailUpdatesCopy'),
   tezosWalletModal: document.getElementById('tezosWalletModal'),
   connectTezBeacon: document.getElementById('connectTezBeacon'),
   connectTezTemple: document.getElementById('connectTezTemple'),
@@ -1793,8 +1817,7 @@ async function handleSession(session) {
     .eq('auth_user_id', currentUser.id)
     .order('last_verified_at', { ascending: false });
 
-  const rows = Array.isArray(holderRows) ? holderRows : [];
-  currentHolder = rows[0] ? { ...rows[0], linked_wallets: rows } : null;
+  currentHolder = mergeLinkedHolderRows(holderRows);
 
   const needsVerify = !currentHolder || isStale(currentHolder.last_verified_at);
 
@@ -1815,7 +1838,7 @@ function setWalletStepCopy(reverify) {
     : 'Step 1 — Verify your token';
   document.getElementById('walletStepNote').textContent = reverify
     ? "Just confirming you still hold the token — you're already signed in, so this takes you straight back to the hub."
-    : 'Connect the wallet that holds your Àpótí Ọlọ́wẹ̀ token. If it checks out, you\'ll set up email sign-in next so you don\'t need the wallet every visit.';
+    : 'Connect the wallet that holds your Àpótí Ọlọ́wẹ̀ token. If this is your first time here, you can add email access after verification.';
 }
 
 function isStale(ts) {
@@ -1829,11 +1852,29 @@ function showStep(id) {
   document.getElementById(id).classList.add('show');
 }
 
+function holderDisplayName(row) {
+  return String(row?.display_name || row?.displayName || row?.name || row?.full_name || row?.fullName || '').trim();
+}
+
+function mergeLinkedHolderRows(rows) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const newest = rows[0];
+  const named = rows.find(row => holderDisplayName(row)) || newest;
+  return {
+    ...newest,
+    display_name: holderDisplayName(named) || holderDisplayName(newest) || null,
+    tier: newest?.tier || named?.tier || null,
+    token_id: newest?.token_id || named?.token_id || null,
+    balancesByTokenId: newest?.balancesByTokenId || newest?.balances_by_token_id || named?.balancesByTokenId || named?.balances_by_token_id || null,
+    linked_wallets: rows,
+  };
+}
+
 // ── Returning holder: sign in with email, no wallet reconnect needed ──
 els.showEmailLoginBtn.addEventListener('click', () => {
   isEmailLoginFlow = true;
   document.getElementById('emailStepTitle').textContent = 'Sign in';
-  document.getElementById('emailStepNote').textContent = "Enter the email you used when you first verified — we'll send a one-time link, no wallet needed.";
+  document.getElementById('emailStepNote').textContent = "Enter the email you saved after verifying your wallet. We'll send a one-time link, no wallet needed.";
   showStep('stepEmail');
 });
 els.backToWalletBtn.addEventListener('click', () => {
@@ -2130,6 +2171,45 @@ els.walletEmailBtn.addEventListener('click', async () => {
   }
 });
 
+function renderEmailUpdatesPreference() {
+  if (!els.emailUpdatesPanel || !els.emailUpdatesOptIn) return;
+  const canEmail = Boolean(currentUser?.id && currentHolder?.auth_user_id);
+  els.emailUpdatesPanel.classList.toggle('show', canEmail);
+  if (!canEmail) return;
+  const enabled = Boolean(currentHolder.email_updates_opt_in);
+  if (els.emailUpdatesCopy) {
+    els.emailUpdatesCopy.innerHTML = '<strong>Project update emails</strong> Notices will be sent to your saved sign-in email. Toggle this on if you want me to email you when there is a new Holder Hub update to check.';
+  }
+  els.emailUpdatesOptIn.checked = enabled;
+  els.emailUpdatesLabel.textContent = enabled ? 'On' : 'Off';
+}
+
+els.emailUpdatesOptIn?.addEventListener('change', async () => {
+  const checked = els.emailUpdatesOptIn.checked;
+  els.emailUpdatesOptIn.disabled = true;
+  els.emailUpdatesLabel.textContent = checked ? 'Saving...' : 'Saving...';
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) throw new Error('Sign in with email before choosing update emails.');
+    const response = await fetch('/api/holder?action=email-updates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+      body: JSON.stringify({ enabled: checked }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not save this preference.');
+    currentHolder.email_updates_opt_in = checked;
+    (currentHolder.linked_wallets || []).forEach(row => { row.email_updates_opt_in = checked; });
+    els.emailUpdatesLabel.textContent = checked ? 'On' : 'Off';
+  } catch (err) {
+    els.emailUpdatesOptIn.checked = !checked;
+    els.emailUpdatesLabel.textContent = !checked ? 'On' : 'Off';
+    alert(err.message || 'Could not save this preference.');
+  } finally {
+    els.emailUpdatesOptIn.disabled = false;
+  }
+});
+
 // ── Dashboard entry ──
 async function enterDashboard() {
   els.gate.style.display = 'none';
@@ -2140,6 +2220,7 @@ async function enterDashboard() {
   els.signoutBtn.classList.add('show');
   els.holderGreeting.textContent = currentHolder.display_name || shortAddr(currentHolder.wallet_address);
   els.reverifyBanner.classList.toggle('show', isStale(currentHolder.last_verified_at));
+  renderEmailUpdatesPreference();
 
   renderMerchEntitlement();
   loadParticipants();
