@@ -650,6 +650,16 @@ body.dark .promo-ticker { background: #1a1210; }
   font-family: 'Cormorant Garamond', serif; font-size: 1.15rem; color: var(--gold);
 }
 .featured-ctas { display: flex; gap: 1rem; }
+.featured-ctas .hero-cta-ghost {
+  color: var(--rust);
+  border-color: var(--clay);
+  background: rgba(255,255,255,0.18);
+}
+.featured-ctas .hero-cta-ghost:hover {
+  color: #fff;
+  border-color: var(--rust);
+  background: var(--rust);
+}
 
 /* Divider */
 .divider-ornament {
@@ -5395,9 +5405,9 @@ function updateCartUI() {
         <div class="cart-item-variant">${c.variant}</div>
         ${note}
         <div class="cart-item-qty">
- <button class="qty-btn" data-key="${cartDomKey(c.key)}" data-dir="-1"></button>
+ <button class="qty-btn" data-key="${cartDomKey(c.key)}" data-dir="-1" aria-label="Decrease quantity">-</button>
           <span class="qty-val">${c.qty}</span>
-          <button class="qty-btn" data-key="${cartDomKey(c.key)}" data-dir="1"${maxed ? ' disabled style="opacity:0.35;cursor:not-allowed"' : ''}>+</button>
+          <button class="qty-btn" data-key="${cartDomKey(c.key)}" data-dir="1" aria-label="Increase quantity"${maxed ? ' disabled style="opacity:0.35;cursor:not-allowed"' : ''}>+</button>
           <button class="cart-item-remove" data-key="${cartDomKey(c.key)}">Remove</button>
         </div>
       </div>
@@ -6599,6 +6609,9 @@ function recalibrateCryptoForTotals() {
 
 function buildOrderSummary() {
   const lines = cart.map(c => {
+    const p = SHOP_CONFIG.products.find(x => x.id === c.id);
+    const left = p ? remainingToAdd(p, c.variantKey) : null;
+    const maxed = left !== null && left <= 0;
     const thumbHtml = c.image
       ? `<div class="order-line-thumb"><img src="${c.image}" alt="${escapeAttr(c.name)}" onerror="this.style.display='none'"/></div>`
  : `<div class="order-line-thumb">${c.emoji || ''}</div>`;
@@ -6609,9 +6622,9 @@ function buildOrderSummary() {
         <div class="order-line-name">${escapeText(c.name)}</div>
         <div class="order-line-variant">${escapeText(c.variant)}</div>
         <div class="order-line-controls">
- <button type="button" class="qty-btn order-qty-btn" data-key="${cartDomKey(c.key)}" data-dir="-1"></button>
+ <button type="button" class="qty-btn order-qty-btn" data-key="${cartDomKey(c.key)}" data-dir="-1" aria-label="Decrease quantity">-</button>
           <span class="qty-val">${c.qty}</span>
-          <button type="button" class="qty-btn order-qty-btn" data-key="${cartDomKey(c.key)}" data-dir="1">+</button>
+          <button type="button" class="qty-btn order-qty-btn" data-key="${cartDomKey(c.key)}" data-dir="1" aria-label="Increase quantity"${maxed ? ' disabled style="opacity:0.35;cursor:not-allowed"' : ''}>+</button>
         </div>
       </div>
       <span class="order-line-price">
