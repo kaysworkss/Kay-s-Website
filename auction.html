@@ -2474,6 +2474,24 @@ const AUCTION_ABI = [
   "event BuyNowExecuted(address indexed buyer, uint256 price)",
 ];
 
+const MARKETPLACE_ABI = [
+  "function bid(uint256 auctionId) payable",
+  "function buyNow(uint256 auctionId) payable",
+  "function settle(uint256 auctionId)",
+  "function cancel(uint256 auctionId)",
+  "function startAuction(uint256 auctionId)",
+  "function isEligible(uint256 auctionId,address wallet) view returns (bool)",
+  "function auctions(uint256) view returns (address seller,address nftContract,uint256 tokenId,address gateContract,uint256 gateDuration,uint256 reservePrice,uint256 minBidIncrementBps,uint256 duration,uint256 extensionWindow,uint8 auctionMode,uint256 scheduledStart,uint256 maxWaitForReserve,uint256 buyNowPrice,uint8 custodyMode,address operator,bool operatorLocked,bool deposited,bool live,bool settled,bool cancelled,uint256 createdAt,uint256 startTime,uint256 endTime,address highestBidder,uint256 highestBid)",
+  "function auctionState(uint256 auctionId) view returns (bool deposited,bool live,bool settled,bool cancelled,uint256 endTime,uint256 timeRemaining,address highestBidder,uint256 highestBid,uint256 nextBid,uint8 mode,bool isOpen,uint256 gateEndsAt,bool holderOnly,uint256 buyNowPrice,bool canBuyNow,uint8 custodyMode)",
+  "event BidPlaced(uint256 indexed auctionId,address indexed bidder,uint256 amount)",
+  "event AuctionSettled(uint256 indexed auctionId,address indexed winner,uint256 amount)",
+  "event AuctionExtended(uint256 indexed auctionId,uint256 newEndTime)",
+  "event AuctionStarted(uint256 indexed auctionId,uint256 endTime)",
+  "event AuctionCancelled(uint256 indexed auctionId)",
+  "event ReserveActivated(uint256 indexed auctionId,address indexed firstBidder,uint256 amount,uint256 endTime)",
+  "event BuyNowExecuted(uint256 indexed auctionId,address indexed buyer,uint256 price)"
+];
+
 const ERC721_ABI = [
   "function tokenURI(uint256 tokenId) external view returns (string)",
   "function name() external view returns (string)",
@@ -2536,6 +2554,9 @@ function _pieceSoldKeys(piece, idx) {
   if (piece.pieceId) add("piece-" + piece.pieceId);
   if (piece.crossChainPairKey) add("pair-" + _soldSlug(piece.crossChainPairKey));
   if (piece.contractAddr) add(piece.contractAddr.toLowerCase());
+  if (piece.marketplaceAddr && piece.marketplaceAuctionId !== undefined && piece.marketplaceAuctionId !== "") {
+    add(("marketplace-" + piece.marketplaceAddr + "-" + piece.marketplaceAuctionId).toLowerCase());
+  }
   if (piece.tezosContractAddr && piece.tezosAuctionId) {
     add(("tezos-" + piece.tezosContractAddr + "-" + piece.tezosAuctionId).toLowerCase());
   }
@@ -2575,6 +2596,25 @@ function _usdHardCapForPair(pairKey, preferredSlot) {
   return null;
 }
 
+function _marketplaceAuctionId(slot) {
+  const raw = String(slot?.marketplaceAuctionId ?? "").trim();
+  if (!/^\d+$/.test(raw)) return null;
+  return BigInt(raw);
+}
+
+function _isMarketplaceAuctionSlot(slot) {
+  return _slotChain(slot) !== "tezos"
+    && ethers.isAddress(String(slot?.marketplaceAddr || "").trim())
+    && _marketplaceAuctionId(slot) !== null;
+}
+
+function _ethContractKeyForSlot(slot) {
+  if (_isMarketplaceAuctionSlot(slot)) {
+    return `marketplace:${String(slot.marketplaceAddr).toLowerCase()}:${slot.marketplaceAuctionId}`;
+  }
+  return String(slot?.contractAddr || "").toLowerCase();
+}
+
 function _auctionKeyForSlot(slot) {
   if (!slot) return "";
   if (_slotChain(slot) === "tezos") {
@@ -2582,7 +2622,7 @@ function _auctionKeyForSlot(slot) {
       ? `${slot.tezosContractAddr}:${slot.tezosAuctionId}`.toLowerCase()
       : String(slot.tezosContractAddr || "").toLowerCase();
   }
-  return String(slot.contractAddr || "").toLowerCase();
+  return _ethContractKeyForSlot(slot);
 }
 
 function _roomIdForSlot(slot) {
@@ -2592,7 +2632,71 @@ function _roomIdForSlot(slot) {
 }
 
 function _isEthAuctionSlot(slot) {
-  return _slotChain(slot) !== "tezos" && slot?.contractAddr && ethers.isAddress(slot.contractAddr);
+  return _slotChain(slot) !== "tezos" && (
+    _isMarketplaceAuctionSlot(slot) ||
+    (slot?.contractAddr && ethers.isAddress(slot.contractAddr))
+  );
+}
+
+function _normaliseMarketplaceState(s) {
+  const settled = Boolean(s.settled ?? s[2]) || Boolean(s.cancelled ?? s[3]);
+  return [
+    Boolean(s.deposited ?? s[0]),
+    Boolean(s.live ?? s[1]),
+    settled,
+    s.endTime ?? s[4],
+    s.timeRemaining ?? s[5],
+    s.highestBidder ?? s[6],
+    s.highestBid ?? s[7],
+    s.nextBid ?? s[8],
+    s.mode ?? s[9],
+    s.isOpen ?? s[10],
+    s.buyNowPrice ?? s[13],
+    s.canBuyNow ?? s[14],
+  ];
+}
+
+function _makeMarketplaceAdapter(slot, runner) {
+  const id = _marketplaceAuctionId(slot);
+  const base = new ethers.Contract(slot.marketplaceAddr, MARKETPLACE_ABI, runner);
+  const matches = value => BigInt(value) === id;
+  const wrapEvent = (name, cb) => {
+    const handler = (...args) => {
+      const ev = args[args.length - 1];
+      if (!matches(args[0])) return;
+      if (name === "BidPlaced") return cb(args[1], args[2], ev);
+      if (name === "AuctionExtended") return cb(args[1], ev);
+      if (name === "AuctionSettled") return cb(args[1], args[2], ev);
+      if (name === "ReserveActivated") return cb(args[1], args[2], args[3], ev);
+      if (name === "BuyNowExecuted") return cb(args[1], args[2], ev);
+      return cb(...args.slice(1));
+    };
+    base.on(name, handler);
+    return adapter;
+  };
+  const adapter = {
+    _isMarketplaceAdapter: true,
+    address: slot.marketplaceAddr,
+    target: slot.marketplaceAddr,
+    connect(nextRunner) { return _makeMarketplaceAdapter(slot, nextRunner); },
+    removeAllListeners() { return base.removeAllListeners(); },
+    on: wrapEvent,
+    async auctionState() { return _normaliseMarketplaceState(await base.auctionState(id)); },
+    async isEligible(wallet) { return base.isEligible(id, wallet); },
+    bid(opts) { return base.bid(id, opts); },
+    buyNow(opts) { return base.buyNow(id, opts); },
+    settle() { return base.settle(id); },
+    cancel() { return base.cancel(id); },
+    startAuction() { return base.startAuction(id); },
+    async nftContract() { const a = await base.auctions(id); return a.nftContract ?? a[1]; },
+    async nftTokenId() { const a = await base.auctions(id); return a.tokenId ?? a[2]; },
+  };
+  return adapter;
+}
+
+function _makeEthAuctionContract(slot, runner) {
+  if (_isMarketplaceAuctionSlot(slot)) return _makeMarketplaceAdapter(slot, runner);
+  return new ethers.Contract(slot.contractAddr, AUCTION_ABI, runner);
 }
 
 
@@ -3231,10 +3335,12 @@ window.addEventListener("load", async () => {
   // Normalise auctions array — supports both single and multi-auction configs
   if (Array.isArray(cfg.auctions) && cfg.auctions.length > 0) {
     _auctions = cfg.auctions;
-  } else if (cfg.contractAddr) {
+  } else if (cfg.contractAddr || cfg.marketplaceAddr) {
     // Single-auction legacy config — wrap into array
     _auctions = [{
       contractAddr: cfg.contractAddr,
+      marketplaceAddr: cfg.marketplaceAddr || "",
+      marketplaceAuctionId: cfg.marketplaceAuctionId || "",
       artTitle:     cfg.artTitle,
       artArtist:    cfg.artArtist,
       artAbout:     cfg.artAbout,
@@ -3778,13 +3884,13 @@ async function _pollAllTabBids() {
 
     // ── ETH slot ──────────────────────────────────────────────────────────────
     if (chain !== "tezos") {
-      if (!slot.contractAddr || !ethers.isAddress(slot.contractAddr)) {
+      if (!_isEthAuctionSlot(slot)) {
         if (manualSold) _setTabSoldState(i, true);
         return;
       }
       if (!provider) return;
-      let c = _contractCache[slot.contractAddr];
-      if (!c) { c = new ethers.Contract(slot.contractAddr, AUCTION_ABI, provider); _contractCache[slot.contractAddr] = c; }
+      let c = _contractCache[_ethContractKeyForSlot(slot)];
+      if (!c) { c = _makeEthAuctionContract(slot, provider); _contractCache[_ethContractKeyForSlot(slot)] = c; }
       const s       = await c.auctionState();
       const bid     = s[6]; // _highestBid
       const settled = s[2]; // _settled
@@ -3977,10 +4083,10 @@ async function _ccPopulateChooserPrices(pairKey) {
   const hardCap     = window._ccUsdHardCap || null;
 
   // ── ETH card ──────────────────────────────────────────────────────────────
-  if (ethSlot?.contractAddr && provider && ethers.isAddress(ethSlot.contractAddr)) {
+  if (_isEthAuctionSlot(ethSlot) && provider) {
     try {
-      let c = _contractCache[ethSlot.contractAddr];
-      if (!c) { c = new ethers.Contract(ethSlot.contractAddr, AUCTION_ABI, provider); _contractCache[ethSlot.contractAddr] = c; }
+      let c = _contractCache[_ethContractKeyForSlot(ethSlot)];
+      if (!c) { c = _makeEthAuctionContract(ethSlot, provider); _contractCache[_ethContractKeyForSlot(ethSlot)] = c; }
       const s        = await c.auctionState();
       const noBids   = s[5] === ethers.ZeroAddress;
       window._ccEthReserveWei = s[7]; // reserve in wei
@@ -4134,6 +4240,8 @@ async function _switchAuction(idx) {
   // Update cfg for loadNFTMeta, but pass slot directly to populateAbout/loadStaticImage
   // so the upcoming view's data is never overwritten by the live view switching pieces.
   cfg.contractAddr = slot.contractAddr;
+  cfg.marketplaceAddr = slot.marketplaceAddr || "";
+  cfg.marketplaceAuctionId = slot.marketplaceAuctionId || "";
   cfg.artTitle     = slot.artTitle;
   cfg.artArtist    = slot.artArtist;
   cfg.artAbout     = slot.artAbout;
@@ -4202,10 +4310,11 @@ async function _switchAuction(idx) {
   }
 
   // Get or create contract
-  if (!_contractCache[slot.contractAddr]) {
-    _contractCache[slot.contractAddr] = new ethers.Contract(slot.contractAddr, AUCTION_ABI, provider);
+  const ethContractKey = _ethContractKeyForSlot(slot);
+  if (!_contractCache[ethContractKey]) {
+    _contractCache[ethContractKey] = _makeEthAuctionContract(slot, provider);
   }
-  auctionContract = _contractCache[slot.contractAddr];
+  auctionContract = _contractCache[ethContractKey];
   if (signer) auctionContract = auctionContract.connect(signer);
   const activeContract = auctionContract;
 
@@ -4219,13 +4328,13 @@ async function _switchAuction(idx) {
   }
 
   await refreshState(switchToken, activeContract);
-  await loadBidHistory(switchToken, slot.contractAddr);
+  await loadBidHistory(switchToken, _auctionKeyForSlot(slot));
   if (switchToken !== _switchToken) {
     _auctionSwitching = false;
     _setPieceTabsBusy(false);
     return;
   }
-  if (slot.contractAddr) await loadNFTMeta(switchToken, activeContract);
+  if (_isEthAuctionSlot(slot)) await loadNFTMeta(switchToken, activeContract);
   if (switchToken !== _switchToken) {
     _auctionSwitching = false;
     _setPieceTabsBusy(false);
@@ -6055,7 +6164,7 @@ function showSettled(winner, amount) {
   document.getElementById("bid-form").style.display = "none";
 
   // Schedule chat lock based on actual settled_at from Supabase
-  const contractAddr = _activeCfg()?.contractAddr || "";
+  const contractAddr = _auctionKeyForSlot(_activeCfg());
   if (contractAddr) _scheduleChatLock(contractAddr);
 
   aucOnWon(winner, amount);

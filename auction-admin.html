@@ -1085,13 +1085,24 @@ function _buildPieceForm(idx) {
         <button type="button" class="piece-status-btn ${(d.chain||'eth')==='tezos' ? 'active-live' : ''}" onclick="setPieceChain(${idx},'tezos')">Tezos</button>
       </div>
       <input type="hidden" id="${_pieceFieldId(idx,'chain')}" value="${d.chain||'eth'}"/>
-      <div class="field-hint">ETH uses FlexAuction. Tezos uses the SmartPy GatedAuction contract.</div>
+      <div class="field-hint">ETH supports either the old one-contract FlexAuction or the new reusable marketplace auction ID. Tezos uses the SmartPy GatedAuction contract.</div>
     </div>
     <div class="field">
       <label>ETH contract address</label>
       <input id="${_pieceFieldId(idx,'contractAddr')}" placeholder="0x..." value="${d.contractAddr||''}"
         oninput="(function(el){el.style.borderColor=el.value&&!ethers.isAddress(el.value.trim())?'var(--accent)':''})(this)"/>
-      <div class="field-hint">Your deployed FlexAuction contract address for this piece</div>
+      <div class="field-hint">Old format: your deployed one-auction FlexAuction contract address for this piece.</div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Marketplace contract</label>
+        <input id="${_pieceFieldId(idx,'marketplaceAddr')}" placeholder="0x..." value="${d.marketplaceAddr||''}"
+          oninput="(function(el){el.style.borderColor=el.value&&!ethers.isAddress(el.value.trim())?'var(--accent)':''})(this)"/>
+        <div class="field-hint">New format: reusable KaysworksMarketplace contract address.</div>
+      </div>
+      <div class="field"><label>Marketplace auction ID</label>
+        <input id="${_pieceFieldId(idx,'marketplaceAuctionId')}" type="number" min="1" step="1" placeholder="1" value="${d.marketplaceAuctionId||''}"/>
+        <div class="field-hint">The auction ID emitted when you created this piece in the marketplace launcher.</div>
+      </div>
     </div>
     <div class="row2">
       <div class="field"><label>Tezos auction contract</label>
@@ -1632,7 +1643,7 @@ document.addEventListener("keyup", (e) => {
 
 function _savePieceFormValues(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
-  const fields = ["chain","contractAddr","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","usdHardCap","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status","chatLocked","chatLockMsg"];
+  const fields = ["chain","contractAddr","marketplaceAddr","marketplaceAuctionId","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","usdHardCap","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status","chatLocked","chatLockMsg"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
     if (!el) return;
@@ -1732,6 +1743,9 @@ function _pieceSoldKeys(piece, idx) {
   add("piece-" + pieceId);
   if (piece.crossChainPairKey) add("pair-" + _soldSlug(piece.crossChainPairKey));
   if (piece.contractAddr) add(piece.contractAddr.toLowerCase());
+  if (piece.marketplaceAddr && piece.marketplaceAuctionId !== undefined && piece.marketplaceAuctionId !== "") {
+    add(("marketplace-" + piece.marketplaceAddr + "-" + piece.marketplaceAuctionId).toLowerCase());
+  }
   if (piece.tezosContractAddr && piece.tezosAuctionId) {
     add(("tezos-" + piece.tezosContractAddr + "-" + piece.tezosAuctionId).toLowerCase());
   }
@@ -1756,6 +1770,8 @@ function populateForm(cfg) {
     _pieces = [{
       chain:        cfg.chain        || "eth",
       contractAddr: cfg.contractAddr || "",
+      marketplaceAddr: cfg.marketplaceAddr || "",
+      marketplaceAuctionId: cfg.marketplaceAuctionId || "",
       tezosContractAddr: cfg.tezosContractAddr || "",
       tezosAuctionId:    cfg.tezosAuctionId    || "",
       tezosNetwork:      cfg.tezosNetwork      || "mainnet",
@@ -1953,8 +1969,17 @@ async function saveConfig() {
   // Validate all contract addresses
   for (let i = 0; i < pieces.length; i++) {
     const addr = pieces[i].contractAddr;
+    const marketplaceAddr = pieces[i].marketplaceAddr;
     if ((pieces[i].chain || "eth") !== "tezos" && addr && !ethers.isAddress(addr)) {
-      toast("err", "Invalid address", `Piece ${i+1}: "${addr}" is not a valid Ethereum address`);
+      toast("err", "Invalid ETH address", `Piece ${i+1}: contract address is not valid`);
+      selectPiece(i); return;
+    }
+    if ((pieces[i].chain || "eth") !== "tezos" && marketplaceAddr && !ethers.isAddress(marketplaceAddr)) {
+      toast("err", "Invalid marketplace address", `Piece ${i+1}: marketplace address is not valid`);
+      selectPiece(i); return;
+    }
+    if ((pieces[i].chain || "eth") !== "tezos" && marketplaceAddr && !/^\d+$/.test(String(pieces[i].marketplaceAuctionId || ""))) {
+      toast("err", "Missing marketplace auction ID", `Piece ${i+1}: add the marketplace auction ID`);
       selectPiece(i); return;
     }
     if ((pieces[i].chain || "eth") === "tezos" && !pieces[i].tezosContractAddr) {
@@ -1974,6 +1999,8 @@ async function saveConfig() {
     // Legacy fields (first piece) so old API readers still work
     chain:        primary.chain        || "eth",
     contractAddr: primary.contractAddr || "",
+    marketplaceAddr: primary.marketplaceAddr || "",
+    marketplaceAuctionId: primary.marketplaceAuctionId || "",
     tezosContractAddr: primary.tezosContractAddr || "",
     tezosAuctionId:    primary.tezosAuctionId    || "",
     tezosNetwork:      primary.tezosNetwork      || "mainnet",
@@ -2262,6 +2289,8 @@ function _buildPreviewPayload(forcePieceIdx) {
     auctions:    pieces,
     chain:       primary.chain || "eth",
     contractAddr: primary.contractAddr || "",
+    marketplaceAddr: primary.marketplaceAddr || "",
+    marketplaceAuctionId: primary.marketplaceAuctionId || "",
     tezosContractAddr: primary.tezosContractAddr || "",
     tezosAuctionId: primary.tezosAuctionId || "",
     tezosNetwork: primary.tezosNetwork || "mainnet",
