@@ -1014,7 +1014,7 @@ const SERVER_INTL_PACKING_BASE_USD = 8;
 const SERVER_INTL_PACKING_EXTRA_PIECE_USD = 4;
 // International quote parts: published courier tier, Kaduna-to-export-hub
 // minimum base, then packing/processing. Keep this mirrored in shop.html.
-const SERVER_INTL_KADUNA_EXPORT_BASE_USD = Object.freeze({ ups: 55, dhl: 60 });
+const SERVER_INTL_KADUNA_EXPORT_BASE_USD = Object.freeze({ ups: 55, dhl: 75 });
 
 function serverVariantPrice(product, variantKey, variant, currency) {
   const prices = currency === 'usd' ? (product.prices_usd || {}) : (product.prices_ngn || {});
@@ -1282,6 +1282,10 @@ const APOTI_MERCH_DISCOUNT_TOKEN_IDS = [1, 2];
 const APOTI_MERCH_ETH_CONTRACT = '0x611cca3635b0f05b103031ee8d4f3261633292b4';
 const APOTI_MERCH_TEZOS_CONTRACT = 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8';
 const APOTI_MERCH_DEFAULT_DISCOUNT = 25;
+const APOTI_MERCH_TOKEN_RULES = {
+  1: { tier: 'Wooden Token Holder', discountPercent: 15, freeTote: false },
+  2: { tier: 'Bronze Token Holder', discountPercent: 25, freeTote: true },
+};
 
 function serverNormalizeHolderText(value) {
   return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -1294,6 +1298,7 @@ function serverHolderProductKind(product) {
     const type = serverNormalizeHolderText([product?.clothing_type, product?.name, product?.slug].join(' '));
     if (type.includes('hoodie')) return 'hoodie';
     if (type.includes('shirt') || type.includes('tee')) return 'shirt';
+    if (type.includes('tote') || type.includes('bag')) return 'tote';
     return 'addon';
   }
   const hay = serverNormalizeHolderText([product?.name, product?.slug, product?.description, product?.category].join(' '));
@@ -1370,10 +1375,7 @@ async function resolveServerHolderMerchClaim(rawClaim) {
     throw err;
   }
 
-  const requestedTokenIds = (Array.isArray(rawClaim.token_ids) ? rawClaim.token_ids : rawClaim.tokenIds)
-    || APOTI_MERCH_TOKEN_IDS;
-  const tokenIds = [...new Set(requestedTokenIds.map(id => Number(id)).filter(id => APOTI_MERCH_DISCOUNT_TOKEN_IDS.includes(id)))];
-  if (!tokenIds.length) tokenIds.push(...APOTI_MERCH_TOKEN_IDS);
+  const tokenIds = [...APOTI_MERCH_DISCOUNT_TOKEN_IDS];
   const contract = chain === 'tezos' ? APOTI_MERCH_TEZOS_CONTRACT : APOTI_MERCH_ETH_CONTRACT;
   const tokenBalances = {};
   for (const id of tokenIds) {
@@ -1388,6 +1390,10 @@ async function resolveServerHolderMerchClaim(rawClaim) {
     err.statusCode = 403;
     throw err;
   }
+  const bronzeBalance = Number(tokenBalances[2] || 0);
+  const woodBalance = Number(tokenBalances[1] || 0);
+  const primaryRule = bronzeBalance > 0 ? APOTI_MERCH_TOKEN_RULES[2] : APOTI_MERCH_TOKEN_RULES[1];
+  const heldTokenIds = tokenIds.filter(id => Number(tokenBalances[id] || 0) > 0);
 
   return {
     project: APOTI_MERCH_PROJECT,
@@ -1395,11 +1401,13 @@ async function resolveServerHolderMerchClaim(rawClaim) {
     wallet,
     chain,
     contract,
-    tokenIds,
+    tokenIds: heldTokenIds,
     tokenBalance,
-    freeTote: rawClaim.free_tote !== false,
-    freeToteQty: tokenBalance,
-    discountPercent: Math.max(0, Math.min(90, Number(rawClaim.merch_discount_percent || rawClaim.discountPercent || APOTI_MERCH_DEFAULT_DISCOUNT) || 0)),
+    tokenBalances,
+    tier: primaryRule.tier,
+    freeTote: primaryRule.freeTote && bronzeBalance > 0,
+    freeToteQty: bronzeBalance,
+    discountPercent: primaryRule.discountPercent,
     verified: true,
   };
 }
@@ -1417,6 +1425,8 @@ function computeServerHolderMerchBenefit(holderClaim, trustedItems, productCache
     const role = String(product.holder_benefit_role || '').toLowerCase();
     const hasExplicitBenefit = product.holder_benefit_active === true && serverIsApotiMerchProduct(product);
     const qty = Number(item.qty || 0);
+    const percent = Math.max(0, Math.min(90, Number(product.holder_benefit_discount_percent || fallbackPercent || 0)));
+    let discountableQty = qty;
     if (((hasExplicitBenefit && role === 'free_tote') || (!role && kind === 'tote' && serverIsApotiMerchProduct(product))) && freeToteRemaining > 0) {
       const covered = Math.min(qty, freeToteRemaining);
       out.coveredToteQty += covered;
@@ -1425,13 +1435,13 @@ function computeServerHolderMerchBenefit(holderClaim, trustedItems, productCache
       out.discountExcludedNgn += Number(item.priceNgn || 0) * covered;
       out.discountExcludedUsd += Number(item.priceUsd || 0) * covered;
       freeToteRemaining -= covered;
-      continue;
+      discountableQty -= covered;
     }
-    if (((hasExplicitBenefit && role === 'discount_addon') || (!role && (kind === 'shirt' || kind === 'hoodie') && serverIsApotiMerchProduct(product))) && percent > Number(appliedProductPercent || 0)) {
-      out.addOnNgn += Number(item.priceNgn || 0) * qty * percent / 100;
-      out.addOnUsd += Number(item.priceUsd || 0) * qty * percent / 100;
-      out.discountExcludedNgn += Number(item.priceNgn || 0) * qty;
-      out.discountExcludedUsd += Number(item.priceUsd || 0) * qty;
+    if (((hasExplicitBenefit && (role === 'discount_addon' || role === 'free_tote')) || (!role && (kind === 'tote' || kind === 'shirt' || kind === 'hoodie') && serverIsApotiMerchProduct(product))) && discountableQty > 0 && percent > Number(appliedProductPercent || 0)) {
+      out.addOnNgn += Number(item.priceNgn || 0) * discountableQty * percent / 100;
+      out.addOnUsd += Number(item.priceUsd || 0) * discountableQty * percent / 100;
+      out.discountExcludedNgn += Number(item.priceNgn || 0) * discountableQty;
+      out.discountExcludedUsd += Number(item.priceUsd || 0) * discountableQty;
     }
   }
   out.freeToteNgn = +out.freeToteNgn.toFixed(2);
@@ -1760,7 +1770,9 @@ async function computeShopCheckout(body, supabase) {
       contract: holderClaim.contract,
       token_ids: holderClaim.tokenIds,
       token_balance: holderClaim.tokenBalance,
-      allowance_qty: holderClaim.tokenBalance,
+      token_balances: holderClaim.tokenBalances,
+      tier: holderClaim.tier,
+      allowance_qty: holderClaim.freeToteQty,
       covered_tote_qty: holderClaim.covered_tote_qty || 0,
       merch_discount_percent: holderClaim.discountPercent,
       benefit_ngn: holderClaim.benefit_ngn || 0,
@@ -3949,5 +3961,3 @@ module.exports = async (req, res) => {
     }
   }
 };
-
-
