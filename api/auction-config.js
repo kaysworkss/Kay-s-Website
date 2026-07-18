@@ -92,6 +92,8 @@ function sanitisePiece(p) {
     pieceId: String(p.pieceId || "").slice(0, 80),
     chain,
     contractAddr: String(p.contractAddr || "").slice(0, 100),
+    marketplaceAddr: String(p.marketplaceAddr || "").slice(0, 100),
+    marketplaceAuctionId: String(p.marketplaceAuctionId || "").replace(/\D/g, "").slice(0, 40),
     tezosContractAddr: String(p.tezosContractAddr || "").slice(0, 100),
     tezosAuctionId: String(p.tezosAuctionId || "").slice(0, 40),
     tezosNetwork: ["mainnet","ghostnet"].includes(String(p.tezosNetwork || "").toLowerCase())
@@ -132,6 +134,8 @@ const DEFAULT_CONFIG = {
   status:           "off",
   chain:            "eth",
   contractAddr:     "",
+  marketplaceAddr:  "",
+  marketplaceAuctionId:"",
   tezosContractAddr:"",
   tezosAuctionId:   "",
   tezosNetwork:     "mainnet",
@@ -189,6 +193,8 @@ module.exports = async function handler(req, res) {
       // Legacy single-piece fields (kept for backward compatibility with old readers)
       chain:            String(body.chain || "eth").toLowerCase() === "tezos" ? "tezos" : "eth",
       contractAddr:     String(body.contractAddr     || "").slice(0, 100),
+      marketplaceAddr:  String(body.marketplaceAddr   || "").slice(0, 100),
+      marketplaceAuctionId:String(body.marketplaceAuctionId || "").replace(/\D/g, "").slice(0, 40),
       tezosContractAddr:String(body.tezosContractAddr || "").slice(0, 100),
       tezosAuctionId:   String(body.tezosAuctionId    || "").slice(0, 40),
       tezosNetwork:     ["mainnet","ghostnet"].includes(String(body.tezosNetwork || "").toLowerCase())
