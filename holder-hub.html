@@ -259,7 +259,7 @@
   }
   .hub-tab-toggle-icon { font-size:1.1rem; line-height:1; color:var(--gold); }
   .tabs {
-    display:flex; flex-wrap:nowrap; justify-content:center; gap:0;
+    display:flex; flex-wrap:wrap; justify-content:center; gap:0;
     border-top:1px solid var(--line); border-bottom:1px solid var(--line);
     margin:0 auto 2.4rem; padding:0; max-width:1180px;
   }
@@ -275,6 +275,16 @@
   .tab-btn:hover,
   .tab-btn.active { color:#fdf0d0; }
   .tab-btn.active::after { transform:scaleX(1); }
+  .tab-notice-dot {
+    display:inline-block; width:6px; height:6px; border-radius:999px; margin-left:0.45rem;
+    background:var(--gold); box-shadow:0 0 0 4px rgba(201,153,58,0.14);
+    vertical-align:middle;
+  }
+  .tabs-scroll-hint {
+    display:none; margin:0.35rem 0 1.55rem; text-align:center;
+    color:var(--text-muted); font-size:0.72rem; letter-spacing:0.12em;
+    text-transform:uppercase;
+  }
 
   .panel-view { display:none; }
   .panel-view.show { display:block; }
@@ -901,6 +911,62 @@
     .future-plan-card.featured { grid-column: auto; }
     .future-plan-card { min-height: auto; }
   }
+  .notifications-grid {
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem;
+    max-width:980px; margin:0 auto;
+  }
+  .notification-card {
+    border:1px solid rgba(201,153,58,0.34); border-radius:8px;
+    background:rgba(30,20,16,0.36); padding:1.15rem;
+  }
+  .notification-card.new { border-color:rgba(223,184,92,0.64); background:rgba(201,153,58,0.1); }
+  .notification-card-top { display:flex; align-items:center; justify-content:space-between; gap:0.8rem; margin-bottom:0.75rem; }
+  .notification-tag {
+    display:inline-flex; align-items:center; border:1px solid rgba(201,153,58,0.44); border-radius:999px;
+    padding:0.28rem 0.55rem; color:var(--gold); font-family:'Cinzel',serif;
+    letter-spacing:0.14em; text-transform:uppercase; font-size:0.62rem;
+  }
+  .notification-date { color:var(--text-muted); font-size:0.78rem; white-space:nowrap; }
+  .notification-card h3 { font-size:1.35rem; margin:0 0 0.55rem; color:var(--sand); }
+  .notification-card p { color:var(--text-muted); line-height:1.62; margin:0; }
+  .notification-actions { display:flex; gap:0.7rem; flex-wrap:wrap; margin-top:1rem; }
+  .notification-link {
+    border:1px solid rgba(201,153,58,0.42); border-radius:999px; background:rgba(232,213,176,0.05);
+    color:var(--sand); cursor:pointer; font-family:'Cinzel',serif; letter-spacing:0.12em;
+    text-transform:uppercase; font-size:0.62rem; padding:0.55rem 0.8rem;
+  }
+  .notification-link:hover { border-color:var(--gold); color:#fdf0d0; }
+
+  @media (max-width:1100px) {
+    .hub-tab-toggle { display:none !important; }
+    .tabs {
+      display:flex !important; flex-direction:row !important; align-items:center !important;
+      justify-content:flex-start !important; flex-wrap:nowrap !important; overflow-x:auto; overflow-y:hidden;
+      -webkit-overflow-scrolling:touch; scrollbar-width:thin; scroll-snap-type:x proximity;
+      gap:0; max-width:none; margin:0 -1.2rem 0.2rem; padding:0 1.2rem 0.5rem;
+      border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+      border-left:0; border-right:0; border-radius:0;
+      background:linear-gradient(90deg,rgba(30,20,16,0.1),rgba(201,153,58,0.07),rgba(30,20,16,0.1));
+    }
+    .tabs.open { display:flex !important; }
+    .tabs::after { content:'Scroll'; flex:0 0 auto; width:2.6rem; color:rgba(232,213,176,0.45); font-size:0.58rem; letter-spacing:0.12em; text-transform:uppercase; align-self:center; }
+    .tab-btn {
+      width:auto !important; flex:0 0 auto; text-align:center !important; scroll-snap-align:start;
+      min-height:44px; padding:0.86rem 0.95rem; font-size:0.58rem;
+    }
+    .tab-btn::after {
+      left:0.9rem; right:0.9rem; top:auto; bottom:-1px; width:auto; height:2px;
+      transform:scaleX(0); transform-origin:center;
+    }
+    .tab-btn.active::after { transform:scaleX(1); }
+    .tabs-scroll-hint { display:block; }
+  }
+  @media (max-width:760px) {
+    .notifications-grid { grid-template-columns:1fr; }
+  }
+  @media (max-width:640px) {
+    .tabs { margin-left:-1rem; margin-right:-1rem; padding-left:1rem; padding-right:1rem; }
+  }
 </style>
 </head>
 <body>
@@ -992,6 +1058,7 @@
     <button class="hub-tab-toggle" id="hubTabToggle" type="button" aria-expanded="false" aria-controls="hubTabs"><span id="hubTabCurrent">Opa Collection</span><span class="hub-tab-toggle-icon">☰</span></button>
     <div class="tabs" id="hubTabs">
       <button class="tab-btn active" data-tab="opa">Opa Collection</button>
+      <button class="tab-btn tab-btn-notify" data-tab="notifications">Notifications<span class="tab-notice-dot" aria-hidden="true"></span></button>
       <button class="tab-btn" data-tab="updates">Updates</button>
       <button class="tab-btn" data-tab="merch">Merch</button>
       <button class="tab-btn" data-tab="artworks">All Artworks</button>
@@ -1000,6 +1067,39 @@
       <button class="tab-btn" data-tab="plans">Milestones &amp; Future Plans</button>
       <button class="tab-btn" data-tab="participants">Participants</button>
       <button class="tab-btn" data-tab="messages">Messages</button>
+    </div>
+    <p class="tabs-scroll-hint">Swipe tabs to see more</p>
+
+    <div class="panel-view" id="view-notifications">
+      <header class="section-intro">
+        <span class="eyebrow">Holder Notices</span>
+        <h2>Notifications</h2>
+        <p>Recent changes in the hub, gathered in one place so you can quickly see what needs your attention.</p>
+      </header>
+      <div class="notifications-grid">
+        <article class="notification-card new">
+          <div class="notification-card-top">
+            <span class="notification-tag">New</span>
+            <span class="notification-date">July 2026</span>
+          </div>
+          <h3>Auction access update</h3>
+          <p>The Updates tab now explains the phased auction format: holders get the first access window, and selected main painting auctions may carry a holder-phase reserve advantage.</p>
+          <div class="notification-actions">
+            <button class="notification-link" type="button" data-jump-tab="updates">Read update</button>
+          </div>
+        </article>
+        <article class="notification-card new">
+          <div class="notification-card-top">
+            <span class="notification-tag">New</span>
+            <span class="notification-date">July 2026</span>
+          </div>
+          <h3>Merch claim details</h3>
+          <p>The Merch tab now shows holder entitlements and made-to-order fulfilment notes. Bronze holders can see free tote eligibility, while Wood and Bronze discounts are kept visible before claiming opens.</p>
+          <div class="notification-actions">
+            <button class="notification-link" type="button" data-jump-tab="merch">View merch</button>
+          </div>
+        </article>
+      </div>
     </div>
 
     <div class="panel-view" id="view-merch">
@@ -2527,6 +2627,14 @@ document.querySelectorAll('.tabs .tab-btn[data-tab]').forEach(btn => {
     if (hubTabCurrent) hubTabCurrent.textContent = btn.textContent.trim();
     hubTabs?.classList.remove('open');
     hubTabToggle?.setAttribute('aria-expanded', 'false');
+    btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  });
+});
+
+document.querySelectorAll('[data-jump-tab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = document.querySelector(`.tabs .tab-btn[data-tab="${btn.dataset.jumpTab}"]`);
+    target?.click();
   });
 });
 
