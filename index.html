@@ -1834,14 +1834,49 @@
     .hero-sub { font-size: 1rem; }
     .hero-actions { flex-direction: column; align-items: center; gap: 1rem; padding-bottom: 2rem; }
     .hero-scroll-hint {
-      position: relative; bottom: auto; left: auto;
-      transform: none;
-      margin-top: 1.5rem;
+      position: absolute;
+      bottom: calc(76px + env(safe-area-inset-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: 0;
       align-items: center;
-      align-self: center;
-      width: 100%;
+      width: auto;
+      pointer-events: none;
     }
-    #hero { overflow: visible; }
+    #hero { overflow: hidden; }
+
+    /* Keep the larger hero actions clear of the scroll prompt. */
+    .hero-left { padding-bottom: 8.5rem; }
+    .hero-actions { padding-bottom: 0; }
+    .scroll-line { height: 32px; }
+
+    /* The sticky marketplace bar is taller now, so keep legacy lightbox
+       artwork and its close control inside the visible mobile viewport. */
+    .lightbox-overlay {
+      padding: max(3.75rem, calc(env(safe-area-inset-top) + 3rem)) 1rem calc(76px + env(safe-area-inset-bottom));
+    }
+    .lightbox-inner {
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+    }
+    .lightbox-inner img {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+    }
+    .lightbox-close {
+      position: fixed;
+      top: max(0.75rem, env(safe-area-inset-top));
+      right: max(0.75rem, env(safe-area-inset-right));
+      z-index: 10002;
+      width: 2.75rem;
+      height: 2.75rem;
+    }
 
     /* FEATURED */
     #featured { max-height: none !important; height: auto !important; }
@@ -2543,14 +2578,25 @@ body.kwp-viewer-open {
 
   .kwp-viewer-panel {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 58dvh) auto;
+    grid-template-rows: minmax(0, 55dvh) auto;
     align-items: start;
     overflow: auto;
-    padding: 4.5rem 1rem 1.25rem;
+    padding: max(4.5rem, calc(env(safe-area-inset-top) + 3.5rem)) 1rem max(1.25rem, env(safe-area-inset-bottom));
   }
 
   .kwp-viewer-media {
     height: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .kwp-viewer-media img {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
   }
 
   .kwp-viewer-info {
@@ -2562,6 +2608,15 @@ body.kwp-viewer-open {
 
   .kwp-viewer-nav {
     top: 35%;
+  }
+
+  .kwp-viewer-close {
+    position: fixed;
+    top: max(0.75rem, env(safe-area-inset-top));
+    right: max(0.75rem, env(safe-area-inset-right));
+    z-index: 5002;
+    width: 2.5rem;
+    height: 2.5rem;
   }
 }
 
@@ -2592,6 +2647,20 @@ body.kwp-viewer-open {
   .kwp-year-filter {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .kwp-viewer-panel {
+    grid-template-rows: minmax(220px, 50dvh) auto;
+  }
+
+  .kwp-viewer-media {
+    width: 100%;
+    height: 100%;
+  }
+
+  .kwp-viewer-media img {
+    max-width: calc(100vw - 2rem);
+    max-height: 50dvh;
   }
 }
 
