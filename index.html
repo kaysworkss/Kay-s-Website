@@ -1791,7 +1791,10 @@
       position: fixed; inset: 0; z-index: 150;
       background: rgba(245,237,224,0.97);
       display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 2.5rem;
+      align-items: center; justify-content: center;
+      gap: clamp(1.1rem, 3.5dvh, 2rem);
+      padding: max(4.5rem, env(safe-area-inset-top)) 1.5rem max(2rem, env(safe-area-inset-bottom));
+      overflow-y: auto;
       opacity: 0; pointer-events: none;
       transition: opacity 0.35s ease;
     }
@@ -1806,6 +1809,16 @@
     }
     body.dark .mobile-nav a { color: #e0c8a8; }
     .mobile-nav a:hover { color: var(--rust); }
+    .mobile-nav .mobile-shop-link {
+      font-family: 'Cinzel', serif;
+      font-size: 1rem;
+      font-style: normal;
+      letter-spacing: 0.14em;
+      color: var(--gold);
+      border: 1px solid rgba(201,153,58,0.45);
+      border-radius: 3px;
+      padding: 0.55rem 0.85rem;
+    }
     .mobile-nav-close {
       position: absolute; top: 1.4rem; right: 1.4rem;
       background: none; border: 1px solid rgba(196,132,90,0.3);
@@ -1829,10 +1842,46 @@
 
     /* HERO */
     #hero { min-height: 100vh; padding: 0; }
-    .hero-left { padding: 7rem 2rem 4rem; }
+    .hero-left {
+      width: 100%;
+      max-width: 680px;
+      margin-inline: auto;
+      padding: 7rem 1.25rem 8.5rem;
+      text-align: center;
+      align-items: center;
+    }
     .hero-title { font-size: clamp(2.8rem, 10vw, 4rem); }
-    .hero-sub { font-size: 1rem; }
-    .hero-actions { flex-direction: column; align-items: center; gap: 1rem; padding-bottom: 2rem; }
+    .hero-sub { font-size: 1rem; margin-inline: auto; }
+    .hero-actions {
+      width: min(100%, 430px);
+      margin-top: 2.25rem;
+      display: grid;
+      grid-template-columns: 1fr 1.25fr 0.9fr;
+      align-items: stretch;
+      gap: 0.45rem;
+      padding-bottom: 0;
+    }
+    .hero-actions .btn-primary,
+    .hero-actions .btn-collect-hero,
+    .hero-actions .btn-ghost {
+      min-width: 0;
+      min-height: 42px;
+      padding: 0.65rem 0.35rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      font-family: 'Cinzel', serif;
+      font-size: clamp(0.46rem, 1.8vw, 0.58rem);
+      line-height: 1.25;
+      letter-spacing: 0.11em;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .hero-actions .btn-ghost {
+      border: 1px solid rgba(196,132,90,0.55);
+      padding-bottom: 0.65rem;
+    }
     .hero-scroll-hint {
       position: absolute;
       bottom: calc(76px + env(safe-area-inset-bottom));
@@ -1845,9 +1894,7 @@
     }
     #hero { overflow: hidden; }
 
-    /* Keep the larger hero actions clear of the scroll prompt. */
-    .hero-left { padding-bottom: 8.5rem; }
-    .hero-actions { padding-bottom: 0; }
+    /* Keep the compact action row clear of the scroll prompt. */
     .scroll-line { height: 32px; }
 
     /* The sticky marketplace bar is taller now, so keep legacy lightbox
@@ -2708,6 +2755,7 @@ body.kwp-viewer-open {
   <a href="#portfolio" class="mobile-link">Portfolio</a>
   <a href="#commissions" class="mobile-link">Commissions</a>
   <a href="#shop" class="mobile-link">Collect</a>
+  <a href="/shop" class="mobile-link mobile-shop-link">Shop ✦</a>
   <a href="#about" class="mobile-link">About</a>
   <a href="/tezos-pin" class="mobile-link">Tezos Pin</a>
 </div>
