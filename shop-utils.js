@@ -597,7 +597,10 @@ function normalizeProduct(p) {
   p.image = p.image || p.image_url || '';
   const storedImages = Array.isArray(p.images) ? p.images : [];
   const optionConfig = storedImages.find(item => item && typeof item === 'object' && item.kind === 'merch_options');
+  const holderTierConfig = storedImages.find(item => item && typeof item === 'object' && item.kind === 'holder_tier_discounts');
   p.merchOptionMode = p.merchOptionMode || p.merch_option_mode || optionConfig?.mode || '';
+  p.holder_benefit_wood_percent = Math.max(0, Math.min(90, Number(p.holder_benefit_wood_percent ?? holderTierConfig?.wood ?? 15)));
+  p.holder_benefit_bronze_percent = Math.max(0, Math.min(90, Number(p.holder_benefit_bronze_percent ?? holderTierConfig?.bronze ?? 20)));
   p.variantImages = Object.assign({}, p.variantImages || p.variant_images || {});
   storedImages.forEach(item => {
     if (item && typeof item === 'object' && item.variant) {
@@ -627,7 +630,14 @@ function packedProductImages(product) {
   const optionConfig = product?.category !== 'prints' && product?.merchOptionMode
     ? [{ kind: 'merch_options', mode: product.merchOptionMode }]
     : [];
-  return gallery.concat(mapped, optionConfig);
+  const holderTierConfig = product?.category === 'merch'
+    ? [{
+        kind: 'holder_tier_discounts',
+        wood: Math.max(0, Math.min(90, Number(product.holder_benefit_wood_percent ?? 15))),
+        bronze: Math.max(0, Math.min(90, Number(product.holder_benefit_bronze_percent ?? 20))),
+      }]
+    : [];
+  return gallery.concat(mapped, optionConfig, holderTierConfig);
 }
 function productKey(p) {
   if (!p) return '';

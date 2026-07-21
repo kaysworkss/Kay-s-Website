@@ -4897,7 +4897,10 @@ function holderMerchDiscountPercent() {
   return Number(_holderMerchClaim?.discountPercent || 0);
 }
 function holderProductDiscountPercent(product) {
-  const productPercent = Number(product?.holder_benefit_discount_percent || 0);
+  const isBronze = /bronze/i.test(String(_holderMerchClaim?.tier || '')) || Number(_holderMerchClaim?.tokenBalances?.[2] || 0) > 0;
+  const productPercent = isBronze
+    ? Number(product?.holder_benefit_bronze_percent ?? 20)
+    : Number(product?.holder_benefit_wood_percent ?? 15);
   return Math.max(0, Math.min(90, productPercent));
 }
 function holderMerchBenefit(currency) {
@@ -5791,7 +5794,7 @@ let _appliedDiscount = null;
 // Apoti holder merch claim. Bronze Token (#2) carries the tote entitlement; Wooden Token (#1) is discount-only.
 const APOTI_HOLDER_CONFIG = {
   defaultTier: 'Apoti Holder',
-  defaultMerchDiscountPercent: 25,
+  defaultMerchDiscountPercent: 20,
   entitlementKey: 'apoti-olowe-token-2-merch',
   accessLocked: true,
   manualLock: false,
@@ -5803,7 +5806,7 @@ const APOTI_HOLDER_CONFIG = {
       type: 'ERC1155',
       tokenIds: [2],
       tier: 'Bronze Token Holder',
-      discountPercent: 25,
+      discountPercent: 20,
       freeTote: true,
     },
     {
@@ -5821,7 +5824,7 @@ const APOTI_HOLDER_CONFIG = {
       type: 'FA2',
       tokenIds: [2],
       tier: 'Bronze Token Holder',
-      discountPercent: 25,
+      discountPercent: 20,
       freeTote: true,
     },
     {
@@ -8895,6 +8898,13 @@ async function loadShopData() {
           print_edition:      r.print_edition || r.edition_type || '',
           is_sold:            r.is_sold || false,
           enquire_only:       r.enquire_only || false,
+          holder_benefit_active:          r.holder_benefit_active === true,
+          holder_benefit_role:            r.holder_benefit_role || '',
+          holder_benefit_project:         r.holder_benefit_project || 'apoti-olowe',
+          holder_benefit_entitlement_key: r.holder_benefit_entitlement_key || 'apoti-olowe-token-2-merch',
+          holder_benefit_discount_percent: Number(r.holder_benefit_discount_percent || 0),
+          holder_benefit_wood_percent: Number((r.images || []).find(x => x && typeof x === 'object' && x.kind === 'holder_tier_discounts')?.wood ?? 15),
+          holder_benefit_bronze_percent: Number((r.images || []).find(x => x && typeof x === 'object' && x.kind === 'holder_tier_discounts')?.bronze ?? 20),
       })).filter(p => !p._isSample);
       _shopProductsLoadedOnce = true;
       delete SHOP_CONFIG._loadError;

@@ -1389,7 +1389,7 @@
         <h4>Collector benefits</h4>
         <p>Your tokens also carry tiered merch benefits:</p>
         <ul class="holder-update-list">
-          <li><strong>Bronze token</strong> holders receive one free tote per Bronze token held, plus up to 25% off available merch such as totes, hoodies, and T-shirts.</li>
+          <li><strong>Bronze token</strong> holders receive one free tote per Bronze token held, plus up to 20% off available merch such as totes, hoodies, and T-shirts.</li>
           <li><strong>Wood token</strong> holders receive up to 15% off available merch.</li>
         </ul>
         <p>And beyond the auctions and merch, your tokens remain part of the long-term structure of the project: the project monolith, the key pieces, and the end-stage vision of Àpótí Ọlọ́wẹ̀.</p>
@@ -2544,7 +2544,10 @@ async function renderMerchEntitlement() {
   const el = document.getElementById('merchEntitlementText');
   if (!el || !currentHolder) return;
   el.textContent = 'Checking your merch entitlement...';
-  const { tier, balances } = await resolveMerchEntitlement(currentHolder);
+  const [{ tier, balances }, tierDiscounts] = await Promise.all([
+    resolveMerchEntitlement(currentHolder),
+    loadHolderTierDiscounts(),
+  ]);
   currentHolder.balancesByTokenId = balances;
   currentHolder.tier = tier || currentHolder.tier;
   currentHolder.token_id = balances['2'] > 0 ? 2 : balances['1'] > 0 ? 1 : currentHolder.token_id;
@@ -2552,12 +2555,32 @@ async function renderMerchEntitlement() {
   const toteText = bronzeBalance === 1 ? '1 tote bag available to redeem' : `${bronzeBalance} tote bags available to redeem`;
 
   if (tier.includes('bronze')) {
-    el.innerHTML = `<strong>Bronze holder benefit:</strong> ${toteText}. Each Bronze token qualifies for one free tote bag, plus up to 25% off available merch such as totes, hoodies, and T-shirts.`;
+    el.innerHTML = `<strong>Bronze holder benefit:</strong> ${toteText}. Each Bronze token qualifies for one free tote bag, plus up to ${tierDiscounts.bronze}% off available merch such as totes, hoodies, and T-shirts.`;
   } else if (tier.includes('wood')) {
-    el.innerHTML = '<strong>Wooden holder benefit:</strong> you qualify for up to 15% off available merch such as totes, hoodies, and T-shirts.';
+    el.innerHTML = `<strong>Wooden holder benefit:</strong> you qualify for up to ${tierDiscounts.wood}% off available merch such as totes, hoodies, and T-shirts.`;
   } else {
     el.innerHTML = '<strong>Merch entitlement:</strong> reconnect the wallet that holds your gate token so this section can show the correct tote and discount benefit before claims open.';
   }
+}
+
+let _holderTierDiscountsPromise = null;
+function loadHolderTierDiscounts() {
+  if (_holderTierDiscountsPromise) return _holderTierDiscountsPromise;
+  _holderTierDiscountsPromise = fetch('/api/shop/products')
+    .then(response => response.ok ? response.json() : Promise.reject(new Error('Products unavailable')))
+    .then(rows => {
+      const configured = (Array.isArray(rows) ? rows : [])
+        .filter(product => product?.holder_benefit_active === true)
+        .map(product => (Array.isArray(product.images) ? product.images : [])
+          .find(item => item && typeof item === 'object' && item.kind === 'holder_tier_discounts'))
+        .filter(Boolean);
+      return {
+        wood: configured.length ? Math.max(...configured.map(item => Number(item.wood ?? 15))) : 15,
+        bronze: configured.length ? Math.max(...configured.map(item => Number(item.bronze ?? 20))) : 20,
+      };
+    })
+    .catch(() => ({ wood: 15, bronze: 20 }));
+  return _holderTierDiscountsPromise;
 }
 
 async function loadFuturePlans() {

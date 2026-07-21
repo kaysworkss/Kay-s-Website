@@ -956,6 +956,8 @@ async function loadAdminConfig() {
         holder_benefit_project:         r.holder_benefit_project || 'apoti-olowe',
         holder_benefit_entitlement_key: r.holder_benefit_entitlement_key || 'apoti-olowe-token-2-merch',
         holder_benefit_discount_percent: Number(r.holder_benefit_discount_percent || 0),
+        holder_benefit_wood_percent: Number((r.images || []).find(x => x && typeof x === 'object' && x.kind === 'holder_tier_discounts')?.wood ?? 15),
+        holder_benefit_bronze_percent: Number((r.images || []).find(x => x && typeof x === 'object' && x.kind === 'holder_tier_discounts')?.bronze ?? 20),
       }));
       renderAdminProducts();
       adminProductsDirty = false;
@@ -1794,8 +1796,11 @@ function renderAdminProducts() {
             <option value="free_tote"${p.holder_benefit_role === 'free_tote' ? ' selected' : ''}>Free holder item</option>
             <option value="discount_addon"${p.holder_benefit_role === 'discount_addon' ? ' selected' : ''}>Holder discount add-on</option>
           </select>
-          <input class="form-input ap-holder-discount-percent" data-idx="${realIdx}" type="number" min="0" max="90" step="1" value="${Number(p.holder_benefit_discount_percent || 0)}" placeholder="Discount %" style="margin-top:0.45rem"/>
-          <p style="font-size:0.68rem;color:var(--text-muted);margin-top:0.3rem">Token #2 can claim free totes. Token #1 can use the discount-only perk. Set the add-on discount percent here.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.55rem;margin-top:0.45rem">
+            <label style="font-size:0.68rem;color:var(--text-muted)">Wooden tier %<input class="form-input ap-holder-wood-percent" data-idx="${realIdx}" type="number" min="0" max="90" step="1" value="${Number(p.holder_benefit_wood_percent ?? 15)}" style="margin-top:0.25rem"/></label>
+            <label style="font-size:0.68rem;color:var(--text-muted)">Bronze tier %<input class="form-input ap-holder-bronze-percent" data-idx="${realIdx}" type="number" min="0" max="90" step="1" value="${Number(p.holder_benefit_bronze_percent ?? 20)}" style="margin-top:0.25rem"/></label>
+          </div>
+          <p style="font-size:0.68rem;color:var(--text-muted);margin-top:0.3rem">Token #2 can also claim the configured free holder item. Set each tier's discount for this product here.</p>
         </div>` : ''}        <div class="form-row" style="margin:0">
           <label class="form-label">Image URL</label>
           <input class="form-input ap-img" data-idx="${realIdx}" value="${escapeAttr(p.image||'')}"/>
@@ -2175,7 +2180,8 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
       const emojiEl = row.querySelector('.ap-emoji');
       const stockEl = row.querySelector('.ap-stock');
       const holderBenefitEl = row.querySelector('.ap-holder-benefit');
-      const holderDiscountEl = row.querySelector('.ap-holder-discount-percent');
+      const holderWoodDiscountEl = row.querySelector('.ap-holder-wood-percent');
+      const holderBronzeDiscountEl = row.querySelector('.ap-holder-bronze-percent');
       const madeToOrderEl = row.querySelector('.ap-made-to-order');
       const optionModeEl = row.querySelector('.ap-option-mode');
       if (nameEl)  p.name  = nameEl.value.trim() || p.name;
@@ -2353,7 +2359,9 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
           p.holder_benefit_active = Boolean(benefitRole);
           p.holder_benefit_project = 'apoti-olowe';
           p.holder_benefit_entitlement_key = 'apoti-olowe-token-2-merch';
-          p.holder_benefit_discount_percent = Math.max(0, Math.min(90, Number(holderDiscountEl?.value || p.holder_benefit_discount_percent || 0)));
+          p.holder_benefit_wood_percent = Math.max(0, Math.min(90, Number(holderWoodDiscountEl?.value ?? p.holder_benefit_wood_percent ?? 15)));
+          p.holder_benefit_bronze_percent = Math.max(0, Math.min(90, Number(holderBronzeDiscountEl?.value ?? p.holder_benefit_bronze_percent ?? 20)));
+          p.holder_benefit_discount_percent = p.holder_benefit_bronze_percent;
         } else {
           p.clothing = false;
           p.clothing_type = '';
@@ -2362,6 +2370,8 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
           p.holder_benefit_project = 'apoti-olowe';
           p.holder_benefit_entitlement_key = 'apoti-olowe-token-2-merch';
           p.holder_benefit_discount_percent = 0;
+          p.holder_benefit_wood_percent = 15;
+          p.holder_benefit_bronze_percent = 20;
         }
 
         const variants = [];
