@@ -596,6 +596,8 @@ function normalizeProduct(p) {
   p.badge = p.badge || '';
   p.image = p.image || p.image_url || '';
   const storedImages = Array.isArray(p.images) ? p.images : [];
+  const optionConfig = storedImages.find(item => item && typeof item === 'object' && item.kind === 'merch_options');
+  p.merchOptionMode = p.merchOptionMode || p.merch_option_mode || optionConfig?.mode || '';
   p.variantImages = Object.assign({}, p.variantImages || p.variant_images || {});
   storedImages.forEach(item => {
     if (item && typeof item === 'object' && item.variant) {
@@ -622,7 +624,10 @@ function packedProductImages(product) {
     .map(([variant, value]) => [variant, (Array.isArray(value) ? value : [value]).filter(Boolean).map(String).slice(0, 2)])
     .filter(([variant, images]) => String(variant).trim() && images.length)
     .map(([variant, images]) => ({ variant: String(variant), images, url: images[0] }));
-  return gallery.concat(mapped);
+  const optionConfig = product?.category !== 'prints' && product?.merchOptionMode
+    ? [{ kind: 'merch_options', mode: product.merchOptionMode }]
+    : [];
+  return gallery.concat(mapped, optionConfig);
 }
 function productKey(p) {
   if (!p) return '';
@@ -862,7 +867,30 @@ function optionDisplaySizes(option) {
 }
 
 function getChoices(p) {
-  return (p.variants || []).map(v => ({ key: v, label: v, size: v }));
+  return (p.variants || []).map(v => {
+    const parts = splitMerchVariant(v);
+    const mode = merchOptionMode(p);
+    if (mode === 'color') return { key: v, label: String(v), size: 'One size', color: String(v) };
+    if (mode === 'none') return { key: v, label: 'One size', size: 'One size', color: '' };
+    return { key: v, label: parts.color ? `${parts.color} / ${parts.size}` : parts.size, size: parts.size, color: parts.color };
+  });
+}
+
+function splitMerchVariant(value) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(.*?)\s+\|\s+(.*)$/);
+  return match ? { color: match[1].trim(), size: match[2].trim() } : { color: '', size: raw };
+}
+function merchVariantKey(color, size) {
+  const c = String(color || '').trim();
+  const s = String(size || '').trim();
+  return c && s ? `${c} | ${s}` : (s || c);
+}
+function merchOptionMode(product) {
+  const explicit = String(product?.merchOptionMode || product?.merch_option_mode || '');
+  if (['none', 'size', 'color', 'size_color'].includes(explicit)) return explicit;
+  const parts = (product?.variants || []).map(splitMerchVariant);
+  return parts.some(x => x.color) ? 'size_color' : (parts.length > 1 || parts[0]?.size !== 'One size' ? 'size' : 'none');
 }
 
 function productPrice(p, key, currency) {
