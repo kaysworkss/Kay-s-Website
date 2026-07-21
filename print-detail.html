@@ -471,6 +471,15 @@ body.dark .size-chip.selected { color:var(--sand); }
   font-size:0.82rem; color:var(--text-muted);
   display:flex; align-items:center; gap:0.4rem; line-height:1.5;
 }
+.made-to-order-note {
+  margin:0 0 0.75rem; padding:0.7rem 0.8rem;
+  border-left:2px solid var(--gold); background:rgba(183,135,54,0.08);
+  font-size:0.82rem; color:var(--text); line-height:1.5;
+}
+.made-to-order-note strong {
+  font-family:'Cinzel',serif; font-size:0.62rem;
+  letter-spacing:0.12em; text-transform:uppercase; color:var(--gold);
+}
 .shipping-note::before { content:'⊕'; color:var(--clay); }
 
 /* ── Cart drawer (ported from shop) ── */
@@ -1479,6 +1488,7 @@ function addToCart(product, variantKey, variantLabel) {
       priceUsd: printPrice(product, variantKey, 'usd'),
       emoji: product.emoji || '🖼',
       image: productVariantImage(product, variantKey),
+      madeToOrder: product.category !== 'prints' && variantStock(product, variantKey) === null,
       qty: 1,
     });
   }
@@ -1651,6 +1661,8 @@ function updateCartUI() {
     const note = maxed
       ? `<span class="cart-item-soldout">Sold out — last ${c.qty} reserved for you</span>`
       : (left !== null && left <= 3 ? `<span class="cart-item-lowstock">Only ${left} more available</span>` : '');
+    const madeToOrder = c.madeToOrder === true
+      ? `<span class="cart-item-lowstock">Made to order · We’ll email you when ready</span>` : '';
     return `
     <div class="cart-item">
       <div class="cart-item-img">
@@ -1659,6 +1671,7 @@ function updateCartUI() {
       <div class="cart-item-info">
         <div class="cart-item-name">${c.name}</div>
         <div class="cart-item-variant">${c.variant}</div>
+        ${madeToOrder}
         ${note}
         <div class="cart-item-qty">
           <button class="qty-btn" data-key="${cartDomKey(c.key)}" data-dir="-1">−</button>
@@ -1752,6 +1765,7 @@ function initZoom(wrap) {
 let _product = null;
 let _selectedPrintType = '';
 let _selectedVariant = '';
+let _selectedMerchOptions = { color: '', size: '' };
 
 function detailTags(p) {
   const tags = [];
@@ -1947,6 +1961,20 @@ function merchVariants(p) {
   const labels = v.map(x => (typeof x === 'string' ? x : (x && x.type) || '')).filter(Boolean);
   return labels.length ? labels : ['One size'];
 }
+function detailMerchOptionMode(p) {
+  const marker = (Array.isArray(p?.images) ? p.images : []).find(x => x && typeof x === 'object' && x.kind === 'merch_options');
+  if (marker?.mode) return marker.mode;
+  return merchVariants(p).some(v => /\s\|\s/.test(v)) ? 'size_color' : 'size';
+}
+function detailMerchChoices(p) {
+  const mode = detailMerchOptionMode(p);
+  return merchVariants(p).map(key => {
+    if (mode === 'color') return { key, color: key, size: 'One size' };
+    if (mode === 'none') return { key, color: '', size: 'One size' };
+    const match = String(key).match(/^(.*?)\s+\|\s+(.*)$/);
+    return { key, color: match ? match[1].trim() : '', size: match ? match[2].trim() : key };
+  });
+}
 function merchVariantDisplay(value) {
   const match = String(value || '').match(/^(.*?)\s+\|\s+(.*)$/);
   return match ? `${match[1].trim()} / ${match[2].trim()}` : String(value || '');
@@ -1959,10 +1987,27 @@ function merchStock(p, label) {
   return null;
 }
 
+function merchIsMadeToOrder(p, label) {
+  if (label) return merchStock(p, label) === null;
+  const variants = merchVariants(p);
+  return variants.length > 0 && variants.every(variant => merchStock(p, variant) === null);
+}
+
+function updateMadeToOrderNotice(label) {
+  const note = document.getElementById('madeToOrderNote');
+  if (!note || !_product) return;
+  note.hidden = !merchIsMadeToOrder(_product, label);
+}
+
 function renderMerchProduct(p) {
   const variants = merchVariants(p);
+  const choices = detailMerchChoices(p);
+  const optionMode = detailMerchOptionMode(p);
+  const colors = [...new Set(choices.map(c => c.color).filter(Boolean))];
+  const sizes = [...new Set(choices.map(c => c.size).filter(Boolean))];
   const requiresChoice = variants.length > 1;
   _selectedVariant = requiresChoice ? '' : (variants[0] || '');
+  _selectedMerchOptions = { color: colors.length === 1 ? colors[0] : '', size: sizes.length === 1 ? sizes[0] : '' };
 
   document.title = `${p.name} · Kay's Works`;
   updateMeta(p);
@@ -1990,9 +2035,9 @@ function renderMerchProduct(p) {
     ? `<img id="heroImg" src="${images[0]}" alt="${p.name}"/>`
     : `<div class="hero-img-placeholder">${p.emoji || '✦'}</div>`;
 
-  const variantChips = variants.map((label, i) => `
-    <button class="size-chip${!requiresChoice&&i===0?' selected':''}" data-v="${escapeAttr(label)}">${escapeAttr(merchVariantDisplay(label))}</button>
-  `).join('');
+  const colorChips = (optionMode === 'color' || optionMode === 'size_color') ? `<div class="option-axis"><p class="purchase-label">Colour</p>${colors.map(color => `<button class="size-chip merch-axis-chip${colors.length===1?' selected':''}" data-axis="color" data-value="${escapeAttr(color)}">${escapeAttr(color)}</button>`).join('')}</div>` : '';
+  const sizeChips = (optionMode === 'size' || optionMode === 'size_color') ? `<div class="option-axis"><p class="purchase-label">Size</p>${sizes.map(size => `<button class="size-chip merch-axis-chip${sizes.length===1?' selected':''}" data-axis="size" data-value="${escapeAttr(size)}">${escapeAttr(size)}</button>`).join('')}</div>` : '';
+  const variantChips = colorChips + sizeChips;
 
   const allNgn = Object.values(p.prices_ngn || {}).map(Number).filter(n => n > 0);
   const allUsd = Object.values(p.prices_usd || {}).map(Number).filter(n => n > 0);
@@ -2000,6 +2045,7 @@ function renderMerchProduct(p) {
   const usd = _selectedVariant ? printPrice(p, _selectedVariant, 'usd') : (allUsd.length ? Math.min(...allUsd) : 0);
   const stock = merchStock(p, _selectedVariant);
   const soldOut = stock === 0;
+  const madeToOrder = merchIsMadeToOrder(p, _selectedVariant);
 
   const storyHtml = (p.story || p.desc || p.description || '')
     .split('\n').filter(Boolean).map(line => `<p>${line}</p>`).join('');
@@ -2036,13 +2082,14 @@ function renderMerchProduct(p) {
         ${specRows ? `<div class="section-divider"><span>Details</span></div><table class="spec-table">${specRows}</table>` : ''}
 
         <div class="purchase-block">
-          <p class="purchase-label">Choose an option</p>
+          <p class="purchase-label">Choose your options</p>
           <div class="size-picker">${variantChips}</div>
           <div class="price-row">
             <span class="price-ngn" id="priceNgn">${requiresChoice ? 'From ' : ''}${(_detailCurrency && _detailCurrency !== 'NGN' && _detailRate) ? (fmtLocal(ngn) || fmt(ngn)) : fmt(ngn)}</span>
             <span class="price-usd" id="priceUsd">${fmtUsd(usd)} USD</span>
             <span id="merchStock" style="font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;margin-left:0.6rem;color:${soldOut?'var(--rust)':'var(--gold)'}">${soldOut?'Sold out':(stock!==null&&stock<=3?`Only ${stock} left`:'')}</span>
           </div>
+          <p class="made-to-order-note" id="madeToOrderNote" ${madeToOrder?'':'hidden'}><strong>Made to order.</strong> Produced after purchase. We’ll email you when it’s ready and when it ships.</p>
           <button class="add-to-cart-btn" id="addBtn" onclick="handleMerchAddToCart()" ${(!_selectedVariant||soldOut)?'disabled':''}>${soldOut?'Sold out':(_selectedVariant?'Add to bag':'Choose an option')}</button>
           <p class="shipping-note">Ships from Nigeria via GIG Logistics (domestic) or DHL / UPS (international).</p>
         </div>
@@ -2059,7 +2106,7 @@ function renderMerchProduct(p) {
 
 function selectMerchVariant(label) {
   _selectedVariant = label;
-  document.querySelectorAll('.size-picker .size-chip').forEach(c =>
+  document.querySelectorAll('.size-picker .size-chip[data-v]').forEach(c =>
     c.classList.toggle('selected', c.dataset.v === label));
   refreshMerchVariantGallery(label);
   const ngn = printPrice(_product, label, 'ngn');
@@ -2083,12 +2130,32 @@ function selectMerchVariant(label) {
     stockEl.textContent = soldOut ? 'Sold out' : (stock !== null && stock <= 3 ? `Only ${stock} left` : '');
     stockEl.style.color = soldOut ? 'var(--rust)' : 'var(--gold)';
   }
+  updateMadeToOrderNotice(label);
   const btn = document.getElementById('addBtn');
   if (btn) {
     btn.disabled = !label || soldOut || maxedByCart;
     btn.textContent = soldOut ? 'Sold out'
       : (maxedByCart ? 'All in your bag'
         : (label ? 'Add to bag' : 'Unavailable'));
+  }
+}
+
+function selectMerchAxis(axis, value) {
+  _selectedMerchOptions[axis] = value;
+  document.querySelectorAll(`.merch-axis-chip[data-axis="${axis}"]`).forEach(chip => chip.classList.toggle('selected', chip.dataset.value === value));
+  const mode = detailMerchOptionMode(_product);
+  const choices = detailMerchChoices(_product);
+  const exact = choices.find(c =>
+    (mode !== 'color' && mode !== 'size_color' || c.color === _selectedMerchOptions.color) &&
+    (mode !== 'size' && mode !== 'size_color' || c.size === _selectedMerchOptions.size));
+  const preview = exact || (_selectedMerchOptions.color ? choices.find(c => c.color === _selectedMerchOptions.color) : null);
+  if (preview) refreshMerchVariantGallery(preview.key);
+  if (exact) selectMerchVariant(exact.key);
+  else {
+    _selectedVariant = '';
+    updateMadeToOrderNotice('');
+    const btn = document.getElementById('addBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Choose remaining option'; }
   }
 }
 
@@ -2496,7 +2563,8 @@ document.getElementById('printContent').addEventListener('click', e => {
   } else if (chip.closest('.size-picker')) {
     if (chip.dataset.v === undefined) return;
     if (_product && _product.category && _product.category !== 'prints') {
-      selectMerchVariant(chip.dataset.v);
+      if (chip.classList.contains('merch-axis-chip')) selectMerchAxis(chip.dataset.axis, chip.dataset.value);
+      else selectMerchVariant(chip.dataset.v);
     } else {
       selectSize(chip.dataset.v);
     }

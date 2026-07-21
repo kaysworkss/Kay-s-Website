@@ -712,6 +712,7 @@ function openDetail(id) {
   const alreadySent = !!o.delivery_details_sent_at;
   const suggestedCarrier = inferredCarrier(o);
   const orderNote = meta?.order_note || '';
+  const madeToOrderItems = items.filter(item => item.madeToOrder === true || item.made_to_order === true);
 
   document.getElementById('detailBody').innerHTML = `
     <div class="detail-section">
@@ -743,6 +744,22 @@ function openDetail(id) {
         <textarea class="detail-input detail-textarea" id="dNote">${o.admin_note||''}</textarea>
       </div>
       <button class="action-btn primary" onclick="saveOrderDetail('${o.id}')">Save changes</button>
+    </div>
+
+    <div class="delivery-panel" style="margin-bottom:1rem">
+      <div class="delivery-panel-head" onclick="toggleProductionPanel()">
+        <span class="delivery-panel-title">✦ Notify customer: order in production</span>
+        <span class="delivery-panel-toggle" id="productionToggleIcon">▾</span>
+      </div>
+      <div class="delivery-panel-body" id="productionPanelBody">
+        ${madeToOrderItems.length ? `<div class="delivery-sent-badge" style="margin-bottom:0.8rem">Made to order: ${madeToOrderItems.map(item => escapeHtml(`${item.name || 'Item'}${item.variant ? ` · ${item.variant}` : ''}`)).join(', ')}</div>` : ''}
+        <div class="delivery-field">
+          <label>Message to customer</label>
+          <textarea id="productionMessage">Your made-to-order item is now being produced.</textarea>
+        </div>
+        <p style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;margin:0 0 0.8rem">This sends an email and changes the order status to Processing.</p>
+        <button class="send-delivery-btn" id="sendProductionBtn" onclick="sendProductionUpdate('${o.id}')">Send production update to ${escapeHtml(o.email||'customer')}</button>
+      </div>
     </div>
 
     <!-- ── Send delivery details to customer ── -->
@@ -855,6 +872,46 @@ function toggleDeliveryPanel() {
   const icon = document.getElementById('deliveryToggleIcon');
   const open = body.classList.toggle('open');
   icon.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+function toggleProductionPanel() {
+  const body = document.getElementById('productionPanelBody');
+  const icon = document.getElementById('productionToggleIcon');
+  const open = body.classList.toggle('open');
+  icon.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+async function sendProductionUpdate(orderId) {
+  const o = _orders.find(x => x.id === orderId);
+  if (!o) { showToast('Order not found'); return; }
+  if (!o.email) { showToast('This order has no customer email'); return; }
+  const message = document.getElementById('productionMessage').value.trim();
+  if (!message) { showToast('Please enter a message'); return; }
+  if (!confirm(`Send a production update to ${o.email}?`)) return;
+
+  const btn = document.getElementById('sendProductionBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    const res = await fetch(`/api/admin/shop-order/${orderId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type':'application/json', 'x-admin-token': _token },
+      body: JSON.stringify({ notify_production: true, production_message: message }),
+    });
+    if (!res.ok) {
+      if (handleAdminAuthFailure(res)) return;
+      throw new Error(await readError(res));
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!data.production_email_sent) throw new Error('The server did not confirm that the email was sent.');
+    showToast('Production update sent to ' + o.email + ' ✦');
+    closeDetail();
+    loadOrders();
+  } catch (e) {
+    showToast('Could not send production update: ' + e.message, 7000);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send production update'; }
+  }
 }
 
 async function sendDeliveryDetails(orderId) {

@@ -3916,6 +3916,7 @@ window.addEventListener('storage', (e) => {
 });
 let selectedVariants = {};
 let selectedTypes = {};
+let selectedMerchOptions = {};
 
 
 /* Config (loaded from Supabase / Edge Config or defaults) */
@@ -4066,12 +4067,18 @@ function buildCard(p) {
   const defaultChoice = choices[0] || { key: '', label: '' };
   const requiresChoice = choices.length > 1;
   selectedVariants[p.id] = requiresChoice ? '' : defaultChoice.key;
+  const optionMode = merchOptionMode(p);
+  const colors = [...new Set(choices.map(c => c.color).filter(Boolean))];
+  const sizes = [...new Set(choices.map(c => c.size).filter(Boolean))];
+  selectedMerchOptions[p.id] = { color: colors.length === 1 ? colors[0] : '', size: sizes.length === 1 ? sizes[0] : '' };
   const ngn = productPrice(p, defaultChoice.key, 'ngn');
   const usd = productPrice(p, defaultChoice.key, 'usd');
 
-  const variantHtml = choices.map((choice,i) =>
-    `<button class="variant-chip${!requiresChoice&&i===0?' selected':''}" data-pid="${p.id}" data-v="${choice.key}">${choice.label}</button>`
-  ).join('');
+  const colorHtml = (optionMode === 'color' || optionMode === 'size_color')
+    ? `<div class="variant-axis"><span class="variant-axis-label">Colour</span>${colors.map(color => `<button class="variant-chip merch-option-chip${colors.length===1&&!requiresChoice?' selected':''}" data-pid="${p.id}" data-axis="color" data-value="${escapeAttr(color)}">${escapeText(color)}</button>`).join('')}</div>` : '';
+  const sizeHtml = (optionMode === 'size' || optionMode === 'size_color')
+    ? `<div class="variant-axis"><span class="variant-axis-label">Size</span>${sizes.map(size => `<button class="variant-chip merch-option-chip${sizes.length===1&&!requiresChoice?' selected':''}" data-pid="${p.id}" data-axis="size" data-value="${escapeAttr(size)}">${escapeText(size)}</button>`).join('')}</div>` : '';
+  const variantHtml = colorHtml + sizeHtml;
 
   // Always introduce a multi-option product with its feature image. A variant
   // mockup replaces it only after the shopper deliberately chooses an option.
@@ -4298,6 +4305,39 @@ function wireVariantButton(btn) {
       document.getElementById('pngn-'+pid).style.display = _showLocalCurrency ? 'none' : '';
     }
     syncCardStock(pid, v);
+  });
+}
+
+function wireMerchOptionButton(btn) {
+  btn.addEventListener('click', () => {
+    const pid = btn.dataset.pid;
+    const p = SHOP_CONFIG.products.find(x => x.id === pid);
+    if (!p) return;
+    const state = selectedMerchOptions[pid] || (selectedMerchOptions[pid] = { color: '', size: '' });
+    state[btn.dataset.axis] = btn.dataset.value || '';
+    document.querySelectorAll(`.merch-option-chip[data-pid="${pid}"][data-axis="${btn.dataset.axis}"]`)
+      .forEach(b => b.classList.toggle('selected', b.dataset.value === state[btn.dataset.axis]));
+    const mode = merchOptionMode(p);
+    const choices = getChoices(p);
+    const exact = choices.find(c =>
+      (mode !== 'color' && mode !== 'size_color' || c.color === state.color) &&
+      (mode !== 'size' && mode !== 'size_color' || c.size === state.size));
+    const preview = exact || (state.color ? choices.find(c => c.color === state.color) : null);
+    const imageWrap = document.querySelector(`.product-card[data-pid="${pid}"] .variant-card-image`);
+    if (imageWrap && preview) {
+      const imageUrl = variantImage(p, preview.key);
+      if (imageUrl) imageWrap.innerHTML = `<img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(p.name)}" loading="lazy"/>`;
+    }
+    selectedVariants[pid] = exact?.key || '';
+    const addBtn = document.querySelector(`.product-card[data-pid="${pid}"] .add-btn[data-pid="${pid}"]`);
+    if (!exact) {
+      if (addBtn) { addBtn.disabled = true; addBtn.textContent = state.color || state.size ? 'Choose remaining option' : 'Choose option'; addBtn.style.opacity = '0.4'; }
+      return;
+    }
+    const ngn = productPrice(p, exact.key, 'ngn');
+    const priceEl = document.getElementById('pngn-' + pid);
+    if (priceEl) priceEl.textContent = fmt(ngn);
+    syncCardStock(pid, exact.key);
   });
 }
 
@@ -4677,7 +4717,10 @@ function renderProductViews(activeFilter = 'all') {
   updateMasonryLayoutMode();
 
   // Variant / size chip clicks
-  document.querySelectorAll('.variant-chip').forEach(btn => wireVariantButton(btn));
+  document.querySelectorAll('.variant-chip').forEach(btn => {
+    if (btn.classList.contains('merch-option-chip')) wireMerchOptionButton(btn);
+    else wireVariantButton(btn);
+  });
 
   // Print option dropdown changes
   document.querySelectorAll('.print-type-select').forEach(sel => {
@@ -4775,7 +4818,9 @@ function addToCart(p, variant) {
       key, id: p.id, name: p.name, variant: label, variantKey: variant,
       priceNgn: productPrice(p, variant, 'ngn'),
       priceUsd: productPrice(p, variant, 'usd'),
-      emoji: p.emoji, image: variantImage(p, variant), qty: 1,
+      emoji: p.emoji, image: variantImage(p, variant),
+      madeToOrder: p.category !== 'prints' && variantStock(p, variant) === null,
+      qty: 1,
     });
   }
   updateCartUI();
@@ -5372,6 +5417,8 @@ function updateCartUI() {
     const note = maxed
  ? `<span class="cart-item-soldout">Sold out last ${c.qty} reserved for you</span>`
       : (left !== null && left <= 3 ? `<span class="cart-item-lowstock">Only ${left} more available</span>` : '');
+    const madeToOrder = (c.madeToOrder === true || (p && p.category !== 'prints' && variantStock(p, c.variantKey) === null))
+      ? `<span class="cart-item-lowstock">Made to order · We’ll email you when ready</span>` : '';
     return `
     <div class="cart-item">
       <div class="cart-item-img">
@@ -5380,6 +5427,7 @@ function updateCartUI() {
       <div class="cart-item-info">
         <div class="cart-item-name">${c.name}</div>
         <div class="cart-item-variant">${c.variant}</div>
+        ${madeToOrder}
         ${note}
         <div class="cart-item-qty">
  <button class="qty-btn" data-key="${cartDomKey(c.key)}" data-dir="-1" aria-label="Decrease quantity">-</button>
@@ -6818,6 +6866,7 @@ function checkoutPayload(customer, method, extra = {}) {
       id: c.id,
       variant: c.variant,
       variantKey: c.variantKey || c.variant,
+      madeToOrder: c.madeToOrder === true,
       qty: c.qty,
     })),
     delivery_method:  customer.deliveryMethod,
@@ -8789,6 +8838,7 @@ async function loadShopData() {
           badge:              r.badge || '',
           image:              r.image_url || '',
           images:             (r.images || []).filter(x => typeof x === 'string'),
+          merchOptionMode:    (r.images || []).find(x => x && typeof x === 'object' && x.kind === 'merch_options')?.mode || '',
           variantImages:      Object.fromEntries((r.images || []).filter(x => x && typeof x === 'object' && x.variant).map(x => [String(x.variant), (Array.isArray(x.images) ? x.images : [x.url]).filter(Boolean).slice(0, 2)])),
           slug:               r.slug || '',
           series_slug:        r.series_slug || '',
