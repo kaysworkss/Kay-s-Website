@@ -1662,6 +1662,12 @@ async function computeShopCheckout(body, supabase) {
       qty,
       priceNgn,
       priceUsd,
+      madeToOrder: product.category !== 'prints' && (() => {
+        const stockByVariant = product.stock_by_variant || {};
+        const sizeKey = String(vkey || '').split('|').pop();
+        const tracked = stockByVariant[vkey] !== undefined || stockByVariant[sizeKey] !== undefined || stockByVariant[item.variant] !== undefined;
+        return !tracked && (product.stock === null || product.stock === undefined);
+      })(),
       imageUrl: (() => {
         const images = Array.isArray(product.images) ? product.images : [];
         const match = images.find(x => x && typeof x === 'object' && String(x.variant) === String(vkey));

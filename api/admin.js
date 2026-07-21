@@ -87,6 +87,41 @@ async function sendHolderUpdateEmail({ email, name, subject, preview }) {
   }
 }
 
+async function sendOrderProductionEmail({ email, name, orderRef, items, message }) {
+  if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is not configured.');
+  const safeName = escapeHtml(name || 'customer');
+  const safeRef = escapeHtml(orderRef || 'your order');
+  const safeMessage = escapeHtml(message || 'Your made-to-order item is now being produced.');
+  const safeItems = (Array.isArray(items) ? items : []).map(item =>
+    `${escapeHtml(item.name || 'Item')}${item.variant ? ` · ${escapeHtml(item.variant)}` : ''} × ${Math.max(1, Number(item.qty) || 1)}`
+  ).join('<br>');
+  const subject = `Your order is now in production — ${orderRef || ''}`.trim();
+  const html = `<!doctype html><html><body style="margin:0;background:#1e1410;padding:28px 12px;color:#392416">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+    <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#ede0c8;border-radius:22px;overflow:hidden">
+      <tr><td style="background:#2a1508;padding:34px 30px;text-align:center"><div style="font-family:Georgia,serif;color:#e8c45a;font-size:12px;letter-spacing:4px;text-transform:uppercase">Kay's Works</div><div style="font-family:Georgia,serif;color:#f5ead4;font-size:30px;line-height:1.15;margin-top:16px">Your order is in production</div></td></tr>
+      <tr><td style="height:5px;background:linear-gradient(90deg,#b8821e,#e8c45a 35%,#f5d878 55%,#b8821e)">&nbsp;</td></tr>
+      <tr><td style="padding:34px"><p style="font-family:Georgia,serif;font-size:19px;color:#4a2a18;margin:0 0 12px">Dear ${safeName},</p><p style="font-family:Arial,sans-serif;font-size:14px;line-height:1.75;color:#74543d;margin:0 0 18px">${safeMessage}</p>${safeItems ? `<p style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#5c3e2e;background:rgba(196,132,90,.08);padding:14px;border-radius:8px;margin:0 0 18px">${safeItems}</p>` : ''}<p style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#74543d;margin:0">We’ll email you again as soon as it is ready and when it ships.</p><p style="font-family:Arial,sans-serif;font-size:11px;color:#93745b;margin:22px 0 0">Order ${safeRef}</p></td></tr>
+    </table>
+  </td></tr></table></body></html>`;
+  const textItems = (Array.isArray(items) ? items : []).map(item => `${item.name || 'Item'}${item.variant ? ` · ${item.variant}` : ''} × ${Math.max(1, Number(item.qty) || 1)}`).join('\n');
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: HOLDER_UPDATE_EMAIL_FROM,
+      to: [email],
+      subject,
+      html,
+      text: `Dear ${name || 'customer'},\n\n${message || 'Your made-to-order item is now being produced.'}\n\n${textItems}\n\nWe’ll email you again as soon as it is ready and when it ships.\n\nOrder ${orderRef || ''}`,
+    })
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error('Email provider returned ' + response.status + (detail ? ': ' + detail : ''));
+  }
+}
+
 // POST /api/admin?action=login 
 async function handleLogin(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -544,6 +579,31 @@ async function handleShopOrderUpdate(req, res, supabase) {
   const body = req.body || {};
   const patch = { updated_at: new Date().toISOString() };
 
+  let productionEmailSent = false;
+  if (body.notify_production === true) {
+    const { data: order, error: loadErr } = await supabase
+      .from('shop_orders')
+      .select('customer_name,email,order_ref,items')
+      .eq('id', id)
+      .maybeSingle();
+    if (loadErr) return json(500, { error: loadErr.message });
+    if (!order) return json(404, { error: 'Order not found' });
+    if (!order.email) return json(422, { error: 'This order has no customer email.' });
+    try {
+      await sendOrderProductionEmail({
+        email: order.email,
+        name: order.customer_name,
+        orderRef: order.order_ref,
+        items: order.items,
+        message: String(body.production_message || '').slice(0, 2000),
+      });
+      productionEmailSent = true;
+      patch.status = 'processing';
+    } catch (emailError) {
+      return json(502, { error: emailError.message || 'Production email could not be sent.' });
+    }
+  }
+
   if (body.status !== undefined) {
     const ALLOWED = ['pending', 'pending_payment', 'confirming', 'review_required', 'expired', 'paid', 'paid_unshipped', 'processing', 'shipped', 'fulfilled', 'cancelled', 'refunded'];
     if (!ALLOWED.includes(body.status))
@@ -660,7 +720,7 @@ async function handleHolderParticipant(req, res, supabase) {
   if (body.tier          !== undefined) patch.tier          = ['gold', 'bronze', 'wood'].includes(body.tier) ? body.tier : null;
   const { error } = await supabase.from('holders').update(patch).eq('id', id);
   if (error) return json(500, { error: error.message });
-  return json(200, { ok: true });
+  return json(200, { ok: true, production_email_sent: productionEmailSent });
 }
 
 // holder-update-notify (POST email alert to opted-in holders)
