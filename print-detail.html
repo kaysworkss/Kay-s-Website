@@ -1313,9 +1313,17 @@ function productGalleryImages(product) {
     .filter(item => typeof item === 'string' && item.trim());
 }
 function productVariantImages(product, variantKey) {
+  // Normalized products keep these in variantImages; raw API products may
+  // still carry the records inside images. Support both representations.
+  const mapped = product?.variantImages || product?.variant_images || {};
+  const colorKey = String(variantKey || '').split('|')[0].trim();
+  const mappedViews = mapped[variantKey] || mapped[colorKey];
+  if (mappedViews) {
+    return (Array.isArray(mappedViews) ? mappedViews : [mappedViews])
+      .filter(Boolean).map(normalizeImg).slice(0, 2);
+  }
   const records = (Array.isArray(product?.images) ? product.images : [])
     .filter(item => item && typeof item === 'object' && item.variant);
-  const colorKey = String(variantKey || '').split('|')[0].trim();
   const match = records.find(item => String(item.variant) === String(variantKey))
     || records.find(item => String(item.variant) === colorKey);
   return (Array.isArray(match?.images) ? match.images : [match?.url]).filter(Boolean).map(normalizeImg).slice(0, 2);
@@ -2022,6 +2030,10 @@ function renderMerchProduct(p) {
   const variants = merchVariants(p);
   const choices = detailMerchChoices(p);
   const optionMode = detailMerchOptionMode(p);
+  const selectionMode = optionMode === 'color'
+    && (p?.clothing === true || /hoodie|shirt|tee|sweatshirt/i.test(String(p?.clothing_type || p?.name || '')))
+      ? 'size_color'
+      : optionMode;
   const colors = [...new Set(choices.map(c => c.color).filter(Boolean))];
   const sizes = [...new Set(choices.map(c => c.size).filter(Boolean))];
   const requiresChoice = choices.length > 1;
@@ -2057,8 +2069,8 @@ function renderMerchProduct(p) {
     ? `<img id="heroImg" src="${images[0]}" alt="${p.name}"/>`
     : `<div class="hero-img-placeholder">${p.emoji || '✦'}</div>`;
 
-  const colorChips = (optionMode === 'color' || optionMode === 'size_color') ? `<div class="option-axis"><p class="purchase-label">Colour</p>${colors.map(color => `<button class="size-chip merch-axis-chip${colors.length===1?' selected':''}" data-axis="color" data-value="${escapeAttr(color)}">${escapeAttr(color)}</button>`).join('')}</div>` : '';
-  const sizeChips = (optionMode === 'size' || optionMode === 'size_color') ? `<div class="option-axis"><p class="purchase-label">Size</p>${sizes.map(size => `<button class="size-chip merch-axis-chip${sizes.length===1?' selected':''}" data-axis="size" data-value="${escapeAttr(size)}">${escapeAttr(size)}</button>`).join('')}</div>` : '';
+  const colorChips = (selectionMode === 'color' || selectionMode === 'size_color') ? `<div class="option-axis"><p class="purchase-label">Colour</p>${colors.map(color => `<button class="size-chip merch-axis-chip${colors.length===1?' selected':''}" data-axis="color" data-value="${escapeAttr(color)}">${escapeAttr(color)}</button>`).join('')}</div>` : '';
+  const sizeChips = (selectionMode === 'size' || selectionMode === 'size_color') ? `<div class="option-axis"><p class="purchase-label">Size</p>${sizes.map(size => `<button class="size-chip merch-axis-chip${sizes.length===1?' selected':''}" data-axis="size" data-value="${escapeAttr(size)}">${escapeAttr(size)}</button>`).join('')}</div>` : '';
   const variantChips = colorChips + sizeChips;
 
   const allNgn = Object.values(p.prices_ngn || {}).map(Number).filter(n => n > 0);
@@ -2166,10 +2178,14 @@ function selectMerchAxis(axis, value) {
   _selectedMerchOptions[axis] = value;
   document.querySelectorAll(`.merch-axis-chip[data-axis="${axis}"]`).forEach(chip => chip.classList.toggle('selected', chip.dataset.value === value));
   const mode = detailMerchOptionMode(_product);
+  const selectionMode = mode === 'color'
+    && (_product?.clothing === true || /hoodie|shirt|tee|sweatshirt/i.test(String(_product?.clothing_type || _product?.name || '')))
+      ? 'size_color'
+      : mode;
   const choices = detailMerchChoices(_product);
   const exact = choices.find(c =>
-    (mode !== 'color' && mode !== 'size_color' || c.color === _selectedMerchOptions.color) &&
-    (mode !== 'size' && mode !== 'size_color' || c.size === _selectedMerchOptions.size));
+    (selectionMode !== 'color' && selectionMode !== 'size_color' || c.color === _selectedMerchOptions.color) &&
+    (selectionMode !== 'size' && selectionMode !== 'size_color' || c.size === _selectedMerchOptions.size));
   const preview = exact || (_selectedMerchOptions.color ? choices.find(c => c.color === _selectedMerchOptions.color) : null);
   if (preview) refreshMerchVariantGallery(preview.key);
   if (exact) selectMerchVariant(exact.key);

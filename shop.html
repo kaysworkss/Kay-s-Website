@@ -837,6 +837,15 @@ body.dark .shop-empty-state {
 }
 .card-img img { width:100%; height:auto; object-fit:contain; transition: transform 0.6s ease; }
 .card-img img:not([src]) { display: none; }
+.product-card:not([data-category="prints"]) .card-img { aspect-ratio: 1 / 1; }
+.product-card:not([data-category="prints"]) .variant-card-image {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.product-card:not([data-category="prints"]) .variant-card-image img {
+  width: 100%; height: 100%; object-fit: contain;
+}
 .product-card { contain: layout; }
 .product-card:hover .card-img img { transform: scale(1.05); }
 .product-card.holder-target-pulse {
@@ -2226,10 +2235,10 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
     border-radius: 10px;
     display: block;
   }
-  .shop-grid .card-img {
+  .shop-grid .product-card[data-category="prints"] .card-img {
     aspect-ratio: auto;
   }
-  .shop-grid .card-img img {
+  .shop-grid .product-card[data-category="prints"] .card-img img {
     height: auto;
     object-fit: contain;
   }
@@ -4097,15 +4106,18 @@ function buildCard(p) {
   const requiresChoice = choices.length > 1;
   selectedVariants[p.id] = requiresChoice ? '' : defaultChoice.key;
   const optionMode = merchOptionMode(p);
+  // Color-configured apparel is still ordered in a standard garment size.
+  // Keep the admin's color pricing mode, but require both choices in-store.
+  const selectionMode = optionMode === 'color' && isApparelProduct(p) ? 'size_color' : optionMode;
   const colors = [...new Set(choices.map(c => c.color).filter(Boolean))];
   const sizes = [...new Set(choices.map(c => c.size).filter(Boolean))];
   selectedMerchOptions[p.id] = { color: colors.length === 1 ? colors[0] : '', size: sizes.length === 1 ? sizes[0] : '' };
   const ngn = productPrice(p, defaultChoice.key, 'ngn');
   const usd = productPrice(p, defaultChoice.key, 'usd');
 
-  const colorHtml = (optionMode === 'color' || optionMode === 'size_color')
+  const colorHtml = (selectionMode === 'color' || selectionMode === 'size_color')
     ? `<div class="variant-axis"><span class="variant-axis-label">Colour</span>${colors.map(color => `<button class="variant-chip merch-option-chip${colors.length===1&&!requiresChoice?' selected':''}" data-pid="${p.id}" data-axis="color" data-value="${escapeAttr(color)}"><span class="variant-swatch" style="--swatch-color:${merchColorSwatch(color)}" aria-hidden="true"></span>${escapeText(color)}</button>`).join('')}</div>` : '';
-  const sizeHtml = (optionMode === 'size' || optionMode === 'size_color')
+  const sizeHtml = (selectionMode === 'size' || selectionMode === 'size_color')
     ? `<div class="variant-axis"><span class="variant-axis-label">Size</span>${sizes.map(size => `<button class="variant-chip merch-option-chip${sizes.length===1&&!requiresChoice?' selected':''}" data-pid="${p.id}" data-axis="size" data-value="${escapeAttr(size)}">${escapeText(size)}</button>`).join('')}</div>` : '';
   const variantHtml = colorHtml + sizeHtml;
 
@@ -4135,7 +4147,7 @@ function buildCard(p) {
   card.dataset.pid = p.id;
   card.dataset.category = p.category;
   card.innerHTML = `
-    <div class="card-img"><span class="variant-card-image">${imgHtml}</span>${badgeHtml}</div>
+    <div class="card-img"><span class="variant-card-image">${imgHtml}</span>${badgeHtml}${p.slug ? `<a class="card-img-hover" href="/shop/${p.slug}" rel="noopener" aria-label="View ${escapeAttr(p.name)}"><span class="card-img-hover-label">View merch</span></a>` : ''}</div>
     <div class="card-body">
       <p class="card-category">${p.category}</p>
       <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
@@ -4347,10 +4359,11 @@ function wireMerchOptionButton(btn) {
     document.querySelectorAll(`.merch-option-chip[data-pid="${pid}"][data-axis="${btn.dataset.axis}"]`)
       .forEach(b => b.classList.toggle('selected', b.dataset.value === state[btn.dataset.axis]));
     const mode = merchOptionMode(p);
+    const selectionMode = mode === 'color' && isApparelProduct(p) ? 'size_color' : mode;
     const choices = getChoices(p);
     const exact = choices.find(c =>
-      (mode !== 'color' && mode !== 'size_color' || c.color === state.color) &&
-      (mode !== 'size' && mode !== 'size_color' || c.size === state.size));
+      (selectionMode !== 'color' && selectionMode !== 'size_color' || c.color === state.color) &&
+      (selectionMode !== 'size' && selectionMode !== 'size_color' || c.size === state.size));
     const preview = exact || (state.color ? choices.find(c => c.color === state.color) : null);
     const imageWrap = document.querySelector(`.product-card[data-pid="${pid}"] .variant-card-image`);
     if (imageWrap && preview) {
@@ -7726,7 +7739,7 @@ function closeEnquire() {
     mx = e.clientX; my = e.clientY;
     cursorEl.style.opacity = '1';
     dot.style.left = mx + 'px'; dot.style.top = my + 'px';
-    ring.style.opacity = e.target.closest?.('.card-img') ? '0' : '0.8';
+    ring.style.opacity = '0.8';
   });
   (function animRing() {
     rx += (mx - rx) * 0.12; ry += (my - ry) * 0.12;
