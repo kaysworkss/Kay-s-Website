@@ -373,6 +373,22 @@ nav.scrolled {
   letter-spacing:0.18em; text-transform:uppercase;
   color:var(--text-muted); width:38%;
 }
+.merch-info-panel {
+  margin:1.6rem 0 2rem; padding:1.25rem 1.35rem;
+  border:1px solid var(--border); border-radius:3px;
+  background:rgba(232,213,176,0.08);
+}
+.merch-info-section + .merch-info-section {
+  margin-top:1.15rem; padding-top:1.15rem; border-top:1px solid var(--border);
+}
+.merch-info-heading {
+  margin:0 0 0.65rem;
+  font-family:'Cinzel',serif; font-size:0.5rem;
+  letter-spacing:0.24em; text-transform:uppercase; color:var(--gold);
+}
+.merch-info-panel .print-story { margin:0; font-size:1rem; line-height:1.65; }
+.merch-info-panel .spec-table { margin:0; }
+.merch-info-panel .spec-table td { padding:0.45rem 0; }
 
 /* Purchase block */
 .purchase-block {
@@ -382,11 +398,10 @@ nav.scrolled {
 }
 .mobile-choice-preview { display:none; }
 @media(max-width:900px) {
-  .info-panel { display:flex; flex-direction:column; }
-  .purchase-block { order:1; }
-  .info-panel > .section-divider,
-  .info-panel > .print-story,
-  .info-panel > .spec-table { order:2; }
+  .merch-detail-info { display:flex; flex-direction:column; }
+  .merch-detail-info > .purchase-block { order:1; }
+  .merch-detail-info > .merch-info-panel { order:2; }
+  .merch-info-panel { margin:0.25rem 0 1.5rem; padding:1rem; }
   .mobile-choice-preview {
     display:grid; grid-template-columns:64px 1fr; gap:0.8rem; align-items:center;
     margin:-0.25rem 0 1rem; padding:0.55rem;
@@ -1914,7 +1929,7 @@ function renderProduct(p) {
         </div>
       </div>
 
-      <div class="info-panel">
+      <div class="info-panel print-detail-info">
         ${seriesSlug ? `<a href="/shop/series/${seriesSlug}" class="print-series-link">${seriesName}</a>` : ''}
 
         <h1 class="print-title">${p.name}</h1>
@@ -2133,7 +2148,7 @@ function renderMerchProduct(p) {
         </div>
       </div>
 
-      <div class="info-panel">
+      <div class="info-panel merch-detail-info">
         <h1 class="print-title">${p.name}</h1>
         ${detailTags(p)}
         <p class="print-year">${catLabel}</p>
@@ -2142,9 +2157,10 @@ function renderMerchProduct(p) {
           Share this product
         </button>
 
-        ${storyHtml ? `<div class="section-divider"><span>About</span></div><div class="print-story">${storyHtml}</div>` : ''}
-
-        ${specRows ? `<div class="section-divider"><span>Details</span></div><table class="spec-table">${specRows}</table>` : ''}
+        ${(storyHtml || specRows) ? `<div class="merch-info-panel">
+          ${storyHtml ? `<section class="merch-info-section"><h2 class="merch-info-heading">About</h2><div class="print-story">${storyHtml}</div></section>` : ''}
+          ${specRows ? `<section class="merch-info-section"><h2 class="merch-info-heading">Details</h2><table class="spec-table">${specRows}</table></section>` : ''}
+        </div>` : ''}
 
         <div class="purchase-block">
           <p class="purchase-label">Choose your options</p>
