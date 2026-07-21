@@ -1022,6 +1022,17 @@ function serverVariantPrice(product, variantKey, variant, currency) {
   if (variant && prices[variant] !== undefined) return Number(prices[variant]) || 0;
   const size = String(variantKey || variant || '').split('|').pop();
   if (size && prices[size] !== undefined) return Number(prices[size]) || 0;
+  const parts = String(variantKey || variant || '').split('|').map(value => value.trim());
+  if (parts.length > 1 && prices[parts[0]] !== undefined) {
+    const marker = (Array.isArray(product?.images) ? product.images : [])
+      .find(item => item && typeof item === 'object' && item.kind === 'merch_options');
+    if (marker?.mode === 'color') {
+      const base = Number(prices[parts[0]]) || 0;
+      const percent = /^(?:XXL|2XL|3XL)$/i.test(parts[1])
+        ? Math.max(0, Math.min(100, Number(marker.extended_size_percent ?? 10))) : 0;
+      return currency === 'usd' ? +(base * (1 + percent / 100)).toFixed(2) : Math.round(base * (1 + percent / 100));
+    }
+  }
   return 0;
 }
 
@@ -1678,7 +1689,9 @@ async function computeShopCheckout(body, supabase) {
       })(),
       imageUrl: (() => {
         const images = Array.isArray(product.images) ? product.images : [];
-        const match = images.find(x => x && typeof x === 'object' && String(x.variant) === String(vkey));
+        const colorKey = String(vkey || '').split('|')[0].trim();
+        const match = images.find(x => x && typeof x === 'object' && String(x.variant) === String(vkey))
+          || images.find(x => x && typeof x === 'object' && String(x.variant) === colorKey);
         return (Array.isArray(match?.images) ? match.images[0] : match?.url) || product.image || product.image_url || '';
       })(),
     });
