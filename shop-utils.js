@@ -884,11 +884,9 @@ function optionDisplaySizes(option) {
 
 function getChoices(p) {
   const mode = merchOptionMode(p);
-  const madeToOrderApparelByColor = mode === 'color'
-    && (p?.clothing === true || /hoodie|shirt|tee|sweatshirt/i.test(String(p?.clothing_type || p?.name || '')))
-    && (p?.stock === null || p?.stock === undefined)
-    && !Object.keys(p?.stock_by_variant || {}).length;
-  if (madeToOrderApparelByColor) {
+  const apparelByColor = mode === 'color'
+    && (p?.clothing === true || /hoodie|shirt|tee|sweatshirt/i.test(String(p?.clothing_type || p?.name || '')));
+  if (apparelByColor) {
     const sizes = ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
     return (p.variants || []).flatMap(color => sizes.map(size => ({
       key: merchVariantKey(String(color), size),

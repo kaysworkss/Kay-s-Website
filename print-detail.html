@@ -1776,6 +1776,7 @@ function initZoom(wrap) {
 let _product = null;
 let _selectedPrintType = '';
 let _selectedVariant = '';
+let _previewVariant = '';
 let _selectedMerchOptions = { color: '', size: '' };
 
 function detailTags(p) {
@@ -1979,11 +1980,9 @@ function detailMerchOptionMode(p) {
 }
 function detailMerchChoices(p) {
   const mode = detailMerchOptionMode(p);
-  const madeToOrderApparelByColor = mode === 'color'
-    && (p?.clothing === true || /hoodie|shirt|tee|sweatshirt/i.test(String(p?.clothing_type || p?.name || '')))
-    && (p?.stock === null || p?.stock === undefined)
-    && !Object.keys(p?.stock_by_variant || {}).length;
-  if (madeToOrderApparelByColor) {
+  const apparelByColor = mode === 'color'
+    && (p?.clothing === true || /hoodie|shirt|tee|sweatshirt/i.test(String(p?.clothing_type || p?.name || '')));
+  if (apparelByColor) {
     return merchVariants(p).flatMap(color => ['S','M','L','XL','XXL','3XL'].map(size => ({
       key: `${color} | ${size}`, color, size,
     })));
@@ -2028,6 +2027,9 @@ function renderMerchProduct(p) {
   const requiresChoice = choices.length > 1;
   _selectedVariant = requiresChoice ? '' : (choices[0]?.key || '');
   _selectedMerchOptions = { color: colors.length === 1 ? colors[0] : '', size: sizes.length === 1 ? sizes[0] : '' };
+  _previewVariant = _selectedVariant || (_selectedMerchOptions.color
+    ? (choices.find(choice => choice.color === _selectedMerchOptions.color)?.key || '')
+    : '');
 
   document.title = `${p.name} · Kay's Works`;
   updateMeta(p);
@@ -2041,7 +2043,7 @@ function renderMerchProduct(p) {
     </div>`;
 
   const extra = productGalleryImages(p);
-  const initialVariantImages = requiresChoice ? [] : productVariantImages(p, _selectedVariant);
+  const initialVariantImages = _previewVariant ? productVariantImages(p, _previewVariant) : [];
   const images = [...(p.image_url ? [p.image_url] : []), ...initialVariantImages, ...extra]
     .map(normalizeImg)
     .filter((v, i, a) => v && a.indexOf(v) === i);
@@ -2181,6 +2183,7 @@ function selectMerchAxis(axis, value) {
 
 function refreshMerchVariantGallery(label) {
   if (!_product || _product.category === 'prints') return;
+  _previewVariant = label || '';
   const images = [...productVariantImages(_product, label), ...(_product.image_url ? [_product.image_url] : []), ...productGalleryImages(_product)]
     .map(normalizeImg).filter((v, i, a) => v && a.indexOf(v) === i);
   const heroImg = document.getElementById('heroImg');
@@ -2444,7 +2447,7 @@ function handleAddToCart() {
 
 function switchImage(idx) {
   const extra = productGalleryImages(_product);
-  const selectedImages = _product?.category !== 'prints' ? productVariantImages(_product, _selectedVariant) : [];
+  const selectedImages = _product?.category !== 'prints' ? productVariantImages(_product, _previewVariant || _selectedVariant) : [];
   const images = [...selectedImages, ...(_product.image_url ? [_product.image_url] : []), ...extra]
     .map(normalizeImg)
     .filter((v, i, a) => v && a.indexOf(v) === i);
