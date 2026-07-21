@@ -1665,7 +1665,7 @@ async function computeShopCheckout(body, supabase) {
       imageUrl: (() => {
         const images = Array.isArray(product.images) ? product.images : [];
         const match = images.find(x => x && typeof x === 'object' && String(x.variant) === String(vkey));
-        return match?.url || product.image || product.image_url || '';
+        return (Array.isArray(match?.images) ? match.images[0] : match?.url) || product.image || product.image_url || '';
       })(),
     });
   }
