@@ -1299,6 +1299,18 @@ function normalizeImg(u) {
   if (/^(https?:)?\/\//i.test(s) || s.startsWith('data:') || s.startsWith('/')) return s;
   return '/' + s.replace(/^\.?\/*/, '');
 }
+function productGalleryImages(product) {
+  return (Array.isArray(product?.images) ? product.images : [])
+    .filter(item => typeof item === 'string' && item.trim());
+}
+function productVariantImages(product, variantKey) {
+  const match = (Array.isArray(product?.images) ? product.images : [])
+    .find(item => item && typeof item === 'object' && String(item.variant) === String(variantKey));
+  return (Array.isArray(match?.images) ? match.images : [match?.url]).filter(Boolean).map(normalizeImg).slice(0, 2);
+}
+function productVariantImage(product, variantKey) {
+  return productVariantImages(product, variantKey)[0] || normalizeImg(product?.image_url || product?.image || '');
+}
 
 function printPrice(p, key, currency) {
   const prices = currency === 'usd' ? (p.prices_usd || {}) : (p.prices_ngn || {});
@@ -1466,7 +1478,7 @@ function addToCart(product, variantKey, variantLabel) {
       priceNgn: printPrice(product, variantKey, 'ngn'),
       priceUsd: printPrice(product, variantKey, 'usd'),
       emoji: product.emoji || '🖼',
-      image: normalizeImg(product.image_url || ''),
+      image: productVariantImage(product, variantKey),
       qty: 1,
     });
   }
@@ -1783,7 +1795,7 @@ function renderProduct(p) {
 
   // Build the gallery: the main product image (image_url) is always the
   // primary/hero; any images[] entries are additional views appended after it.
-  const extra = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
+  const extra = productGalleryImages(p);
   const images = [...(p.image_url ? [p.image_url] : []), ...extra]
     .map(normalizeImg)
     .filter((v, i, a) => v && a.indexOf(v) === i);
@@ -1958,8 +1970,9 @@ function renderMerchProduct(p) {
       <span style="color:var(--text)">${p.name}</span>
     </div>`;
 
-  const extra = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
-  const images = [...(p.image_url ? [p.image_url] : []), ...extra]
+  const extra = productGalleryImages(p);
+  const initialVariantImages = productVariantImages(p, _selectedVariant);
+  const images = [...initialVariantImages, ...(p.image_url ? [p.image_url] : []), ...extra]
     .map(normalizeImg)
     .filter((v, i, a) => v && a.indexOf(v) === i);
   const thumbsHtml = images.length > 1
@@ -2041,6 +2054,7 @@ function selectMerchVariant(label) {
   _selectedVariant = label;
   document.querySelectorAll('.size-picker .size-chip').forEach(c =>
     c.classList.toggle('selected', c.dataset.v === label));
+  refreshMerchVariantGallery(label);
   const ngn = printPrice(_product, label, 'ngn');
   const usd = printPrice(_product, label, 'usd');
   const priceNgnEl = document.getElementById('priceNgn');
@@ -2068,6 +2082,23 @@ function selectMerchVariant(label) {
     btn.textContent = soldOut ? 'Sold out'
       : (maxedByCart ? 'All in your bag'
         : (label ? 'Add to bag' : 'Unavailable'));
+  }
+}
+
+function refreshMerchVariantGallery(label) {
+  if (!_product || _product.category === 'prints') return;
+  const images = [...productVariantImages(_product, label), ...(_product.image_url ? [_product.image_url] : []), ...productGalleryImages(_product)]
+    .map(normalizeImg).filter((v, i, a) => v && a.indexOf(v) === i);
+  const heroImg = document.getElementById('heroImg');
+  if (heroImg && images[0]) heroImg.src = images[0];
+  const wrap = document.getElementById('heroWrap');
+  if (!wrap) return;
+  wrap.querySelector('.thumb-strip')?.remove();
+  if (images.length > 1) {
+    wrap.insertAdjacentHTML('beforeend', `<div class="thumb-strip">${images.map((img, i) => `
+      <div class="thumb${i === 0 ? ' active' : ''}" data-idx="${i}" onclick="switchImage(${i})">
+        <img src="${escapeAttr(img)}" alt="${i === 0 ? 'Front' : i === 1 && productVariantImages(_product, label).length > 1 ? 'Back' : `View ${i + 1}`}" loading="lazy"/>
+      </div>`).join('')}</div>`);
   }
 }
 
@@ -2318,8 +2349,9 @@ function handleAddToCart() {
 }
 
 function switchImage(idx) {
-  const extra = Array.isArray(_product.images) ? _product.images.filter(Boolean) : [];
-  const images = [...(_product.image_url ? [_product.image_url] : []), ...extra]
+  const extra = productGalleryImages(_product);
+  const selectedImages = _product?.category !== 'prints' ? productVariantImages(_product, _selectedVariant) : [];
+  const images = [...selectedImages, ...(_product.image_url ? [_product.image_url] : []), ...extra]
     .map(normalizeImg)
     .filter((v, i, a) => v && a.indexOf(v) === i);
   const heroImg = document.getElementById('heroImg');

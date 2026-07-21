@@ -598,7 +598,10 @@ function normalizeProduct(p) {
   const storedImages = Array.isArray(p.images) ? p.images : [];
   p.variantImages = Object.assign({}, p.variantImages || p.variant_images || {});
   storedImages.forEach(item => {
-    if (item && typeof item === 'object' && item.variant && item.url) p.variantImages[String(item.variant)] = String(item.url);
+    if (item && typeof item === 'object' && item.variant) {
+      const views = Array.isArray(item.images) ? item.images : [item.url];
+      p.variantImages[String(item.variant)] = views.filter(Boolean).map(String).slice(0, 2);
+    }
   });
   p.images = storedImages.filter(item => typeof item === 'string');
   p.stock_by_variant = p.stock_by_variant || {};
@@ -609,13 +612,16 @@ function normalizeProduct(p) {
 }
 function variantImage(product, variantKey) {
   const map = product?.variantImages || product?.variant_images || {};
-  return normalizeImg(map[variantKey] || map[keySize(variantKey)] || product?.image || product?.image_url || '');
+  const value = map[variantKey] || map[keySize(variantKey)];
+  const first = Array.isArray(value) ? value[0] : value;
+  return normalizeImg(first || product?.image || product?.image_url || '');
 }
 function packedProductImages(product) {
   const gallery = (Array.isArray(product?.images) ? product.images : []).filter(item => typeof item === 'string' && item.trim());
   const mapped = Object.entries(product?.variantImages || product?.variant_images || {})
-    .filter(([variant, url]) => String(variant).trim() && String(url).trim())
-    .map(([variant, url]) => ({ variant: String(variant), url: String(url) }));
+    .map(([variant, value]) => [variant, (Array.isArray(value) ? value : [value]).filter(Boolean).map(String).slice(0, 2)])
+    .filter(([variant, images]) => String(variant).trim() && images.length)
+    .map(([variant, images]) => ({ variant: String(variant), images, url: images[0] }));
   return gallery.concat(mapped);
 }
 function productKey(p) {
