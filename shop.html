@@ -4064,15 +4064,18 @@ function buildCard(p) {
 
   const choices = getChoices(p);
   const defaultChoice = choices[0] || { key: '', label: '' };
-  selectedVariants[p.id] = defaultChoice.key;
+  const requiresChoice = choices.length > 1;
+  selectedVariants[p.id] = requiresChoice ? '' : defaultChoice.key;
   const ngn = productPrice(p, defaultChoice.key, 'ngn');
   const usd = productPrice(p, defaultChoice.key, 'usd');
 
   const variantHtml = choices.map((choice,i) =>
-    `<button class="variant-chip${i===0?' selected':''}" data-pid="${p.id}" data-v="${choice.key}">${choice.label}</button>`
+    `<button class="variant-chip${!requiresChoice&&i===0?' selected':''}" data-pid="${p.id}" data-v="${choice.key}">${choice.label}</button>`
   ).join('');
 
-  const defaultImage = variantImage(p, defaultChoice.key);
+  // Always introduce a multi-option product with its feature image. A variant
+  // mockup replaces it only after the shopper deliberately chooses an option.
+  const defaultImage = normalizeImg(p.image) || (!requiresChoice ? variantImage(p, defaultChoice.key) : '');
   const imgHtml = defaultImage
     ? `<img src="${defaultImage}" alt="${p.name}" loading="lazy"/>`
     : `<div class="card-img-placeholder">${p.emoji}</div>`;
@@ -4108,8 +4111,8 @@ function buildCard(p) {
           <span class="price-local" id="plocal-${p.id}" style="display:none"></span>
           <span id="stock-${p.id}">${stockHtml}</span>
         </div>
-        <button class="add-btn" data-pid="${p.id}" ${!defaultChoice.key || defaultStock===0?'disabled style="opacity:0.4;cursor:not-allowed"':''}>
-          ${!defaultChoice.key ? 'Unavailable' : defaultStock===0?'Sold out':'Add to bag'}
+        <button class="add-btn" data-pid="${p.id}" ${!defaultChoice.key || requiresChoice || defaultStock===0?'disabled style="opacity:0.4;cursor:not-allowed"':''}>
+          ${!defaultChoice.key ? 'Unavailable' : requiresChoice ? 'Choose option' : defaultStock===0?'Sold out':'Add to bag'}
         </button>
       </div>
       ${detailsLink(p)}
@@ -4690,7 +4693,8 @@ function renderProductViews(activeFilter = 'all') {
     btn.addEventListener('click', () => {
       const pid = btn.dataset.pid;
       const p = SHOP_CONFIG.products.find(x=>x.id===pid);
-      const v = selectedVariants[pid] || getChoices(p)[0]?.key;
+      const productChoices = getChoices(p);
+      const v = selectedVariants[pid] || (productChoices.length === 1 ? productChoices[0]?.key : '');
       addToCart(p, v);
     });
   });
