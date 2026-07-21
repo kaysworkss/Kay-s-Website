@@ -599,6 +599,7 @@ function normalizeProduct(p) {
   const optionConfig = storedImages.find(item => item && typeof item === 'object' && item.kind === 'merch_options');
   const holderTierConfig = storedImages.find(item => item && typeof item === 'object' && item.kind === 'holder_tier_discounts');
   p.merchOptionMode = p.merchOptionMode || p.merch_option_mode || optionConfig?.mode || '';
+  p.merchExtendedSizePercent = Math.max(0, Math.min(100, Number(p.merchExtendedSizePercent ?? optionConfig?.extended_size_percent ?? 10)));
   p.holder_benefit_wood_percent = Math.max(0, Math.min(90, Number(p.holder_benefit_wood_percent ?? holderTierConfig?.wood ?? 15)));
   p.holder_benefit_bronze_percent = Math.max(0, Math.min(90, Number(p.holder_benefit_bronze_percent ?? holderTierConfig?.bronze ?? 20)));
   p.variantImages = Object.assign({}, p.variantImages || p.variant_images || {});
@@ -617,7 +618,8 @@ function normalizeProduct(p) {
 }
 function variantImage(product, variantKey) {
   const map = product?.variantImages || product?.variant_images || {};
-  const value = map[variantKey] || map[keySize(variantKey)];
+  const colorKey = String(variantKey || '').split('|')[0].trim();
+  const value = map[variantKey] || map[colorKey] || map[keySize(variantKey)];
   const first = Array.isArray(value) ? value[0] : value;
   return normalizeImg(first || product?.image || product?.image_url || '');
 }
@@ -628,7 +630,11 @@ function packedProductImages(product) {
     .filter(([variant, images]) => String(variant).trim() && images.length)
     .map(([variant, images]) => ({ variant: String(variant), images, url: images[0] }));
   const optionConfig = product?.category !== 'prints' && product?.merchOptionMode
-    ? [{ kind: 'merch_options', mode: product.merchOptionMode }]
+    ? [{
+        kind: 'merch_options',
+        mode: product.merchOptionMode,
+        extended_size_percent: Math.max(0, Math.min(100, Number(product.merchExtendedSizePercent ?? 10))),
+      }]
     : [];
   const holderTierConfig = product?.category === 'merch'
     ? [{
@@ -877,9 +883,22 @@ function optionDisplaySizes(option) {
 }
 
 function getChoices(p) {
+  const mode = merchOptionMode(p);
+  const madeToOrderApparelByColor = mode === 'color'
+    && (p?.clothing === true || /hoodie|shirt|tee|sweatshirt/i.test(String(p?.clothing_type || p?.name || '')))
+    && (p?.stock === null || p?.stock === undefined)
+    && !Object.keys(p?.stock_by_variant || {}).length;
+  if (madeToOrderApparelByColor) {
+    const sizes = ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
+    return (p.variants || []).flatMap(color => sizes.map(size => ({
+      key: merchVariantKey(String(color), size),
+      label: `${color} / ${size}`,
+      size,
+      color: String(color),
+    })));
+  }
   return (p.variants || []).map(v => {
     const parts = splitMerchVariant(v);
-    const mode = merchOptionMode(p);
     if (mode === 'color') return { key: v, label: String(v), size: 'One size', color: String(v) };
     if (mode === 'none') return { key: v, label: 'One size', size: 'One size', color: '' };
     return { key: v, label: parts.color ? `${parts.color} / ${parts.size}` : parts.size, size: parts.size, color: parts.color };
@@ -906,7 +925,15 @@ function merchOptionMode(product) {
 function productPrice(p, key, currency) {
   const prices = currency === 'usd' ? (p.priceUsd || p.prices_usd || {}) : (p.priceNgn || p.prices_ngn || {});
   if (prices[key] !== undefined) return prices[key];
-  return prices[keySize(key)] || 0;
+  if (prices[keySize(key)] !== undefined) return prices[keySize(key)];
+  const parts = splitMerchVariant(key);
+  if (parts.color && prices[parts.color] !== undefined) {
+    const base = Number(prices[parts.color]) || 0;
+    const extended = /^(?:XXL|2XL|3XL)$/i.test(parts.size);
+    const percent = extended ? Math.max(0, Math.min(100, Number(p?.merchExtendedSizePercent ?? 10))) : 0;
+    return currency === 'usd' ? +(base * (1 + percent / 100)).toFixed(2) : Math.round(base * (1 + percent / 100));
+  }
+  return 0;
 }
 
 

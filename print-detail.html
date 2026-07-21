@@ -1313,8 +1313,11 @@ function productGalleryImages(product) {
     .filter(item => typeof item === 'string' && item.trim());
 }
 function productVariantImages(product, variantKey) {
-  const match = (Array.isArray(product?.images) ? product.images : [])
-    .find(item => item && typeof item === 'object' && String(item.variant) === String(variantKey));
+  const records = (Array.isArray(product?.images) ? product.images : [])
+    .filter(item => item && typeof item === 'object' && item.variant);
+  const colorKey = String(variantKey || '').split('|')[0].trim();
+  const match = records.find(item => String(item.variant) === String(variantKey))
+    || records.find(item => String(item.variant) === colorKey);
   return (Array.isArray(match?.images) ? match.images : [match?.url]).filter(Boolean).map(normalizeImg).slice(0, 2);
 }
 function productVariantImage(product, variantKey) {
@@ -1325,7 +1328,15 @@ function printPrice(p, key, currency) {
   const prices = currency === 'usd' ? (p.prices_usd || {}) : (p.prices_ngn || {});
   if (prices[key] !== undefined) return prices[key];
   const size = String(key).split('|').pop();
-  return prices[size] || 0;
+  if (prices[size] !== undefined) return prices[size];
+  const parts = String(key || '').split('|').map(x => x.trim());
+  if (parts.length > 1 && prices[parts[0]] !== undefined) {
+    const marker = (Array.isArray(p?.images) ? p.images : []).find(item => item && typeof item === 'object' && item.kind === 'merch_options');
+    const percent = /^(?:XXL|2XL|3XL)$/i.test(parts[1]) ? Math.max(0, Math.min(100, Number(marker?.extended_size_percent ?? 10))) : 0;
+    const base = Number(prices[parts[0]]) || 0;
+    return currency === 'usd' ? +(base * (1 + percent / 100)).toFixed(2) : Math.round(base * (1 + percent / 100));
+  }
+  return 0;
 }
 
 // Limited-edition helpers. A size is "tracked" if it has a run total set.
@@ -1968,6 +1979,15 @@ function detailMerchOptionMode(p) {
 }
 function detailMerchChoices(p) {
   const mode = detailMerchOptionMode(p);
+  const madeToOrderApparelByColor = mode === 'color'
+    && (p?.clothing === true || /hoodie|shirt|tee|sweatshirt/i.test(String(p?.clothing_type || p?.name || '')))
+    && (p?.stock === null || p?.stock === undefined)
+    && !Object.keys(p?.stock_by_variant || {}).length;
+  if (madeToOrderApparelByColor) {
+    return merchVariants(p).flatMap(color => ['S','M','L','XL','XXL','3XL'].map(size => ({
+      key: `${color} | ${size}`, color, size,
+    })));
+  }
   return merchVariants(p).map(key => {
     if (mode === 'color') return { key, color: key, size: 'One size' };
     if (mode === 'none') return { key, color: '', size: 'One size' };
@@ -2005,8 +2025,8 @@ function renderMerchProduct(p) {
   const optionMode = detailMerchOptionMode(p);
   const colors = [...new Set(choices.map(c => c.color).filter(Boolean))];
   const sizes = [...new Set(choices.map(c => c.size).filter(Boolean))];
-  const requiresChoice = variants.length > 1;
-  _selectedVariant = requiresChoice ? '' : (variants[0] || '');
+  const requiresChoice = choices.length > 1;
+  _selectedVariant = requiresChoice ? '' : (choices[0]?.key || '');
   _selectedMerchOptions = { color: colors.length === 1 ? colors[0] : '', size: sizes.length === 1 ? sizes[0] : '' };
 
   document.title = `${p.name} · Kay's Works`;
