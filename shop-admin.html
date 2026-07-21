@@ -922,7 +922,8 @@ async function loadAdminConfig() {
         priceUsd:           r.prices_usd || {},
         badge:              r.badge || '',
         image:              r.image_url || '',
-        images:             r.images || [],
+        images:             (r.images || []).filter(x => typeof x === 'string'),
+        variantImages:      Object.fromEntries((r.images || []).filter(x => x && typeof x === 'object' && x.variant && x.url).map(x => [String(x.variant), String(x.url)])),
         slug:               r.slug || '',
         series_slug:        r.series_slug || '',
         series_name:        r.series_name || '',
@@ -1714,11 +1715,12 @@ function renderAdminProducts() {
           </div>
         </div>` : '';
       const variantRows = (p.variants.length ? p.variants : ['One size']).map(v => `
-        <div class="ap-variant-row" data-idx="${realIdx}" style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr auto;gap:0.4rem;align-items:center;margin-bottom:0.4rem">
+        <div class="ap-variant-row" data-idx="${realIdx}" data-original-variant="${escapeAttr(v)}" style="display:grid;grid-template-columns:1.1fr 0.8fr 0.8fr 0.7fr 1.4fr auto;gap:0.4rem;align-items:center;margin-bottom:0.4rem">
           <input class="form-input ap-v-label" value="${escapeAttr(v)}" placeholder="Variant" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <input class="form-input ap-v-ngn" value="${productPrice(p, v, 'ngn') || ''}" placeholder="NGN" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <input class="form-input ap-v-usd" value="${productPrice(p, v, 'usd') || ''}" placeholder="USD" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <input class="form-input ap-v-stock" value="${p.stock_by_variant?.[v] ?? ''}" placeholder="Stock" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+          <input class="form-input ap-v-image" value="${escapeAttr(p.variantImages?.[v] || '')}" placeholder="Optional variant image URL" type="url" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <button class="ap-remove-variant" type="button" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem" title="Remove">x</button>
         </div>`).join('');
       html += `<div class="admin-product-row${p.active===false?' is-draft':''}" data-idx="${realIdx}" data-key="${escapeAttr(pKey)}" style="grid-template-columns:1fr;gap:0.7rem">
@@ -1790,8 +1792,8 @@ function renderAdminProducts() {
         ${apparelAdminHtml}
         <label class="form-label">Variants, prices &amp; stock</label>
         <div class="ap-variant-list" data-idx="${realIdx}">
-          <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr auto;gap:0.4rem;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.35rem">
-            <span>Variant</span><span>NGN</span><span>USD</span><span>Stock</span><span></span>
+          <div style="display:grid;grid-template-columns:1.1fr 0.8fr 0.8fr 0.7fr 1.4fr auto;gap:0.4rem;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.35rem">
+            <span>Variant</span><span>NGN</span><span>USD</span><span>Stock</span><span>Image (optional)</span><span></span>
           </div>
           ${variantRows}
         </div>
@@ -1946,12 +1948,13 @@ function renderAdminProducts() {
       const list = row.querySelector('.ap-variant-list');
       const variant = document.createElement('div');
       variant.className = 'ap-variant-row';
-      variant.style.cssText = 'display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr auto;gap:0.4rem;align-items:center;margin-bottom:0.4rem';
+      variant.style.cssText = 'display:grid;grid-template-columns:1.1fr 0.8fr 0.8fr 0.7fr 1.4fr auto;gap:0.4rem;align-items:center;margin-bottom:0.4rem';
       variant.innerHTML = `
         <input class="form-input ap-v-label" value="" placeholder="Variant" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
         <input class="form-input ap-v-ngn" value="" placeholder="NGN" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
         <input class="form-input ap-v-usd" value="" placeholder="USD" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
         <input class="form-input ap-v-stock" value="" placeholder="Stock" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
+        <input class="form-input ap-v-image" value="" placeholder="Optional variant image URL" type="url" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
         <button class="ap-remove-variant" type="button" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;padding:0 0.5rem" title="Remove">x</button>`;
       list.appendChild(variant);
       variant.querySelector('.ap-remove-variant').addEventListener('click', () => variant.remove());
@@ -2301,6 +2304,7 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
         const nextNgn = {};
         const nextUsd = {};
         const nextStock = {};
+        const nextVariantImages = {};
         row.querySelectorAll('.ap-variant-row').forEach(vrow => {
           const label = vrow.querySelector('.ap-v-label')?.value.trim();
           if (!label) return;
@@ -2309,11 +2313,14 @@ document.getElementById('saveConfigBtn').addEventListener('click', async () => {
           nextUsd[label] = Number(vrow.querySelector('.ap-v-usd')?.value) || 0;
           const stockVal = vrow.querySelector('.ap-v-stock')?.value;
           if (stockVal !== '') nextStock[label] = Number(stockVal);
+          const imageUrl = vrow.querySelector('.ap-v-image')?.value.trim();
+          if (imageUrl) nextVariantImages[label] = imageUrl;
         });
         p.variants = variants.length ? variants : ['One size'];
         p.priceNgn = nextNgn;
         p.priceUsd = nextUsd;
         p.stock_by_variant = nextStock;
+        p.variantImages = nextVariantImages;
         const enquireElM = row.querySelector('.ap-enquire-only');
         if (enquireElM) p.enquire_only = enquireElM.checked;
       }
@@ -3366,7 +3373,8 @@ async function loadShopData() {
           priceUsd:           r.prices_usd || {},
           badge:              r.badge || '',
           image:              r.image_url || '',
-          images:             r.images || [],
+          images:             (r.images || []).filter(x => typeof x === 'string'),
+          variantImages:      Object.fromEntries((r.images || []).filter(x => x && typeof x === 'object' && x.variant && x.url).map(x => [String(x.variant), String(x.url)])),
           slug:               r.slug || '',
           series_slug:        r.series_slug || '',
           series_name:        r.series_name || '',
@@ -3435,7 +3443,7 @@ function buildProductSaveBody(p) {
     description: p.desc, emoji: p.emoji || '*', variants: p.variants,
     available_variants: p.availableVariants || [], prices_ngn: p.priceNgn,
     prices_usd: p.priceUsd, badge: p.badge, image_url: p.image,
-    images: p.images || [], slug: p.slug || '', series_slug: p.series_slug || '',
+    images: packedProductImages(p), slug: p.slug || '', series_slug: p.series_slug || '',
     series_name: p.series_name || '', series_desc: p.series_desc || '',
     series_year: p.series_year || '', story: p.story || '', process: p.process || '',
     quote: p.quote || '', year: p.year || '', medium: p.medium || '',

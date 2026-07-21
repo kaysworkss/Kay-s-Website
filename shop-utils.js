@@ -595,11 +595,28 @@ function normalizeProduct(p) {
   p.priceUsd = p.priceUsd || p.prices_usd || {};
   p.badge = p.badge || '';
   p.image = p.image || p.image_url || '';
+  const storedImages = Array.isArray(p.images) ? p.images : [];
+  p.variantImages = Object.assign({}, p.variantImages || p.variant_images || {});
+  storedImages.forEach(item => {
+    if (item && typeof item === 'object' && item.variant && item.url) p.variantImages[String(item.variant)] = String(item.url);
+  });
+  p.images = storedImages.filter(item => typeof item === 'string');
   p.stock_by_variant = p.stock_by_variant || {};
   p.edition_totals = p.edition_totals || {};
   p.certificate_of_authenticity = p.certificate_of_authenticity === true;
   p.active = p.active !== false;
   return p;
+}
+function variantImage(product, variantKey) {
+  const map = product?.variantImages || product?.variant_images || {};
+  return normalizeImg(map[variantKey] || map[keySize(variantKey)] || product?.image || product?.image_url || '');
+}
+function packedProductImages(product) {
+  const gallery = (Array.isArray(product?.images) ? product.images : []).filter(item => typeof item === 'string' && item.trim());
+  const mapped = Object.entries(product?.variantImages || product?.variant_images || {})
+    .filter(([variant, url]) => String(variant).trim() && String(url).trim())
+    .map(([variant, url]) => ({ variant: String(variant), url: String(url) }));
+  return gallery.concat(mapped);
 }
 function productKey(p) {
   if (!p) return '';

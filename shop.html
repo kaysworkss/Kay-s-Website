@@ -4072,8 +4072,9 @@ function buildCard(p) {
     `<button class="variant-chip${i===0?' selected':''}" data-pid="${p.id}" data-v="${choice.key}">${choice.label}</button>`
   ).join('');
 
-  const imgHtml = p.image
-    ? `<img src="${p.image}" alt="${p.name}" loading="lazy"/>`
+  const defaultImage = variantImage(p, defaultChoice.key);
+  const imgHtml = defaultImage
+    ? `<img src="${defaultImage}" alt="${p.name}" loading="lazy"/>`
     : `<div class="card-img-placeholder">${p.emoji}</div>`;
 
   const badgeHtml = buildBadgeStack(p);
@@ -4095,7 +4096,7 @@ function buildCard(p) {
   card.dataset.pid = p.id;
   card.dataset.category = p.category;
   card.innerHTML = `
-    <div class="card-img">${imgHtml}${badgeHtml}</div>
+    <div class="card-img"><span class="variant-card-image">${imgHtml}</span>${badgeHtml}</div>
     <div class="card-body">
       <p class="card-category">${p.category}</p>
       <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
@@ -4279,6 +4280,11 @@ function wireVariantButton(btn) {
     document.querySelectorAll(`.variant-chip[data-pid="${pid}"]`)
       .forEach(b => b.classList.toggle('selected', b.dataset.v === v));
     const p = SHOP_CONFIG.products.find(x=>x.id===pid);
+    const imageWrap = document.querySelector(`.product-card[data-pid="${pid}"] .variant-card-image`);
+    if (imageWrap) {
+      const imageUrl = variantImage(p, v);
+      imageWrap.innerHTML = imageUrl ? `<img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(p.name)}" loading="lazy"/>` : `<div class="card-img-placeholder">${escapeText(p.emoji || '')}</div>`;
+    }
     const _updNgn = productPrice(p, v, 'ngn');
     document.getElementById('pngn-'+pid).textContent = fmt(_updNgn);
     document.getElementById('pusd-'+pid).textContent = fmtUsd(productPrice(p, v, 'usd')) + ' USD';
@@ -4765,7 +4771,7 @@ function addToCart(p, variant) {
       key, id: p.id, name: p.name, variant: label, variantKey: variant,
       priceNgn: productPrice(p, variant, 'ngn'),
       priceUsd: productPrice(p, variant, 'usd'),
-      emoji: p.emoji, image: normalizeImg(p.image), qty: 1,
+      emoji: p.emoji, image: variantImage(p, variant), qty: 1,
     });
   }
   updateCartUI();
@@ -4814,11 +4820,11 @@ function holderMerchDiscountPercent() {
 }
 function holderProductDiscountPercent(product) {
   const productPercent = Number(product?.holder_benefit_discount_percent || 0);
-  return Math.max(0, Math.min(90, productPercent > 0 ? productPercent : holderMerchDiscountPercent()));
+  return Math.max(0, Math.min(90, productPercent));
 }
 function holderMerchBenefit(currency) {
   if (!_holderMerchClaim) return { total: 0, freeTote: 0, addOn: 0, percent: 0 };
-  const percent = holderMerchDiscountPercent();
+  let highestPercent = 0;
   const appliedProductPercent = _appliedDiscount && (_appliedDiscount.scope === 'products' || _appliedDiscount.scope === 'all')
     ? Number(_appliedDiscount.percent || 0)
     : 0;
@@ -4829,23 +4835,27 @@ function holderMerchBenefit(currency) {
     const product = SHOP_CONFIG.products.find(p => p.id === item.id) || {};
     if (String(product.category || '').toLowerCase() !== 'merch') return;
     const kind = holderProductKind(product);
+    const role = String(product.holder_benefit_role || '');
+    const benefitActive = product.holder_benefit_active === true && isApotiMerchProduct(product);
     const unit = liveCartItemPrice(item, currency);
     let discountableQty = item.qty;
-    if (kind === 'tote' && freeToteRemaining > 0) {
+    if (benefitActive && role === 'free_tote' && freeToteRemaining > 0) {
       const covered = Math.min(item.qty, freeToteRemaining);
       freeTote += unit * covered;
       freeToteRemaining -= covered;
       discountableQty -= covered;
     }
-    if ((kind === 'tote' || kind === 'shirt' || kind === 'hoodie' || kind === 'addon') && discountableQty > 0 && percent > appliedProductPercent && isApotiMerchProduct(product)) {
+    const percent = holderProductDiscountPercent(product);
+    if (benefitActive && (role === 'free_tote' || role === 'discount_addon') && discountableQty > 0 && percent > appliedProductPercent) {
       addOn += unit * discountableQty * percent / 100;
+      highestPercent = Math.max(highestPercent, percent);
     }
   });
   return {
     total: +(freeTote + addOn).toFixed(2),
     freeTote: +freeTote.toFixed(2),
     addOn: +addOn.toFixed(2),
-    percent: percent > appliedProductPercent ? percent : 0,
+    percent: highestPercent,
   };
 }
 function holderDiscountExcludedSubtotal(currency) {
@@ -4858,16 +4868,18 @@ function holderDiscountExcludedSubtotal(currency) {
     const product = SHOP_CONFIG.products.find(p => p.id === item.id) || {};
     if (String(product.category || '').toLowerCase() !== 'merch') return;
     const kind = holderProductKind(product);
+    const role = String(product.holder_benefit_role || '');
+    const benefitActive = product.holder_benefit_active === true && isApotiMerchProduct(product);
     const unit = liveCartItemPrice(item, currency);
     let discountableQty = item.qty;
-    if (kind === 'tote' && freeToteRemaining > 0) {
+    if (benefitActive && role === 'free_tote' && freeToteRemaining > 0) {
       const covered = Math.min(item.qty, freeToteRemaining);
       excluded += unit * covered;
       freeToteRemaining -= covered;
       discountableQty -= covered;
     }
     const itemPercent = holderProductDiscountPercent(product);
-    if ((kind === 'tote' || kind === 'shirt' || kind === 'hoodie' || kind === 'addon') && discountableQty > 0 && isApotiMerchProduct(product) && itemPercent > appliedProductPercent) {
+    if (benefitActive && (role === 'free_tote' || role === 'discount_addon') && discountableQty > 0 && itemPercent > appliedProductPercent) {
       excluded += unit * discountableQty;
     }
   });
@@ -8772,7 +8784,8 @@ async function loadShopData() {
           priceUsd:           r.prices_usd || {},
           badge:              r.badge || '',
           image:              r.image_url || '',
-          images:             r.images || [],
+          images:             (r.images || []).filter(x => typeof x === 'string'),
+          variantImages:      Object.fromEntries((r.images || []).filter(x => x && typeof x === 'object' && x.variant && x.url).map(x => [String(x.variant), String(x.url)])),
           slug:               r.slug || '',
           series_slug:        r.series_slug || '',
           series_name:        r.series_name || '',
@@ -8870,7 +8883,7 @@ async function apiSaveProduct(p, token) {
     prices_usd:         p.priceUsd,
     badge:              p.badge,
     image_url:          p.image,
-    images:             p.images || [],
+    images:             packedProductImages(p),
     slug:               p.slug || '',
     series_slug:        p.series_slug || '',
     series_name:        p.series_name || '',
