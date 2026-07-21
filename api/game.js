@@ -1284,8 +1284,16 @@ const APOTI_MERCH_TEZOS_CONTRACT = 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8';
 const APOTI_MERCH_DEFAULT_DISCOUNT = 25;
 const APOTI_MERCH_TOKEN_RULES = {
   1: { tier: 'Wooden Token Holder', discountPercent: 15, freeTote: false },
-  2: { tier: 'Bronze Token Holder', discountPercent: 25, freeTote: true },
+  2: { tier: 'Bronze Token Holder', discountPercent: 20, freeTote: true },
 };
+
+function serverHolderProductDiscountPercent(product, holderClaim) {
+  const marker = (Array.isArray(product?.images) ? product.images : [])
+    .find(item => item && typeof item === 'object' && item.kind === 'holder_tier_discounts');
+  const isBronze = Number(holderClaim?.tokenBalances?.[2] || 0) > 0 || /bronze/i.test(String(holderClaim?.tier || ''));
+  const value = isBronze ? (marker?.bronze ?? 20) : (marker?.wood ?? 15);
+  return Math.max(0, Math.min(90, Number(value) || 0));
+}
 
 function serverNormalizeHolderText(value) {
   return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -1426,7 +1434,7 @@ function computeServerHolderMerchBenefit(holderClaim, trustedItems, productCache
     const qty = Number(item.qty || 0);
     // Admin product settings are authoritative. Zero intentionally disables
     // the percentage discount while leaving a configured free-item role intact.
-    const percent = Math.max(0, Math.min(90, Number(product.holder_benefit_discount_percent || 0)));
+    const percent = serverHolderProductDiscountPercent(product, holderClaim);
     let discountableQty = qty;
     if (hasExplicitBenefit && role === 'free_tote' && freeToteRemaining > 0) {
       const covered = Math.min(qty, freeToteRemaining);
