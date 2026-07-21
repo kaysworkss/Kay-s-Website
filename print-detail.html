@@ -380,6 +380,28 @@ nav.scrolled {
   padding:1.6rem; margin-bottom:2rem;
   background:var(--bg-card);
 }
+.mobile-choice-preview { display:none; }
+@media(max-width:900px) {
+  .info-panel { display:flex; flex-direction:column; }
+  .purchase-block { order:1; }
+  .info-panel > .section-divider,
+  .info-panel > .print-story,
+  .info-panel > .spec-table { order:2; }
+  .mobile-choice-preview {
+    display:grid; grid-template-columns:64px 1fr; gap:0.8rem; align-items:center;
+    margin:-0.25rem 0 1rem; padding:0.55rem;
+    border:1px solid var(--border); background:var(--bg-alt); border-radius:3px;
+  }
+  .mobile-choice-preview img {
+    width:64px; height:64px; object-fit:contain; background:var(--bg); border-radius:2px;
+  }
+  .mobile-choice-preview-label {
+    font-family:'Montserrat',sans-serif; font-size:0.7rem; line-height:1.5; color:var(--text-muted);
+  }
+  .mobile-choice-preview-label strong {
+    display:block; color:var(--text); font-weight:500; margin-top:0.12rem;
+  }
+}
 .purchase-label {
   font-family:'Cinzel',serif; font-size:0.5rem;
   letter-spacing:0.22em; text-transform:uppercase;
@@ -2126,6 +2148,7 @@ function renderMerchProduct(p) {
 
         <div class="purchase-block">
           <p class="purchase-label">Choose your options</p>
+          ${images[0] ? `<div class="mobile-choice-preview"><img id="mobileChoicePreviewImg" src="${escapeAttr(images[0])}" alt="Selected product preview"/><div class="mobile-choice-preview-label">Your selection<strong id="mobileChoicePreviewLabel">Choose a colour and size</strong></div></div>` : ''}
           <div class="size-picker">${variantChips}</div>
           <div class="price-row">
             <span class="price-ngn" id="priceNgn">${requiresChoice ? 'From ' : ''}${(_detailCurrency && _detailCurrency !== 'NGN' && _detailRate) ? (fmtLocal(ngn) || fmt(ngn)) : fmt(ngn)}</span>
@@ -2185,6 +2208,10 @@ function selectMerchVariant(label) {
 
 function selectMerchAxis(axis, value) {
   _selectedMerchOptions[axis] = value;
+  const mobileLabel = document.getElementById('mobileChoicePreviewLabel');
+  if (mobileLabel) {
+    mobileLabel.textContent = [_selectedMerchOptions.color, _selectedMerchOptions.size].filter(Boolean).join(' / ') || 'Choose a colour and size';
+  }
   document.querySelectorAll(`.merch-axis-chip[data-axis="${axis}"]`).forEach(chip => chip.classList.toggle('selected', chip.dataset.value === value));
   const mode = detailMerchOptionMode(_product);
   const selectionMode = mode === 'color'
@@ -2212,9 +2239,11 @@ function refreshMerchVariantGallery(label) {
   const images = [...productVariantImages(_product, label), ...(_product.image_url ? [_product.image_url] : []), ...productGalleryImages(_product)]
     .map(normalizeImg).filter((v, i, a) => v && a.indexOf(v) === i);
   const heroImg = document.getElementById('heroImg');
+  const mobilePreview = document.getElementById('mobileChoicePreviewImg');
   const currentWrap = document.getElementById('heroWrap');
   if (currentWrap?._setDetailZoom) currentWrap._setDetailZoom(false);
   if (heroImg && images[0]) heroImg.src = images[0];
+  if (mobilePreview && images[0]) mobilePreview.src = images[0];
   const wrap = document.getElementById('heroWrap');
   if (!wrap) return;
   wrap.querySelector('.thumb-strip')?.remove();
@@ -2482,6 +2511,8 @@ function switchImage(idx) {
   const heroWrap = document.getElementById('heroWrap');
   if (heroWrap?._setDetailZoom) heroWrap._setDetailZoom(false);
   if (heroImg && images[idx]) heroImg.src = images[idx];
+  const mobilePreview = document.getElementById('mobileChoicePreviewImg');
+  if (mobilePreview && images[idx]) mobilePreview.src = images[idx];
   document.querySelectorAll('.thumb').forEach(t => t.classList.toggle('active', Number(t.dataset.idx) === idx));
 }
 
