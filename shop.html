@@ -905,10 +905,21 @@ a.card-img-hover {
   display: flex; flex-wrap: wrap; gap: 0.4rem;
   margin-bottom: 1rem;
 }
+.variant-axis {
+  width:100%; display:flex; align-items:center; flex-wrap:wrap;
+  column-gap:0.4rem; row-gap:0.38rem;
+}
+.variant-axis + .variant-axis { margin-top:0.2rem; }
+.variant-axis-label {
+  flex:0 0 3.4rem;
+  font-family:'Montserrat',sans-serif; font-size:0.58rem;
+  letter-spacing:0.06em; color:var(--text-muted);
+}
 .variant-chip {
   font-family: 'Montserrat', sans-serif; font-size: 0.6rem;
   letter-spacing: 0.06em; font-weight: 500;
   padding: 0.28rem 0.65rem;
+  min-height:1.65rem; display:inline-flex; align-items:center; justify-content:center; gap:0.35rem;
   border: 1px solid var(--border);
   border-radius: 20px; color: var(--text-muted);
   transition: border-color 0.15s, color 0.15s, background 0.15s;
@@ -920,6 +931,12 @@ a.card-img-hover {
   border-color: var(--clay); color: var(--bark);
 }
 body.dark .variant-chip.selected { color: var(--sand); }
+.variant-swatch {
+  width:0.55rem; height:0.55rem; flex:0 0 0.55rem;
+  border-radius:50%; background:var(--swatch-color, #c7b7a5);
+  border:1px solid rgba(55,39,31,0.2);
+  box-shadow:0 0 0 1px rgba(255,255,255,0.45) inset;
+}
 
 /* Print option selector on artwork cards */
 .print-type-wrap { margin-bottom: 0.7rem; }
@@ -4060,6 +4077,19 @@ function detailsLink(p) {
   return `<a class="details-link" href="/shop/${p.slug}" rel="noopener">${label}</a>`;
 }
 
+function merchColorSwatch(color) {
+  const key = String(color || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
+  const colors = {
+    'black':'#171513', 'off white':'#f2eee4', 'white':'#ffffff', 'cream':'#eadfc8',
+    'beige':'#cdbb9b', 'tan':'#b58b61', 'brown':'#704a33', 'oxblood':'#581b20',
+    'burgundy':'#6d1f2b', 'maroon':'#681f2a', 'red':'#b63b32', 'orange':'#d97832',
+    'yellow':'#dfb83d', 'olive':'#72733f', 'green':'#3f704d', 'blue':'#3d6592',
+    'navy':'#202d49', 'purple':'#71527c', 'pink':'#c98591', 'grey':'#8a8782',
+    'gray':'#8a8782', 'charcoal':'#3f403f'
+  };
+  return colors[key] || '#b9aa98';
+}
+
 function buildCard(p) {
   if (p.category === 'prints') return buildPrintCard(p);
 
@@ -4075,7 +4105,7 @@ function buildCard(p) {
   const usd = productPrice(p, defaultChoice.key, 'usd');
 
   const colorHtml = (optionMode === 'color' || optionMode === 'size_color')
-    ? `<div class="variant-axis"><span class="variant-axis-label">Colour</span>${colors.map(color => `<button class="variant-chip merch-option-chip${colors.length===1&&!requiresChoice?' selected':''}" data-pid="${p.id}" data-axis="color" data-value="${escapeAttr(color)}">${escapeText(color)}</button>`).join('')}</div>` : '';
+    ? `<div class="variant-axis"><span class="variant-axis-label">Colour</span>${colors.map(color => `<button class="variant-chip merch-option-chip${colors.length===1&&!requiresChoice?' selected':''}" data-pid="${p.id}" data-axis="color" data-value="${escapeAttr(color)}"><span class="variant-swatch" style="--swatch-color:${merchColorSwatch(color)}" aria-hidden="true"></span>${escapeText(color)}</button>`).join('')}</div>` : '';
   const sizeHtml = (optionMode === 'size' || optionMode === 'size_color')
     ? `<div class="variant-axis"><span class="variant-axis-label">Size</span>${sizes.map(size => `<button class="variant-chip merch-option-chip${sizes.length===1&&!requiresChoice?' selected':''}" data-pid="${p.id}" data-axis="size" data-value="${escapeAttr(size)}">${escapeText(size)}</button>`).join('')}</div>` : '';
   const variantHtml = colorHtml + sizeHtml;
