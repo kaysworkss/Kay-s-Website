@@ -6256,10 +6256,32 @@ function updateShippingFieldGroups() {
   }
 
   const validOptions = () => Array.from(countryEl.options).filter(o => o.value);
+  const commonCountryAliases = {
+    US: ['USA', 'United States of America', 'America'],
+    GB: ['UK', 'Great Britain', 'Britain', 'England'],
+    AE: ['UAE', 'Emirates'],
+    NG: ['NGA'],
+    CA: ['CAN'],
+    AU: ['AUS'],
+    NZ: ['NZL'],
+  };
+  const countryAliases = new Map();
+  validOptions().forEach(option => {
+    countryAliases.set(option.value.toLocaleLowerCase(), option);
+    countryAliases.set(option.text.trim().toLocaleLowerCase(), option);
+    (commonCountryAliases[option.value] || []).forEach(alias => countryAliases.set(alias.toLocaleLowerCase(), option));
+  });
   validOptions().sort((a, b) => a.text.localeCompare(b.text)).forEach(option => {
     const suggestion = document.createElement('option');
     suggestion.value = option.text;
+    suggestion.label = option.value;
     suggestionsEl.appendChild(suggestion);
+    [option.value, ...(commonCountryAliases[option.value] || [])].forEach(alias => {
+      const aliasSuggestion = document.createElement('option');
+      aliasSuggestion.value = alias;
+      aliasSuggestion.label = option.text;
+      suggestionsEl.appendChild(aliasSuggestion);
+    });
   });
 
   let userEditedCountry = false;
@@ -6287,7 +6309,7 @@ function updateShippingFieldGroups() {
   function syncTypedCountry() {
     userEditedCountry = true;
     const typed = searchEl.value.trim().toLocaleLowerCase();
-    const option = validOptions().find(o => o.text.trim().toLocaleLowerCase() === typed);
+    const option = countryAliases.get(typed);
     const nextValue = option?.value || '';
     if (countryEl.value !== nextValue) {
       countryEl.value = nextValue;
@@ -6295,7 +6317,22 @@ function updateShippingFieldGroups() {
     }
   }
   searchEl.addEventListener('input', syncTypedCountry);
-  searchEl.addEventListener('change', syncTypedCountry);
+  searchEl.addEventListener('change', () => {
+    syncTypedCountry();
+    const selected = countryEl.options[countryEl.selectedIndex];
+    if (countryEl.value && selected) searchEl.value = selected.text;
+  });
+  // Desktop datalists filter against their current value. Clear only the
+  // visible filter when reopening it so the full list is immediately usable;
+  // the canonical selected country remains intact until another is chosen.
+  searchEl.addEventListener('pointerdown', () => {
+    if (!window.matchMedia('(min-width:601px)').matches) return;
+    const selected = countryEl.options[countryEl.selectedIndex];
+    if (selected && searchEl.value.trim() === selected.text.trim()) {
+      searchEl.value = '';
+      requestAnimationFrame(() => { try { searchEl.showPicker?.(); } catch (_) {} });
+    }
+  });
 
   // Mobile: the native select is used directly (no search step needed).
   countryEl.addEventListener('change', () => {
