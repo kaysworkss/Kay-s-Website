@@ -989,7 +989,7 @@ body.dark .cart-note-toggle { color: var(--sand); }
 
 <!-- Nav -->
 <nav id="mainNav">
-  <a href="/shop" class="nav-logo" title="Back to shop"><span style="font-weight:600">KAY'S</span>&nbsp;<span style="font-weight:500">WORKS</span></a>
+  <a href="/shop" class="nav-logo" title="Back to shop" aria-label="Kay's Works Shop — back to shop"><span style="font-weight:600">KAY'S</span>&nbsp;<span style="font-weight:500">WORKS</span>&nbsp;<span style="opacity:0.45">/</span>&nbsp;<span style="font-weight:500;color:var(--clay)">SHOP</span></a>
   <div class="nav-right">
     <div class="nav-links">
       <a href="/shop">Shop</a>
@@ -2600,10 +2600,12 @@ document.getElementById('printContent').addEventListener('click', e => {
   if (chip.closest('.print-option-picker')) {
     if (chip.dataset.type !== undefined) selectPrintType(chip.dataset.type);
   } else if (chip.closest('.size-picker')) {
-    if (chip.dataset.v === undefined) return;
-    if (_product && _product.category && _product.category !== 'prints') {
-      if (chip.classList.contains('merch-axis-chip')) selectMerchAxis(chip.dataset.axis, chip.dataset.value);
-      else selectMerchVariant(chip.dataset.v);
+    if (_product && _product.category && _product.category !== 'prints' && chip.classList.contains('merch-axis-chip')) {
+      selectMerchAxis(chip.dataset.axis, chip.dataset.value);
+    } else if (chip.dataset.v === undefined) {
+      return;
+    } else if (_product && _product.category && _product.category !== 'prints') {
+      selectMerchVariant(chip.dataset.v);
     } else {
       selectSize(chip.dataset.v);
     }
