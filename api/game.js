@@ -1415,7 +1415,6 @@ async function resolveServerHolderMerchClaim(rawClaim) {
 function computeServerHolderMerchBenefit(holderClaim, trustedItems, productCache, appliedProductPercent) {
   const empty = { totalNgn: 0, totalUsd: 0, freeToteNgn: 0, freeToteUsd: 0, addOnNgn: 0, addOnUsd: 0, coveredToteQty: 0, discountExcludedNgn: 0, discountExcludedUsd: 0 };
   if (!holderClaim) return empty;
-  const fallbackPercent = Number(holderClaim.discountPercent || 0);
   let freeToteRemaining = holderClaim.freeTote ? Number(holderClaim.freeToteQty || 0) : 0;
   const out = { ...empty };
   for (const item of trustedItems) {
@@ -1425,9 +1424,11 @@ function computeServerHolderMerchBenefit(holderClaim, trustedItems, productCache
     const role = String(product.holder_benefit_role || '').toLowerCase();
     const hasExplicitBenefit = product.holder_benefit_active === true && serverIsApotiMerchProduct(product);
     const qty = Number(item.qty || 0);
-    const percent = Math.max(0, Math.min(90, Number(product.holder_benefit_discount_percent || fallbackPercent || 0)));
+    // Admin product settings are authoritative. Zero intentionally disables
+    // the percentage discount while leaving a configured free-item role intact.
+    const percent = Math.max(0, Math.min(90, Number(product.holder_benefit_discount_percent || 0)));
     let discountableQty = qty;
-    if (((hasExplicitBenefit && role === 'free_tote') || (!role && kind === 'tote' && serverIsApotiMerchProduct(product))) && freeToteRemaining > 0) {
+    if (hasExplicitBenefit && role === 'free_tote' && freeToteRemaining > 0) {
       const covered = Math.min(qty, freeToteRemaining);
       out.coveredToteQty += covered;
       out.freeToteNgn += Number(item.priceNgn || 0) * covered;
@@ -1437,7 +1438,7 @@ function computeServerHolderMerchBenefit(holderClaim, trustedItems, productCache
       freeToteRemaining -= covered;
       discountableQty -= covered;
     }
-    if (((hasExplicitBenefit && (role === 'discount_addon' || role === 'free_tote')) || (!role && (kind === 'tote' || kind === 'shirt' || kind === 'hoodie') && serverIsApotiMerchProduct(product))) && discountableQty > 0 && percent > Number(appliedProductPercent || 0)) {
+    if (hasExplicitBenefit && (role === 'discount_addon' || role === 'free_tote') && discountableQty > 0 && percent > Number(appliedProductPercent || 0)) {
       out.addOnNgn += Number(item.priceNgn || 0) * discountableQty * percent / 100;
       out.addOnUsd += Number(item.priceUsd || 0) * discountableQty * percent / 100;
       out.discountExcludedNgn += Number(item.priceNgn || 0) * discountableQty;
@@ -1661,7 +1662,11 @@ async function computeShopCheckout(body, supabase) {
       qty,
       priceNgn,
       priceUsd,
-      imageUrl: product.image || product.image_url || '',
+      imageUrl: (() => {
+        const images = Array.isArray(product.images) ? product.images : [];
+        const match = images.find(x => x && typeof x === 'object' && String(x.variant) === String(vkey));
+        return match?.url || product.image || product.image_url || '';
+      })(),
     });
   }
 
