@@ -1188,6 +1188,47 @@ body {
   margin-top: 3px; font-style: italic;
 }
 
+/* Token-gate context: action first, optional background second */
+.gate-why {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--divider);
+}
+.gate-why summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  list-style: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: 'Cinzel', serif;
+  font-size: 0.48rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+.gate-why summary::-webkit-details-marker { display: none; }
+.gate-why summary::after {
+  content: '+';
+  color: var(--gold);
+  font-family: 'Crimson Pro', serif;
+  font-size: 1rem;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+.gate-why[open] summary { color: var(--clay); }
+.gate-why[open] summary::after { transform: rotate(45deg); }
+.gate-why-copy {
+  margin-top: 11px;
+  color: var(--text-muted);
+  font-family: 'Crimson Pro', serif;
+  font-size: 0.84rem;
+  line-height: 1.62;
+}
+.gate-why-copy p { margin: 0 0 9px; }
+.gate-why-copy p:last-child { margin-bottom: 0; }
+
 /* Settled banner */
 .settled-banner {
   background: rgba(107,124,92,0.1);
@@ -1994,8 +2035,16 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
         <div style="background:rgba(196,132,90,0.05);border:1px solid var(--divider);border-radius:var(--r);padding:16px 18px">
           <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">Entry requirement</div>
           <div style="font-family:'Cormorant Garamond',serif;font-size:1.15rem;color:var(--clay);margin-bottom:6px" id="upcoming-gate-name">Token-gated auction</div>
-          <div style="font-family:'Crimson Pro',serif;font-size:0.85rem;color:var(--text-muted);line-height:1.6;font-style:italic" id="upcoming-gate-detail">You'll need to hold this token to participate.</div>
+          <div style="font-family:'Crimson Pro',serif;font-size:0.85rem;color:var(--text-muted);line-height:1.6;font-style:italic" id="upcoming-gate-detail">Hold the entry token to participate during the gated phase.</div>
           <a id="upcoming-gate-link" href="#" target="_blank" style="display:none;margin-top:10px;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold);text-decoration:none;border-bottom:1px solid rgba(201,153,58,0.3);padding-bottom:1px" onmouseover="this.style.color='var(--clay)'" onmouseout="this.style.color='var(--gold)'">Get the entry token →</a>
+          <details class="gate-why">
+            <summary>Why an entry token?</summary>
+            <div class="gate-why-copy">
+              <p>The token-gated phase is my way of honouring the collectors who have actively supported this project since its inception. Their contributions helped build the infrastructure behind the work and made its long-term sustainability possible.</p>
+              <p>This early access recognises their belief, participation, and commitment. After this period, the auction will open to the public.</p>
+              <p>You can also choose to acquire an entry token to participate during this phase and unlock the wider benefits available to token holders.</p>
+            </div>
+          </details>
         </div>
 
         <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--divider);text-align:center">
@@ -2097,8 +2146,16 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           <!-- Gate access notice — shown when auction requires a token; hidden for open auctions and once wallet connects -->
           <div id="live-gate-notice" style="display:none;margin-bottom:16px;background:rgba(196,132,90,0.05);border:1px solid var(--divider);border-radius:var(--r);padding:14px 16px">
             <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Entry requirement</div>
-            <div style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);line-height:1.6;font-style:italic;margin-bottom:8px">This auction requires <span id="live-gate-name-inline" style="color:var(--clay);font-style:normal">an entry token</span> to participate. Connect a wallet that holds it to join.</div>
+            <div style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);line-height:1.6;font-style:italic;margin-bottom:8px">Hold <span id="live-gate-name-inline" style="color:var(--clay);font-style:normal">the entry token</span> to participate during the gated phase. Connect the wallet that holds it to join.</div>
             <a id="live-gate-link" href="#" target="_blank" style="display:none;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold);text-decoration:none;border-bottom:1px solid rgba(201,153,58,0.3);padding-bottom:1px" onmouseover="this.style.color='var(--clay)'" onmouseout="this.style.color='var(--gold)'">Get the entry token →</a>
+            <details class="gate-why">
+              <summary>Why an entry token?</summary>
+              <div class="gate-why-copy">
+                <p>The token-gated phase is my way of honouring the collectors who have actively supported this project since its inception. Their contributions helped build the infrastructure behind the work and made its long-term sustainability possible.</p>
+                <p>This early access recognises their belief, participation, and commitment. After this period, the auction will open to the public.</p>
+                <p>You can also choose to acquire an entry token to participate during this phase and unlock the wider benefits available to token holders.</p>
+              </div>
+            </details>
           </div>
 
           <!-- Wallet -->
@@ -3639,7 +3696,7 @@ function _loadUpcomingPiece(idx) {
   const gateLinkEl   = document.getElementById("upcoming-gate-link");
   if (slot.gateName && gateNameEl) {
     gateNameEl.textContent = slot.gateName;
-    if (gateDetailEl) gateDetailEl.textContent = "You'll need to hold this token to participate.";
+    if (gateDetailEl) gateDetailEl.textContent = "Hold this entry token to participate during the gated phase.";
   }
   if (slot.gateLink && gateLinkEl) {
     gateLinkEl.href = slot.gateLink.startsWith("http") ? slot.gateLink : "#";
@@ -4769,6 +4826,11 @@ function _wcOpenModal() {
             <span class="wc-wallet-name">Coinbase Wallet</span>
             <span class="wc-wallet-tag">Open in app</span>
           </button>
+          <button class="wc-wallet-btn" onclick="_wcConnectWC('phantom')">
+            <span class="wc-wallet-icon-ph">&#x1F47B;</span>
+            <span class="wc-wallet-name">Phantom</span>
+            <span class="wc-wallet-tag">Open in app</span>
+          </button>
         </div>
         <button class="wc-cancel-btn" onclick="_wcCloseModal()">Cancel</button>`;
     } else {
@@ -4797,19 +4859,22 @@ function _wcCloseModal() {
   if (overlay) overlay.classList.remove("show");
 }
 
-async function _wcConnectInjected() {
+async function _wcConnectInjected(walletHint) {
   _wcCloseModal();
   if (_walletConnecting) return;
   _walletConnecting = true; walletChain = "eth"; setWalletUi("connecting");
   try {
-    if (!window.ethereum) throw new Error("No browser wallet found. Use WalletConnect instead.");
-    await window.ethereum.request({ method: "eth_requestAccounts" });
-    provider = new ethers.BrowserProvider(window.ethereum);
+    const injected = walletHint === "phantom"
+      ? window.phantom?.ethereum
+      : window.ethereum;
+    if (!injected) throw new Error("No browser wallet found. Use a mobile wallet option instead.");
+    await injected.request({ method: "eth_requestAccounts" });
+    provider = new ethers.BrowserProvider(injected);
     signer   = await provider.getSigner();
-    await _wcFinishConnect(await signer.getAddress(), "injected");
-    if (!_walletEventsBound && window.ethereum?.on) {
-      window.ethereum.on("accountsChanged", () => location.reload());
-      window.ethereum.on("chainChanged",    () => location.reload());
+    await _wcFinishConnect(await signer.getAddress(), walletHint === "phantom" ? "phantom" : "injected");
+    if (!_walletEventsBound && injected?.on) {
+      injected.on("accountsChanged", () => location.reload());
+      injected.on("chainChanged",    () => location.reload());
       _walletEventsBound = true;
     }
   } catch(e) { _wcHandleError(e); }
@@ -4826,7 +4891,12 @@ async function _wcConnectWC(walletHint) {
   const title    = document.getElementById("wc-modal-title");
   const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 
-  if (isMobile && walletHint && window.ethereum) {
+  if (isMobile && walletHint === "phantom" && window.phantom?.ethereum) {
+    _walletConnecting = false;
+    return _wcConnectInjected("phantom");
+  }
+
+  if (isMobile && walletHint && walletHint !== "phantom" && window.ethereum) {
     _walletConnecting = false;
     return _wcConnectInjected();
   }
@@ -4842,6 +4912,7 @@ async function _wcConnectWC(walletHint) {
       metamask: `https://metamask.app.link/dapp/${dappUrl}`,
       rainbow:  `https://rnbwapp.com/dapp/${dappUrl}`,
       coinbase: `https://go.cb-w.com/dapp?cb_url=${encodedUrl}`,
+      phantom:  `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodeURIComponent(window.location.origin)}`,
     };
     const link = deepLinks[walletHint];
     if (link) {
@@ -5223,6 +5294,12 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     const isOpen        = s[9];
     const buyNowPriceWei = s[10];
     const buyNowAvail    = s[11];
+
+    // A wallet that connected during the token-gated phase may become eligible
+    // automatically when the contract enters its public phase. Re-check while
+    // polling so that visitor can use chat without reconnecting. Wallet
+    // ownership was already proved by the signature collected at connection.
+    _refreshRoomEligibilityForPublicPhase(runToken, contract);
 
     endTimestamp = Number(endTime);
     minNextBid   = mnb;
@@ -6607,6 +6684,47 @@ const _sb = {
 
 let _currentMode  = "collector";
 let _roomEligible = false;
+let _roomEligibilityRefreshPending = false;
+let _lastRoomEligibilityRefreshAt = 0;
+
+async function _refreshRoomEligibilityForPublicPhase(runToken, contract) {
+  if (
+    _roomEligible ||
+    _roomEligibilityRefreshPending ||
+    !signerAddress ||
+    walletChain === "tezos" ||
+    !contract ||
+    runToken !== _switchToken
+  ) return;
+
+  // refreshState normally runs every 15 seconds. This guard also protects
+  // against extra state refreshes triggered by contract events.
+  const now = Date.now();
+  if (now - _lastRoomEligibilityRefreshAt < 10000) return;
+  _lastRoomEligibilityRefreshAt = now;
+  _roomEligibilityRefreshPending = true;
+  const checkedAddress = signerAddress;
+
+  try {
+    const ok = await withTimeout(
+      contract.isEligible(checkedAddress),
+      9000,
+      "Public-phase eligibility check timed out."
+    );
+    if (
+      ok &&
+      runToken === _switchToken &&
+      signerAddress &&
+      signerAddress.toLowerCase() === checkedAddress.toLowerCase()
+    ) {
+      onRoomEligibilityGranted();
+    }
+  } catch (e) {
+    console.debug("Public-phase chat eligibility refresh:", e?.message || e);
+  } finally {
+    _roomEligibilityRefreshPending = false;
+  }
+}
 let _auctionId    = null;
 let _realtimeWS   = null;
 let _seenMsgIds   = new Set();
