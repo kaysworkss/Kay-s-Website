@@ -1010,13 +1010,15 @@ async function authenticate() {
 
   setLoading(true);
   try {
-    // Verify the password by attempting a POST with no-op data
+    // Send the candidate password with the validation GET. The API keeps
+    // ordinary GET requests public, but validates GETs carrying this header.
+    adminPassword = pw;
     const res = await apiFetch("GET");
     if (res.status === 401) {
+      adminPassword = "";
       toast("err", "Wrong password", "Admin password is incorrect");
       return;
     }
-    adminPassword = pw;
     document.getElementById("auth-gate").style.display = "none";
     document.getElementById("main-content").style.display = "block";
     populateForm(res.config);
@@ -1024,6 +1026,7 @@ async function authenticate() {
     loadAuctioneerProfile();
     toast("ok", "Unlocked", "Configuration loaded from server");
   } catch (err) {
+    adminPassword = "";
     toast("err", "Connection error", err.message);
   } finally {
     setLoading(false);
@@ -1043,7 +1046,10 @@ async function apiFetch(method, body) {
   if (body) opts.body = JSON.stringify(body);
 
   const res = await fetch(API_URL, opts);
-  const json = await res.json();
+  const contentType = res.headers.get("content-type") || "";
+  const json = contentType.includes("application/json")
+    ? await res.json()
+    : { ok: false, error: (await res.text()) || `Request failed (${res.status})` };
   if (!json.ok && res.status !== 401) throw new Error(json.error || "Unknown error");
   json.status = res.status;
   return json;
@@ -2025,7 +2031,10 @@ async function saveConfig() {
   setLoading(true);
   setBusy(true);
   try {
-    await apiFetch("POST", cfg);
+    const result = await apiFetch("POST", cfg);
+    if (result.status === 401) {
+      throw new Error("Admin session was rejected. Reload the page and sign in again.");
+    }
     updatePreviewBar();
     toast("ok", "Saved", `${pieces.length} piece${pieces.length===1?"":"s"} published — changes are live`);
   } catch (err) {
