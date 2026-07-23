@@ -167,6 +167,11 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === "GET") {
+    // Public readers send no admin header. When the admin page supplies one,
+    // validate it so the login gate cannot accept a bad/empty password.
+    if (req.headers["x-admin-password"] !== undefined && !isAuthorised(req)) {
+      return res.status(401).json({ ok: false, error: "Unauthorized" });
+    }
     try {
       const stored = await ecGet();
       const config = stored || DEFAULT_CONFIG;
