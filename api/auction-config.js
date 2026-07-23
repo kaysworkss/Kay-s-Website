@@ -15,16 +15,32 @@ const EC_KEY = "auction_config";
 
 // ── Edge Config helpers ───────────────────────────────────────────────────────
 
+function edgeConfigWriteSettings() {
+  const connection = String(process.env.EDGE_CONFIG || "");
+  const match = connection.match(/\/(ecfg_[A-Za-z0-9]+)(?:[/?]|$)/);
+  const id = String(process.env.EDGE_CONFIG_ID || (match && match[1]) || "").trim();
+  const token = String(process.env.VERCEL_API_TOKEN || "").trim();
+  // Team-owned Edge Config stores require the team scope. VERCEL_ORG_ID is
+  // supplied automatically by Vercel; VERCEL_TEAM_ID remains a manual option.
+  const teamId = String(process.env.VERCEL_TEAM_ID || process.env.VERCEL_ORG_ID || "").trim();
+
+  if (!id) throw new Error("Missing EDGE_CONFIG_ID (and it could not be derived from EDGE_CONFIG)");
+  if (!token) throw new Error("Missing VERCEL_API_TOKEN");
+
+  const url = new URL(`https://api.vercel.com/v1/edge-config/${encodeURIComponent(id)}/items`);
+  if (teamId) url.searchParams.set("teamId", teamId);
+  return { url: url.toString(), token };
+}
+
 async function ecGet() {
   const client = createClient(process.env.EDGE_CONFIG);
   return await client.get(EC_KEY);
 }
 
 async function ecSet(value) {
-  const id    = process.env.EDGE_CONFIG_ID;
-  const token = process.env.VERCEL_API_TOKEN;
+  const { url, token } = edgeConfigWriteSettings();
   const res = await fetch(
-    `https://api.vercel.com/v1/edge-config/${id}/items`,
+    url,
     {
       method: "PATCH",
       headers: {
@@ -43,10 +59,9 @@ async function ecSet(value) {
 }
 
 async function ecDel() {
-  const id    = process.env.EDGE_CONFIG_ID;
-  const token = process.env.VERCEL_API_TOKEN;
+  const { url, token } = edgeConfigWriteSettings();
   const res = await fetch(
-    `https://api.vercel.com/v1/edge-config/${id}/items`,
+    url,
     {
       method: "PATCH",
       headers: {
@@ -232,7 +247,17 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, config });
     } catch (err) {
       console.error("POST error:", err);
-      return res.status(500).json({ ok: false, error: "Failed to save config" });
+      const detail = String(err && err.message || "");
+      const safeDetail = detail.startsWith("Missing ")
+        ? detail
+        : /write failed (401|403)/.test(detail)
+          ? "VERCEL_API_TOKEN is invalid, expired, or lacks access to this Edge Config"
+          : /write failed 404/.test(detail)
+            ? "Edge Config ID or Vercel team scope is incorrect"
+            : /write failed 4\d\d/.test(detail)
+              ? detail.slice(0, 500)
+              : "Check the Vercel function logs for the Edge Config write error";
+      return res.status(500).json({ ok: false, error: `Failed to save config: ${safeDetail}` });
     }
   }
 
