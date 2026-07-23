@@ -5552,9 +5552,17 @@ function _normalizeTezosAuction(raw) {
   const highestBidMutez = _tezosNat(a.highest_bid);
   const incrementBps = Math.max(1, _tezosNat(a.min_bid_increment));
   const reserveMutez = _tezosNat(a.reserve_price);
+  const isPhased = a.public_reserve_price != null && a.gate_duration != null;
+  const publicReserveMutez = isPhased
+    ? _tezosNat(a.public_reserve_price)
+    : reserveMutez;
+  const gateDurationSec = isPhased ? _tezosNat(a.gate_duration) : 0;
+  const gateStartMs = isPhased ? _tezosTimestampMs(a.gate_start) : 0;
+  const holderOnly = !isPhased || Date.now() < gateStartMs + gateDurationSec * 1000;
+  const activeReserveMutez = holderOnly ? reserveMutez : publicReserveMutez;
   const minNext = highestBidMutez > 0
     ? highestBidMutez + Math.floor((highestBidMutez * incrementBps) / 10000)
-    : reserveMutez;
+    : activeReserveMutez;
   return {
     auctionId: _tezosNat(a.auction_id),
     mode: _tezosNat(a.mode),
@@ -5563,8 +5571,14 @@ function _normalizeTezosAuction(raw) {
     cancelled: Boolean(a.cancelled),
     highestBidder: _tezosAddressValue(a.highest_bidder),
     highestBidMutez,
-    minNextBidMutez: Math.max(minNext, reserveMutez),
+    minNextBidMutez: Math.max(minNext, activeReserveMutez),
     reserveMutez,
+    publicReserveMutez,
+    activeReserveMutez,
+    gateDurationSec,
+    gateStartMs,
+    holderOnly,
+    isPhased,
     buyNowMutez: _tezosNat(a.buy_now_price),
     endTimeMs: _tezosTimestampMs(a.end_time),
     gateTokens: Array.isArray(a.gate_tokens) ? a.gate_tokens : [],
@@ -5650,6 +5664,15 @@ async function refreshTezosState(runToken = _switchToken) {
     if (runToken !== _switchToken) return;
     loadTezosNFTMeta(auction, runToken).catch(() => {});
 
+    if (tezosAddress && auction.isPhased && !auction.holderOnly && !_roomEligible) {
+      checkTezosEligibility(runToken)
+        .then(ok => {
+          if (runToken !== _switchToken) return;
+          ok ? onRoomEligibilityGranted() : onRoomEligibilityRevoked();
+        })
+        .catch(e => console.warn("public Tezos eligibility:", e));
+    }
+
     const nowMs = Date.now();
     endTimestamp = auction.endTimeMs ? Math.floor(auction.endTimeMs / 1000) : 0;
     minNextBidMutez = auction.minNextBidMutez;
@@ -5671,12 +5694,20 @@ async function refreshTezosState(runToken = _switchToken) {
     else ["cd-d","cd-h","cd-m","cd-s"].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = "00"; });
 
     const sl = document.getElementById("status-line");
+    const phaseSuffix = auction.isPhased
+      ? (auction.holderOnly ? " · Holder phase" : " · Public phase")
+      : "";
     if (auction.cancelled)                         { sl.textContent = "Tezos auction cancelled"; sl.className = "status-line ended"; }
     else if (auction.settled)                      { sl.textContent = "Tezos auction settled"; sl.className = "status-line settled"; }
-    else if (auction.mode === 2 && !auction.started && noBids) { sl.textContent = "Open - first XTZ bid starts the clock"; sl.className = "status-line live"; }
-    else if (auction.started && auction.endTimeMs > nowMs)     { sl.textContent = "Live - XTZ bids open"; sl.className = "status-line live"; }
+    else if (auction.mode === 2 && !auction.started && noBids) { sl.textContent = "Open - first XTZ bid starts the clock" + phaseSuffix; sl.className = "status-line live"; }
+    else if (auction.started && auction.endTimeMs > nowMs)     { sl.textContent = "Live - XTZ bids open" + phaseSuffix; sl.className = "status-line live"; }
     else if (!auction.started)                     { sl.textContent = "Waiting for Tezos auction start"; sl.className = "status-line upcoming-line"; }
     else                                           { sl.textContent = "Ended - awaiting settlement"; sl.className = "status-line ended"; }
+
+    const gateNotice = document.getElementById("live-gate-notice");
+    if (gateNotice && auction.isPhased) {
+      gateNotice.style.display = auction.holderOnly && !tezosAddress ? "block" : "none";
+    }
 
     document.getElementById("stats-grid").style.display = "grid";
     document.getElementById("stat-bid").textContent = noBids ? "—" : `${(auction.highestBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "")} XTZ`;
@@ -5727,6 +5758,14 @@ async function refreshTezosState(runToken = _switchToken) {
 async function _checkTezosEligibility(slot, address) {
   if (!slot?.gateName) return true;
   if (!address) return false;
+  // Phased Tezos auctions become wallet-open automatically after the holder
+  // window. Legacy Tezos contracts have no phase fields and remain gated.
+  try {
+    const auction = _normalizeTezosAuction(await _readTezosAuction(slot));
+    if (auction?.isPhased && !auction.holderOnly) return true;
+  } catch (e) {
+    console.warn("_checkTezosEligibility phase read:", e);
+  }
   const GATE_CONTRACT = "KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8";
   const GATE_TOKEN_ID = "1";
   let gateContract = GATE_CONTRACT;
