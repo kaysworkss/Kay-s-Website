@@ -5100,7 +5100,9 @@ function ethereumHolderWalletMessage() {
 async function requestEthereumHolderAccount() {
   const ethProvider = await getEthereumWalletProvider();
   if (!ethProvider) throw new Error(ethereumHolderWalletMessage());
-  if (ethProvider === _walletConnectEthProvider && !ethProvider.session) await ethProvider.connect?.();
+  if (ethProvider === _walletConnectEthProvider && !ethProvider.session) {
+    await ethProvider.connect?.({ chains: [1], rpcMap: { 1: 'https://ethereum.publicnode.com' } });
+  }
   if (typeof ethProvider.request === 'function') {
     const accounts = ethProvider.accounts?.length ? ethProvider.accounts : await ethProvider.request({ method: 'eth_requestAccounts' });
     if (accounts && accounts[0]) return accounts[0];
@@ -7996,6 +7998,7 @@ async function loadWalletConnectEthereumProvider() {
   if (!EthereumProvider?.init) throw new Error('WalletConnect provider did not load.');
   _walletConnectEthProvider = await EthereumProvider.init({
     projectId: WALLETCONNECT_PROJECT_ID,
+    chains: [1],
     optionalChains: [1],
     showQrModal: true,
     methods: ['eth_requestAccounts', 'eth_sendTransaction', 'wallet_switchEthereumChain', 'wallet_addEthereumChain'],
@@ -8315,7 +8318,9 @@ async function ethConnectWallet() {
 
   try {
     const ethProvider = await getEthereumWalletProvider();
-    if (ethProvider === _walletConnectEthProvider && !ethProvider.session) await ethProvider.connect?.();
+    if (ethProvider === _walletConnectEthProvider && !ethProvider.session) {
+      await ethProvider.connect?.({ chains: [1], rpcMap: { 1: 'https://ethereum.publicnode.com' } });
+    }
     const accounts = ethProvider.accounts?.length ? ethProvider.accounts : await ethProvider.request({ method: 'eth_requestAccounts' });
     if (!accounts || !accounts[0]) throw new Error('No account returned');
     _ethConnectedAddr = accounts[0];
