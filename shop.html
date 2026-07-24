@@ -5101,7 +5101,11 @@ async function requestEthereumHolderAccount() {
   const ethProvider = await getEthereumWalletProvider();
   if (!ethProvider) throw new Error(ethereumHolderWalletMessage());
   if (typeof ethProvider.request === 'function') {
-    const accounts = ethProvider.accounts?.length ? ethProvider.accounts : await ethProvider.request({ method: 'eth_requestAccounts' });
+    const accounts = await ethProvider.request({ method: 'eth_requestAccounts' }).catch(async err => {
+      const fallback = await ethProvider.request?.({ method: 'eth_accounts' }).catch(() => []);
+      if (fallback?.[0]) return fallback;
+      throw err;
+    });
     if (accounts && accounts[0]) return accounts[0];
   }
   const provider = new ethers.providers.Web3Provider(ethProvider, 'any');
@@ -5109,11 +5113,53 @@ async function requestEthereumHolderAccount() {
   if (!accounts || !accounts[0]) throw new Error('Ethereum wallet connected but returned no account.');
   return accounts[0];
 }
-async function connectApotiTezosHolderAddress() {
-  if (_tezosConnectedAddr) return _tezosConnectedAddr;
-  if (typeof tezosConnectWallet === 'function') {
-    try { await tezosConnectWallet(); } catch (_) {}
+let _holderClaimBeaconClient = null;
+function makeHolderClaimBeaconClient(sdk) {
+  const DAppClient = sdk?.DAppClient;
+  if (typeof DAppClient !== 'function') throw new Error('Beacon SDK did not load. Refresh and try again.');
+  return new DAppClient({
+    name: "Kay's Works Holder Claim",
+    iconUrl: location.origin + '/images/kayslogo1.png',
+    appUrl: location.origin,
+    network: beaconShopNetworkConfig(sdk),
+    featuredWallets: ['temple', 'kukai', 'trust'],
+    matrixNodes: beaconShopMatrixNodes(sdk),
+  });
+}
+async function requestHolderClaimBeaconAddress(client, sdk) {
+  const scopes = sdk?.PermissionScope
+    ? [sdk.PermissionScope.OPERATION_REQUEST, sdk.PermissionScope.SIGN].filter(Boolean)
+    : ['operation_request', 'sign'];
+  let permission;
+  try {
+    permission = await withCryptoTimeout(client.requestPermissions({ scopes }), 90000);
+  } catch (err) {
+    const msg = err?.message || String(err);
+    if (/not accepted|invalid|unknown|unexpected/i.test(msg)) {
+      permission = await withCryptoTimeout(client.requestPermissions(), 90000);
+    } else {
+      throw err;
+    }
   }
+  const account = await client.getActiveAccount?.();
+  const address = permission?.address || account?.address;
+  if (!address) throw new Error('Beacon connected but returned no Tezos address.');
+  return address;
+}
+async function connectHolderClaimBeaconAddress() {
+  const sdk = await loadBeaconSdk();
+  let client = _holderClaimBeaconClient || makeHolderClaimBeaconClient(sdk);
+  _holderClaimBeaconClient = client;
+  try {
+    return await requestHolderClaimBeaconAddress(client, sdk);
+  } catch (firstError) {
+    await resetShopBeaconClient(client);
+    client = makeHolderClaimBeaconClient(sdk);
+    _holderClaimBeaconClient = client;
+    return requestHolderClaimBeaconAddress(client, sdk);
+  }
+}
+async function connectApotiTezosHolderAddress() {
   if (_tezosConnectedAddr) return _tezosConnectedAddr;
   const temple = window.temple || window.tezos;
   if (temple && typeof temple.requestPermissions === 'function') {
@@ -5123,6 +5169,12 @@ async function connectApotiTezosHolderAddress() {
       _tezosConnectedAddr = address;
       return address;
     }
+    throw new Error('Temple connected but returned no Tezos address.');
+  }
+  const address = await connectHolderClaimBeaconAddress();
+  if (address) {
+    _tezosConnectedAddr = address;
+    return address;
   }
   throw new Error('No Tezos wallet returned an address. Try Beacon on mobile, or Temple in a desktop browser.');
 }
@@ -5174,6 +5226,32 @@ function holderClaimFromGateBalances(balances, chain, source) {
     freeTote: bronzeBalance > 0,
   };
 }
+function encodeErc1155BalanceOf(owner, tokenId) {
+  const cleanOwner = String(owner || '').toLowerCase().replace(/^0x/, '');
+  if (!/^[0-9a-f]{40}$/.test(cleanOwner)) throw new Error('Invalid Ethereum wallet address');
+  const tokenHex = BigInt(tokenId).toString(16).padStart(64, '0');
+  return '0x00fdd58e' + cleanOwner.padStart(64, '0') + tokenHex;
+}
+async function fetchEthGateBalanceViaRpc(address, tokenId) {
+  const response = await fetch(HOLDER_GATE_ETH_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: Number(tokenId),
+      method: 'eth_call',
+      params: [{
+        to: HOLDER_GATE_ETH_CONTRACT,
+        data: encodeErc1155BalanceOf(address, tokenId),
+      }, 'latest'],
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.error) {
+    throw new Error(payload.error?.message || 'Ethereum RPC balance check failed');
+  }
+  return Number(BigInt(payload.result || '0x0'));
+}
 async function detectApotiHolderTier(wallet) {
   if (!HOLDER_GATE_ETH_CONTRACT) {
     return {
@@ -5189,15 +5267,27 @@ async function detectApotiHolderTier(wallet) {
       freeTote: true,
     };
   }
-  if (typeof ethers === 'undefined') throw new Error('ethers.js is unavailable');
-  const provider = new ethers.providers.JsonRpcProvider(HOLDER_GATE_ETH_RPC);
-  const erc1155Abi = ['function balanceOf(address account,uint256 id) view returns (uint256)'];
-  const gate = new ethers.Contract(HOLDER_GATE_ETH_CONTRACT, erc1155Abi, provider);
-  const pairs = await Promise.all(HOLDER_GATE_TOKEN_IDS.map(async id => {
-    const balance = await gate.balanceOf(wallet, id);
-    return [id, Number(balance.toString())];
-  }));
-  return holderClaimFromGateBalances(Object.fromEntries(pairs), 'eth', HOLDER_GATE_ETH_CONTRACT);
+  let balances = null;
+  try {
+    const pairs = await Promise.all(HOLDER_GATE_TOKEN_IDS.map(async id => {
+      const balance = await fetchEthGateBalanceViaRpc(wallet, id);
+      return [id, balance];
+    }));
+    balances = Object.fromEntries(pairs);
+  } catch (rpcErr) {
+    if (typeof ethers === 'undefined') throw rpcErr;
+    console.warn('[holder merch] raw Ethereum RPC token check failed, retrying with ethers:', rpcErr);
+    const provider = new ethers.providers.JsonRpcProvider(HOLDER_GATE_ETH_RPC);
+    const erc1155Abi = ['function balanceOf(address account,uint256 id) view returns (uint256)'];
+    const gate = new ethers.Contract(HOLDER_GATE_ETH_CONTRACT, erc1155Abi, provider);
+    const pairs = await Promise.all(HOLDER_GATE_TOKEN_IDS.map(async id => {
+      const balance = await gate.balanceOf(wallet, id);
+      return [id, Number(balance.toString())];
+    }));
+    balances = Object.fromEntries(pairs);
+  }
+  window.__lastHolderGateCheck = { chain: 'eth', wallet, balances: normalizeGateBalances(balances), contract: HOLDER_GATE_ETH_CONTRACT };
+  return holderClaimFromGateBalances(balances, 'eth', HOLDER_GATE_ETH_CONTRACT);
 }
 async function detectApotiTezosHolderTier(wallet) {
   if (!HOLDER_GATE_TEZOS_CONTRACT) return null;
@@ -5272,7 +5362,10 @@ async function connectApotiHolderWallet() {
     const detected = await detectApotiHolderTier(wallet);
     if (!detected) {
       _holderMerchClaim = null;
-      updateHolderMerchStatus('Wallet connected, but no configured Apoti holder token was detected.', 'pending');
+      const checked = window.__lastHolderGateCheck || {};
+      const balances = checked.balances || {};
+      const short = wallet.slice(0, 6) + '...' + wallet.slice(-4);
+      updateHolderMerchStatus(`Wallet ${short} was checked, but no Apoti holder token was detected. Token #1 balance: ${Number(balances['1'] || 0)}. Token #2 Bronze balance: ${Number(balances['2'] || 0)}.`, 'pending');
       buildOrderSummary();
       updateCartUI();
       return;
@@ -5327,7 +5420,7 @@ async function connectApotiTezosHolderWallet() {
     updateCartUI();
     recalibrateCryptoForTotals();
   } catch (err) {
-    updateHolderMerchStatus('Tezos wallet connection or token check was not completed.', 'pending');
+    updateHolderMerchStatus(err.message || 'Tezos wallet connection or token check was not completed.', 'pending');
     showToast(err.message || 'Could not verify Tezos holder token');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = _holderMerchClaim?.chain === 'tezos' ? 'Recheck Tezos wallet' : 'Check Tezos holder wallet'; }
