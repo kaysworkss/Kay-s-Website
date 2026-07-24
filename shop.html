@@ -3111,7 +3111,7 @@ body.dark { --text-muted: #b3a392; }
           <span class="holder-merch-kicker">Private holder note</span>
           <span class="holder-merch-summary-row">
             <span class="holder-merch-title">Holder access</span>
-            <span class="holder-merch-lock-pill" id="holderMerchLockPill">Checker open - redemption Sunday 9 PM GMT+1</span>
+            <span class="holder-merch-lock-pill" id="holderMerchLockPill">Claim open</span>
           </span>
         </span>
       </summary>
@@ -3135,7 +3135,7 @@ body.dark { --text-muted: #b3a392; }
           </div>
         </div>
 
-        <div class="holder-merch-status" id="holderMerchStatus">Wallet checker is open now. Redemption opens Sunday, July 19, 2026 at 9:00 PM GMT+1.</div>
+        <div class="holder-merch-status" id="holderMerchStatus">Claim open. Check your wallet to apply your holder benefit.</div>
       </div>
     </details>
   </section>
@@ -5062,11 +5062,7 @@ function isHolderMerchAccessLocked() {
 }
 function holderMerchLockMessage() {
   if (APOTI_HOLDER_CONFIG.manualLock === true) return 'Holder merch access is temporarily locked.';
-  const liveAt = holderMerchUnlockDate();
-  if (!liveAt) return 'Holder merch access is locked.';
-  const countdown = holderMerchCountdownText();
-  const countdownSuffix = countdown ? ` (${countdown} left)` : '';
-  return `Wallet checker is open now. Redemption opens Sunday, July 19, 2026 at 9:00 PM GMT+1${countdownSuffix}.`;
+  return 'Claim open. Check your wallet to apply your holder benefit.';
 }
 function updateHolderMerchLockState() {
   const panel = document.getElementById('apotiHolderMerch');
@@ -5078,8 +5074,7 @@ function updateHolderMerchLockState() {
     btn.setAttribute('aria-disabled', locked ? 'true' : 'false');
   });
   if (pill) {
-    const countdown = locked ? holderMerchCountdownText() : '';
-    pill.textContent = locked ? (countdown ? `Opens in ${countdown}` : 'Redemption is live') : 'Redemption is live';
+    pill.textContent = 'Claim open';
   }
   const status = document.getElementById('holderMerchStatus');
   if (status && locked && !_holderMerchClaim) {
@@ -5481,10 +5476,6 @@ function holderVerificationMessage(detected, short) {
     parts.push('No Bronze Token tote redemption found across the checked wallets.');
   }
   if (discount > 0) parts.push(`${discount}% holder merch discount is active.`);
-  if (isHolderMerchAccessLocked()) {
-    const countdown = holderMerchCountdownText();
-    parts.push(`You can check eligibility now; redemption opens Sunday, July 19, 2026 at 9:00 PM GMT+1${countdown ? ` (${countdown} left)` : ''}.`);
-  }
   return parts.join(' ');
 }
 function revealHolderMerchProduct(kind) {
