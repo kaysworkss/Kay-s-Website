@@ -128,7 +128,7 @@ function holderRowKey(row) {
 }
 
 async function findLinkedHolderRows(supabase, chain, walletAddress, connectedBalancesByTokenId) {
-  const selectFields = 'id,auth_user_id,wallet_address,chain,token_balance,display_name,tier,last_verified_at';
+  const selectFields = 'id,auth_user_id,wallet_address,chain,token_balance,display_name,tier,last_verified_at,email_updates_opt_in';
   const linked = [];
   const seen = new Set();
   const addRows = rows => {
@@ -191,6 +191,7 @@ async function findLinkedHolderRows(supabase, chain, walletAddress, connectedBal
       display_name: holderDisplayName(row) || null,
       tier: row.tier || null,
       last_verified_at: row.last_verified_at || null,
+      email_updates_opt_in: row.email_updates_opt_in === true,
       balancesByTokenId: isConnected ? connectedBalancesByTokenId : null,
     };
   });
@@ -271,6 +272,9 @@ async function handleVerify(req, res, supabase) {
   const linkedWallets = await findLinkedHolderRows(supabase, chain, normalizedAddress, holderTokens.balancesByTokenId);
   const namedWallet = linkedWallets.find(row => holderDisplayName(row)) || null;
   const displayName = holderDisplayName(namedWallet);
+  const authLinkedWallet = linkedWallets.find(row => row.auth_user_id) || null;
+  const emailLinked = Boolean(authLinkedWallet);
+  const emailUpdatesOptIn = linkedWallets.some(row => row.email_updates_opt_in === true);
 
   const authHeader = req.headers.authorization || '';
   const token = authHeader.replace(/^Bearer\s+/i, '');
@@ -296,6 +300,9 @@ async function handleVerify(req, res, supabase) {
       tier: holderTokens.tier,
       balancesByTokenId: holderTokens.balancesByTokenId,
       displayName,
+      emailLinked,
+      auth_user_id: authLinkedWallet?.auth_user_id || null,
+      email_updates_opt_in: emailUpdatesOptIn,
       linked_wallets: linkedWallets,
     });
   }
@@ -316,6 +323,9 @@ async function handleVerify(req, res, supabase) {
     tier: holderTokens.tier,
     balancesByTokenId: holderTokens.balancesByTokenId,
     displayName,
+    emailLinked,
+    auth_user_id: authLinkedWallet?.auth_user_id || null,
+    email_updates_opt_in: emailUpdatesOptIn,
     linked_wallets: linkedWallets,
     claimToken: pending.id,
   });
