@@ -5201,6 +5201,58 @@ function addGateBalances(target, source) {
     target[id] = Math.max(Number(target[id] || 0), Number(source[id] || 0));
   });
 }
+function normalizeHolderChain(chain) {
+  const value = String(chain || '').toLowerCase();
+  if (value === 'ethereum' || value === 'eth' || value === 'eip155') return 'eth';
+  if (value === 'tezos' || value === 'tez' || value === 'xtz') return 'tezos';
+  return value;
+}
+function holderWalletRowsFromVerification(result, chain, wallet) {
+  const rows = [];
+  const seen = new Set();
+  const addWallet = row => {
+    const address = row?.wallet_address || row?.walletAddress || row?.address;
+    const rowChain = normalizeHolderChain(row?.chain || row?.wallet_chain || row?.walletChain || chain);
+    if (!address || !rowChain) return;
+    const key = rowChain + ':' + String(address).toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    rows.push(Object.assign({}, row, { wallet_address: address, chain: rowChain }));
+  };
+  addWallet({ wallet_address: wallet, chain, balancesByTokenId: result?.balancesByTokenId || result?.balances_by_token_id || result?.tokenBalances || result?.token_balances });
+  (result?.linked_wallets || result?.linkedWallets || result?.wallets || []).forEach(addWallet);
+  return rows;
+}
+async function fetchTezosGateBalancesForHolder(address) {
+  const url =
+    'https://api.tzkt.io/v1/tokens/balances' +
+    '?account=' + encodeURIComponent(address) +
+    '&token.contract=' + encodeURIComponent(HOLDER_GATE_TEZOS_CONTRACT) +
+    '&token.tokenId.in=' + HOLDER_GATE_TOKEN_IDS.join(',') +
+    '&limit=10';
+  const response = await fetch(url, { cache: 'no-store' });
+  if (!response.ok) throw new Error('TzKT returned ' + response.status);
+  const rows = await response.json();
+  const balances = { '1': 0, '2': 0 };
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    const tokenId = String(row?.token?.tokenId ?? '');
+    if (!Object.prototype.hasOwnProperty.call(balances, tokenId)) return;
+    balances[tokenId] += Number(row?.balance || 0);
+  });
+  return balances;
+}
+async function fetchHolderGateBalancesForWallet(row) {
+  const chain = normalizeHolderChain(row?.chain);
+  if (chain === 'tezos') return fetchTezosGateBalancesForHolder(row.wallet_address);
+  if (chain === 'eth') {
+    const pairs = await Promise.all(HOLDER_GATE_TOKEN_IDS.map(async id => {
+      const balance = await fetchEthGateBalanceViaRpc(row.wallet_address, id);
+      return [id, balance];
+    }));
+    return Object.fromEntries(pairs);
+  }
+  return { '1': 0, '2': 0 };
+}
 function holderTierFromGateBalances(balances) {
   if (Number(balances?.['2'] || 0) > 0) return 'Bronze Token Holder';
   if (Number(balances?.['1'] || 0) > 0) return 'Wooden Token Holder';
@@ -5238,7 +5290,7 @@ function mergeHolderMerchChainClaims() {
   Object.values(_holderMerchChainClaims || {}).forEach(claim => {
     if (!claim) return;
     addGateBalances(balances, normalizeGateBalances(claim.tokenBalances));
-    if (claim.wallet) wallets.push(claim.wallet);
+    (Array.isArray(claim.wallets) ? claim.wallets : [claim.wallet]).filter(Boolean).forEach(address => wallets.push(address));
     if (claim.chain) chains.push(claim.chain);
     if (claim.source) sources.push(claim.source);
     verified = verified || claim.verified === true;
@@ -5266,7 +5318,8 @@ function rememberHolderMerchChainClaim(chain, wallet, detected) {
   return _holderMerchClaim;
 }
 async function detectApotiHolderViaHolderApi(chain, wallet) {
-  const apiChain = chain === 'eth' ? 'ethereum' : chain;
+  const normalizedChain = normalizeHolderChain(chain);
+  const apiChain = normalizedChain === 'eth' ? 'ethereum' : normalizedChain;
   const response = await fetch('/api/holder?action=verify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -5294,12 +5347,44 @@ async function detectApotiHolderViaHolderApi(chain, wallet) {
     balances[tokenId] = Number.isFinite(balance) && balance > 0 ? balance : 1;
   }
 
-  const source = result.contract || result.source || (chain === 'tezos' ? HOLDER_GATE_TEZOS_CONTRACT : HOLDER_GATE_ETH_CONTRACT);
-  const detected = holderClaimFromGateBalances(balances, chain, source);
+  const wallets = holderWalletRowsFromVerification(result, normalizedChain, wallet);
+  const checkedWallets = [];
+  const checkedChains = [];
+  const sources = [];
+  wallets.forEach(row => {
+    addGateBalances(balances, normalizeGateBalances(
+      row.balances_by_token_id || row.balancesByTokenId || row.tokenBalances || row.token_balances
+    ));
+  });
+  await Promise.all(wallets.map(async row => {
+    const rowChain = normalizeHolderChain(row.chain);
+    if (!rowChain || (rowChain !== 'eth' && rowChain !== 'tezos')) return;
+    checkedWallets.push(row.wallet_address);
+    checkedChains.push(rowChain);
+    sources.push(rowChain === 'tezos' ? HOLDER_GATE_TEZOS_CONTRACT : HOLDER_GATE_ETH_CONTRACT);
+    try {
+      const walletBalances = await fetchHolderGateBalancesForWallet(row);
+      addGateBalances(balances, normalizeGateBalances(walletBalances));
+    } catch (err) {
+      console.warn('[holder merch] linked wallet token check failed:', rowChain, row.wallet_address, err);
+    }
+  }));
+
+  const source = Array.from(new Set(sources)).join(', ')
+    || result.contract
+    || result.source
+    || (normalizedChain === 'tezos' ? HOLDER_GATE_TEZOS_CONTRACT : HOLDER_GATE_ETH_CONTRACT);
+  const detected = holderClaimFromGateBalances(
+    balances,
+    Array.from(new Set(checkedChains)).join('+') || normalizedChain,
+    source
+  );
   if (!detected) return null;
   detected.holderId = result.holderId || result.holder_id || null;
   detected.apiVerified = true;
-  window.__lastHolderGateCheck = { chain, wallet, balances: normalizeGateBalances(balances), contract: source, via: 'holder-api' };
+  detected.wallets = Array.from(new Set(checkedWallets.length ? checkedWallets : [wallet]));
+  detected.wallet = wallet;
+  window.__lastHolderGateCheck = { chain: normalizedChain, wallet, wallets: detected.wallets, balances: normalizeGateBalances(balances), contract: source, via: 'holder-api' };
   return detected;
 }
 function encodeErc1155BalanceOf(owner, tokenId) {
@@ -5379,21 +5464,7 @@ async function detectApotiTezosHolderTier(wallet) {
   } catch (apiErr) {
     console.warn('[holder merch] holder API Tezos check failed, retrying TzKT:', apiErr);
   }
-  const url =
-    'https://api.tzkt.io/v1/tokens/balances' +
-    '?account=' + encodeURIComponent(wallet) +
-    '&token.contract=' + encodeURIComponent(HOLDER_GATE_TEZOS_CONTRACT) +
-    '&token.tokenId.in=' + HOLDER_GATE_TOKEN_IDS.join(',') +
-    '&limit=10';
-  const response = await fetch(url, { cache: 'no-store' });
-  if (!response.ok) throw new Error('TzKT returned ' + response.status);
-  const rows = await response.json();
-  const balances = { '1': 0, '2': 0 };
-  (Array.isArray(rows) ? rows : []).forEach(row => {
-    const tokenId = String(row?.token?.tokenId ?? '');
-    if (!Object.prototype.hasOwnProperty.call(balances, tokenId)) return;
-    balances[tokenId] += Number(row?.balance || 0);
-  });
+  const balances = await fetchTezosGateBalancesForHolder(wallet);
   window.__lastHolderGateCheck = { chain: 'tezos', wallet, balances: normalizeGateBalances(balances), contract: HOLDER_GATE_TEZOS_CONTRACT, via: 'tzkt' };
   return holderClaimFromGateBalances(balances, 'tezos', HOLDER_GATE_TEZOS_CONTRACT);
 }
@@ -5405,9 +5476,9 @@ function holderVerificationMessage(detected, short) {
   const subject = wallets.length > 1 ? `${wallets.length} wallets` : short;
   const parts = [`Verified ${detected.tier}${chainText}: ${subject}.`];
   if (toteQty > 0) {
-    parts.push(`${toteQty} Bronze Token tote redemption${toteQty === 1 ? '' : 's'} available for this wallet.`);
+    parts.push(`${toteQty} Bronze Token tote redemption${toteQty === 1 ? '' : 's'} available from the highest checked chain balance.`);
   } else {
-    parts.push('No Bronze Token tote redemption found for this wallet.');
+    parts.push('No Bronze Token tote redemption found across the checked wallets.');
   }
   if (discount > 0) parts.push(`${discount}% holder merch discount is active.`);
   if (isHolderMerchAccessLocked()) {
