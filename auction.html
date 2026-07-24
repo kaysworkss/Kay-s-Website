@@ -4788,6 +4788,14 @@ let _reownAppKit = null;
 let _reownProviderState = null;
 let _ethWalletProvider = null;
 
+function _reownEip155ProviderFromState(state) {
+  return state?.eip155 || state?.provider || null;
+}
+
+function _reownAddressFromState(state, modal) {
+  return state?.address || modal?.getAddress?.() || '';
+}
+
 function connectWallet() {
   if (window.ethereum || window.phantom?.ethereum) _wcOpenModal();
   else _wcConnectAppKit();
@@ -4886,6 +4894,10 @@ async function _loadReownAppKit() {
       icons: [`${window.location.origin}/images/kaysworkslogo.svg`],
     },
     allWallets: "SHOW",
+    enableWallets: true,
+    enableReconnect: false,
+    enableNetworkSwitch: false,
+    enableMobileFullScreen: true,
     features: {
       analytics: false,
       email: false,
@@ -4895,17 +4907,24 @@ async function _loadReownAppKit() {
   });
   _reownAppKit.subscribeProvider?.(state => {
     _reownProviderState = state || null;
-    if (state?.provider) _ethWalletProvider = state.provider;
+    const nextProvider = _reownEip155ProviderFromState(state);
+    if (nextProvider) _ethWalletProvider = nextProvider;
+  });
+  _reownAppKit.subscribeProviders?.(state => {
+    if (!state) return;
+    const nextProvider = _reownEip155ProviderFromState(state);
+    if (nextProvider) _ethWalletProvider = nextProvider;
   });
   return _reownAppKit;
 }
 
 async function _connectReownProvider() {
   const modal = await _loadReownAppKit();
-  const existing = modal.getWalletProvider?.() || _reownProviderState?.provider;
+  const existing = modal.getProviders?.()?.eip155 || modal.getWalletProvider?.() || _reownEip155ProviderFromState(_reownProviderState);
   if (existing) {
     const accounts = await existing.request?.({ method: "eth_accounts" }).catch(() => []);
-    if (accounts?.[0] || _reownProviderState?.address) return existing;
+    if (accounts?.[0] || _reownAddressFromState(_reownProviderState, modal)) return existing;
+    try { await modal.adapter?.connectionControllerClient?.disconnect?.(); } catch(_) {}
   }
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -4918,12 +4937,30 @@ async function _connectReownProvider() {
     };
     unsubscribe = modal.subscribeProvider?.(state => {
       _reownProviderState = state || null;
-      if (state?.provider && state?.address) {
-        _ethWalletProvider = state.provider;
-        finish(state.provider);
+      const nextProvider = _reownEip155ProviderFromState(state);
+      const nextAddress = _reownAddressFromState(state, modal);
+      if (nextProvider && nextAddress) {
+        _ethWalletProvider = nextProvider;
+        finish(nextProvider);
       }
     });
-    modal.open?.({ view: "Connect" });
+    const unsubscribeProviders = modal.subscribeProviders?.(async state => {
+      const nextProvider = state?.eip155 || null;
+      const accounts = nextProvider?.request
+        ? await nextProvider.request({ method: "eth_accounts" }).catch(() => [])
+        : [];
+      const nextAddress = accounts?.[0] || _reownAddressFromState(_reownProviderState, modal);
+      if (nextProvider && nextAddress) {
+        _ethWalletProvider = nextProvider;
+        finish(nextProvider);
+      }
+    });
+    const stop = unsubscribe;
+    unsubscribe = () => {
+      try { stop?.(); } catch(_) {}
+      try { unsubscribeProviders?.(); } catch(_) {}
+    };
+    modal.open?.({ view: "Connect", namespace: "eip155" });
     window.setTimeout(() => {
       if (settled) return;
       try { unsubscribe?.(); } catch(_) {}
@@ -4943,7 +4980,7 @@ async function _wcConnectAppKit() {
     const accounts = ethProvider.accounts?.length
       ? ethProvider.accounts
       : await ethProvider.request?.({ method: "eth_requestAccounts" });
-    const addr = accounts?.[0] || _reownProviderState?.address;
+    const addr = accounts?.[0] || _reownAddressFromState(_reownProviderState, _reownAppKit);
     if (!addr) throw new Error("No account returned");
     _ethWalletProvider = ethProvider;
     _wcProvider = ethProvider;
