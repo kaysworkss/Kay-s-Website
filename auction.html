@@ -11,6 +11,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <script src="https://unpkg.com/@taquito/taquito@20.1.0/dist/taquito.min.js"></script>
 <script src="https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js"></script>
+<link rel="preconnect" href="https://esm.sh" crossorigin>
+<link rel="modulepreload" href="https://esm.sh/@reown/appkit@1.8.22">
+<link rel="modulepreload" href="https://esm.sh/@reown/appkit-adapter-ethers@1.8.22">
+<link rel="modulepreload" href="https://esm.sh/@reown/appkit@1.8.22/networks">
 <!-- ETH mobile wallet connection -->
 <script>
 window._wcProviderPromise = null;
@@ -4785,6 +4789,7 @@ function setWalletUi(state, addr) {
 const _ETH_WC_PROJECT_ID = "42dc845feb4ebf8f5cbe5725c2e07672";
 let _wcProvider = null;
 let _reownAppKit = null;
+let _reownAppKitPromise = null;
 let _reownProviderState = null;
 let _ethWalletProvider = null;
 
@@ -4798,7 +4803,10 @@ function _reownAddressFromState(state, modal) {
 
 function connectWallet() {
   if (window.ethereum || window.phantom?.ethereum) _wcOpenModal();
-  else _wcConnectAppKit();
+  else {
+    _wcShowWalletOptionsLoading();
+    _wcConnectAppKit();
+  }
 }
 
 function _htmlAttr(s) {
@@ -4875,13 +4883,30 @@ function _wcCloseModal() {
   if (overlay) overlay.classList.remove("show");
 }
 
+function _wcShowWalletOptionsLoading() {
+  const overlay = document.getElementById("wc-modal-overlay");
+  const body = document.getElementById("wc-modal-body");
+  const title = document.getElementById("wc-modal-title");
+  if (title) title.textContent = "Connect Ethereum Wallet";
+  if (body) {
+    body.innerHTML = `
+      <p style="color:var(--text-muted);font-family:'Crimson Pro',serif;font-size:0.9rem;text-align:center;padding:18px 0 14px">
+        Opening wallet options&hellip;
+      </p>
+      <button class="wc-cancel-btn" onclick="_wcDisconnectWC()">Cancel</button>`;
+  }
+  if (overlay) overlay.classList.add("show");
+}
+
 async function _loadReownAppKit() {
   if (_reownAppKit) return _reownAppKit;
-  const [{ createAppKit }, { EthersAdapter }, { mainnet }] = await Promise.all([
-    import("https://esm.sh/@reown/appkit@1.8.22"),
-    import("https://esm.sh/@reown/appkit-adapter-ethers@1.8.22"),
-    import("https://esm.sh/@reown/appkit@1.8.22/networks"),
-  ]);
+  if (_reownAppKitPromise) return _reownAppKitPromise;
+  _reownAppKitPromise = (async () => {
+    const [{ createAppKit }, { EthersAdapter }, { mainnet }] = await Promise.all([
+      import("https://esm.sh/@reown/appkit@1.8.22"),
+      import("https://esm.sh/@reown/appkit-adapter-ethers@1.8.22"),
+      import("https://esm.sh/@reown/appkit@1.8.22/networks"),
+    ]);
   _reownAppKit = createAppKit({
     adapters: [new EthersAdapter()],
     networks: [mainnet],
@@ -4916,7 +4941,21 @@ async function _loadReownAppKit() {
     if (nextProvider) _ethWalletProvider = nextProvider;
   });
   return _reownAppKit;
+  })().catch(err => {
+    _reownAppKitPromise = null;
+    throw err;
+  });
+  return _reownAppKitPromise;
 }
+
+function _warmReownAppKitSoon() {
+  if (window.ethereum || window.phantom?.ethereum) return;
+  const warm = () => _loadReownAppKit().catch(err => console.warn("[eth] AppKit preload failed:", err));
+  if (typeof requestIdleCallback === "function") requestIdleCallback(warm, { timeout: 2500 });
+  else window.setTimeout(warm, 900);
+}
+if (document.readyState === "complete") _warmReownAppKitSoon();
+else window.addEventListener("load", _warmReownAppKitSoon, { once: true });
 
 async function _connectReownProvider() {
   const modal = await _loadReownAppKit();
@@ -4970,7 +5009,7 @@ async function _connectReownProvider() {
 }
 
 async function _wcConnectAppKit() {
-  _wcCloseModal();
+  _wcShowWalletOptionsLoading();
   if (_walletConnecting) return;
   _walletConnecting = true;
   walletChain = "eth";

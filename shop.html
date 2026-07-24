@@ -5226,6 +5226,43 @@ function holderClaimFromGateBalances(balances, chain, source) {
     freeTote: bronzeBalance > 0,
   };
 }
+async function detectApotiHolderViaHolderApi(chain, wallet) {
+  const apiChain = chain === 'eth' ? 'ethereum' : chain;
+  const response = await fetch('/api/holder?action=verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chain: apiChain, address: wallet }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const msg = result?.error || result?.message || '';
+    if (/doesn.?t hold|no token|not.*hold|not eligible/i.test(msg)) return null;
+    throw new Error(msg || 'Holder verification failed');
+  }
+
+  const rawBalances = result.balancesByTokenId
+    || result.balances_by_token_id
+    || result.tokenBalances
+    || result.token_balances
+    || null;
+  const balances = normalizeGateBalances(rawBalances);
+  const tokenId = String(
+    result.tokenId ?? result.token_id ?? result.gateTokenId ?? result.gate_token_id
+    ?? result.holdingTokenId ?? result.holding_token_id ?? ''
+  ).trim();
+  const balance = Number(result.balance || result.token_balance || 1);
+  if (HOLDER_GATE_TOKEN_TIERS[tokenId] && !balances[tokenId]) {
+    balances[tokenId] = Number.isFinite(balance) && balance > 0 ? balance : 1;
+  }
+
+  const source = result.contract || result.source || (chain === 'tezos' ? HOLDER_GATE_TEZOS_CONTRACT : HOLDER_GATE_ETH_CONTRACT);
+  const detected = holderClaimFromGateBalances(balances, chain, source);
+  if (!detected) return null;
+  detected.holderId = result.holderId || result.holder_id || null;
+  detected.apiVerified = true;
+  window.__lastHolderGateCheck = { chain, wallet, balances: normalizeGateBalances(balances), contract: source, via: 'holder-api' };
+  return detected;
+}
 function encodeErc1155BalanceOf(owner, tokenId) {
   const cleanOwner = String(owner || '').toLowerCase().replace(/^0x/, '');
   if (!/^[0-9a-f]{40}$/.test(cleanOwner)) throw new Error('Invalid Ethereum wallet address');
@@ -5267,6 +5304,12 @@ async function detectApotiHolderTier(wallet) {
       freeTote: true,
     };
   }
+  try {
+    const verified = await detectApotiHolderViaHolderApi('eth', wallet);
+    if (verified) return verified;
+  } catch (apiErr) {
+    console.warn('[holder merch] holder API Ethereum check failed, retrying direct chain read:', apiErr);
+  }
   let balances = null;
   try {
     const pairs = await Promise.all(HOLDER_GATE_TOKEN_IDS.map(async id => {
@@ -5291,6 +5334,12 @@ async function detectApotiHolderTier(wallet) {
 }
 async function detectApotiTezosHolderTier(wallet) {
   if (!HOLDER_GATE_TEZOS_CONTRACT) return null;
+  try {
+    const verified = await detectApotiHolderViaHolderApi('tezos', wallet);
+    if (verified) return verified;
+  } catch (apiErr) {
+    console.warn('[holder merch] holder API Tezos check failed, retrying TzKT:', apiErr);
+  }
   const url =
     'https://api.tzkt.io/v1/tokens/balances' +
     '?account=' + encodeURIComponent(wallet) +
@@ -5306,6 +5355,7 @@ async function detectApotiTezosHolderTier(wallet) {
     if (!Object.prototype.hasOwnProperty.call(balances, tokenId)) return;
     balances[tokenId] += Number(row?.balance || 0);
   });
+  window.__lastHolderGateCheck = { chain: 'tezos', wallet, balances: normalizeGateBalances(balances), contract: HOLDER_GATE_TEZOS_CONTRACT, via: 'tzkt' };
   return holderClaimFromGateBalances(balances, 'tezos', HOLDER_GATE_TEZOS_CONTRACT);
 }
 function holderVerificationMessage(detected, short) {
@@ -5408,7 +5458,10 @@ async function connectApotiTezosHolderWallet() {
     const detected = await detectApotiTezosHolderTier(wallet);
     if (!detected) {
       _holderMerchClaim = null;
-      updateHolderMerchStatus('Tezos wallet connected, but a Wooden Token (#1) or Bronze Token (#2) was not detected in the Apoti collection.', 'pending');
+      const checked = window.__lastHolderGateCheck || {};
+      const balances = checked.balances || {};
+      const short = wallet.slice(0, 6) + '...' + wallet.slice(-4);
+      updateHolderMerchStatus(`Tezos wallet ${short} was checked, but no Apoti holder token was detected. Token #1 balance: ${Number(balances['1'] || 0)}. Token #2 Bronze balance: ${Number(balances['2'] || 0)}.`, 'pending');
       buildOrderSummary();
       updateCartUI();
       return;
