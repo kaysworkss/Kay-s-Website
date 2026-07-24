@@ -4784,8 +4784,14 @@ function setWalletUi(state, addr) {
 // Replace the string below with your Project ID from https://cloud.reown.com
 const _ETH_WC_PROJECT_ID = "42dc845feb4ebf8f5cbe5725c2e07672";
 let _wcProvider = null;
+let _reownAppKit = null;
+let _reownProviderState = null;
+let _ethWalletProvider = null;
 
-function connectWallet() { _wcOpenModal(); }
+function connectWallet() {
+  if (window.ethereum || window.phantom?.ethereum) _wcOpenModal();
+  else _wcConnectAppKit();
+}
 
 function _htmlAttr(s) {
   return String(s || "")
@@ -4843,12 +4849,14 @@ function _wcOpenModal() {
           </button>
         </div>
         <button class="wc-cancel-btn" onclick="_wcCloseModal()">Cancel</button>` : `
-        <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);text-align:center;padding:12px 0 20px;line-height:1.6">
-          No wallet detected. Install
-          <a href="https://metamask.io" target="_blank" style="color:var(--gold)">MetaMask</a>
-          or another browser wallet, then refresh.
-        </p>
-        <button class="wc-cancel-btn" onclick="_wcCloseModal()">Close</button>`;
+        <div class="wc-wallet-list">
+          <button class="wc-wallet-btn" onclick="_wcConnectAppKit()">
+            <span class="wc-wallet-icon-ph">WC</span>
+            <span class="wc-wallet-name">WalletConnect</span>
+            <span class="wc-wallet-tag">Wallet list / QR</span>
+          </button>
+        </div>
+        <button class="wc-cancel-btn" onclick="_wcCloseModal()">Cancel</button>`;
     }
   }
   if (overlay) overlay.classList.add("show");
@@ -4857,6 +4865,100 @@ function _wcOpenModal() {
 function _wcCloseModal() {
   const overlay = document.getElementById("wc-modal-overlay");
   if (overlay) overlay.classList.remove("show");
+}
+
+async function _loadReownAppKit() {
+  if (_reownAppKit) return _reownAppKit;
+  const [{ createAppKit }, { EthersAdapter }, { mainnet }] = await Promise.all([
+    import("https://esm.sh/@reown/appkit@1.8.22"),
+    import("https://esm.sh/@reown/appkit-adapter-ethers@1.8.22"),
+    import("https://esm.sh/@reown/appkit@1.8.22/networks"),
+  ]);
+  _reownAppKit = createAppKit({
+    adapters: [new EthersAdapter()],
+    networks: [mainnet],
+    defaultNetwork: mainnet,
+    projectId: _ETH_WC_PROJECT_ID,
+    metadata: {
+      name: "Kay's Works Auction",
+      description: "Kay's Works live auction",
+      url: window.location.origin,
+      icons: [`${window.location.origin}/images/kaysworkslogo.svg`],
+    },
+    allWallets: "SHOW",
+    features: {
+      analytics: false,
+      email: false,
+      socials: false,
+      showWallets: true,
+    },
+  });
+  _reownAppKit.subscribeProvider?.(state => {
+    _reownProviderState = state || null;
+    if (state?.provider) _ethWalletProvider = state.provider;
+  });
+  return _reownAppKit;
+}
+
+async function _connectReownProvider() {
+  const modal = await _loadReownAppKit();
+  const existing = modal.getWalletProvider?.() || _reownProviderState?.provider;
+  if (existing) {
+    const accounts = await existing.request?.({ method: "eth_accounts" }).catch(() => []);
+    if (accounts?.[0] || _reownProviderState?.address) return existing;
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let unsubscribe = null;
+    const finish = providerLike => {
+      if (settled) return;
+      settled = true;
+      try { unsubscribe?.(); } catch(_) {}
+      resolve(providerLike);
+    };
+    unsubscribe = modal.subscribeProvider?.(state => {
+      _reownProviderState = state || null;
+      if (state?.provider && state?.address) {
+        _ethWalletProvider = state.provider;
+        finish(state.provider);
+      }
+    });
+    modal.open?.({ view: "Connect" });
+    window.setTimeout(() => {
+      if (settled) return;
+      try { unsubscribe?.(); } catch(_) {}
+      reject(new Error("Wallet connection timed out. Close the wallet window and try again."));
+    }, 90000);
+  });
+}
+
+async function _wcConnectAppKit() {
+  _wcCloseModal();
+  if (_walletConnecting) return;
+  _walletConnecting = true;
+  walletChain = "eth";
+  setWalletUi("connecting");
+  try {
+    const ethProvider = await _connectReownProvider();
+    const accounts = ethProvider.accounts?.length
+      ? ethProvider.accounts
+      : await ethProvider.request?.({ method: "eth_requestAccounts" });
+    const addr = accounts?.[0] || _reownProviderState?.address;
+    if (!addr) throw new Error("No account returned");
+    _ethWalletProvider = ethProvider;
+    _wcProvider = ethProvider;
+    provider = new ethers.BrowserProvider(ethProvider);
+    signer = await provider.getSigner();
+    await _wcFinishConnect(addr, "reown-appkit");
+    ethProvider.on?.("accountsChanged", () => location.reload());
+    ethProvider.on?.("chainChanged", () => location.reload());
+    ethProvider.on?.("disconnect", () => disconnectWallet());
+  } catch(e) {
+    _wcHandleError(e);
+  } finally {
+    _walletConnecting = false;
+    if (!signerAddress) setWalletUi("disconnected");
+  }
 }
 
 async function _wcConnectInjected(walletHint) {
@@ -4882,104 +4984,24 @@ async function _wcConnectInjected(walletHint) {
 }
 
 async function _wcConnectWC(walletHint) {
-  if (_walletConnecting) return;
-  _walletConnecting = true;
-  walletChain = "eth";
-  setWalletUi("connecting");
-
-  const body     = document.getElementById("wc-modal-body");
-  const title    = document.getElementById("wc-modal-title");
   const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 
   if (isMobile && walletHint === "phantom" && window.phantom?.ethereum) {
-    _walletConnecting = false;
     return _wcConnectInjected("phantom");
   }
 
   if (isMobile && walletHint && walletHint !== "phantom" && window.ethereum) {
-    _walletConnecting = false;
     return _wcConnectInjected();
   }
 
-  // Mobile: redirect into the wallet's in-app browser.
-  // Once inside the wallet browser, window.ethereum is injected and the modal
-  // offers a direct "Browser wallet" connection.
-  if (isMobile && walletHint) {
-    const currentUrl = window.location.href;
-    const dappUrl    = currentUrl.replace(/^https?:\/\//, "");
-    const encodedUrl = encodeURIComponent(currentUrl);
-    const deepLinks = {
-      metamask: `https://metamask.app.link/dapp/${dappUrl}`,
-      rainbow:  `https://rnbwapp.com/dapp/${dappUrl}`,
-      coinbase: `https://go.cb-w.com/dapp?cb_url=${encodedUrl}`,
-      phantom:  `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodeURIComponent(window.location.origin)}`,
-    };
-    const link = deepLinks[walletHint];
-    if (link) {
-      _walletConnecting = false;
-      setWalletUi("disconnected");
-      _wcCloseModal();
-      window.location.href = link;
-      return;
-    }
-  }
-
-  // Desktop / generic WalletConnect: create a real EIP-1193 provider.
-  if (body)  body.innerHTML = `<p style="color:var(--text-muted);font-family:'Crimson Pro',serif;font-size:0.9rem;text-align:center;padding:24px 0">Opening WalletConnect&hellip;</p>`;
-  if (title) title.textContent = "WalletConnect";
-
-  try {
-    const EthereumProvider = await _loadWCEthereumProvider();
-    _wcProvider = await EthereumProvider.init({
-      projectId: _ETH_WC_PROJECT_ID,
-      chains: [1],
-      optionalChains: [1],
-      showQrModal: true,
-      metadata: {
-        name: "Kay's Works Auction",
-        description: "Kay's Works live auction",
-        url: window.location.origin,
-        icons: [`${window.location.origin}/images/kaysworkslogo.svg`],
-      },
-    });
-
-    _wcProvider.on?.("display_uri", (uri) => {
-      if (!body) return;
-      body.innerHTML = `
-        <div style="text-align:center;padding:8px 0 4px">
-          <p style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--linen);margin:0 0 14px">
-            Scan the WalletConnect QR modal, or copy the link below.
-          </p>
-          <input id="wc-uri-input"
-            style="width:100%;box-sizing:border-box;font-size:0.6rem;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(196,132,90,0.2);border-radius:6px;color:var(--linen);font-family:monospace;cursor:pointer"
-            readonly value="${_htmlAttr(uri)}" onclick="this.select();document.execCommand('copy');this.style.borderColor='var(--gold)'" title="Click to copy" />
-          <p style="font-family:'Crimson Pro',serif;font-size:0.72rem;color:var(--text-muted);font-style:italic;margin:8px 0 0">
-            After approval, return here to sign the wallet verification message.
-          </p>
-        </div>
-        <button class="wc-cancel-btn" onclick="_wcDisconnectWC()" style="margin-top:16px">Cancel</button>`;
-    });
-
-    await _wcProvider.connect();
-    provider = new ethers.BrowserProvider(_wcProvider);
-    signer   = await provider.getSigner();
-    _wcCloseModal();
-    await _wcFinishConnect(await signer.getAddress(), "walletconnect");
-
-    _wcProvider.on?.("accountsChanged", () => location.reload());
-    _wcProvider.on?.("chainChanged",    () => location.reload());
-    _wcProvider.on?.("disconnect",      () => disconnectWallet());
-  } catch(e) {
-    _wcCloseModal();
-    _wcHandleError(e);
-  } finally {
-    _walletConnecting = false;
-    if (!signerAddress) setWalletUi("disconnected");
-  }
+  return _wcConnectAppKit();
 }
-
 async function _wcDisconnectWC() {
   try { await _wcProvider?.disconnect?.(); } catch(_) {}
+  try { await _reownAppKit?.disconnect?.(); } catch(_) {}
+  try { await _reownAppKit?.adapter?.connectionControllerClient?.disconnect?.(); } catch(_) {}
+  _reownProviderState = null;
+  _ethWalletProvider = null;
   _wcCloseModal();
   _walletConnecting = false;
   if (!signerAddress) setWalletUi("disconnected");
@@ -5246,7 +5268,11 @@ async function connectTezosWallet() {
 function disconnectWallet() {
   const wc = _wcProvider;
   _wcProvider = null;
+  _reownProviderState = null;
+  _ethWalletProvider = null;
   if (wc?.disconnect) wc.disconnect().catch(() => {});
+  try { _reownAppKit?.disconnect?.(); } catch(_) {}
+  try { _reownAppKit?.adapter?.connectionControllerClient?.disconnect?.(); } catch(_) {}
   signer = null;
   signerAddress = null;
   tezosWallet = null;
