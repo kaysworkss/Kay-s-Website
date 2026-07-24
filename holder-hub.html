@@ -200,11 +200,14 @@
   .merch-entitlement p { color:var(--text-muted); line-height:1.65; margin:0 auto; max-width:66ch; }
   .merch-entitlement strong { color:var(--sand); }
   .merch-cta { display:flex; width:max-content; margin:0 auto; padding:0.85rem 1.6rem; }
-  .merch-cta:disabled {
+  .merch-cta:disabled,
+  .merch-cta[aria-disabled="true"] {
     cursor:not-allowed; transform:none; filter:none; opacity:0.62;
     background:rgba(232,213,176,0.08); color:rgba(232,213,176,0.62);
     border-color:rgba(232,213,176,0.22);
+    pointer-events:none;
   }
+  .merch-countdown { max-width:620px; margin:0 auto 1rem; }
   .merch-cta-note { margin-top:0.75rem; text-align:center; color:var(--text-muted); font-size:0.95rem; }
   @media (max-width:900px) {
     .merch-grid { columns:2 260px; }
@@ -1132,8 +1135,18 @@
           <figcaption>Back fit preview</figcaption>
         </figure>
       </div>
-      <button class="btn merch-cta" type="button" disabled>Claim coming soon</button>
-      <p class="merch-cta-note">Claims are coming soon. Once redeemed, each item will be produced to order before shipping.</p>
+      <div class="opa-countdown merch-countdown" id="merchCountdown" data-merch-claim-start="2026-07-25T11:00:00Z">
+        <div class="opa-countdown-label">Merch claims open in</div>
+        <div class="opa-countdown-units" id="merchCountdownUnits">
+          <div class="opa-countdown-unit"><strong data-countdown="days">00</strong><span>Days</span></div>
+          <div class="opa-countdown-unit"><strong data-countdown="hours">00</strong><span>Hours</span></div>
+          <div class="opa-countdown-unit"><strong data-countdown="minutes">00</strong><span>Minutes</span></div>
+          <div class="opa-countdown-unit"><strong data-countdown="seconds">00</strong><span>Seconds</span></div>
+        </div>
+        <div class="opa-countdown-note">25 July 2026 &middot; 12:00 PM GMT+1</div>
+      </div>
+      <a class="btn merch-cta" id="merchClaimButton" href="/shop?holder=apoti-olowe#apotiHolderMerch" aria-disabled="true">Claim coming soon</a>
+      <p class="merch-cta-note" id="merchClaimNote">Claims open at 12:00 PM GMT+1 on 25 July 2026. Once redeemed, each item will be produced to order before shipping.</p>
       </section>
     </div>
 
@@ -3271,6 +3284,47 @@ document.getElementById('sendMsgBtn').addEventListener('click', async () => {
     if (remaining <= 0) {
       clearInterval(timer);
       units.innerHTML = '<a class="opa-countdown-live" href="https://www.kaysworks.com/auction">The Opa Collection auction is now live →</a>';
+      return;
+    }
+    const totalSeconds = Math.floor(remaining / 1000);
+    values.days.textContent = pad(Math.floor(totalSeconds / 86400));
+    values.hours.textContent = pad(Math.floor(totalSeconds % 86400 / 3600));
+    values.minutes.textContent = pad(Math.floor(totalSeconds % 3600 / 60));
+    values.seconds.textContent = pad(totalSeconds % 60);
+  }
+  updateCountdown();
+  timer = setInterval(updateCountdown, 1000);
+})();
+
+// Merch claim countdown
+(() => {
+  const countdown = document.getElementById('merchCountdown');
+  const claimButton = document.getElementById('merchClaimButton');
+  const claimNote = document.getElementById('merchClaimNote');
+  if (!countdown || !claimButton) return;
+  const startsAt = Date.parse(countdown.dataset.merchClaimStart); // 11:00 UTC = 12:00 GMT+1
+  const units = countdown.querySelector('.opa-countdown-units');
+  const values = {
+    days: countdown.querySelector('[data-countdown="days"]'),
+    hours: countdown.querySelector('[data-countdown="hours"]'),
+    minutes: countdown.querySelector('[data-countdown="minutes"]'),
+    seconds: countdown.querySelector('[data-countdown="seconds"]'),
+  };
+  const pad = value => String(value).padStart(2, '0');
+  let timer;
+  function openClaims() {
+    clearInterval(timer);
+    claimButton.removeAttribute('aria-disabled');
+    claimButton.textContent = 'Claim merch';
+    units.innerHTML = '<span class="opa-countdown-live">Merch claims are now live</span>';
+    if (claimNote) {
+      claimNote.textContent = 'Claims are open. Once redeemed, each item will be produced to order before shipping.';
+    }
+  }
+  function updateCountdown() {
+    const remaining = startsAt - Date.now();
+    if (remaining <= 0) {
+      openClaims();
       return;
     }
     const totalSeconds = Math.floor(remaining / 1000);

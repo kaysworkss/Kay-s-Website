@@ -1794,14 +1794,14 @@ function renderAdminProducts() {
           <label class="form-label">Holder benefit</label>
           <select class="form-select ap-holder-benefit" data-idx="${realIdx}">
             <option value=""${!p.holder_benefit_role ? ' selected' : ''}>No holder benefit</option>
-            <option value="free_tote"${p.holder_benefit_role === 'free_tote' ? ' selected' : ''}>Free holder item</option>
+            <option value="free_tote"${p.holder_benefit_role === 'free_tote' ? ' selected' : ''}>Free holder item + tier discount</option>
             <option value="discount_addon"${p.holder_benefit_role === 'discount_addon' ? ' selected' : ''}>Holder discount add-on</option>
           </select>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.55rem;margin-top:0.45rem">
             <label style="font-size:0.68rem;color:var(--text-muted)">Wooden tier %<input class="form-input ap-holder-wood-percent" data-idx="${realIdx}" type="number" min="0" max="90" step="1" value="${Number(p.holder_benefit_wood_percent ?? 15)}" style="margin-top:0.25rem"/></label>
             <label style="font-size:0.68rem;color:var(--text-muted)">Bronze tier %<input class="form-input ap-holder-bronze-percent" data-idx="${realIdx}" type="number" min="0" max="90" step="1" value="${Number(p.holder_benefit_bronze_percent ?? 20)}" style="margin-top:0.25rem"/></label>
           </div>
-          <p style="font-size:0.68rem;color:var(--text-muted);margin-top:0.3rem">Token #2 can also claim the configured free holder item. Set each tier's discount for this product here.</p>
+          <p style="font-size:0.68rem;color:var(--text-muted);margin-top:0.3rem">Use Free holder item + tier discount for totes: Bronze can claim the free tote, while Wooden still receives the Wooden tier discount on this same product.</p>
         </div>` : ''}        <div class="form-row" style="margin:0">
           <label class="form-label">Image URL</label>
           <input class="form-input ap-img" data-idx="${realIdx}" value="${escapeAttr(p.image||'')}"/>
@@ -3526,6 +3526,35 @@ async function loadShopData() {
   renderProducts();
 }
 
+function packedProductImages(p) {
+  const packed = [];
+  (Array.isArray(p.images) ? p.images : []).forEach(url => {
+    if (typeof url === 'string' && url.trim()) packed.push(url.trim());
+  });
+  const variantImages = p.variantImages || {};
+  Object.keys(variantImages).forEach(variant => {
+    const images = (Array.isArray(variantImages[variant]) ? variantImages[variant] : [variantImages[variant]])
+      .map(url => String(url || '').trim())
+      .filter(Boolean)
+      .slice(0, 2);
+    if (images.length) packed.push({ variant, images });
+  });
+  if (String(p.category || '').toLowerCase() === 'merch') {
+    packed.push({
+      kind: 'merch_options',
+      mode: p.merchOptionMode || 'none',
+      extended_size_percent: Math.max(0, Math.min(100, Number(p.merchExtendedSizePercent ?? 10))),
+    });
+    if (p.holder_benefit_active && p.holder_benefit_role) {
+      packed.push({
+        kind: 'holder_tier_discounts',
+        wood: Math.max(0, Math.min(90, Number(p.holder_benefit_wood_percent ?? 15))),
+        bronze: Math.max(0, Math.min(90, Number(p.holder_benefit_bronze_percent ?? 20))),
+      });
+    }
+  }
+  return packed;
+}
 /* Save product via admin API */
 function buildProductSaveBody(p) {
   return {

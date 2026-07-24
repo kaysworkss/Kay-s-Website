@@ -267,6 +267,28 @@ nav.scrolled .nav-cart:hover { color: var(--rust); opacity: 1; }
   z-index: 2; pointer-events: none;
 }
 .cart-badge.visible { opacity: 1; transform: scale(1); }
+.nav-cart.cart-added {
+  animation: cartAddedShake 0.54s ease;
+}
+.nav-cart.cart-added .cart-badge {
+  animation: cartBadgePop 0.54s ease;
+}
+@keyframes cartAddedShake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  18% { transform: translateX(-2px) rotate(-5deg); }
+  36% { transform: translateX(3px) rotate(5deg); }
+  54% { transform: translateX(-2px) rotate(-3deg); }
+  72% { transform: translateX(1px) rotate(2deg); }
+}
+@keyframes cartBadgePop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-cart.cart-added,
+  .nav-cart.cart-added .cart-badge { animation: none; }
+}
 
 /* Hero full bleed cinematic */
 .shop-hero {
@@ -4866,7 +4888,7 @@ function addToCart(p, variant) {
     });
   }
   updateCartUI();
-  openCart();
+  indicateCartAdded();
   // If that was the last one, slam the card shut so the next shopper feels it.
   syncCardStock(p.id, variant);
  showToast(remainingToAdd(p, variant) === 0 ? 'Added last one, now sold out ' : 'Added to bag ');
@@ -4892,6 +4914,11 @@ function holderProductKind(product) {
   return '';
 }
 function isApotiMerchProduct(product) {
+  const project = String(product?.holder_benefit_project || '').toLowerCase();
+  const entitlementKey = String(product?.holder_benefit_entitlement_key || '');
+  if (product?.holder_benefit_active === true && project === 'apoti-olowe' && entitlementKey === 'apoti-olowe-token-2-merch') {
+    return true;
+  }
   const hay = normalizeHolderText([product?.name, product?.slug, product?.series_slug, product?.description, product?.category].join(' '));
   return String(product?.category || '').toLowerCase() === 'merch'
  && /(apoti|olowe|olow|project|series)/.test(hay);
@@ -5071,12 +5098,14 @@ function ethereumHolderWalletMessage() {
   return 'No Ethereum wallet detected. Install or unlock MetaMask, Rabby, Coinbase Wallet, or another Ethereum wallet, then try again.';
 }
 async function requestEthereumHolderAccount() {
-  if (!window.ethereum) throw new Error(ethereumHolderWalletMessage());
-  if (typeof window.ethereum.request === 'function') {
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  const ethProvider = await getEthereumWalletProvider();
+  if (!ethProvider) throw new Error(ethereumHolderWalletMessage());
+  if (ethProvider === _walletConnectEthProvider && !ethProvider.session) await ethProvider.connect?.();
+  if (typeof ethProvider.request === 'function') {
+    const accounts = ethProvider.accounts?.length ? ethProvider.accounts : await ethProvider.request({ method: 'eth_requestAccounts' });
     if (accounts && accounts[0]) return accounts[0];
   }
-  const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+  const provider = new ethers.providers.Web3Provider(ethProvider, 'any');
   const accounts = await provider.send('eth_requestAccounts', []);
   if (!accounts || !accounts[0]) throw new Error('Ethereum wallet connected but returned no account.');
   return accounts[0];
@@ -5121,71 +5150,102 @@ async function detectApotiHolderTier(wallet) {
       freeTote: true,
     };
   }
-  const provider = new ethers.providers.Web3Provider(window.ethereum);
+  const ethProvider = await getEthereumWalletProvider();
+  const provider = new ethers.providers.Web3Provider(ethProvider);
   const erc721Abi = ['function balanceOf(address owner) view returns (uint256)'];
   const erc1155Abi = ['function balanceOf(address account,uint256 id) view returns (uint256)'];
+  const tokenBalances = {};
+  const heldTokenIds = [];
+  let source = '';
   for (const c of contracts) {
     try {
       const type = String(c.type || 'ERC721').toUpperCase();
       const contract = new ethers.Contract(c.address, type === 'ERC1155' ? erc1155Abi : erc721Abi, provider);
       let bal = 0;
+      const tokenIds = Array.isArray(c.tokenIds) ? c.tokenIds : (c.tokenId != null ? [c.tokenId] : []);
       if (type === 'ERC1155') {
-        const tokenIds = Array.isArray(c.tokenIds) ? c.tokenIds : (c.tokenId != null ? [c.tokenId] : []);
         for (const id of tokenIds) {
           const b = await contract.balanceOf(wallet, id);
-          bal += Number(b.toString());
+          const nextBalance = Number(b.toString());
+          tokenBalances[id] = (Number(tokenBalances[id] || 0) + nextBalance);
+          bal += nextBalance;
+          if (nextBalance > 0 && !heldTokenIds.includes(id)) heldTokenIds.push(id);
         }
       } else {
         const b = await contract.balanceOf(wallet);
         bal = Number(b.toString());
+        const id = tokenIds[0] || 2;
+        tokenBalances[id] = (Number(tokenBalances[id] || 0) + bal);
+        if (bal > 0 && !heldTokenIds.includes(id)) heldTokenIds.push(id);
       }
-      if (bal > 0) {
-        return {
-          tier: c.tier || APOTI_HOLDER_CONFIG.defaultTier,
-          verified: true,
-          source: c.address,
-          chain: c.chain || 'eth',
-          tokenIds: Array.isArray(c.tokenIds) ? c.tokenIds : (c.tokenId != null ? [c.tokenId] : [2]),
-          entitlementKey: c.entitlementKey || APOTI_HOLDER_CONFIG.entitlementKey,
-          discountPercent: Number(c.discountPercent || APOTI_HOLDER_CONFIG.defaultMerchDiscountPercent),
-          tokenBalance: bal,
-          freeToteQty: c.freeTote === false ? 0 : bal,
-          freeTote: c.freeTote !== false,
-        };
-      }
+      if (bal > 0 && !source) source = c.address;
     } catch (err) {
       console.warn('[holder merch] token check failed', c.address, err);
     }
+  }
+  const bronzeBalance = Number(tokenBalances[2] || 0);
+  const woodBalance = Number(tokenBalances[1] || 0);
+  const tokenBalance = bronzeBalance + woodBalance;
+  if (tokenBalance > 0) {
+    const isBronze = bronzeBalance > 0;
+    return {
+      tier: isBronze ? 'Bronze Token Holder' : 'Wooden Token Holder',
+      verified: true,
+      source: source || contracts[0]?.address || '',
+      chain: 'eth',
+      tokenIds: heldTokenIds.length ? heldTokenIds : (isBronze ? [2] : [1]),
+      entitlementKey: APOTI_HOLDER_CONFIG.entitlementKey,
+      discountPercent: isBronze ? 20 : 15,
+      tokenBalance,
+      tokenBalances,
+      freeToteQty: bronzeBalance,
+      freeTote: bronzeBalance > 0,
+    };
   }
   return null;
 }
 async function detectApotiTezosHolderTier(wallet) {
   const contracts = Array.isArray(APOTI_HOLDER_CONFIG.contracts) ? APOTI_HOLDER_CONFIG.contracts.filter(c => c.address && c.chain === 'tezos') : [];
   if (!contracts.length) return null;
+  const tokenBalances = {};
+  const heldTokenIds = [];
+  let source = '';
   for (const c of contracts) {
     const tokenIds = Array.isArray(c.tokenIds) ? c.tokenIds : (c.tokenId != null ? [c.tokenId] : []);
     for (const id of tokenIds) {
       try {
         const url = `https://api.tzkt.io/v1/tokens/balances?account=${encodeURIComponent(wallet)}&token.contract=${encodeURIComponent(c.address)}&token.tokenId=${encodeURIComponent(id)}&balance.ne=0&limit=1`;
         const rows = await fetch(url, { cache: 'no-store' }).then(r => r.ok ? r.json() : []);
+        const balance = Array.isArray(rows) ? Number(rows.reduce((sum, row) => sum + Number(row.balance || 0), 0)) : 0;
+        tokenBalances[id] = (Number(tokenBalances[id] || 0) + balance);
+        if (balance > 0 && !heldTokenIds.includes(id)) heldTokenIds.push(id);
+        if (balance > 0 && !source) source = c.address;
         if (Array.isArray(rows) && rows.length) {
-          return {
-            tier: c.tier || APOTI_HOLDER_CONFIG.defaultTier,
-            verified: true,
-            source: c.address,
-            chain: 'tezos',
-            tokenIds: tokenIds,
-            entitlementKey: c.entitlementKey || APOTI_HOLDER_CONFIG.entitlementKey,
-            discountPercent: Number(c.discountPercent || APOTI_HOLDER_CONFIG.defaultMerchDiscountPercent),
-            tokenBalance: Number(rows.reduce((sum, row) => sum + Number(row.balance || 0), 0)),
-            freeToteQty: c.freeTote === false ? 0 : Number(rows.reduce((sum, row) => sum + Number(row.balance || 0), 0)),
-            freeTote: c.freeTote !== false,
-          };
+          continue;
         }
       } catch (err) {
         console.warn('[holder merch] Tezos token check failed', c.address, id, err);
       }
     }
+  }
+  const bronzeBalance = Number(tokenBalances[2] || 0);
+  const woodBalance = Number(tokenBalances[1] || 0);
+  const tokenBalance = bronzeBalance + woodBalance;
+  if (tokenBalance > 0) {
+    const isBronze = bronzeBalance > 0;
+    return {
+      tier: isBronze ? 'Bronze Token Holder' : 'Wooden Token Holder',
+      verified: true,
+      source: source || contracts[0]?.address || '',
+      chain: 'tezos',
+      tokenIds: heldTokenIds.length ? heldTokenIds : (isBronze ? [2] : [1]),
+      entitlementKey: APOTI_HOLDER_CONFIG.entitlementKey,
+      discountPercent: isBronze ? 20 : 15,
+      tokenBalance,
+      tokenBalances,
+      freeToteQty: bronzeBalance,
+      freeTote: bronzeBalance > 0,
+    };
   }
   return null;
 }
@@ -5232,12 +5292,6 @@ function revealHolderMerchProduct(kind) {
 }
 async function connectApotiHolderWallet() {
   const btn = document.getElementById('holderConnectBtn');
-  if (!window.ethereum) {
-    const message = ethereumHolderWalletMessage();
-    updateHolderMerchStatus(message, 'pending');
-    showToast('No Ethereum wallet detected');
-    return;
-  }
   if (typeof ethers === 'undefined') {
     updateHolderMerchStatus('Wallet library is still loading. Try again in a moment.', 'pending');
     return;
@@ -5255,6 +5309,8 @@ async function connectApotiHolderWallet() {
       return;
     }
     _holderMerchClaim = Object.assign({ wallet }, detected);
+    if (typeof _ethConnectedAddr !== 'undefined') _ethConnectedAddr = wallet;
+    if (typeof _ethProvider !== 'undefined') _ethProvider = new ethers.providers.Web3Provider(await getEthereumWalletProvider());
     const short = wallet.slice(0, 6) + '...' + wallet.slice(-4);
     updateHolderMerchStatus(
       detected.verified
@@ -5529,6 +5585,16 @@ function updateCartUI() {
     // shown amount, order hash, and pending order reflect the new cart.
     if (typeof relockOnCartChange === 'function') relockOnCartChange();
  } catch (e) { /* panels not present yet ignore */ }
+}
+
+function indicateCartAdded() {
+  const btn = document.getElementById('cartBtn');
+  if (!btn) return;
+  btn.classList.remove('cart-added');
+  void btn.offsetWidth;
+  btn.classList.add('cart-added');
+  window.clearTimeout(btn._cartAddedTimer);
+  btn._cartAddedTimer = window.setTimeout(() => btn.classList.remove('cart-added'), 620);
 }
 
 function openCart() {
@@ -6938,6 +7004,24 @@ function validateForm() {
   return true;
 }
 
+function checkoutReadyForCryptoLock() {
+  const d = getFormData();
+  if (!d.name || d.name.length < 2) return false;
+  if (!d.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) return false;
+  const phoneDigits = (d.phone || '').replace(/[^\d]/g, '');
+  if (phoneDigits.length < 7) return false;
+  if (!d.countryCode || !d.deliveryZone) return false;
+  if (d.countryCode === 'NG') {
+    return Boolean(document.getElementById('ckState')?.value)
+      && Boolean(gv('ckGigCity'))
+      && gv('ckGigStreet').length >= 4;
+  }
+  return gv('ckUpsLine1').length >= 4
+    && Boolean(gv('ckUpsCity'))
+    && Boolean(gv('ckUpsState'))
+    && Boolean(gv('ckUpsPostal'));
+}
+
 function checkoutPayload(customer, method, extra = {}) {
   return {
     name:             customer.name,
@@ -7489,7 +7573,7 @@ async function refreshLock(method, silent) {
   const seq = ++_lockSeq;
   const d = getFormData();
   // Don't lock until the form is minimally valid.
-  if (!d.name || !d.email) { window.__activeLock = null; renderLockUI(method); return; }
+  if (!checkoutReadyForCryptoLock()) { window.__activeLock = null; renderLockUI(method); return; }
   try {
     const payer = lockPayerAddress(method);
     // Carry the previous order_ref so re-locks keep the same reference.
@@ -7512,6 +7596,7 @@ async function refreshLock(method, silent) {
     };
     rememberPendingOrder(orderRef, { method, payer_address: payer, quote: q.quote, customer: d });
     renderLockUI(method);
+    if (window.__manualCryptoMode === method) fillManualCryptoFields(method);
     if (method === 'tezos' && typeof renderTezosPanel === 'function') renderTezosPanel();
     if (method === 'eth' && typeof renderEthPanel === 'function') renderEthPanel();
     return window.__activeLock;
@@ -7549,6 +7634,41 @@ function relockOnCartChange() {
   if (lock && window.__manualCryptoMode === lock.method) return;
   if (lock && lock.method) refreshLock(lock.method, true);
 }
+
+let _cryptoFormLockTimer = null;
+function scheduleCryptoLockFromForm() {
+  window.clearTimeout(_cryptoFormLockTimer);
+  _cryptoFormLockTimer = window.setTimeout(() => {
+    const activeTab = document.querySelector('.ck-pay-method.active')?.dataset.pay
+      || document.querySelector('.pay-tab.active')?.dataset.pay;
+    if (activeTab !== 'eth' && activeTab !== 'tezos') return;
+    if (!checkoutReadyForCryptoLock()) {
+      if (window.__activeLock?.method === activeTab) {
+        window.__activeLock = null;
+        renderLockUI(activeTab);
+      }
+      return;
+    }
+    refreshLock(activeTab, true);
+  }, 450);
+}
+
+(function wireCryptoLockFormRefresh() {
+  const ids = [
+    'ckName', 'ckEmail', 'ckPhone', 'ckCountrySearch', 'ckCountry', 'ckState',
+    'ckGigCity', 'ckGigStreet', 'ckUpsLine1', 'ckUpsLine2', 'ckUpsCity',
+    'ckUpsState', 'ckUpsPostal',
+  ];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', scheduleCryptoLockFromForm);
+    el.addEventListener('change', scheduleCryptoLockFromForm);
+  });
+  document.addEventListener('change', event => {
+    if (event.target?.name === 'deliveryCarrier') scheduleCryptoLockFromForm();
+  });
+})();
 
 
 // Notify via site-form API (reuse existing backend)
@@ -7864,6 +7984,54 @@ const ERC20_ABI = [
 let _ethConnectedAddr    = null;
 let _ethProvider         = null;
 let _ethConnecting       = false;
+let _ethWalletProvider   = null;
+let _walletConnectEthProvider = null;
+
+const WALLETCONNECT_PROJECT_ID = '42dc845feb4ebf8f5cbe5725c2e07672';
+
+async function loadWalletConnectEthereumProvider() {
+  if (_walletConnectEthProvider) return _walletConnectEthProvider;
+  const mod = await import('https://esm.sh/@walletconnect/ethereum-provider@2.23.10');
+  const EthereumProvider = mod.EthereumProvider || mod.default;
+  if (!EthereumProvider?.init) throw new Error('WalletConnect provider did not load.');
+  _walletConnectEthProvider = await EthereumProvider.init({
+    projectId: WALLETCONNECT_PROJECT_ID,
+    optionalChains: [1],
+    showQrModal: true,
+    methods: ['eth_requestAccounts', 'eth_sendTransaction', 'wallet_switchEthereumChain', 'wallet_addEthereumChain'],
+    events: ['accountsChanged', 'chainChanged', 'disconnect'],
+    rpcMap: { 1: 'https://ethereum.publicnode.com' },
+    metadata: {
+      name: "Kay's Works",
+      description: 'Fine art prints and merch',
+      url: 'https://www.kaysworks.com',
+      icons: ['https://www.kaysworks.com/images/kaysworkslogo.svg'],
+    },
+  });
+  _walletConnectEthProvider.on?.('accountsChanged', accounts => {
+    _ethConnectedAddr = accounts?.[0] || null;
+    if (!_ethConnectedAddr) _ethProvider = null;
+    renderEthPanel();
+  });
+  _walletConnectEthProvider.on?.('disconnect', () => {
+    if (_ethWalletProvider === _walletConnectEthProvider) {
+      _ethConnectedAddr = null;
+      _ethProvider = null;
+      _ethWalletProvider = null;
+      renderEthPanel();
+    }
+  });
+  return _walletConnectEthProvider;
+}
+
+async function getEthereumWalletProvider() {
+  if (_ethWalletProvider) return _ethWalletProvider;
+  if (window.ethereum) {
+    _ethWalletProvider = window.ethereum;
+    return _ethWalletProvider;
+  }
+  return loadWalletConnectEthereumProvider();
+}
 
 function ethShortAddr(addr) {
   if (!addr) return '';
@@ -7880,6 +8048,22 @@ function ethEthAmount() {
 // Per-chain payment mode: 'connect' (default wallet handles the address, we
 // show only the amount) or 'manual' (show address + ref + amount + confirm).
 window.__cryptoMode = window.__cryptoMode || { eth: 'connect', tezos: 'connect' };
+
+function fillManualCryptoFields(chain) {
+  const refInput = document.getElementById(chain === 'tezos' ? 'tezosManualRef' : 'ethManualRef');
+  const senderInput = document.getElementById(chain === 'tezos' ? 'tezosManualSender' : 'ethManualSender');
+  const lock = window.__activeLock;
+  if (refInput && !refInput.value) {
+    let ref = (lock && lock.method === chain) ? lock.order_ref : '';
+    if (!ref) { const r = latestPendingOrder(chain); if (r) ref = r.ref; }
+    if (ref) refInput.value = ref;
+  }
+  if (senderInput && !senderInput.value) {
+    senderInput.value = chain === 'tezos'
+      ? ((_tezosConnectedAddr || lock?.payerAddress || latestPendingOrder(chain)?.payer_address || '') || '')
+      : ((_ethConnectedAddr || lock?.payerAddress || latestPendingOrder(chain)?.payer_address || '') || '');
+  }
+}
 
 function setCryptoMode(chain, mode) {
   window.__cryptoMode[chain] = mode;
@@ -7906,19 +8090,7 @@ function setCryptoMode(chain, mode) {
     if (fields && fields.dataset.revealed !== '1') {
       fields.dataset.revealed = '1';
       fields.style.display = '';
-      const refInput = document.getElementById(chain === 'tezos' ? 'tezosManualRef' : 'ethManualRef');
-      const senderInput = document.getElementById(chain === 'tezos' ? 'tezosManualSender' : 'ethManualSender');
-      const lock = window.__activeLock;
-      if (refInput && !refInput.value) {
-        let ref = (lock && lock.method === chain) ? lock.order_ref : '';
-        if (!ref) { const r = latestPendingOrder(chain); if (r) ref = r.ref; }
-        if (ref) refInput.value = ref;
-      }
-      if (senderInput && !senderInput.value) {
-        senderInput.value = chain === 'tezos'
-          ? ((_tezosConnectedAddr || lock?.payerAddress || latestPendingOrder(chain)?.payer_address || '') || '')
-          : ((_ethConnectedAddr || lock?.payerAddress || latestPendingOrder(chain)?.payer_address || '') || '');
-      }
+      fillManualCryptoFields(chain);
     }
   } else {
     if (window.__manualCryptoMode === chain) window.__manualCryptoMode = null;
@@ -8136,23 +8308,22 @@ async function ethConnectWallet() {
  showToast('Payment library still loading please try again in a moment');
     return;
   }
-  if (!window.ethereum) {
- showToast('No Ethereum wallet detected install MetaMask or use manual send');
-    return;
-  }
 
   _ethConnecting = true;
   const btn = document.getElementById('ethConnectBtn');
-  btn.disabled = true; btn.textContent = 'Connecting\u2026';
+  btn.disabled = true; btn.textContent = window.ethereum ? 'Connecting\u2026' : 'Opening wallet options\u2026';
 
   try {
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const ethProvider = await getEthereumWalletProvider();
+    if (ethProvider === _walletConnectEthProvider && !ethProvider.session) await ethProvider.connect?.();
+    const accounts = ethProvider.accounts?.length ? ethProvider.accounts : await ethProvider.request({ method: 'eth_requestAccounts' });
     if (!accounts || !accounts[0]) throw new Error('No account returned');
     _ethConnectedAddr = accounts[0];
-    _ethProvider      = new ethers.providers.Web3Provider(window.ethereum);
+    _ethWalletProvider = ethProvider;
+    _ethProvider      = new ethers.providers.Web3Provider(ethProvider);
 
     // Listen for account changes
-    window.ethereum.on('accountsChanged', accs => {
+    ethProvider.on?.('accountsChanged', accs => {
       _ethConnectedAddr = accs[0] || null;
       if (!_ethConnectedAddr) _ethProvider = null;
       renderEthPanel();
@@ -8175,11 +8346,12 @@ async function ethConnectWallet() {
 }
 
 async function ensureEthereumMainnet() {
-  if (!window.ethereum) throw new Error('No Ethereum wallet detected');
-  const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+  const ethProvider = await getEthereumWalletProvider();
+  if (!ethProvider) throw new Error('No Ethereum wallet detected');
+  const chainId = await ethProvider.request({ method: 'eth_chainId' });
   if (String(chainId).toLowerCase() === '0x1') return;
   try {
-    await window.ethereum.request({
+    await ethProvider.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: '0x1' }],
     });
@@ -8192,9 +8364,13 @@ async function ensureEthereumMainnet() {
 /* Send ETH via connected wallet */
 document.getElementById('ethConnectBtn').addEventListener('click', ethConnectWallet);
 
-document.getElementById('ethDisconnectBtn').addEventListener('click', () => {
+document.getElementById('ethDisconnectBtn').addEventListener('click', async () => {
+  try {
+    if (_ethWalletProvider === _walletConnectEthProvider) await _walletConnectEthProvider?.disconnect?.();
+  } catch (_) {}
   _ethConnectedAddr = null;
   _ethProvider      = null;
+  _ethWalletProvider = null;
   renderEthPanel();
   showToast('Wallet disconnected');
 });
@@ -8237,14 +8413,15 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
 
     btn.textContent = 'Opening wallet\u2026';
     await ensureEthereumMainnet();
-    const activeAccounts = await window.ethereum.request({ method: 'eth_accounts' });
+    const ethProvider = await getEthereumWalletProvider();
+    const activeAccounts = await ethProvider.request({ method: 'eth_accounts' });
     const from = activeAccounts && activeAccounts[0];
  if (!from) throw new Error('Wallet disconnected connect it and try again');
     _ethConnectedAddr = from;
 
     // Ask the injected wallet directly so account/network changes cannot leave
     // ethers holding a stale signer that never opens the payment prompt.
-    txHash = await window.ethereum.request({
+    txHash = await ethProvider.request({
       method: 'eth_sendTransaction',
       params: [{
         from,
@@ -8302,7 +8479,7 @@ async function sendErc20(token) {
 
   try {
     await ensureEthereumMainnet();
-    _ethProvider = new ethers.providers.Web3Provider(window.ethereum);
+    _ethProvider = new ethers.providers.Web3Provider(await getEthereumWalletProvider());
     const quoteData = await getServerCheckoutQuote(d, token, { payer_address: _ethConnectedAddr });
     const usd = Number(quoteData.quote?.crypto_amount);
     if (!usd) { showToast(label + ' quote unavailable'); return; }
