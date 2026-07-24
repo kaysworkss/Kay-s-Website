@@ -460,6 +460,50 @@ async function handleContent(req, res, supabase) {
   return res.status(200).json({ future_plans: (data && data.future_plans) || '' });
 }
 
+async function isHolderAuthorised(req, supabase) {
+  const accessToken = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const walletClaim = String(req.headers['x-holder-claim'] || '');
+  if (accessToken) {
+    const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
+    if (!userError && userData && userData.user) {
+      const { data: holder } = await supabase.from('holders').select('id').eq('auth_user_id', userData.user.id).maybeSingle();
+      return Boolean(holder);
+    }
+  }
+  if (walletClaim) {
+    const { data: pending } = await supabase.from('pending_verifications')
+      .select('id,expires_at').eq('id', walletClaim).eq('consumed', false).maybeSingle();
+    return Boolean(pending && new Date(pending.expires_at) > new Date());
+  }
+  return false;
+}
+
+// -- action=participants ----
+// Holder-only participant list, served through the service-role API so the
+// dashboard does not depend on a public-view RLS policy being perfectly open.
+async function handleParticipants(req, res, supabase) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const authorised = await isHolderAuthorised(req, supabase);
+  if (!authorised) return res.status(403).json({ error: 'Holder access required.' });
+
+  let { data, error } = await supabase
+    .from('holder_public')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    const fallback = await supabase
+      .from('holders')
+      .select('id,wallet_address,chain,display_name,tier,created_at')
+      .order('created_at', { ascending: true });
+    data = fallback.data;
+    error = fallback.error;
+  }
+
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json({ participants: Array.isArray(data) ? data : [] });
+}
+
 // -- action=email-updates ----
 // Holder-controlled opt-in for project update emails from the Holder Hub admin.
 async function handleEmailUpdates(req, res, supabase) {
@@ -520,6 +564,7 @@ module.exports = async (req, res) => {
       case 'claim':  return await handleClaim(req, res, supabase);
       case 'send-auth-email': return await handleSendAuthEmail(req, res, supabase);
       case 'content': return await handleContent(req, res, supabase);
+      case 'participants': return await handleParticipants(req, res, supabase);
       case 'email-updates': return await handleEmailUpdates(req, res, supabase);
       default:
         return res.status(404).json({ error: `Unknown holder action: ${action}` });
