@@ -127,6 +127,15 @@ function holderRowKey(row) {
   return String(row?.chain || '') + ':' + String(row?.wallet_address || row?.walletAddress || '').toLowerCase();
 }
 
+async function checkHolderRowBalances(row) {
+  const chain = String(row?.chain || '').toLowerCase();
+  const address = row?.wallet_address || row?.walletAddress || '';
+  if (!address) return null;
+  if (chain === 'tezos') return checkTezosBalances(address);
+  if (chain === 'ethereum' || chain === 'eth') return checkEthBalances(normalizeAddress('ethereum', address));
+  return null;
+}
+
 async function findLinkedHolderRows(supabase, chain, walletAddress, connectedBalancesByTokenId) {
   const selectFields = 'id,auth_user_id,wallet_address,chain,token_balance,display_name,tier,last_verified_at,email_updates_opt_in';
   const linked = [];
@@ -180,8 +189,18 @@ async function findLinkedHolderRows(supabase, chain, walletAddress, connectedBal
     tier: current?.tier || null,
   });
 
-  return linked.map(row => {
+  return Promise.all(linked.map(async row => {
     const isConnected = row.wallet_address === walletAddress && row.chain === chain;
+    let balancesByTokenId = isConnected ? connectedBalancesByTokenId : null;
+    let balanceCheckError = null;
+    if (!balancesByTokenId) {
+      try {
+        balancesByTokenId = await checkHolderRowBalances(row);
+      } catch (err) {
+        balanceCheckError = err.message || String(err);
+        console.warn('Could not live-check linked holder wallet:', row.chain, row.wallet_address, err);
+      }
+    }
     return {
       id: row.id || null,
       auth_user_id: row.auth_user_id || null,
@@ -192,9 +211,10 @@ async function findLinkedHolderRows(supabase, chain, walletAddress, connectedBal
       tier: row.tier || null,
       last_verified_at: row.last_verified_at || null,
       email_updates_opt_in: row.email_updates_opt_in === true,
-      balancesByTokenId: isConnected ? connectedBalancesByTokenId : null,
+      balancesByTokenId,
+      balance_check_error: balanceCheckError,
     };
-  });
+  }));
 }
 
 async function checkTezosBalances(address) {
