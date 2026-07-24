@@ -2310,7 +2310,8 @@ async function verifyAndLink(chain, address) {
     tier: result.tier || result.tokenTier || result.token_tier || null,
     token_id: result.tokenId || result.token_id || result.gateTokenId || result.gate_token_id || result.holdingTokenId || result.holding_token_id || null,
     balancesByTokenId: result.balancesByTokenId || result.balances_by_token_id || result.tokenBalances || null,
-    display_name: result.displayName || null,
+    display_name: result.displayName || result.display_name || null,
+    linked_wallets: result.linked_wallets || result.linkedWallets || result.wallets || [],
     last_verified_at: new Date().toISOString(),
   };
   await enterDashboard();
@@ -3192,8 +3193,19 @@ async function highlightOwnedPieces() {
 
 async function loadParticipants() {
   const el = document.getElementById('participantsList');
-  const { data, error } = await sb.from('holder_public').select('*').order('created_at', { ascending: true });
-  if (error || !data?.length) { el.innerHTML = '<p class="empty-state">No participants to show yet.</p>'; return; }
+  let { data, error } = await sb.from('holder_public').select('*').order('created_at', { ascending: true });
+  const fallbackRows = currentHolder
+    ? (currentHolder.linked_wallets && currentHolder.linked_wallets.length ? currentHolder.linked_wallets : [currentHolder])
+    : [];
+  if (error || !data?.length) {
+    if (!fallbackRows.length) { el.innerHTML = '<p class="empty-state">No participants to show yet.</p>'; return; }
+    data = fallbackRows.map(row => ({
+      display_name: holderDisplayName(row) || currentHolder.display_name || null,
+      tier: row.tier || currentHolder.tier || null,
+      wallet_address: row.wallet_address || row.walletAddress || currentHolder.wallet_address,
+      chain: row.chain || currentHolder.chain,
+    }));
+  }
 
   // Group by display_name so a holder with both an ETH and a Tezos wallet
   // shows once, not twice. Anonymous holders (no display_name) stay separate.
