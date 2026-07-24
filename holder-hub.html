@@ -3197,7 +3197,23 @@ async function highlightOwnedPieces() {
 
 async function loadParticipants() {
   const el = document.getElementById('participantsList');
-  let { data, error } = await sb.from('holder_public').select('*').order('created_at', { ascending: true });
+  let data = [];
+  let error = null;
+  try {
+    const headers = {};
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) headers.Authorization = 'Bearer ' + session.access_token;
+    else if (pendingClaimToken) headers['x-holder-claim'] = pendingClaimToken;
+    const response = await fetch('/api/holder?action=participants', { headers });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not load participants.');
+    data = Array.isArray(result.participants) ? result.participants : [];
+  } catch (apiErr) {
+    console.warn('Participant API lookup failed, retrying holder_public:', apiErr);
+    const direct = await sb.from('holder_public').select('*').order('created_at', { ascending: true });
+    data = direct.data;
+    error = direct.error;
+  }
   const fallbackRows = currentHolder
     ? (currentHolder.linked_wallets && currentHolder.linked_wallets.length ? currentHolder.linked_wallets : [currentHolder])
     : [];
