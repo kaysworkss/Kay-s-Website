@@ -5100,9 +5100,6 @@ function ethereumHolderWalletMessage() {
 async function requestEthereumHolderAccount() {
   const ethProvider = await getEthereumWalletProvider();
   if (!ethProvider) throw new Error(ethereumHolderWalletMessage());
-  if (ethProvider === _walletConnectEthProvider && !ethProvider.session) {
-    await ethProvider.connect?.({ chains: [1], rpcMap: { 1: 'https://ethereum.publicnode.com' } });
-  }
   if (typeof ethProvider.request === 'function') {
     const accounts = ethProvider.accounts?.length ? ethProvider.accounts : await ethProvider.request({ method: 'eth_requestAccounts' });
     if (accounts && accounts[0]) return accounts[0];
@@ -7988,8 +7985,85 @@ let _ethProvider         = null;
 let _ethConnecting       = false;
 let _ethWalletProvider   = null;
 let _walletConnectEthProvider = null;
+let _reownAppKit         = null;
+let _reownProviderState  = null;
 
 const WALLETCONNECT_PROJECT_ID = '42dc845feb4ebf8f5cbe5725c2e07672';
+
+const REOWN_METADATA = {
+  name: "Kay's Works",
+  description: 'Fine art prints and merch',
+  url: 'https://www.kaysworks.com',
+  icons: ['https://www.kaysworks.com/images/kaysworkslogo.svg'],
+};
+
+async function loadReownAppKit() {
+  if (_reownAppKit) return _reownAppKit;
+  const [{ createAppKit }, { Ethers5Adapter }, { mainnet }] = await Promise.all([
+    import('https://esm.sh/@reown/appkit@1.8.22'),
+    import('https://esm.sh/@reown/appkit-adapter-ethers5@1.8.22'),
+    import('https://esm.sh/@reown/appkit@1.8.22/networks'),
+  ]);
+  _reownAppKit = createAppKit({
+    adapters: [new Ethers5Adapter()],
+    networks: [mainnet],
+    defaultNetwork: mainnet,
+    projectId: WALLETCONNECT_PROJECT_ID,
+    metadata: REOWN_METADATA,
+    allWallets: 'SHOW',
+    features: {
+      analytics: false,
+      email: false,
+      socials: false,
+      showWallets: true,
+    },
+  });
+  _reownAppKit.subscribeProvider?.(state => {
+    _reownProviderState = state || null;
+    if (state?.provider && state?.address) {
+      _ethWalletProvider = state.provider;
+      _ethConnectedAddr = state.address;
+      _ethProvider = typeof ethers !== 'undefined' ? new ethers.providers.Web3Provider(state.provider, 'any') : null;
+      renderEthPanel();
+    }
+  });
+  return _reownAppKit;
+}
+
+async function connectReownAppKitProvider() {
+  const modal = await loadReownAppKit();
+  const existing = modal.getWalletProvider?.() || _reownProviderState?.provider;
+  if (existing) {
+    const accounts = await existing.request?.({ method: 'eth_accounts' }).catch(() => []);
+    if (accounts?.[0] || _reownProviderState?.address) return existing;
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let unsubscribe = null;
+    const finish = provider => {
+      if (settled) return;
+      settled = true;
+      try { unsubscribe?.(); } catch (_) {}
+      resolve(provider);
+    };
+    unsubscribe = modal.subscribeProvider?.(state => {
+      _reownProviderState = state || null;
+      if (state?.provider && state?.address) {
+        _ethWalletProvider = state.provider;
+        _ethConnectedAddr = state.address;
+        _ethProvider = typeof ethers !== 'undefined' ? new ethers.providers.Web3Provider(state.provider, 'any') : null;
+        renderEthPanel();
+        finish(state.provider);
+      }
+    });
+    modal.open?.({ view: 'Connect' });
+    window.setTimeout(() => {
+      if (settled) return;
+      try { unsubscribe?.(); } catch (_) {}
+      reject(new Error('Wallet connection timed out. Close the wallet window and try again.'));
+    }, 90000);
+  });
+}
 
 async function loadWalletConnectEthereumProvider() {
   if (_walletConnectEthProvider) return _walletConnectEthProvider;
@@ -8004,12 +8078,7 @@ async function loadWalletConnectEthereumProvider() {
     methods: ['eth_requestAccounts', 'eth_sendTransaction', 'wallet_switchEthereumChain', 'wallet_addEthereumChain'],
     events: ['accountsChanged', 'chainChanged', 'disconnect'],
     rpcMap: { 1: 'https://ethereum.publicnode.com' },
-    metadata: {
-      name: "Kay's Works",
-      description: 'Fine art prints and merch',
-      url: 'https://www.kaysworks.com',
-      icons: ['https://www.kaysworks.com/images/kaysworkslogo.svg'],
-    },
+    metadata: REOWN_METADATA,
   });
   _walletConnectEthProvider.on?.('accountsChanged', accounts => {
     _ethConnectedAddr = accounts?.[0] || null;
@@ -8033,7 +8102,7 @@ async function getEthereumWalletProvider() {
     _ethWalletProvider = window.ethereum;
     return _ethWalletProvider;
   }
-  return loadWalletConnectEthereumProvider();
+  return connectReownAppKitProvider();
 }
 
 function ethShortAddr(addr) {
@@ -8372,10 +8441,12 @@ document.getElementById('ethConnectBtn').addEventListener('click', ethConnectWal
 document.getElementById('ethDisconnectBtn').addEventListener('click', async () => {
   try {
     if (_ethWalletProvider === _walletConnectEthProvider) await _walletConnectEthProvider?.disconnect?.();
+    await _reownAppKit?.adapter?.connectionControllerClient?.disconnect?.();
   } catch (_) {}
   _ethConnectedAddr = null;
   _ethProvider      = null;
   _ethWalletProvider = null;
+  _reownProviderState = null;
   renderEthPanel();
   showToast('Wallet disconnected');
 });
