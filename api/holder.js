@@ -269,6 +269,8 @@ async function handleVerify(req, res, supabase) {
 
   if (balance < 1) return res.status(403).json({ error: 'This wallet does not currently hold the token.' });
   const linkedWallets = await findLinkedHolderRows(supabase, chain, normalizedAddress, holderTokens.balancesByTokenId);
+  const namedWallet = linkedWallets.find(row => holderDisplayName(row)) || null;
+  const displayName = holderDisplayName(namedWallet);
 
   const authHeader = req.headers.authorization || '';
   const token = authHeader.replace(/^Bearer\s+/i, '');
@@ -293,6 +295,7 @@ async function handleVerify(req, res, supabase) {
       tokenId: holderTokens.tokenId,
       tier: holderTokens.tier,
       balancesByTokenId: holderTokens.balancesByTokenId,
+      displayName,
       linked_wallets: linkedWallets,
     });
   }
@@ -312,6 +315,7 @@ async function handleVerify(req, res, supabase) {
     tokenId: holderTokens.tokenId,
     tier: holderTokens.tier,
     balancesByTokenId: holderTokens.balancesByTokenId,
+    displayName,
     linked_wallets: linkedWallets,
     claimToken: pending.id,
   });
