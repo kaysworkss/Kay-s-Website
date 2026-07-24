@@ -5015,12 +5015,14 @@ function holderClaimPayload() {
   return {
     project: 'apoti-olowe',
     wallet: _holderMerchClaim.wallet,
+    wallets: _holderMerchClaim.wallets || (_holderMerchClaim.wallet ? [_holderMerchClaim.wallet] : []),
     tier: _holderMerchClaim.tier,
     verified: _holderMerchClaim.verified === true,
     source: _holderMerchClaim.source || '',
     chain: _holderMerchClaim.chain || '',
     contract: _holderMerchClaim.source || '',
     token_ids: _holderMerchClaim.tokenIds || [2],
+    token_balances: _holderMerchClaim.tokenBalances || {},
     entitlement_key: _holderMerchClaim.entitlementKey || APOTI_HOLDER_CONFIG.entitlementKey,
     free_tote: _holderMerchClaim.freeTote === true,
     free_tote_qty: Number(_holderMerchClaim.freeToteQty || 0),
@@ -5226,6 +5228,43 @@ function holderClaimFromGateBalances(balances, chain, source) {
     freeTote: bronzeBalance > 0,
   };
 }
+function mergeHolderMerchChainClaims() {
+  const balances = { '1': 0, '2': 0 };
+  const wallets = [];
+  const chains = [];
+  const sources = [];
+  let verified = false;
+  let apiVerified = false;
+  Object.values(_holderMerchChainClaims || {}).forEach(claim => {
+    if (!claim) return;
+    addGateBalances(balances, normalizeGateBalances(claim.tokenBalances));
+    if (claim.wallet) wallets.push(claim.wallet);
+    if (claim.chain) chains.push(claim.chain);
+    if (claim.source) sources.push(claim.source);
+    verified = verified || claim.verified === true;
+    apiVerified = apiVerified || claim.apiVerified === true;
+  });
+  const merged = holderClaimFromGateBalances(
+    balances,
+    Array.from(new Set(chains)).join('+'),
+    Array.from(new Set(sources)).join(', ')
+  );
+  if (!merged) return null;
+  merged.wallet = wallets[wallets.length - 1] || '';
+  merged.wallets = Array.from(new Set(wallets));
+  merged.verified = verified;
+  merged.apiVerified = apiVerified;
+  return merged;
+}
+function rememberHolderMerchChainClaim(chain, wallet, detected) {
+  if (!detected) {
+    delete _holderMerchChainClaims[chain];
+  } else {
+    _holderMerchChainClaims[chain] = Object.assign({ wallet, chain }, detected);
+  }
+  _holderMerchClaim = mergeHolderMerchChainClaims();
+  return _holderMerchClaim;
+}
 async function detectApotiHolderViaHolderApi(chain, wallet) {
   const apiChain = chain === 'eth' ? 'ethereum' : chain;
   const response = await fetch('/api/holder?action=verify', {
@@ -5361,7 +5400,10 @@ async function detectApotiTezosHolderTier(wallet) {
 function holderVerificationMessage(detected, short) {
   const toteQty = Number(detected?.freeToteQty || 0);
   const discount = Number(detected?.discountPercent || 0);
-  const parts = [`Verified ${detected.tier}: ${short}.`];
+  const wallets = Array.isArray(detected?.wallets) ? detected.wallets.filter(Boolean) : [];
+  const chainText = detected?.chain && String(detected.chain).includes('+') ? ' across checked wallets' : '';
+  const subject = wallets.length > 1 ? `${wallets.length} wallets` : short;
+  const parts = [`Verified ${detected.tier}${chainText}: ${subject}.`];
   if (toteQty > 0) {
     parts.push(`${toteQty} Bronze Token tote redemption${toteQty === 1 ? '' : 's'} available for this wallet.`);
   } else {
@@ -5411,24 +5453,25 @@ async function connectApotiHolderWallet() {
     if (!wallet) throw new Error('No wallet returned');
     const detected = await detectApotiHolderTier(wallet);
     if (!detected) {
-      _holderMerchClaim = null;
+      const merged = rememberHolderMerchChainClaim('eth', wallet, null);
       const checked = window.__lastHolderGateCheck || {};
       const balances = checked.balances || {};
       const short = wallet.slice(0, 6) + '...' + wallet.slice(-4);
-      updateHolderMerchStatus(`Wallet ${short} was checked, but no Apoti holder token was detected. Token #1 balance: ${Number(balances['1'] || 0)}. Token #2 Bronze balance: ${Number(balances['2'] || 0)}.`, 'pending');
+      const suffix = merged ? ` Your ${merged.tier} benefit remains active from another checked wallet.` : '';
+      updateHolderMerchStatus(`Wallet ${short} was checked, but no Apoti holder token was detected. Token #1 balance: ${Number(balances['1'] || 0)}. Token #2 Bronze balance: ${Number(balances['2'] || 0)}.${suffix}`, merged ? 'verified' : 'pending');
       buildOrderSummary();
       updateCartUI();
       return;
     }
-    _holderMerchClaim = Object.assign({ wallet }, detected);
+    const merged = rememberHolderMerchChainClaim('eth', wallet, detected);
     if (typeof _ethConnectedAddr !== 'undefined') _ethConnectedAddr = wallet;
     if (typeof _ethProvider !== 'undefined') _ethProvider = new ethers.providers.Web3Provider(await getEthereumWalletProvider());
     const short = wallet.slice(0, 6) + '...' + wallet.slice(-4);
     updateHolderMerchStatus(
-      detected.verified
-        ? holderVerificationMessage(detected, short)
-        : `${detected.tier} claim started for ${short}. Contract verification is pending, so this order will be flagged for fulfillment review.`,
-      detected.verified ? 'verified' : 'pending'
+      merged.verified
+        ? holderVerificationMessage(merged, short)
+        : `${merged.tier} claim started for ${short}. Contract verification is pending, so this order will be flagged for fulfillment review.`,
+      merged.verified ? 'verified' : 'pending'
     );
     buildOrderSummary();
     updateCartUI();
@@ -5437,7 +5480,7 @@ async function connectApotiHolderWallet() {
     updateHolderMerchStatus('Wallet connection was not completed.', 'pending');
     showToast(err.message || 'Could not connect wallet');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = _holderMerchClaim ? 'Recheck ETH wallet' : 'Check ETH holder wallet'; }
+    if (btn) { btn.disabled = false; btn.textContent = _holderMerchChainClaims.eth ? 'Recheck ETH wallet' : 'Check ETH holder wallet'; }
   }
 }
 function addHolderMerchToCart(kind) {
@@ -5457,18 +5500,19 @@ async function connectApotiTezosHolderWallet() {
     if (!wallet) throw new Error('No Tezos wallet returned');
     const detected = await detectApotiTezosHolderTier(wallet);
     if (!detected) {
-      _holderMerchClaim = null;
+      const merged = rememberHolderMerchChainClaim('tezos', wallet, null);
       const checked = window.__lastHolderGateCheck || {};
       const balances = checked.balances || {};
       const short = wallet.slice(0, 6) + '...' + wallet.slice(-4);
-      updateHolderMerchStatus(`Tezos wallet ${short} was checked, but no Apoti holder token was detected. Token #1 balance: ${Number(balances['1'] || 0)}. Token #2 Bronze balance: ${Number(balances['2'] || 0)}.`, 'pending');
+      const suffix = merged ? ` Your ${merged.tier} benefit remains active from another checked wallet.` : '';
+      updateHolderMerchStatus(`Tezos wallet ${short} was checked, but no Apoti holder token was detected. Token #1 balance: ${Number(balances['1'] || 0)}. Token #2 Bronze balance: ${Number(balances['2'] || 0)}.${suffix}`, merged ? 'verified' : 'pending');
       buildOrderSummary();
       updateCartUI();
       return;
     }
-    _holderMerchClaim = Object.assign({ wallet }, detected);
+    const merged = rememberHolderMerchChainClaim('tezos', wallet, detected);
     const short = wallet.slice(0, 6) + '...' + wallet.slice(-4);
-    updateHolderMerchStatus(holderVerificationMessage(detected, short), 'verified');
+    updateHolderMerchStatus(holderVerificationMessage(merged, short), 'verified');
     buildOrderSummary();
     updateCartUI();
     recalibrateCryptoForTotals();
@@ -5476,7 +5520,7 @@ async function connectApotiTezosHolderWallet() {
     updateHolderMerchStatus(err.message || 'Tezos wallet connection or token check was not completed.', 'pending');
     showToast(err.message || 'Could not verify Tezos holder token');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = _holderMerchClaim?.chain === 'tezos' ? 'Recheck Tezos wallet' : 'Check Tezos holder wallet'; }
+    if (btn) { btn.disabled = false; btn.textContent = _holderMerchChainClaims.tezos ? 'Recheck Tezos wallet' : 'Check Tezos holder wallet'; }
   }
 }
 function recommendedCartProducts(limit = 3) {
@@ -6126,6 +6170,7 @@ const APOTI_HOLDER_CONFIG = {
   ],
 };
 let _holderMerchClaim = null;
+let _holderMerchChainClaims = {};
 function shouldShowHolderMerchAccess() {
   const params = new URLSearchParams(window.location.search || '');
   const holderParam = String(params.get('holder') || params.get('holderAccess') || '').toLowerCase();
