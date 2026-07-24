@@ -119,6 +119,83 @@ function summarizeTokenBalances(balancesByTokenId) {
   };
 }
 
+function holderDisplayName(row) {
+  return String(row?.display_name || row?.displayName || '').trim();
+}
+
+function holderRowKey(row) {
+  return String(row?.chain || '') + ':' + String(row?.wallet_address || row?.walletAddress || '').toLowerCase();
+}
+
+async function findLinkedHolderRows(supabase, chain, walletAddress, connectedBalancesByTokenId) {
+  const selectFields = 'id,auth_user_id,wallet_address,chain,token_balance,display_name,tier,last_verified_at';
+  const linked = [];
+  const seen = new Set();
+  const addRows = rows => {
+    (Array.isArray(rows) ? rows : [rows]).filter(Boolean).forEach(row => {
+      const key = holderRowKey(row);
+      if (!key || key === ':') return;
+      if (seen.has(key)) return;
+      seen.add(key);
+      linked.push(row);
+    });
+  };
+
+  const { data: current, error: currentError } = await supabase
+    .from('holders')
+    .select(selectFields)
+    .eq('wallet_address', walletAddress)
+    .eq('chain', chain)
+    .maybeSingle();
+  if (currentError) {
+    console.warn('Could not look up holder pair:', currentError.message);
+  }
+  addRows(current);
+
+  if (current && current.auth_user_id) {
+    const { data: authRows, error: authError } = await supabase
+      .from('holders')
+      .select(selectFields)
+      .eq('auth_user_id', current.auth_user_id);
+    if (authError) console.warn('Could not look up auth-linked holder wallets:', authError.message);
+    else addRows(authRows);
+  }
+
+  const displayName = holderDisplayName(current);
+  if (displayName) {
+    const { data: nameRows, error: nameError } = await supabase
+      .from('holders')
+      .select(selectFields)
+      .eq('display_name', displayName);
+    if (nameError) console.warn('Could not look up name-linked holder wallets:', nameError.message);
+    else addRows(nameRows);
+  }
+
+  addRows({
+    wallet_address: walletAddress,
+    chain,
+    token_balance: Object.values(connectedBalancesByTokenId || {}).reduce((sum, value) => sum + Number(value || 0), 0),
+    balancesByTokenId: connectedBalancesByTokenId,
+    display_name: holderDisplayName(current) || null,
+    tier: current?.tier || null,
+  });
+
+  return linked.map(row => {
+    const isConnected = row.wallet_address === walletAddress && row.chain === chain;
+    return {
+      id: row.id || null,
+      auth_user_id: row.auth_user_id || null,
+      wallet_address: row.wallet_address,
+      chain: row.chain,
+      token_balance: Number(row.token_balance || 0),
+      display_name: holderDisplayName(row) || null,
+      tier: row.tier || null,
+      last_verified_at: row.last_verified_at || null,
+      balancesByTokenId: isConnected ? connectedBalancesByTokenId : null,
+    };
+  });
+}
+
 async function checkTezosBalances(address) {
   const url =
     'https://api.tzkt.io/v1/tokens/balances' +
@@ -191,6 +268,7 @@ async function handleVerify(req, res, supabase) {
   const balance = holderTokens.totalBalance;
 
   if (balance < 1) return res.status(403).json({ error: 'This wallet does not currently hold the token.' });
+  const linkedWallets = await findLinkedHolderRows(supabase, chain, normalizedAddress, holderTokens.balancesByTokenId);
 
   const authHeader = req.headers.authorization || '';
   const token = authHeader.replace(/^Bearer\s+/i, '');
@@ -215,6 +293,7 @@ async function handleVerify(req, res, supabase) {
       tokenId: holderTokens.tokenId,
       tier: holderTokens.tier,
       balancesByTokenId: holderTokens.balancesByTokenId,
+      linked_wallets: linkedWallets,
     });
   }
 
@@ -233,6 +312,7 @@ async function handleVerify(req, res, supabase) {
     tokenId: holderTokens.tokenId,
     tier: holderTokens.tier,
     balancesByTokenId: holderTokens.balancesByTokenId,
+    linked_wallets: linkedWallets,
     claimToken: pending.id,
   });
 }
