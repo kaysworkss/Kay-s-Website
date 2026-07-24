@@ -2311,13 +2311,17 @@ async function verifyAndLink(chain, address) {
     token_id: result.tokenId || result.token_id || result.gateTokenId || result.gate_token_id || result.holdingTokenId || result.holding_token_id || null,
     balancesByTokenId: result.balancesByTokenId || result.balances_by_token_id || result.tokenBalances || null,
     display_name: result.displayName || result.display_name || null,
+    auth_user_id: result.auth_user_id || result.authUserId || null,
+    email_updates_opt_in: result.email_updates_opt_in === true || result.emailUpdatesOptIn === true,
     linked_wallets: result.linked_wallets || result.linkedWallets || result.wallets || [],
     last_verified_at: new Date().toISOString(),
   };
   await enterDashboard();
-  if (!result.emailLinked && pendingClaimToken) {
+  const hasSavedEmailAccess = result.emailLinked === true || Boolean(currentHolder.auth_user_id);
+  if (!hasSavedEmailAccess && pendingClaimToken) {
     els.walletEmailPanel.classList.add('show');
     document.body.classList.add('email-prompt-open');
+    setStatus(els.walletEmailStatus, '', 'Add an email if you want easier sign-in and Holder Hub notification options.');
   } else {
     els.walletEmailPanel.classList.remove('show');
     document.body.classList.remove('email-prompt-open');
