@@ -5379,7 +5379,20 @@ async function detectApotiHolderViaHolderApi(chain, wallet) {
   detected.apiVerified = true;
   detected.wallets = Array.from(new Set(checkedWallets.length ? checkedWallets : [wallet]));
   detected.wallet = wallet;
-  window.__lastHolderGateCheck = { chain: normalizedChain, wallet, wallets: detected.wallets, balances: normalizeGateBalances(balances), contract: source, via: 'holder-api' };
+  window.__lastHolderGateCheck = {
+    chain: normalizedChain,
+    wallet,
+    wallets: detected.wallets,
+    linkedWallets: wallets.map(row => ({
+      chain: row.chain,
+      wallet: row.wallet_address,
+      balances: normalizeGateBalances(row.balances_by_token_id || row.balancesByTokenId || row.tokenBalances || row.token_balances),
+      error: row.balance_check_error || null,
+    })),
+    balances: normalizeGateBalances(balances),
+    contract: source,
+    via: 'holder-api'
+  };
   return detected;
 }
 function encodeErc1155BalanceOf(owner, tokenId) {
