@@ -5133,9 +5133,49 @@ function updateHolderMerchStatus(message, state) {
   el.classList.remove('verified', 'pending');
   if (state) el.classList.add(state);
 }
+function normalizeGateBalances(rawBalances) {
+  const balances = { '1': 0, '2': 0 };
+  if (!rawBalances) return balances;
+  HOLDER_GATE_TOKEN_IDS.forEach(id => {
+    const value = Number(rawBalances[id] ?? rawBalances[Number(id)] ?? 0);
+    balances[id] = Number.isFinite(value) && value > 0 ? value : 0;
+  });
+  return balances;
+}
+function addGateBalances(target, source) {
+  HOLDER_GATE_TOKEN_IDS.forEach(id => {
+    target[id] = Math.max(Number(target[id] || 0), Number(source[id] || 0));
+  });
+}
+function holderTierFromGateBalances(balances) {
+  if (Number(balances?.['2'] || 0) > 0) return 'Bronze Token Holder';
+  if (Number(balances?.['1'] || 0) > 0) return 'Wooden Token Holder';
+  return '';
+}
+function holderClaimFromGateBalances(balances, chain, source) {
+  const normalized = normalizeGateBalances(balances);
+  const bronzeBalance = Number(normalized['2'] || 0);
+  const woodBalance = Number(normalized['1'] || 0);
+  const tokenBalance = bronzeBalance + woodBalance;
+  if (tokenBalance <= 0) return null;
+  const heldTokenIds = HOLDER_GATE_TOKEN_IDS.filter(id => Number(normalized[id] || 0) > 0);
+  const isBronze = bronzeBalance > 0;
+  return {
+    tier: holderTierFromGateBalances(normalized),
+    verified: true,
+    source,
+    chain,
+    tokenIds: heldTokenIds,
+    entitlementKey: APOTI_HOLDER_CONFIG.entitlementKey,
+    discountPercent: isBronze ? 20 : 15,
+    tokenBalance,
+    tokenBalances: normalized,
+    freeToteQty: bronzeBalance,
+    freeTote: bronzeBalance > 0,
+  };
+}
 async function detectApotiHolderTier(wallet) {
-  const contracts = Array.isArray(APOTI_HOLDER_CONFIG.contracts) ? APOTI_HOLDER_CONFIG.contracts.filter(c => c.address && (!c.chain || c.chain === 'eth')) : [];
-  if (!contracts.length) {
+  if (!HOLDER_GATE_ETH_CONTRACT) {
     return {
       tier: APOTI_HOLDER_CONFIG.defaultTier,
       verified: false,
@@ -5149,104 +5189,34 @@ async function detectApotiHolderTier(wallet) {
       freeTote: true,
     };
   }
-  const ethProvider = await getEthereumWalletProvider();
-  const provider = new ethers.providers.Web3Provider(ethProvider);
-  const erc721Abi = ['function balanceOf(address owner) view returns (uint256)'];
+  if (typeof ethers === 'undefined') throw new Error('ethers.js is unavailable');
+  const provider = new ethers.providers.JsonRpcProvider(HOLDER_GATE_ETH_RPC);
   const erc1155Abi = ['function balanceOf(address account,uint256 id) view returns (uint256)'];
-  const tokenBalances = {};
-  const heldTokenIds = [];
-  let source = '';
-  for (const c of contracts) {
-    try {
-      const type = String(c.type || 'ERC721').toUpperCase();
-      const contract = new ethers.Contract(c.address, type === 'ERC1155' ? erc1155Abi : erc721Abi, provider);
-      let bal = 0;
-      const tokenIds = Array.isArray(c.tokenIds) ? c.tokenIds : (c.tokenId != null ? [c.tokenId] : []);
-      if (type === 'ERC1155') {
-        for (const id of tokenIds) {
-          const b = await contract.balanceOf(wallet, id);
-          const nextBalance = Number(b.toString());
-          tokenBalances[id] = (Number(tokenBalances[id] || 0) + nextBalance);
-          bal += nextBalance;
-          if (nextBalance > 0 && !heldTokenIds.includes(id)) heldTokenIds.push(id);
-        }
-      } else {
-        const b = await contract.balanceOf(wallet);
-        bal = Number(b.toString());
-        const id = tokenIds[0] || 2;
-        tokenBalances[id] = (Number(tokenBalances[id] || 0) + bal);
-        if (bal > 0 && !heldTokenIds.includes(id)) heldTokenIds.push(id);
-      }
-      if (bal > 0 && !source) source = c.address;
-    } catch (err) {
-      console.warn('[holder merch] token check failed', c.address, err);
-    }
-  }
-  const bronzeBalance = Number(tokenBalances[2] || 0);
-  const woodBalance = Number(tokenBalances[1] || 0);
-  const tokenBalance = bronzeBalance + woodBalance;
-  if (tokenBalance > 0) {
-    const isBronze = bronzeBalance > 0;
-    return {
-      tier: isBronze ? 'Bronze Token Holder' : 'Wooden Token Holder',
-      verified: true,
-      source: source || contracts[0]?.address || '',
-      chain: 'eth',
-      tokenIds: heldTokenIds.length ? heldTokenIds : (isBronze ? [2] : [1]),
-      entitlementKey: APOTI_HOLDER_CONFIG.entitlementKey,
-      discountPercent: isBronze ? 20 : 15,
-      tokenBalance,
-      tokenBalances,
-      freeToteQty: bronzeBalance,
-      freeTote: bronzeBalance > 0,
-    };
-  }
-  return null;
+  const gate = new ethers.Contract(HOLDER_GATE_ETH_CONTRACT, erc1155Abi, provider);
+  const pairs = await Promise.all(HOLDER_GATE_TOKEN_IDS.map(async id => {
+    const balance = await gate.balanceOf(wallet, id);
+    return [id, Number(balance.toString())];
+  }));
+  return holderClaimFromGateBalances(Object.fromEntries(pairs), 'eth', HOLDER_GATE_ETH_CONTRACT);
 }
 async function detectApotiTezosHolderTier(wallet) {
-  const contracts = Array.isArray(APOTI_HOLDER_CONFIG.contracts) ? APOTI_HOLDER_CONFIG.contracts.filter(c => c.address && c.chain === 'tezos') : [];
-  if (!contracts.length) return null;
-  const tokenBalances = {};
-  const heldTokenIds = [];
-  let source = '';
-  for (const c of contracts) {
-    const tokenIds = Array.isArray(c.tokenIds) ? c.tokenIds : (c.tokenId != null ? [c.tokenId] : []);
-    for (const id of tokenIds) {
-      try {
-        const url = `https://api.tzkt.io/v1/tokens/balances?account=${encodeURIComponent(wallet)}&token.contract=${encodeURIComponent(c.address)}&token.tokenId=${encodeURIComponent(id)}&balance.ne=0&limit=1`;
-        const rows = await fetch(url, { cache: 'no-store' }).then(r => r.ok ? r.json() : []);
-        const balance = Array.isArray(rows) ? Number(rows.reduce((sum, row) => sum + Number(row.balance || 0), 0)) : 0;
-        tokenBalances[id] = (Number(tokenBalances[id] || 0) + balance);
-        if (balance > 0 && !heldTokenIds.includes(id)) heldTokenIds.push(id);
-        if (balance > 0 && !source) source = c.address;
-        if (Array.isArray(rows) && rows.length) {
-          continue;
-        }
-      } catch (err) {
-        console.warn('[holder merch] Tezos token check failed', c.address, id, err);
-      }
-    }
-  }
-  const bronzeBalance = Number(tokenBalances[2] || 0);
-  const woodBalance = Number(tokenBalances[1] || 0);
-  const tokenBalance = bronzeBalance + woodBalance;
-  if (tokenBalance > 0) {
-    const isBronze = bronzeBalance > 0;
-    return {
-      tier: isBronze ? 'Bronze Token Holder' : 'Wooden Token Holder',
-      verified: true,
-      source: source || contracts[0]?.address || '',
-      chain: 'tezos',
-      tokenIds: heldTokenIds.length ? heldTokenIds : (isBronze ? [2] : [1]),
-      entitlementKey: APOTI_HOLDER_CONFIG.entitlementKey,
-      discountPercent: isBronze ? 20 : 15,
-      tokenBalance,
-      tokenBalances,
-      freeToteQty: bronzeBalance,
-      freeTote: bronzeBalance > 0,
-    };
-  }
-  return null;
+  if (!HOLDER_GATE_TEZOS_CONTRACT) return null;
+  const url =
+    'https://api.tzkt.io/v1/tokens/balances' +
+    '?account=' + encodeURIComponent(wallet) +
+    '&token.contract=' + encodeURIComponent(HOLDER_GATE_TEZOS_CONTRACT) +
+    '&token.tokenId.in=' + HOLDER_GATE_TOKEN_IDS.join(',') +
+    '&limit=10';
+  const response = await fetch(url, { cache: 'no-store' });
+  if (!response.ok) throw new Error('TzKT returned ' + response.status);
+  const rows = await response.json();
+  const balances = { '1': 0, '2': 0 };
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    const tokenId = String(row?.token?.tokenId ?? '');
+    if (!Object.prototype.hasOwnProperty.call(balances, tokenId)) return;
+    balances[tokenId] += Number(row?.balance || 0);
+  });
+  return holderClaimFromGateBalances(balances, 'tezos', HOLDER_GATE_TEZOS_CONTRACT);
 }
 function holderVerificationMessage(detected, short) {
   const toteQty = Number(detected?.freeToteQty || 0);
@@ -5621,9 +5591,114 @@ document.getElementById('cartNoteToggle')?.addEventListener('click', () => {
 document.getElementById('cartOrderNote')?.addEventListener('input', e => {
   cartOrderNote = e.target.value.trim();
   localStorage.setItem('kwCartOrderNote', cartOrderNote);
+  if (typeof saveCheckoutDraft === 'function') saveCheckoutDraft();
 });
 
 /* Checkout modal */
+const CHECKOUT_DRAFT_KEY = 'kwCheckoutDraft';
+const CHECKOUT_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+const CHECKOUT_FIELD_IDS = [
+  'ckName', 'ckEmail', 'ckPhone', 'ckCountrySearch', 'ckCountry', 'ckState',
+  'ckGigCity', 'ckGigStreet', 'ckUpsLine1', 'ckUpsLine2', 'ckUpsCity',
+  'ckUpsState', 'ckUpsPostal', 'discountInput', 'tipCustomInput',
+];
+let _restoringCheckoutDraft = false;
+
+function activeCheckoutTab() {
+  return document.querySelector('.ck-pay-method.active')?.dataset.pay
+    || document.querySelector('.pay-tab.active')?.dataset.pay
+    || 'flutterwave';
+}
+
+function readCheckoutDraft() {
+  try {
+    const draft = JSON.parse(sessionStorage.getItem(CHECKOUT_DRAFT_KEY) || 'null');
+    if (!draft || !draft.savedAt || Date.now() - draft.savedAt > CHECKOUT_DRAFT_TTL_MS) {
+      sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+      return null;
+    }
+    return draft;
+  } catch (_) {
+    try { sessionStorage.removeItem(CHECKOUT_DRAFT_KEY); } catch (_) {}
+    return null;
+  }
+}
+
+function saveCheckoutDraft(options = {}) {
+  if (_restoringCheckoutDraft) return;
+  const overlay = document.getElementById('checkoutOverlay');
+  const shouldMarkOpen = options.open ?? !!overlay?.classList.contains('open');
+  if (options.open === undefined && !shouldMarkOpen) {
+    const existing = readCheckoutDraft();
+    if (existing?.open) return;
+  }
+  const fields = {};
+  CHECKOUT_FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) fields[id] = el.value || '';
+  });
+  const draft = {
+    savedAt: Date.now(),
+    open: shouldMarkOpen,
+    tab: activeCheckoutTab(),
+    fields,
+    collectorConsent: !!document.getElementById('ckCollectorConsent')?.checked,
+    deliveryCarrier: _deliveryCarrier || '',
+    tip: _tip || { percent: null, customNgn: null },
+    appliedDiscount: _appliedDiscount || null,
+    cartOrderNote: cartOrderNote || '',
+  };
+  try { sessionStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify(draft)); } catch (_) {}
+}
+
+function clearCheckoutDraft() {
+  try { sessionStorage.removeItem(CHECKOUT_DRAFT_KEY); } catch (_) {}
+}
+
+function applyCheckoutDraft(draft) {
+  if (!draft) return;
+  _restoringCheckoutDraft = true;
+  try {
+    Object.entries(draft.fields || {}).forEach(([id, value]) => {
+      const el = document.getElementById(id);
+      if (el) el.value = value || '';
+    });
+    const consent = document.getElementById('ckCollectorConsent');
+    if (consent) consent.checked = !!draft.collectorConsent;
+    cartOrderNote = draft.cartOrderNote || cartOrderNote || '';
+    if (cartOrderNote) localStorage.setItem('kwCartOrderNote', cartOrderNote);
+    _deliveryCarrier = draft.deliveryCarrier || _deliveryCarrier || '';
+    _appliedDiscount = draft.appliedDiscount || null;
+    _tip = draft.tip || { percent: null, customNgn: null };
+  } finally {
+    _restoringCheckoutDraft = false;
+  }
+  _deliveryZone = selectedDeliveryZone();
+  if (!_deliveryCarrier && _deliveryZone) _deliveryCarrier = preferredCarrier(_deliveryZone);
+  updateShippingFieldGroups();
+  updateDeliveryEstimate();
+  if (typeof refreshTipUI === 'function') refreshTipUI();
+}
+
+function wireCheckoutDraftPersistence() {
+  CHECKOUT_FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.checkoutDraftWired === '1') return;
+    el.dataset.checkoutDraftWired = '1';
+    el.addEventListener('input', () => saveCheckoutDraft());
+    el.addEventListener('change', () => saveCheckoutDraft());
+  });
+  const consent = document.getElementById('ckCollectorConsent');
+  if (consent && consent.dataset.checkoutDraftWired !== '1') {
+    consent.dataset.checkoutDraftWired = '1';
+    consent.addEventListener('change', () => saveCheckoutDraft());
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') saveCheckoutDraft();
+  });
+  window.addEventListener('pagehide', () => saveCheckoutDraft());
+}
+
 /* Size guide engine */
 const SIZE_DATA = {
   tee: {
@@ -5870,6 +5945,12 @@ let _deliveryZone = '';
 // { code, percent, scope, ngn, usd, isFree }
 let _appliedDiscount = null;
 // Apoti holder merch claim. Bronze Token (#2) carries the tote entitlement; Wooden Token (#1) is discount-only.
+const HOLDER_GATE_TOKEN_IDS = ['1', '2'];
+const HOLDER_GATE_TOKEN_TIERS = { '1': 'wood', '2': 'bronze' };
+const HOLDER_GATE_ETH_CONTRACT = '0x611cca3635b0f05b103031ee8d4f3261633292b4';
+const HOLDER_GATE_ETH_RPC = 'https://ethereum.publicnode.com';
+const HOLDER_GATE_TEZOS_CONTRACT = 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8';
+
 const APOTI_HOLDER_CONFIG = {
   defaultTier: 'Apoti Holder',
   defaultMerchDiscountPercent: 20,
@@ -5880,39 +5961,21 @@ const APOTI_HOLDER_CONFIG = {
   contracts: [
     {
       chain: 'eth',
-      address: '0x611cca3635b0f05b103031ee8d4f3261633292b4',
+      address: HOLDER_GATE_ETH_CONTRACT,
       type: 'ERC1155',
-      tokenIds: [2],
-      tier: 'Bronze Token Holder',
-      discountPercent: 20,
-      freeTote: true,
-    },
-    {
-      chain: 'eth',
-      address: '0x611cca3635b0f05b103031ee8d4f3261633292b4',
-      type: 'ERC1155',
-      tokenIds: [1],
-      tier: 'Wooden Token Holder',
-      discountPercent: 15,
-      freeTote: false,
-    },
-    {
-      chain: 'tezos',
-      address: 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8',
-      type: 'FA2',
-      tokenIds: [2],
+      tokenIds: HOLDER_GATE_TOKEN_IDS,
       tier: 'Bronze Token Holder',
       discountPercent: 20,
       freeTote: true,
     },
     {
       chain: 'tezos',
-      address: 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8',
+      address: HOLDER_GATE_TEZOS_CONTRACT,
       type: 'FA2',
-      tokenIds: [1],
-      tier: 'Wooden Token Holder',
-      discountPercent: 15,
-      freeTote: false,
+      tokenIds: HOLDER_GATE_TOKEN_IDS,
+      tier: 'Bronze Token Holder',
+      discountPercent: 20,
+      freeTote: true,
     },
   ],
 };
@@ -6262,6 +6325,7 @@ function updateDeliveryEstimate() {
           _deliveryCarrier = input.value;
           updateDeliveryEstimate();
           buildOrderSummary();
+          saveCheckoutDraft();
         });
       });
     }
@@ -6358,6 +6422,7 @@ function updateShippingFieldGroups() {
     updateShippingFieldGroups();
     updateDeliveryEstimate();
     buildOrderSummary();
+    saveCheckoutDraft();
   }
   function selectCountryCode(code) {
     const option = validOptions().find(o => o.value === String(code || '').toUpperCase());
@@ -6426,6 +6491,7 @@ document.getElementById('ckState') && document.getElementById('ckState').addEven
   updateShippingFieldGroups();
   updateDeliveryEstimate();
   buildOrderSummary();
+  saveCheckoutDraft();
 });
 
 // Shipping is the only delivery method initialise it
@@ -6536,6 +6602,7 @@ function refreshTipUI() {
       if (custom) custom.value = '';
       buildOrderSummary();
       refreshTipUI();
+      saveCheckoutDraft();
     });
   });
   if (custom) custom.addEventListener('input', () => {
@@ -6543,12 +6610,14 @@ function refreshTipUI() {
     _tip = { percent: null, customNgn: (v > 0 ? supportInputToNgn(v) : null) };
     buildOrderSummary();
     refreshTipUI();
+    saveCheckoutDraft();
   });
   if (clearBtn) clearBtn.addEventListener('click', () => {
     _tip = { percent: null, customNgn: null };
     if (custom) custom.value = '';
     buildOrderSummary();
     refreshTipUI();
+    saveCheckoutDraft();
   });
 })();
 
@@ -6618,6 +6687,7 @@ function orderIsFree() { return grandTotalNgn() <= 0 && grandTotalUsd() <= 0; }
 function openCheckout(defaultTab) {
   if (!cart.length) return;
   closeCart();
+  applyCheckoutDraft(readCheckoutDraft());
   buildOrderSummary();
   ensureCryptoRateUpdates();
   renderEthPanel();
@@ -6645,6 +6715,7 @@ function openCheckout(defaultTab) {
   const di = document.getElementById('discountInput');
   if (di && _appliedDiscount) di.value = _appliedDiscount.code;
   updateFreeOrderUI();
+  saveCheckoutDraft({ open: true });
 }
 
 // When the order total is 0 (100%-off), hide the payment-method picker and show
@@ -6709,6 +6780,7 @@ function clearAppliedDiscount() {
   if (msg) msg.style.display = 'none';
   const di = document.getElementById('discountInput');
   if (di) di.value = '';
+  saveCheckoutDraft();
 }
 
 async function applyDiscountCode() {
@@ -6757,6 +6829,7 @@ async function applyDiscountCode() {
     buildOrderSummary();
     updateFreeOrderUI();
     recalibrateCryptoForTotals();
+    saveCheckoutDraft();
   } catch (e) {
  showMsg('Could not validate code try again', 'var(--rust)');
   } finally {
@@ -6914,6 +6987,7 @@ function switchPayTab(tab) {
     stopLockTimer();
     window.__activeLock = null;
   }
+  saveCheckoutDraft();
 }
 document.querySelectorAll('.pay-tab').forEach(t=>{
   t.addEventListener('click',()=>switchPayTab(t.dataset.pay));
@@ -6921,6 +6995,7 @@ document.querySelectorAll('.pay-tab').forEach(t=>{
 
 function closeCheckout() {
   document.getElementById('checkoutOverlay').classList.remove('open');
+  saveCheckoutDraft({ open: false });
 }
 document.getElementById('checkoutClose').addEventListener('click', closeCheckout);
 document.getElementById('checkoutOverlay').addEventListener('click', e=>{
@@ -7107,6 +7182,7 @@ function showConfirmation(method, ref) {
   cart = [];
   cartOrderNote = '';
   localStorage.removeItem('kwCartOrderNote');
+  clearCheckoutDraft();
   updateCartUI();
   // Refresh product data so the buyer immediately sees the decremented stock
   // (their just-purchased limited edition) without a manual page reload.
@@ -7918,6 +7994,7 @@ function closeEnquire() {
 
 loadCart();
 updateCartUI();
+wireCheckoutDraftPersistence();
 
 // If we arrived from a product (slug) page's checkout, show a loading overlay
 // straight away so there's no flash of the shop grid, then open the checkout
@@ -7953,6 +8030,14 @@ function maybeOpenCheckoutFromHash() {
 // checkout on the next paint instead of making the customer wait for network
 // product/config refreshes; loadShopData() reconciles it in the background.
 if (_arrivedForCheckout) requestAnimationFrame(maybeOpenCheckoutFromHash);
+
+function maybeRestoreCheckoutAfterRefresh() {
+  if (_arrivedForCheckout || ['#checkout', '#checkout-eth', '#checkout-tezos'].includes(location.hash)) return;
+  const draft = readCheckoutDraft();
+  if (!draft?.open || !cart?.length) return;
+  requestAnimationFrame(() => openCheckout(draft.tab || 'flutterwave'));
+}
+requestAnimationFrame(maybeRestoreCheckoutAfterRefresh);
 
 // Recover an abandoned cart from a reminder email link (?recover=TOKEN).
 (function recoverAbandonedCart() {
