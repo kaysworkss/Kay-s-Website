@@ -3899,12 +3899,11 @@ async function handleShopHolderClaimSummary(req, res, supabase) {
   let rows = [];
   const { data, error } = await supabase
     .from('holder_merch_claims')
-    .select('order_ref,status,requested_qty,fulfilled_qty,created_at,fulfilled_at')
+    .select('order_ref,status,requested_qty,fulfilled_qty,contract_address,created_at,fulfilled_at')
     .eq('project', APOTI_MERCH_PROJECT)
     .eq('entitlement_key', APOTI_MERCH_ENTITLEMENT_KEY)
     .eq('chain', chain)
     .eq('wallet_address', wallet)
-    .eq('contract_address', String(contract || '').toLowerCase())
     .in('status', ['reserved', 'partial_fulfilled', 'fulfilled'])
     .order('created_at', { ascending: false })
     .limit(50);
@@ -3912,7 +3911,11 @@ async function handleShopHolderClaimSummary(req, res, supabase) {
     const missingTable = error.code === '42P01' || /does not exist|schema cache/i.test(String(error.message || ''));
     if (!missingTable) return json(500, { error: error.message });
   } else {
-    rows = data || [];
+    const requestedContract = String(contract || '').toLowerCase();
+    rows = (data || []).filter(row => {
+      const rowContract = String(row.contract_address || '').toLowerCase();
+      return !requestedContract || !rowContract || rowContract === requestedContract;
+    });
     reservedQty = rows.reduce((sum, row) => sum + Math.max(0, Number(row.requested_qty || 0)), 0);
     fulfilledQty = rows.reduce((sum, row) => sum + Math.max(0, Number(row.fulfilled_qty || 0)), 0);
     partialQty = rows
