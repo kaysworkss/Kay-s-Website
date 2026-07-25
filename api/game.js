@@ -1383,21 +1383,9 @@ async function fetchWithRetry(url, options, { timeoutMs = 2500, attempts = 2 } =
 async function serverEth1155Balance(contract, wallet, tokenId) {
   const paddedAddress = String(wallet).toLowerCase().replace(/^0x/, '').padStart(64, '0');
   const tokenIdHex = BigInt(tokenId).toString(16).padStart(64, '0');
-  const payload = {
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'eth_call',
-    params: [{ to: contract, data: '0x00fdd58e' + paddedAddress + tokenIdHex }, 'latest'],
-  };
-  const r = await fetchWithRetry(process.env.ETH_RPC_URL || 'https://ethereum.publicnode.com', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const jsonRes = await r.json();
-  if (jsonRes.error) throw new Error('ETH holder check failed: ' + (jsonRes.error.message || JSON.stringify(jsonRes.error)));
-  if (!jsonRes.result || jsonRes.result === '0x') return 0;
-  return parseInt(jsonRes.result, 16) || 0;
+  const result = await ethRpc('eth_call', [{ to: contract, data: '0x00fdd58e' + paddedAddress + tokenIdHex }, 'latest']);
+  if (!result || result === '0x') return 0;
+  return parseInt(result, 16) || 0;
 }
 
 async function serverTezosFa2Balance(contract, wallet, tokenIds) {
@@ -2228,11 +2216,18 @@ async function ethRpc(method, params = []) {
   ].map(url => String(url || '').trim()).filter(Boolean);
   const urls = Array.from(new Set([
     ...configured,
+    'https://ethereum-rpc.publicnode.com',
     'https://ethereum.publicnode.com',
     'https://eth.llamarpc.com',
+    'https://rpc.flashbots.net',
+    'https://rpc.mevblocker.io',
+    'https://1rpc.io/eth',
     'https://rpc.ankr.com/eth',
   ]));
-  const timeoutMs = Number(process.env.ETH_RPC_TIMEOUT_MS || 2500);
+  const timeoutMs = Number(process.env.ETH_RPC_TIMEOUT_MS || 8000);
+  const rpcLabel = url => {
+    try { return new URL(url).hostname; } catch (_) { return 'configured-rpc'; }
+  };
   const checks = urls.map(async rpcUrl => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -2246,10 +2241,10 @@ async function ethRpc(method, params = []) {
       const data = await r.json().catch(() => ({}));
       if (!r.ok || data.error) throw new Error(data.error?.message || String(r.status));
       return data.result === null || data.result === undefined
-        ? { ok: true, empty: true, rpcUrl }
-        : { ok: true, result: data.result, rpcUrl };
+        ? { ok: true, empty: true, rpcUrl: rpcLabel(rpcUrl) }
+        : { ok: true, result: data.result, rpcUrl: rpcLabel(rpcUrl) };
     } catch (networkErr) {
-      return { ok: false, error: networkErr, rpcUrl };
+      return { ok: false, error: networkErr, rpcUrl: rpcLabel(rpcUrl) };
     } finally {
       clearTimeout(timer);
     }
@@ -2260,8 +2255,12 @@ async function ethRpc(method, params = []) {
   if (hit) return hit.result;
   const sawNull = settled.some(x => x.ok && x.empty);
   if (sawNull) return null;
-  const lastError = settled.find(x => !x.ok)?.error || null;
-  const e = new Error('Transaction is not confirmed yet - ETH RPC temporarily unreachable' + (lastError ? ': ' + (lastError.message || lastError) : ''));
+  const failures = settled
+    .filter(x => !x.ok)
+    .slice(0, 4)
+    .map(x => `${x.rpcUrl}: ${x.error?.message || x.error || 'failed'}`)
+    .join('; ');
+  const e = new Error('Transaction is not confirmed yet - ETH RPC temporarily unreachable' + (failures ? ': ' + failures : ''));
   e.statusCode = 409;
   throw e;
 }
@@ -2274,8 +2273,8 @@ async function getShopPaymentAddresses(supabase) {
     .limit(1)
     .maybeSingle();
   return {
-    eth: process.env.SHOP_ETH_ADDRESS || data?.eth_address || '',
-    tezos: process.env.SHOP_TEZOS_ADDRESS || data?.tezos_address || '',
+    eth: data?.eth_address || process.env.SHOP_ETH_ADDRESS || '',
+    tezos: data?.tezos_address || process.env.SHOP_TEZOS_ADDRESS || '',
   };
 }
 
