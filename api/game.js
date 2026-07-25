@@ -3882,6 +3882,66 @@ async function handleShopConfig(req, res, supabase) {
   return json(200, safe);
 }
 
+async function handleShopHolderClaimSummary(req, res, supabase) {
+  if (req.method !== 'GET') return json(405, { error: 'GET only' });
+  const rawChain = String(req.query.chain || '').trim().toLowerCase();
+  const chain = rawChain === 'eth' || rawChain === 'ethereum' ? 'ethereum' : rawChain;
+  const wallet = serverNormalizeHolderWallet(chain, req.query.wallet || req.query.wallet_address || '');
+  const contract = String(req.query.contract || (chain === 'tezos' ? APOTI_MERCH_TEZOS_CONTRACT : APOTI_MERCH_ETH_CONTRACT)).trim();
+  const tokenBalance = Math.max(0, Math.floor(Number(req.query.token_balance || 0)));
+  if (!wallet || !['ethereum', 'tezos'].includes(chain)) {
+    return json(400, { error: 'wallet and chain are required' });
+  }
+
+  let reservedQty = 0;
+  let fulfilledQty = 0;
+  let partialQty = 0;
+  let rows = [];
+  const { data, error } = await supabase
+    .from('holder_merch_claims')
+    .select('order_ref,status,requested_qty,fulfilled_qty,created_at,fulfilled_at')
+    .eq('project', APOTI_MERCH_PROJECT)
+    .eq('entitlement_key', APOTI_MERCH_ENTITLEMENT_KEY)
+    .eq('chain', chain)
+    .eq('wallet_address', wallet)
+    .eq('contract_address', String(contract || '').toLowerCase())
+    .in('status', ['reserved', 'partial_fulfilled', 'fulfilled'])
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) {
+    const missingTable = error.code === '42P01' || /does not exist|schema cache/i.test(String(error.message || ''));
+    if (!missingTable) return json(500, { error: error.message });
+  } else {
+    rows = data || [];
+    reservedQty = rows.reduce((sum, row) => sum + Math.max(0, Number(row.requested_qty || 0)), 0);
+    fulfilledQty = rows.reduce((sum, row) => sum + Math.max(0, Number(row.fulfilled_qty || 0)), 0);
+    partialQty = rows
+      .filter(row => row.status === 'partial_fulfilled')
+      .reduce((sum, row) => sum + Math.max(0, Number(row.fulfilled_qty || 0)), 0);
+  }
+  return json(200, {
+    ok: true,
+    project: APOTI_MERCH_PROJECT,
+    entitlement_key: APOTI_MERCH_ENTITLEMENT_KEY,
+    wallet,
+    chain,
+    contract: String(contract || '').toLowerCase(),
+    token_balance: tokenBalance,
+    reserved_qty: reservedQty,
+    fulfilled_qty: fulfilledQty,
+    partial_fulfilled_qty: partialQty,
+    available_qty: Math.max(0, tokenBalance - reservedQty),
+    claims: rows.map(row => ({
+      order_ref: row.order_ref,
+      status: row.status,
+      requested_qty: Number(row.requested_qty || 0),
+      fulfilled_qty: Number(row.fulfilled_qty || 0),
+      created_at: row.created_at || null,
+      fulfilled_at: row.fulfilled_at || null,
+    })),
+  });
+}
+
 // Netlify entry point
 
 // Vercel entry point
@@ -4127,6 +4187,7 @@ module.exports = async (req, res) => {
       else if (urlPath.includes('/notify-bid'))          action = 'notify-bid';
       else if (urlPath.includes('/shop-products') || urlPath.includes('/shop/products')) action = 'shop-products';
       else if (urlPath.includes('/shop-config') || urlPath.includes('/shop/config')) action = 'shop-config';
+      else if (urlPath.includes('/shop-holder-claim-summary') || urlPath.includes('/shop/holder-claim-summary')) action = 'shop-holder-claim-summary';
       else if (urlPath.includes('/shop-payment-init') || urlPath.includes('/shop/payment-init')) action = 'shop-payment-init';
       else if (urlPath.includes('/shop-quote') || urlPath.includes('/shop/quote')) action = 'shop-quote';
       else if (urlPath.includes('/shop-discount') || urlPath.includes('/shop/discount')) action = 'shop-discount';
@@ -4156,6 +4217,7 @@ module.exports = async (req, res) => {
       case 'notify-bid':         return handleNotifyBid(req, res);
       case 'shop-products':      return handleShopProducts(req, res, supabase);
       case 'shop-config':        return handleShopConfig(req, res, supabase);
+      case 'shop-holder-claim-summary': return handleShopHolderClaimSummary(req, res, supabase);
       case 'shop-quote':         return handleShopQuote(req, res, supabase);
       case 'shop-discount':      return handleShopDiscount(req, res, supabase);
       case 'shop-payment-init':  return handleShopPaymentInit(req, res, supabase);
