@@ -498,6 +498,114 @@ async function isHolderAuthorised(req, supabase) {
   return false;
 }
 
+function normalizeClaimChain(chain) {
+  const value = String(chain || '').trim().toLowerCase();
+  if (value === 'eth') return 'ethereum';
+  if (value === 'ethereum' || value === 'tezos') return value;
+  return '';
+}
+
+function normalizeClaimWallet(chain, wallet) {
+  const value = String(wallet || '').trim();
+  return normalizeClaimChain(chain) === 'ethereum' ? value.toLowerCase() : value;
+}
+
+function walletKey(row) {
+  const chain = normalizeClaimChain(row?.chain);
+  const wallet = normalizeClaimWallet(chain, row?.wallet_address || row?.walletAddress || row?.address);
+  return chain && wallet ? `${chain}:${wallet.toLowerCase()}` : '';
+}
+
+async function getHolderAccessRows(req, supabase) {
+  const accessToken = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const walletClaim = String(req.headers['x-holder-claim'] || '');
+
+  if (accessToken) {
+    const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
+    if (userError || !userData || !userData.user) return [];
+
+    const selectFields = 'id,auth_user_id,wallet_address,chain,display_name,tier,token_balance';
+    const { data: authRows, error: authError } = await supabase
+      .from('holders')
+      .select(selectFields)
+      .eq('auth_user_id', userData.user.id);
+    if (authError) throw authError;
+
+    const rows = Array.isArray(authRows) ? [...authRows] : [];
+    const names = [...new Set(rows.map(holderDisplayName).filter(Boolean))];
+    for (const name of names) {
+      const { data: nameRows, error: nameError } = await supabase
+        .from('holders')
+        .select(selectFields)
+        .eq('display_name', name);
+      if (!nameError && Array.isArray(nameRows)) rows.push(...nameRows);
+    }
+
+    const seen = new Set();
+    return rows.filter(row => {
+      const key = walletKey(row);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  if (walletClaim) {
+    const { data: pending, error } = await supabase
+      .from('pending_verifications')
+      .select('wallet_address,chain,token_balance,expires_at')
+      .eq('id', walletClaim)
+      .eq('consumed', false)
+      .maybeSingle();
+    if (error) throw error;
+    if (pending && new Date(pending.expires_at) > new Date()) return [pending];
+  }
+
+  return [];
+}
+
+async function handleMerchClaims(req, res, supabase) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const holderRows = await getHolderAccessRows(req, supabase);
+  if (!holderRows.length) return res.status(403).json({ error: 'Holder access required.' });
+
+  const walletKeys = new Set(holderRows.map(walletKey).filter(Boolean));
+  let rows = [];
+  const { data, error } = await supabase
+    .from('holder_merch_claims')
+    .select('order_ref,status,requested_qty,fulfilled_qty,wallet_address,chain,contract_address,created_at,fulfilled_at')
+    .eq('project', 'apoti-olowe')
+    .eq('entitlement_key', 'apoti-olowe-token-2-merch')
+    .in('status', ['reserved', 'partial_fulfilled', 'fulfilled'])
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  if (error) {
+    const missing = error.code === '42P01' || /does not exist|schema cache/i.test(String(error.message || ''));
+    if (!missing) return res.status(500).json({ error: error.message });
+  } else {
+    rows = (Array.isArray(data) ? data : []).filter(row => walletKeys.has(walletKey(row)));
+  }
+
+  const reservedQty = rows.reduce((sum, row) => sum + Math.max(0, Number(row.requested_qty || 0)), 0);
+  const fulfilledQty = rows.reduce((sum, row) => sum + Math.max(0, Number(row.fulfilled_qty || 0)), 0);
+  return res.status(200).json({
+    ok: true,
+    reserved_qty: reservedQty,
+    fulfilled_qty: fulfilledQty,
+    claims: rows.map(row => ({
+      order_ref: row.order_ref,
+      status: row.status,
+      requested_qty: Number(row.requested_qty || 0),
+      fulfilled_qty: Number(row.fulfilled_qty || 0),
+      wallet_address: row.wallet_address,
+      chain: row.chain,
+      created_at: row.created_at || null,
+      fulfilled_at: row.fulfilled_at || null,
+    })),
+  });
+}
+
 // -- action=participants ----
 // Holder-only participant list, served through the service-role API so the
 // dashboard does not depend on a public-view RLS policy being perfectly open.
@@ -584,6 +692,7 @@ module.exports = async (req, res) => {
       case 'claim':  return await handleClaim(req, res, supabase);
       case 'send-auth-email': return await handleSendAuthEmail(req, res, supabase);
       case 'content': return await handleContent(req, res, supabase);
+      case 'merch-claims': return await handleMerchClaims(req, res, supabase);
       case 'participants': return await handleParticipants(req, res, supabase);
       case 'email-updates': return await handleEmailUpdates(req, res, supabase);
       default:
