@@ -3378,15 +3378,19 @@ async function handleShopOrderConfirm(req, res, supabase) {
     claimed.push(item);
   }
 
+  let holderClaimReservation = null;
   try {
-    await reserveHolderMerchClaimForOrder(supabase, orderRef, order.id, body, {
+    const result = await reserveHolderMerchClaimForOrder(supabase, orderRef, order.id, body, {
       ...checkout,
       holderMerchClaim: checkout.holderMerchClaim || readCryptoOrderLock(order)?.checkout_quote?.holder_merch_claim || null,
     });
+    holderClaimReservation = result ? { ok: true, result } : null;
   } catch (e) {
-    for (const c of claimed) await releaseVariantStock(supabase, c);
-    await markOrderVerificationFailure(supabase, orderRef, e);
-    return jsonError(e);
+    holderClaimReservation = {
+      ok: false,
+      error: String(e?.message || e || 'Holder merch claim reservation failed').slice(0, 1000),
+    };
+    console.warn('[shop-order] holder claim reservation failed after payment verification:', orderRef, holderClaimReservation.error);
   }
 
   // Backfill customer details from the confirm request if the order row is
@@ -3415,6 +3419,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
         payment_ref: paymentRef,
         received_amount: chainVerification?.received_amount,
         confirmations: chainVerification?.confirmations,
+        ...(holderClaimReservation ? { holder_claim_reservation: holderClaimReservation } : {}),
         paid_at: new Date().toISOString(),
       } : order.payment_metadata,
       paid_at: new Date().toISOString(),
@@ -3473,6 +3478,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
     delivery_fee_ngn: checkout.deliveryNgn,
     chain_verification: chainVerification,
     card_verification: cardVerification,
+    holder_claim_reservation: holderClaimReservation,
     seller_notification: sellerNotification,
     customer_notification: customerNotification,
   });
