@@ -7709,6 +7709,7 @@ async function submitManualCrypto(chain) {
  showToast('Enter the order reference (ORD-) from your payment check your email receipt if needed');
       return;
     }
+    remembered = remembered || latestPendingOrder(method);
     await confirmPendingOrder(orderRef, {
       payment_method: method,
       payment_ref: proof.payment_ref,
@@ -7929,6 +7930,25 @@ async function confirmPendingOrder(orderRef, opts) {
   }
 }
 
+function buildOrderConfirmPayload(orderRef, opts) {
+  let customer = opts?.customer || {};
+  if (!customer || !customer.name) {
+    try { customer = getFormData() || {}; } catch (_) { customer = {}; }
+  }
+  const confirmOpts = Object.assign({}, opts);
+  delete confirmOpts.customer;
+  return Object.assign({
+    order_ref: orderRef,
+    order_hash: orderRef,
+    name: customer.name || '',
+    email: customer.email || '',
+    phone: customer.phone || '',
+    address: customer.address || '',
+    delivery_method: customer.deliveryMethod || _deliveryMethod || 'ship',
+    delivery_zone: customer.deliveryZone || _deliveryZone || '',
+    delivery_carrier: customer.deliveryCarrier || _deliveryCarrier || '',
+  }, confirmOpts);
+}
 
 // Local safety net: remember an unconfirmed crypto order so a returning
 // customer (or you) can still confirm it even after the lock timer expires,
@@ -8936,6 +8956,7 @@ async function confirmExistingPayment(chain, btn) {
       payment_ref: txHash,
       payer_address: sender,
       checkout_quote: quote,
+      customer: remembered?.customer || null,
     });
     clearPendingOrder(orderRef);
     stopLockTimer();
