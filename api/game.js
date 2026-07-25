@@ -2196,8 +2196,6 @@ const ERC20_CONTRACTS = {
 };
 const ERC20_DECIMALS = { usdc: 6, usdt: 6 };
 const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-const ETH_VERIFY_RECEIPT_POLL_ATTEMPTS = Math.max(1, Number(process.env.ETH_VERIFY_RECEIPT_POLL_ATTEMPTS || 5));
-const ETH_VERIFY_RECEIPT_POLL_MS = Math.max(250, Number(process.env.ETH_VERIFY_RECEIPT_POLL_MS || 1500));
 
 function normEvmAddress(addr) {
   return String(addr || '').trim().toLowerCase();
@@ -2215,35 +2213,43 @@ function decimalToUnits(value, decimals) {
 }
 
 async function ethRpc(method, params = []) {
-  const rpcUrl = process.env.ETH_RPC_URL || process.env.EVM_RPC_URL;
-  if (!rpcUrl) {
-    const err = new Error('ETH_RPC_URL is required for on-chain crypto verification');
-    err.statusCode = 503;
-    throw err;
+  const configured = [
+    ...(process.env.ETH_RPC_URLS || '').split(','),
+    process.env.ETH_RPC_URL,
+    process.env.EVM_RPC_URL,
+  ].map(url => String(url || '').trim()).filter(Boolean);
+  const urls = Array.from(new Set([
+    ...configured,
+    'https://ethereum.publicnode.com',
+    'https://eth.llamarpc.com',
+    'https://rpc.ankr.com/eth',
+  ]));
+  let lastError = null;
+  let sawNull = false;
+  for (const rpcUrl of urls) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Number(process.env.ETH_RPC_TIMEOUT_MS || 4500));
+    try {
+      const r = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
+        signal: controller.signal,
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || data.error) throw new Error(data.error?.message || String(r.status));
+      if (data.result !== null && data.result !== undefined) return data.result;
+      sawNull = true;
+    } catch (networkErr) {
+      lastError = networkErr;
+    } finally {
+      clearTimeout(timer);
+    }
   }
-  let r, data;
-  try {
-    r = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
-    });
-    data = await r.json().catch(() => ({}));
-  } catch (networkErr) {
-    const e = new Error('Transaction is not confirmed yet - RPC temporarily unreachable');
-    e.statusCode = 409;
-    throw e;
-  }
-  if (!r.ok || data.error) {
-    const e = new Error('Transaction is not confirmed yet - RPC error: ' + (data.error?.message || r.status));
-    e.statusCode = 409;
-    throw e;
-  }
-  return data.result;
-}
-
-function wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  if (sawNull) return null;
+  const e = new Error('Transaction is not confirmed yet - ETH RPC temporarily unreachable' + (lastError ? ': ' + (lastError.message || lastError) : ''));
+  e.statusCode = 409;
+  throw e;
 }
 
 async function getShopPaymentAddresses(supabase) {
@@ -2261,14 +2267,8 @@ async function getShopPaymentAddresses(supabase) {
 
 async function verifyEvmPayment({ method, txHash, payerAddress, quote, payeeAddress }) {
   if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) throw new Error('Invalid Ethereum transaction hash');
-  let tx = null;
-  let receipt = null;
-  for (let attempt = 1; attempt <= ETH_VERIFY_RECEIPT_POLL_ATTEMPTS; attempt++) {
-    tx = tx || await ethRpc('eth_getTransactionByHash', [txHash]);
-    receipt = await ethRpc('eth_getTransactionReceipt', [txHash]);
-    if (tx && receipt) break;
-    if (attempt < ETH_VERIFY_RECEIPT_POLL_ATTEMPTS) await wait(ETH_VERIFY_RECEIPT_POLL_MS);
-  }
+  const tx = await ethRpc('eth_getTransactionByHash', [txHash]);
+  const receipt = await ethRpc('eth_getTransactionReceipt', [txHash]);
   if (!tx || !receipt) {
     const err = new Error('Transaction is not confirmed yet');
     err.statusCode = 409;
