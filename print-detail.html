@@ -1282,11 +1282,15 @@ function applyLocalCurrencyToDetail(p) {
   if (priceUsdEl) priceUsdEl.style.display = 'none';
 }
 function shopHref(path = '') {
+  const holderQuery = hasHolderMerchContext() ? 'holder=apoti' : '';
   if (location.protocol === 'file:') {
     const base = new URL('shop.html', location.href).href;
-    return path ? base + '#' + path.replace(/^\/+/, '') : base;
+    const url = new URL(base, location.href);
+    if (holderQuery) url.search = holderQuery;
+    if (path) url.hash = path.replace(/^\/+/, '');
+    return url.href;
   }
-  return '/shop' + (path ? '/' + path.replace(/^\/+/, '') : '');
+  return '/shop' + (path ? '/' + path.replace(/^\/+/, '') : '') + (holderQuery ? '?' + holderQuery : '');
 }
 function hasActiveHolderMerchClaimCache() {
   try {
@@ -1301,11 +1305,15 @@ function hasActiveHolderMerchClaimCache() {
     return false;
   }
 }
+function hasHolderMerchContext() {
+  const params = new URLSearchParams(location.search || '');
+  const holderParam = String(params.get('holder') || params.get('holderAccess') || '').toLowerCase();
+  return ['apoti', 'apoti-olowe', 'holder', 'true', '1'].includes(holderParam) || hasActiveHolderMerchClaimCache();
+}
 function shopCheckoutHref(hash = 'checkout') {
-  const base = shopHref();
-  const holderQuery = hasActiveHolderMerchClaimCache() ? 'holder=apoti' : '';
+  const holderQuery = hasHolderMerchContext() ? 'holder=apoti' : '';
   if (location.protocol === 'file:') {
-    const url = new URL(base, location.href);
+    const url = new URL(shopHref(), location.href);
     if (holderQuery) url.search = holderQuery;
     url.hash = hash;
     return url.href;

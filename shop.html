@@ -4168,10 +4168,16 @@ function buildEditionBadge(p) {
 
 // Quiet secondary action that leads to the full product page. Only shown when
 // the product has a slug to link to.
+function productSlugHref(slug) {
+  if (!slug) return '';
+  const holderQuery = shouldShowHolderMerchAccess() || !!_holderMerchClaim ? '?holder=apoti' : '';
+  return `/shop/${slug}${holderQuery}`;
+}
+
 function detailsLink(p) {
   if (!p.slug) return '';
   const label = p.category === 'prints' ? 'View print' : 'View details';
-  return `<a class="details-link" href="/shop/${p.slug}" rel="noopener">${label}</a>`;
+  return `<a class="details-link" href="${productSlugHref(p.slug)}" rel="noopener">${label}</a>`;
 }
 
 function merchColorSwatch(color) {
@@ -4236,10 +4242,10 @@ function buildCard(p) {
   card.dataset.pid = p.id;
   card.dataset.category = p.category;
   card.innerHTML = `
-    <div class="card-img"><span class="variant-card-image">${imgHtml}</span>${badgeHtml}${p.slug ? `<a class="card-img-hover" href="/shop/${p.slug}" rel="noopener" aria-label="View ${escapeAttr(p.name)}"><span class="card-img-hover-label">View merch</span></a>` : ''}</div>
+    <div class="card-img"><span class="variant-card-image">${imgHtml}</span>${badgeHtml}${p.slug ? `<a class="card-img-hover" href="${productSlugHref(p.slug)}" rel="noopener" aria-label="View ${escapeAttr(p.name)}"><span class="card-img-hover-label">View merch</span></a>` : ''}</div>
     <div class="card-body">
       <p class="card-category">${p.category}</p>
-      <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
+      <h3 class="card-title">${p.slug ? `<a href="${productSlugHref(p.slug)}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
       <p class="card-desc">${p.desc}</p>
       <div class="card-variants" id="variants-${p.id}">${variantHtml || '<span class="variant-chip selected">Unavailable</span>'}${sizeGuideLink}</div>
       <div class="card-footer">
@@ -4271,7 +4277,7 @@ function buildPrintCard(p) {
 
   if (!options.length) {
     const viewHover = p.slug
-      ? `<a class="card-img-hover" href="/shop/${p.slug}" rel="noopener" style="text-decoration:none"><span class="card-img-hover-label">View print</span></a>`
+      ? `<a class="card-img-hover" href="${productSlugHref(p.slug)}" rel="noopener" style="text-decoration:none"><span class="card-img-hover-label">View print</span></a>`
       : `<div class="card-img-hover"><span class="card-img-hover-label">View print</span></div>`;
     // 1-of-1 with no price/variants OR admin-flagged enquire-only
     const isOneOfOne = p.print_edition === 'one_of_one';
@@ -4295,7 +4301,7 @@ function buildPrintCard(p) {
         <button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold</button>`;
     } else if (isEnquire) {
       footerHtml = p.slug
- ? `<a href="/shop/${p.slug}" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%">View artwork </a>`
+ ? `<a href="${productSlugHref(p.slug)}" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%">View artwork </a>`
  : `<button class="interest-btn" data-pid="${p.id}" data-pname="${escapeAttr(p.name)}" onclick="openInterestForm('${escapeAttr(p.id)}','${escapeAttr(p.name)}')" style="width:100%;text-align:center">Make inquiry </button>`;
     } else {
       footerHtml = `<div class="card-price"><span class="price-ngn">Unavailable</span></div>
@@ -4306,7 +4312,7 @@ function buildPrintCard(p) {
       <div class="card-body">
         ${buildEditionBadge(p)}
         <p class="card-category">${p.category}</p>
-        <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
+        <h3 class="card-title">${p.slug ? `<a href="${productSlugHref(p.slug)}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
         <p class="card-desc">${p.desc}</p>
         ${infoSizes}
         <div class="card-footer">${footerHtml}</div>
@@ -4351,26 +4357,26 @@ function buildPrintCard(p) {
   let actionHtml;
   if (isSold) {
     actionHtml = p.slug
-      ? `<a href="/shop/${p.slug}" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;opacity:0.4;pointer-events:none">Sold out</a>`
+      ? `<a href="${productSlugHref(p.slug)}" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;opacity:0.4;pointer-events:none">Sold out</a>`
       : `<button class="add-btn" disabled style="opacity:0.4;cursor:not-allowed;background:var(--ash)">Sold out</button>`;
   } else if (isEnquireOnly) {
  // 1-of-1: no inquiry on grid send them to the detail page first
     actionHtml = p.slug
- ? `<a href="/shop/${p.slug}" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">View artwork </a>`
+ ? `<a href="${productSlugHref(p.slug)}" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">View artwork </a>`
  : `<a href="#" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">View artwork </a>`;
   } else {
  // Prints always go to detail page no add-to-bag on grid
     actionHtml = p.slug
- ? `<a href="/shop/${p.slug}" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">View print </a>`
+ ? `<a href="${productSlugHref(p.slug)}" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">View print </a>`
  : `<a href="#" class="add-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">View print </a>`;
   }
 
   card.innerHTML = `
-    <div class="card-img">${imgHtml}${badgeHtml}${buildSoldOverlay(p)}${p.slug ? `<a class="card-img-hover" href="/shop/${p.slug}" rel="noopener" style="text-decoration:none"><span class="card-img-hover-label">View print</span></a>` : `<div class="card-img-hover"><span class="card-img-hover-label">View print</span></div>`}</div>
+    <div class="card-img">${imgHtml}${badgeHtml}${buildSoldOverlay(p)}${p.slug ? `<a class="card-img-hover" href="${productSlugHref(p.slug)}" rel="noopener" style="text-decoration:none"><span class="card-img-hover-label">View print</span></a>` : `<div class="card-img-hover"><span class="card-img-hover-label">View print</span></div>`}</div>
     <div class="card-body">
       ${buildEditionBadge(p)}
       <p class="card-category">${p.category}</p>
-      <h3 class="card-title">${p.slug ? `<a href="/shop/${p.slug}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
+      <h3 class="card-title">${p.slug ? `<a href="${productSlugHref(p.slug)}" style="color:inherit;text-decoration:none">${p.name}</a>` : p.name}</h3>
       ${ !isEnquireOnly ? `<p class="card-desc" id="pdesc-${p.id}">${active.desc || p.desc}</p>` : `` }
       ${ isEnquireOnly
         ? `<div class="card-footer" style="padding-top:0.8rem">${actionHtml}</div>`
@@ -4567,7 +4573,7 @@ function renderFeaturedSection() {
   if (imgEl) { imgEl.src = img || '/images/monostudy.png'; imgEl.alt = p.name; }
 
   // Link: goes to slug page if available, otherwise scrolls to the product grid
-  const dest = p.slug ? `/shop/${p.slug}` : null;
+  const dest = p.slug ? productSlugHref(p.slug) : null;
   if (imgLinkEl) {
     if (dest) { imgLinkEl.href = dest; imgLinkEl.removeAttribute('onclick'); }
     else { imgLinkEl.href = '#shopGrid'; imgLinkEl.setAttribute('onclick', "event.preventDefault();document.getElementById('shopGrid').scrollIntoView({behavior:'smooth'})"); }
@@ -5768,7 +5774,7 @@ function renderCartRecommendations() {
   if (!recs.length) return '';
   const cards = recs.map(({ p, choice, priceNgn, priceUsd }) => {
     const img = normalizeImg(p.image);
-    const slugLink = p.slug ? `/shop/${p.slug}` : null;
+    const slugLink = p.slug ? productSlugHref(p.slug) : null;
     const nameHtml = slugLink
       ? `<a href="${slugLink}" class="cart-rec-name" style="color:inherit;text-decoration:none">${escapeText(p.name)}</a>`
       : `<div class="cart-rec-name">${escapeText(p.name)}</div>`;
