@@ -1354,7 +1354,7 @@ function serverNormalizeHolderWallet(chain, wallet) {
 // in the critical path of every holder-merch-claim price lock (fired on tab
 // open, cart change, and every 10-min re-lock) so a single slow/unreachable
 // node must not be able to kill checkout outright.
-async function fetchWithRetry(url, options, { timeoutMs = 6000, attempts = 3 } = {}) {
+async function fetchWithRetry(url, options, { timeoutMs = 2500, attempts = 2 } = {}) {
   let lastErr;
   for (let i = 0; i < attempts; i++) {
     const controller = new AbortController();
