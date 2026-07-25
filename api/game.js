@@ -3295,6 +3295,18 @@ async function handleShopOrderConfirm(req, res, supabase) {
   // Reconstruct the trusted checkout from the SAVED order items so verification
   // uses authoritative server data, not anything the client re-sends now.
   const savedItems = Array.isArray(order.items) ? order.items : [];
+  const lockedQuote = storedLock?.checkout_quote || {};
+  const storedMeta = order.payment_metadata && typeof order.payment_metadata === 'object' ? order.payment_metadata : {};
+  const storedHolderClaim =
+    storedMeta.holder_merch_claim ||
+    lockedQuote.holder_merch_claim ||
+    lockedQuote.holderMerchClaim ||
+    null;
+  const storedHolderBenefit =
+    storedMeta.holder_merch_benefit ||
+    lockedQuote.holder_merch_benefit ||
+    lockedQuote.holderMerchBenefit ||
+    null;
   const checkout = {
     trustedItems: savedItems,
     totalNgn: Number(order.total_ngn) || 0,
@@ -3302,6 +3314,8 @@ async function handleShopOrderConfirm(req, res, supabase) {
     deliveryNgn: Number(order.delivery_fee_ngn) || 0,
     method: order.delivery_method || 'pickup',
     zone: order.delivery_zone || 'pickup',
+    holderMerchClaim: storedHolderClaim,
+    holderMerchBenefit: storedHolderBenefit,
   };
 
   // Verify payment BEFORE touching stock.
@@ -3382,7 +3396,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
   try {
     const result = await reserveHolderMerchClaimForOrder(supabase, orderRef, order.id, body, {
       ...checkout,
-      holderMerchClaim: checkout.holderMerchClaim || readCryptoOrderLock(order)?.checkout_quote?.holder_merch_claim || null,
+      holderMerchClaim: checkout.holderMerchClaim,
     });
     holderClaimReservation = result ? { ok: true, result } : null;
   } catch (e) {
@@ -3415,6 +3429,8 @@ async function handleShopOrderConfirm(req, res, supabase) {
       payment_ref: paymentRef,
       payment_metadata: isCryptoPayment ? {
         ...(readCryptoOrderLock(order) || {}),
+        ...(checkout.holderMerchClaim ? { holder_merch_claim: checkout.holderMerchClaim } : {}),
+        ...(checkout.holderMerchBenefit ? { holder_merch_benefit: checkout.holderMerchBenefit } : {}),
         payer_address: payerAddress,
         payment_ref: paymentRef,
         received_amount: chainVerification?.received_amount,

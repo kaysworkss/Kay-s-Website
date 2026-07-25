@@ -615,6 +615,45 @@ async function handleShopOrderUpdate(req, res, supabase) {
   if (body.tracking_carrier !== undefined) patch.tracking_carrier = String(body.tracking_carrier).slice(0, 100);
   if (body.admin_note !== undefined) patch.admin_note = String(body.admin_note).slice(0, 1000);
   if (body.delivery_details_sent_at !== undefined) patch.delivery_details_sent_at = String(body.delivery_details_sent_at).slice(0, 40);
+  if (body.holder_claim_manual_review === true) {
+    const { data: order, error: loadErr } = await supabase
+      .from('shop_orders')
+      .select('payment_metadata')
+      .eq('id', id)
+      .maybeSingle();
+    if (loadErr) return json(500, { error: loadErr.message });
+    if (!order) return json(404, { error: 'Order not found' });
+
+    let metadata = {};
+    if (order.payment_metadata && typeof order.payment_metadata === 'object') {
+      metadata = { ...order.payment_metadata };
+    } else if (typeof order.payment_metadata === 'string') {
+      try { metadata = JSON.parse(order.payment_metadata) || {}; } catch (_) { metadata = {}; }
+    }
+    const previousReservation = metadata.holder_claim_reservation && typeof metadata.holder_claim_reservation === 'object'
+      ? metadata.holder_claim_reservation
+      : {};
+    const fulfilledQty = Math.max(0, Math.floor(Number(body.holder_claim_fulfilled_qty || 0)));
+    const reviewedAt = new Date().toISOString();
+    const reservationError = previousReservation.error || previousReservation.reservation_error || null;
+    metadata.holder_claim_reservation = {
+      ...previousReservation,
+      ok: true,
+      manual_review: true,
+      manually_reviewed: true,
+      fulfilled_qty: fulfilledQty,
+      note: String(body.holder_claim_note || '').slice(0, 1000),
+      reviewed_at: reviewedAt,
+      ...(reservationError ? { reservation_error: reservationError } : {}),
+    };
+    delete metadata.holder_claim_reservation.error;
+    metadata.holder_claim_review = {
+      fulfilled_qty: fulfilledQty,
+      note: String(body.holder_claim_note || '').slice(0, 1000),
+      reviewed_at: reviewedAt,
+    };
+    patch.payment_metadata = metadata;
+  }
 
   const { error } = await supabase.from('shop_orders').update(patch).eq('id', id);
   if (error) {
