@@ -1725,8 +1725,8 @@ function renderAdminProducts() {
         const variantParts = splitMerchVariant(v);
         return `
         <div class="ap-variant-row" data-idx="${realIdx}" data-original-variant="${escapeAttr(v)}" style="display:grid;grid-template-columns:0.9fr 0.8fr 0.65fr 0.65fr 0.55fr 1.1fr 1.1fr auto;gap:0.4rem;align-items:center;margin-bottom:0.4rem">
-          <input class="form-input ap-v-color" value="${escapeAttr(variantParts.color || (optionMode === 'color' ? variantParts.size : ''))}" placeholder="e.g. Black" style="padding:0.35rem 0.5rem;font-size:0.78rem;${optionMode === 'size' || optionMode === 'none' ? 'display:none' : ''}"/>
-          <input class="form-input ap-v-label" value="${escapeAttr(optionMode === 'color' ? '' : variantParts.size)}" placeholder="e.g. M" ${cat === 'merch' ? 'list="standardMerchSizes"' : ''} style="padding:0.35rem 0.5rem;font-size:0.78rem;${optionMode === 'color' || optionMode === 'none' ? 'display:none' : ''}"/>
+          <input class="form-input ap-v-color" value="${escapeAttr(variantParts.color || (optionMode === 'color' ? variantParts.size : ''))}" placeholder="e.g. Black" style="padding:0.35rem 0.5rem;font-size:0.78rem;${optionMode === 'size' || optionMode === 'none' ? 'visibility:hidden;pointer-events:none' : ''}"/>
+          <input class="form-input ap-v-label" value="${escapeAttr(optionMode === 'color' ? '' : variantParts.size)}" placeholder="e.g. M" ${cat === 'merch' ? 'list="standardMerchSizes"' : ''} style="padding:0.35rem 0.5rem;font-size:0.78rem;${optionMode === 'color' || optionMode === 'none' ? 'visibility:hidden;pointer-events:none' : ''}"/>
           <input class="form-input ap-v-ngn" value="${productPrice(p, v, 'ngn') || ''}" placeholder="NGN" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <input class="form-input ap-v-usd" value="${productPrice(p, v, 'usd') || ''}" placeholder="USD" type="number" style="padding:0.35rem 0.5rem;font-size:0.78rem"/>
           <input class="form-input ap-v-stock" value="${p.stock_by_variant?.[v] ?? ''}" placeholder="${madeToOrder ? 'Made to order' : 'Stock'}" type="number" ${madeToOrder ? 'disabled' : ''} style="padding:0.35rem 0.5rem;font-size:0.78rem;${madeToOrder ? 'opacity:0.5' : ''}"/>
@@ -1878,8 +1878,14 @@ function renderAdminProducts() {
       if (!row) return;
       const showColor = ['color','size_color'].includes(select.value);
       const showSize = ['size','size_color'].includes(select.value);
-      row.querySelectorAll('.ap-v-color').forEach(x => x.style.display = showColor ? '' : 'none');
-      row.querySelectorAll('.ap-v-label').forEach(x => x.style.display = showSize ? '' : 'none');
+      row.querySelectorAll('.ap-v-color').forEach(x => {
+        x.style.visibility = showColor ? '' : 'hidden';
+        x.style.pointerEvents = showColor ? '' : 'none';
+      });
+      row.querySelectorAll('.ap-v-label').forEach(x => {
+        x.style.visibility = showSize ? '' : 'hidden';
+        x.style.pointerEvents = showSize ? '' : 'none';
+      });
       const extendedSetting = row.querySelector('.ap-extended-size-setting');
       if (extendedSetting) extendedSetting.style.display = select.value === 'color' ? '' : 'none';
     });
@@ -2024,8 +2030,16 @@ function renderAdminProducts() {
       const optionMode = row.querySelector('.ap-option-mode')?.value || 'size';
       const colorInput = variant.querySelector('.ap-v-color');
       const sizeInput = variant.querySelector('.ap-v-label');
-      if (colorInput) colorInput.style.display = ['color','size_color'].includes(optionMode) ? '' : 'none';
-      if (sizeInput) sizeInput.style.display = ['size','size_color'].includes(optionMode) ? '' : 'none';
+      if (colorInput) {
+        const showColor = ['color','size_color'].includes(optionMode);
+        colorInput.style.visibility = showColor ? '' : 'hidden';
+        colorInput.style.pointerEvents = showColor ? '' : 'none';
+      }
+      if (sizeInput) {
+        const showSize = ['size','size_color'].includes(optionMode);
+        sizeInput.style.visibility = showSize ? '' : 'hidden';
+        sizeInput.style.pointerEvents = showSize ? '' : 'none';
+      }
       const madeToOrder = row.querySelector('.ap-made-to-order')?.checked === true;
       const stockInput = variant.querySelector('.ap-v-stock');
       if (stockInput && madeToOrder) { stockInput.disabled = true; stockInput.placeholder = 'Made to order'; stockInput.style.opacity = '0.5'; }

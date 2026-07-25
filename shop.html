@@ -5360,6 +5360,7 @@ function rememberHolderMerchChainClaim(chain, wallet, detected) {
     _holderMerchChainClaims[chain] = Object.assign({ wallet, chain, checkedAt: Date.now() }, detected);
   }
   _holderMerchClaim = mergeHolderMerchChainClaims();
+  persistHolderMerchClaimCache();
   return _holderMerchClaim;
 }
 async function detectApotiHolderViaHolderApi(chain, wallet) {
@@ -6288,6 +6289,8 @@ const APOTI_HOLDER_CONFIG = {
 let _holderMerchClaim = null;
 let _holderMerchChainClaims = {};
 const HOLDER_MERCH_STATE_KEY = 'kwHolderMerchState';
+const HOLDER_MERCH_CLAIM_CACHE_KEY = 'kwHolderMerchClaimCache';
+const HOLDER_MERCH_CLAIM_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function saveHolderMerchState(extra = {}) {
   const panel = document.getElementById('apotiHolderMerch');
@@ -6309,6 +6312,47 @@ function readHolderMerchState() {
     return state && Date.now() - Number(state.at || 0) < 30 * 60 * 1000 ? state : null;
   } catch (_) {
     return null;
+  }
+}
+
+function persistHolderMerchClaimCache() {
+  try {
+    if (!_holderMerchClaim || _holderMerchClaim.verified !== true) {
+      localStorage.removeItem(HOLDER_MERCH_CLAIM_CACHE_KEY);
+      return;
+    }
+    localStorage.setItem(HOLDER_MERCH_CLAIM_CACHE_KEY, JSON.stringify({
+      at: Date.now(),
+      selected: _holderMerchClaim,
+      chainClaims: _holderMerchChainClaims,
+    }));
+  } catch (_) {}
+}
+
+function restoreHolderMerchClaimCache() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(HOLDER_MERCH_CLAIM_CACHE_KEY) || 'null');
+    if (!cached || Date.now() - Number(cached.at || 0) > HOLDER_MERCH_CLAIM_CACHE_TTL_MS) {
+      localStorage.removeItem(HOLDER_MERCH_CLAIM_CACHE_KEY);
+      return false;
+    }
+    const chainClaims = cached.chainClaims && typeof cached.chainClaims === 'object'
+      ? cached.chainClaims
+      : {};
+    const selected = cached.selected && cached.selected.verified === true
+      ? cached.selected
+      : chooseBestHolderMerchClaim(Object.values(chainClaims));
+    if (!selected) return false;
+    _holderMerchChainClaims = chainClaims;
+    _holderMerchClaim = selected;
+    const wallet = selected.wallet || selected.selectedWallet || '';
+    const short = wallet ? wallet.slice(0, 6) + '...' + wallet.slice(-4) : 'saved wallet';
+    updateHolderMerchStatus(holderVerificationMessage(selected, short) + ' Saved access was restored after refresh; checkout will revalidate it server-side.', 'verified');
+    refreshCheckoutAfterHolderMerchClaim();
+    return true;
+  } catch (_) {
+    try { localStorage.removeItem(HOLDER_MERCH_CLAIM_CACHE_KEY); } catch (__) {}
+    return false;
   }
 }
 
@@ -6348,6 +6392,7 @@ function applyHolderMerchContext() {
   document.getElementById('holderConnectBtn')?.addEventListener('click', connectApotiHolderWallet);
   document.getElementById('holderConnectTezosBtn')?.addEventListener('click', connectApotiTezosHolderWallet);
   updateHolderMerchLockState();
+  restoreHolderMerchClaimCache();
   setInterval(updateHolderMerchLockState, 1000);
   document.querySelectorAll('[data-holder-add]').forEach(btn => {
     btn.addEventListener('click', () => addHolderMerchToCart(btn.dataset.holderAdd));

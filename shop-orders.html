@@ -535,6 +535,82 @@ function payerAddress(o) {
   const meta = paymentMeta(o) || {};
   return meta.payer_address || meta.wallet || '';
 }
+function holderClaimReservation(o) {
+  const meta = paymentMeta(o) || {};
+  return meta.holder_claim_reservation || null;
+}
+function holderClaimReservationLine(o) {
+  const reservation = holderClaimReservation(o);
+  if (!reservation) return '';
+  if (reservation.manual_review || reservation.manually_reviewed) {
+    const qty = Number(reservation.fulfilled_qty || reservation.claimed_qty || 0);
+    return `Holder claim reviewed${qty ? `: ${qty} tote${qty === 1 ? '' : 's'}` : ''}`;
+  }
+  if (reservation.ok === false) return `Holder claim needs review: ${reservation.error || 'reservation failed'}`;
+  return 'Holder claim reserved';
+}
+function numOrZero(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+function holderClaimInfo(o) {
+  const meta = paymentMeta(o) || {};
+  const quote = meta.checkout_quote || meta.quote || {};
+  const claim = meta.holder_merch_claim || quote.holder_merch_claim || quote.holderMerchClaim || null;
+  const benefit = meta.holder_merch_benefit || quote.holder_merch_benefit || quote.holderMerchBenefit || null;
+  const reservation = holderClaimReservation(o);
+  const items = Array.isArray(o.items) ? o.items : [];
+  const toteQty = items.reduce((sum, item) => {
+    const label = `${item.name || ''} ${item.category || ''} ${item.type || ''} ${item.product_type || ''}`;
+    return /tote/i.test(label) ? sum + Math.max(1, numOrZero(item.qty) || 1) : sum;
+  }, 0);
+  const claimedQty = numOrZero(
+    claim?.covered_tote_qty ??
+    claim?.coveredToteQty ??
+    benefit?.coveredToteQty ??
+    benefit?.covered_tote_qty ??
+    reservation?.result?.covered_tote_qty ??
+    reservation?.result?.coveredToteQty ??
+    reservation?.result?.reserved_qty ??
+    reservation?.fulfilled_qty
+  );
+  const handledQty = numOrZero(
+    reservation?.fulfilled_qty ??
+    reservation?.claimed_qty ??
+    reservation?.result?.reserved_qty ??
+    reservation?.result?.claimed_qty ??
+    reservation?.result?.covered_tote_qty
+  );
+  const tokenBalance = numOrZero(claim?.token_balance ?? claim?.tokenBalance ?? claim?.allowance_qty ?? claim?.allowanceQty);
+  const exists = !!(claim || benefit || reservation || claimedQty || toteQty);
+  return {
+    exists,
+    claim,
+    benefit,
+    reservation,
+    tier: claim?.tier || claim?.holder_tier || '',
+    chain: claim?.chain || claim?.selected_chain || '',
+    wallet: claim?.wallet || claim?.wallet_address || claim?.address || '',
+    tokenBalance,
+    requestedQty: claimedQty || toteQty,
+    handledQty,
+    reviewNote: reservation?.note || meta.holder_claim_review?.note || '',
+    status: reservation?.manual_review || reservation?.manually_reviewed
+      ? 'Reviewed'
+      : reservation?.ok === false
+        ? 'Needs review'
+        : reservation
+          ? 'Reserved'
+          : 'Claim proof stored',
+  };
+}
+function holderClaimSummary(o) {
+  const info = holderClaimInfo(o);
+  if (!info.exists) return '';
+  const qty = info.requestedQty || info.handledQty;
+  const tier = info.tier ? `${String(info.tier).charAt(0).toUpperCase()}${String(info.tier).slice(1)} ` : '';
+  return `${tier}holder claim${qty ? ` - ${qty} tote${qty === 1 ? '' : 's'}` : ''}`;
+}
 function inferredCarrier(o) {
   if (o.tracking_carrier) return o.tracking_carrier;
   const meta = paymentMeta(o) || {};
@@ -686,6 +762,10 @@ function renderOrders() {
     const failureLine = o.failure_reason
       ? `<div style="font-size:0.66rem;color:var(--rust);margin-top:0.25rem">${escapeHtml(short(o.failure_reason,42))}</div>`
       : '';
+    const holderLine = holderClaimReservationLine(o) || holderClaimSummary(o);
+    const holderClaimLine = holderLine
+      ? `<div style="font-size:0.66rem;color:${holderClaimReservation(o)?.ok === false ? 'var(--rust)' : 'var(--moss)'};margin-top:0.25rem">${escapeHtml(short(holderLine,54))}</div>`
+      : '';
     return `<tr>
       <td><div class="order-ref">${short(orderRef(o),18)}</div><div style="font-size:0.68rem;color:var(--text-muted);margin-top:0.2rem">${o.status==='pending' ? orderAgeLabel(o) : ''}</div></td>
       <td>
@@ -697,7 +777,7 @@ function renderOrders() {
         <div class="order-total">${fmt(o.total_ngn)}</div>
         <div class="order-total-usd">${fmtUsd(o.total_usd)}</div>
       </td>
-      <td><span class="pay-badge">${(o.payment_method||'-').toUpperCase()}</span>${proofLine}${failureLine}</td>
+      <td><span class="pay-badge">${(o.payment_method||'-').toUpperCase()}</span>${proofLine}${failureLine}${holderClaimLine}</td>
       <td style="font-size:0.82rem;color:var(--text-muted)">${o.delivery_method==='pickup'?'Pickup - Kaduna':(o.delivery_zone||'-')}</td>
       <td><span class="status-badge status-${o.status||'pending'}">${o.status||'pending'}</span></td>
       <td style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap">
@@ -734,6 +814,8 @@ function openDetail(id) {
   const suggestedCarrier = inferredCarrier(o);
   const orderNote = meta?.order_note || '';
   const madeToOrderItems = items.filter(item => item.madeToOrder === true || item.made_to_order === true);
+  const holderInfo = holderClaimInfo(o);
+  const holderLine = holderClaimReservationLine(o) || holderClaimSummary(o);
 
   document.getElementById('detailBody').innerHTML = `
     <div class="detail-section">
@@ -845,9 +927,33 @@ function openDetail(id) {
               <div style="font-size:0.78rem;color:var(--text-muted)">${i.variant} x ${i.qty}</div>
             </div>
             <div class="detail-item-price">${fmt((i.priceNgn||0)*i.qty)}</div>
-          </div>`).join('')}
+        </div>`).join('')}
       </div>
     </div>
+
+    ${holderInfo.exists ? `
+    <div class="detail-section">
+      <div class="detail-section-label">Holder claim reconciliation</div>
+      <div class="detail-row"><span class="detail-row-label">Status</span><span class="detail-row-val" style="color:${holderInfo.reservation?.ok === false ? 'var(--rust)' : 'var(--moss)'}">${escapeHtml(holderInfo.status)}</span></div>
+      <div class="detail-row"><span class="detail-row-label">Claim in this order</span><span class="detail-row-val">${holderInfo.requestedQty || 0} tote${holderInfo.requestedQty === 1 ? '' : 's'}</span></div>
+      ${holderInfo.handledQty ? `<div class="detail-row"><span class="detail-row-label">Handled quantity</span><span class="detail-row-val">${holderInfo.handledQty} tote${holderInfo.handledQty === 1 ? '' : 's'}</span></div>` : ''}
+      ${holderInfo.tier ? `<div class="detail-row"><span class="detail-row-label">Tier</span><span class="detail-row-val">${escapeHtml(holderInfo.tier)}</span></div>` : ''}
+      ${holderInfo.tokenBalance ? `<div class="detail-row"><span class="detail-row-label">Balance seen</span><span class="detail-row-val">${holderInfo.tokenBalance}</span></div>` : ''}
+      ${holderInfo.chain ? `<div class="detail-row"><span class="detail-row-label">Chain</span><span class="detail-row-val">${escapeHtml(holderInfo.chain)}</span></div>` : ''}
+      ${holderInfo.wallet ? `<div class="detail-row"><span class="detail-row-label">Wallet</span><span class="detail-row-val" style="font-family:'Montserrat',sans-serif;font-size:0.72rem">${escapeHtml(holderInfo.wallet)}</span></div>` : ''}
+      ${holderLine ? `<div class="detail-row"><span class="detail-row-label">Reservation</span><span class="detail-row-val" style="color:${holderInfo.reservation?.ok === false ? 'var(--rust)' : 'var(--moss)'}">${escapeHtml(holderLine)}</span></div>` : ''}
+      ${holderInfo.reservation?.error ? `<div class="detail-row"><span class="detail-row-label">Reservation error</span><span class="detail-row-val" style="color:var(--rust)">${escapeHtml(holderInfo.reservation.error)}</span></div>` : ''}
+      ${holderInfo.reservation?.reservation_error ? `<div class="detail-row"><span class="detail-row-label">Original error</span><span class="detail-row-val">${escapeHtml(holderInfo.reservation.reservation_error)}</span></div>` : ''}
+      <div class="detail-form-row" style="margin-top:0.8rem">
+        <label class="detail-form-label">Quantity handled</label>
+        <input class="detail-input" id="holderClaimQty" type="number" min="0" step="1" value="${holderInfo.handledQty || holderInfo.requestedQty || 0}"/>
+      </div>
+      <div class="detail-form-row">
+        <label class="detail-form-label">Claim note</label>
+        <textarea class="detail-input detail-textarea" id="holderClaimNote" placeholder="e.g. 20 totes packed now; 20 left to handle">${escapeHtml(holderInfo.reviewNote)}</textarea>
+      </div>
+      <button class="action-btn primary" onclick="saveHolderClaimReview('${o.id}')">Save claim reconciliation</button>
+    </div>` : ''}
 
     <div class="detail-section">
       <div class="detail-section-label">Payment</div>
@@ -856,6 +962,7 @@ function openDetail(id) {
       <div class="detail-row"><span class="detail-row-label">Transaction</span><span class="detail-row-val" style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--clay)">${paymentRef(o)||'-'}</span></div>
       ${payerAddress(o) ? `<div class="detail-row"><span class="detail-row-label">Wallet</span><span class="detail-row-val" style="font-family:'Montserrat',sans-serif;font-size:0.72rem">${payerAddress(o)}</span></div>` : ''}
       ${o.failure_reason ? `<div class="detail-row"><span class="detail-row-label">Verification note</span><span class="detail-row-val" style="color:var(--rust)">${escapeHtml(o.failure_reason)}</span></div>` : ''}
+      ${holderLine ? `<div class="detail-row"><span class="detail-row-label">Holder claim</span><span class="detail-row-val" style="color:${holderClaimReservation(o)?.ok === false ? 'var(--rust)' : 'var(--moss)'}">${escapeHtml(holderLine)}</span></div>` : ''}
       ${meta?.crypto_amount ? `<div class="detail-row"><span class="detail-row-label">Locked amount</span><span class="detail-row-val">${meta.crypto_amount} ${(meta.crypto_symbol || o.payment_method || '').toUpperCase()}</span></div>` : ''}
       <div class="detail-row"><span class="detail-row-label">Subtotal</span><span class="detail-row-val">${fmt(o.total_ngn - (o.delivery_fee_ngn||0))}</span></div>
       <div class="detail-row"><span class="detail-row-label">Delivery fee</span><span class="detail-row-val">${o.delivery_fee_ngn ? fmt(o.delivery_fee_ngn) : '—'}</span></div>
@@ -1038,6 +1145,35 @@ async function saveOrderDetail(id) {
     closeDetail();
     loadOrders();
   } catch(e) { showToast('Network error'); }
+}
+
+async function saveHolderClaimReview(id) {
+  const qtyEl = document.getElementById('holderClaimQty');
+  const noteEl = document.getElementById('holderClaimNote');
+  const qty = Math.max(0, Math.floor(Number(qtyEl?.value || 0)));
+  const note = (noteEl?.value || '').trim();
+  try {
+    const res = await fetch(`/api/admin/shop-order/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type':'application/json', 'x-admin-token': _token },
+      body: JSON.stringify({
+        holder_claim_manual_review: true,
+        holder_claim_fulfilled_qty: qty,
+        holder_claim_note: note,
+      }),
+    });
+    if (!res.ok) {
+      if (handleAdminAuthFailure(res)) return;
+      const msg = await readError(res);
+      showToast(`Claim save failed: ${msg}`, 6000);
+      return;
+    }
+    showToast('Holder claim reconciliation saved');
+    closeDetail();
+    loadOrders();
+  } catch(e) {
+    showToast('Network error saving holder claim', 6000);
+  }
 }
 
 async function deleteOrder(id, event) {
