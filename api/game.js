@@ -2232,11 +2232,10 @@ async function ethRpc(method, params = []) {
     'https://eth.llamarpc.com',
     'https://rpc.ankr.com/eth',
   ]));
-  let lastError = null;
-  let sawNull = false;
-  for (const rpcUrl of urls) {
+  const timeoutMs = Number(process.env.ETH_RPC_TIMEOUT_MS || 2500);
+  const checks = urls.map(async rpcUrl => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Number(process.env.ETH_RPC_TIMEOUT_MS || 4500));
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const r = await fetch(rpcUrl, {
         method: 'POST',
@@ -2246,15 +2245,22 @@ async function ethRpc(method, params = []) {
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok || data.error) throw new Error(data.error?.message || String(r.status));
-      if (data.result !== null && data.result !== undefined) return data.result;
-      sawNull = true;
+      return data.result === null || data.result === undefined
+        ? { ok: true, empty: true, rpcUrl }
+        : { ok: true, result: data.result, rpcUrl };
     } catch (networkErr) {
-      lastError = networkErr;
+      return { ok: false, error: networkErr, rpcUrl };
     } finally {
       clearTimeout(timer);
     }
-  }
+  });
+
+  const settled = await Promise.all(checks);
+  const hit = settled.find(x => x.ok && !x.empty);
+  if (hit) return hit.result;
+  const sawNull = settled.some(x => x.ok && x.empty);
   if (sawNull) return null;
+  const lastError = settled.find(x => !x.ok)?.error || null;
   const e = new Error('Transaction is not confirmed yet - ETH RPC temporarily unreachable' + (lastError ? ': ' + (lastError.message || lastError) : ''));
   e.statusCode = 409;
   throw e;
@@ -2279,8 +2285,10 @@ async function verifyEvmPayment({ method, txHash, payerAddress, quote, payeeAddr
     err.statusCode = 400;
     throw err;
   }
-  const tx = await ethRpc('eth_getTransactionByHash', [txHash]);
-  const receipt = await ethRpc('eth_getTransactionReceipt', [txHash]);
+  const [tx, receipt] = await Promise.all([
+    ethRpc('eth_getTransactionByHash', [txHash]),
+    ethRpc('eth_getTransactionReceipt', [txHash]),
+  ]);
   if (!tx || !receipt) {
     const err = new Error('Transaction is not confirmed yet');
     err.statusCode = 409;
@@ -2291,9 +2299,12 @@ async function verifyEvmPayment({ method, txHash, payerAddress, quote, payeeAddr
     err.statusCode = 400;
     throw err;
   }
-  const latestBlockHex = await ethRpc('eth_blockNumber', []);
-  const confirmations = Number(BigInt(latestBlockHex) - BigInt(receipt.blockNumber) + 1n);
   const minConfirmations = Number(process.env.CRYPTO_MIN_CONFIRMATIONS || 1);
+  let confirmations = 1;
+  if (minConfirmations > 1) {
+    const latestBlockHex = await ethRpc('eth_blockNumber', []);
+    confirmations = Number(BigInt(latestBlockHex) - BigInt(receipt.blockNumber) + 1n);
+  }
   if (confirmations < minConfirmations) {
     const err = new Error(`Waiting for ${minConfirmations} confirmation(s)`);
     err.statusCode = 409;
