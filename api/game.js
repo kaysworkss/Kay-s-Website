@@ -1350,6 +1350,28 @@ function serverNormalizeHolderWallet(chain, wallet) {
   return serverNormalizeHolderChain(chain) === 'ethereum' ? value.toLowerCase() : value;
 }
 
+// Fetch with a timeout and a couple of quick retries. On-chain RPC calls sit
+// in the critical path of every holder-merch-claim price lock (fired on tab
+// open, cart change, and every 10-min re-lock) so a single slow/unreachable
+// node must not be able to kill checkout outright.
+async function fetchWithRetry(url, options, { timeoutMs = 6000, attempts = 3 } = {}) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const r = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timer);
+      return r;
+    } catch (e) {
+      clearTimeout(timer);
+      lastErr = e;
+      if (i < attempts - 1) await new Promise(res => setTimeout(res, 300 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 async function serverEth1155Balance(contract, wallet, tokenId) {
   const paddedAddress = String(wallet).toLowerCase().replace(/^0x/, '').padStart(64, '0');
   const tokenIdHex = BigInt(tokenId).toString(16).padStart(64, '0');
@@ -1359,7 +1381,7 @@ async function serverEth1155Balance(contract, wallet, tokenId) {
     method: 'eth_call',
     params: [{ to: contract, data: '0x00fdd58e' + paddedAddress + tokenIdHex }, 'latest'],
   };
-  const r = await fetch(process.env.ETH_RPC_URL || 'https://ethereum.publicnode.com', {
+  const r = await fetchWithRetry(process.env.ETH_RPC_URL || 'https://ethereum.publicnode.com', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -1376,7 +1398,7 @@ async function serverTezosFa2Balance(contract, wallet, tokenIds) {
     + '&token.contract=' + encodeURIComponent(contract)
     + '&token.tokenId.in=' + tokenIds.map(encodeURIComponent).join(',')
     + '&balance.ne=0&limit=20';
-  const r = await fetch(url, { headers: { accept: 'application/json' } });
+  const r = await fetchWithRetry(url, { headers: { accept: 'application/json' } });
   if (!r.ok) throw new Error('Tezos holder check failed: TzKT returned ' + r.status);
   const rows = await r.json();
   return (Array.isArray(rows) ? rows : []).reduce((sum, row) => sum + Number(row.balance || 0), 0);
@@ -1397,11 +1419,12 @@ async function resolveServerHolderMerchClaim(rawClaim) {
   const tokenIds = [...APOTI_MERCH_DISCOUNT_TOKEN_IDS];
   const contract = chain === 'tezos' ? APOTI_MERCH_TEZOS_CONTRACT : APOTI_MERCH_ETH_CONTRACT;
   const tokenBalances = {};
-  for (const id of tokenIds) {
-    tokenBalances[id] = chain === 'tezos'
-      ? await serverTezosFa2Balance(contract, wallet, [id])
-      : await serverEth1155Balance(contract, wallet, id);
-  }
+  const balanceResults = await Promise.all(tokenIds.map(id => (
+    chain === 'tezos'
+      ? serverTezosFa2Balance(contract, wallet, [id])
+      : serverEth1155Balance(contract, wallet, id)
+  )));
+  tokenIds.forEach((id, i) => { tokenBalances[id] = balanceResults[i]; });
   const tokenBalance = Object.values(tokenBalances).reduce((sum, n) => sum + Number(n || 0), 0);
   const freeToteQty = APOTI_MERCH_TOKEN_IDS.reduce((sum, id) => sum + Number(tokenBalances[id] || 0), 0);
   if (tokenBalance < 1) {
