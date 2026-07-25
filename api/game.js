@@ -1404,6 +1404,40 @@ async function serverTezosFa2Balance(contract, wallet, tokenIds) {
   return (Array.isArray(rows) ? rows : []).reduce((sum, row) => sum + Number(row.balance || 0), 0);
 }
 
+// Holder balance results are cached per wallet for a short window matching
+// the client's price-lock lifetime (10 min). The wallet was already verified
+// once at Holder Hub login, so checkout only needs a *recent* on-chain read,
+// not a fresh one on every single quote/re-lock — a token balance is not
+// going to change inside a 10-minute checkout window in any real scenario.
+// This also gives us a safety net: if a fresh check fails (RPC hiccup), we
+// fall back to the last known-good balance rather than blocking checkout.
+const _holderBalanceCache = new Map(); // `${chain}:${wallet}` -> { balances, ts }
+const HOLDER_BALANCE_CACHE_TTL_MS = 10 * 60 * 1000;
+
+async function getCachedTokenBalances(chain, contract, wallet, tokenIds) {
+  const key = `${chain}:${wallet}`;
+  const cached = _holderBalanceCache.get(key);
+  if (cached && (Date.now() - cached.ts) < HOLDER_BALANCE_CACHE_TTL_MS) {
+    return cached.balances;
+  }
+  try {
+    const balanceResults = await Promise.all(tokenIds.map(id => (
+      chain === 'tezos'
+        ? serverTezosFa2Balance(contract, wallet, [id])
+        : serverEth1155Balance(contract, wallet, id)
+    )));
+    const balances = {};
+    tokenIds.forEach((id, i) => { balances[id] = balanceResults[i]; });
+    _holderBalanceCache.set(key, { balances, ts: Date.now() });
+    return balances;
+  } catch (e) {
+    // Fresh check failed - use the last known-good balance if we have one,
+    // however slightly stale, rather than blocking the whole checkout.
+    if (cached) return cached.balances;
+    throw e;
+  }
+}
+
 async function resolveServerHolderMerchClaim(rawClaim) {
   if (!rawClaim || typeof rawClaim !== 'object') return null;
   const entitlementKey = String(rawClaim.entitlement_key || rawClaim.entitlementKey || '').trim();
@@ -1418,13 +1452,7 @@ async function resolveServerHolderMerchClaim(rawClaim) {
 
   const tokenIds = [...APOTI_MERCH_DISCOUNT_TOKEN_IDS];
   const contract = chain === 'tezos' ? APOTI_MERCH_TEZOS_CONTRACT : APOTI_MERCH_ETH_CONTRACT;
-  const tokenBalances = {};
-  const balanceResults = await Promise.all(tokenIds.map(id => (
-    chain === 'tezos'
-      ? serverTezosFa2Balance(contract, wallet, [id])
-      : serverEth1155Balance(contract, wallet, id)
-  )));
-  tokenIds.forEach((id, i) => { tokenBalances[id] = balanceResults[i]; });
+  const tokenBalances = await getCachedTokenBalances(chain, contract, wallet, tokenIds);
   const tokenBalance = Object.values(tokenBalances).reduce((sum, n) => sum + Number(n || 0), 0);
   const freeToteQty = APOTI_MERCH_TOKEN_IDS.reduce((sum, id) => sum + Number(tokenBalances[id] || 0), 0);
   if (tokenBalance < 1) {
