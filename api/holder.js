@@ -606,6 +606,23 @@ async function handleMerchClaims(req, res, supabase) {
   });
 }
 
+async function handleProfile(req, res, supabase) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const holderRows = await getHolderAccessRows(req, supabase);
+  if (!holderRows.length) return res.status(403).json({ error: 'Holder access required.' });
+
+  const primary =
+    holderRows.find(row => row.auth_user_id) ||
+    holderRows.find(row => holderDisplayName(row)) ||
+    holderRows[0];
+
+  return res.status(200).json({
+    ok: true,
+    holder: primary,
+    linked_wallets: holderRows,
+  });
+}
+
 // -- action=participants ----
 // Holder-only participant list, served through the service-role API so the
 // dashboard does not depend on a public-view RLS policy being perfectly open.
@@ -692,6 +709,7 @@ module.exports = async (req, res) => {
       case 'claim':  return await handleClaim(req, res, supabase);
       case 'send-auth-email': return await handleSendAuthEmail(req, res, supabase);
       case 'content': return await handleContent(req, res, supabase);
+      case 'profile': return await handleProfile(req, res, supabase);
       case 'merch-claims': return await handleMerchClaims(req, res, supabase);
       case 'participants': return await handleParticipants(req, res, supabase);
       case 'email-updates': return await handleEmailUpdates(req, res, supabase);
