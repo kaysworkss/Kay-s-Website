@@ -3029,6 +3029,7 @@ async function handleShopOrderCreate(req, res, supabase) {
 
   const paymentMethod = String(body.payment_method || '').slice(0, 40);
   const quoteRequired = ['paystack','flutterwave','eth','tezos','usdc','usdt'].includes(paymentMethod);
+  const isCryptoCreate = ['eth','tezos','usdc','usdt'].includes(paymentMethod);
   // Verify the signed quote so a pending order can't be created with tampered totals.
   if (quoteRequired && !verifyShopQuote(body.checkout_quote, checkout, { payment_method: paymentMethod })) {
     return json(400, { error: 'Invalid or expired server checkout quote' });
@@ -3071,7 +3072,9 @@ async function handleShopOrderCreate(req, res, supabase) {
         .select('id, order_ref')
         .single();
       if (!updErr && updated) {
-        try { await reserveHolderMerchClaimForOrder(supabase, updated.order_ref, updated.id, body, checkout); } catch (e) { return jsonError(e); }
+        if (!isCryptoCreate) {
+          try { await reserveHolderMerchClaimForOrder(supabase, updated.order_ref, updated.id, body, checkout); } catch (e) { return jsonError(e); }
+        }
         return json(200, {
           ok: true,
           order_ref: updated.order_ref,
@@ -3116,7 +3119,9 @@ async function handleShopOrderCreate(req, res, supabase) {
     .select('id, order_ref')
     .single();
   if (orderError) return json(500, { error: orderError.message });
-  try { await reserveHolderMerchClaimForOrder(supabase, order.order_ref, order.id, body, checkout); } catch (e) { return jsonError(e); }
+  if (!isCryptoCreate) {
+    try { await reserveHolderMerchClaimForOrder(supabase, order.order_ref, order.id, body, checkout); } catch (e) { return jsonError(e); }
+  }
 
   return json(200, {
     ok: true,
@@ -3371,6 +3376,17 @@ async function handleShopOrderConfirm(req, res, supabase) {
       });
     }
     claimed.push(item);
+  }
+
+  try {
+    await reserveHolderMerchClaimForOrder(supabase, orderRef, order.id, body, {
+      ...checkout,
+      holderMerchClaim: checkout.holderMerchClaim || readCryptoOrderLock(order)?.checkout_quote?.holder_merch_claim || null,
+    });
+  } catch (e) {
+    for (const c of claimed) await releaseVariantStock(supabase, c);
+    await markOrderVerificationFailure(supabase, orderRef, e);
+    return jsonError(e);
   }
 
   // Backfill customer details from the confirm request if the order row is
