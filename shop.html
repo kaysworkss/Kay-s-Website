@@ -8369,6 +8369,7 @@ let _reownConnectAttempt = 0;
 const WALLETCONNECT_PROJECT_ID = '42dc845feb4ebf8f5cbe5725c2e07672';
 const ETH_WALLET_FEEDBACK_TIMEOUT_MS = 25000;
 const ETH_WALLET_HANDOFF_KEY = 'kwEthWalletHandoff';
+let _shopCatalogueRenderedOnce = false;
 
 const REOWN_METADATA = {
   name: "Kay's Works",
@@ -8452,6 +8453,11 @@ function markEthWalletHandoff(source) {
 
 function clearEthWalletHandoff() {
   try { localStorage.removeItem(ETH_WALLET_HANDOFF_KEY); } catch (_) {}
+}
+
+function closeEthWalletConnectSurfaces() {
+  try { _reownAppKit?.close?.(); } catch (_) {}
+  try { _reownAppKit?.closeModal?.(); } catch (_) {}
 }
 
 function readRecentEthWalletHandoff() {
@@ -8613,6 +8619,7 @@ async function clearEthWalletConnectionAfterStall() {
 }
 
 async function resumeEthWalletHandoffIfPossible() {
+  if (!_shopCatalogueRenderedOnce && !_shopProductsLoadedOnce) return;
   const handoff = readRecentEthWalletHandoff();
   if (!handoff || _ethConnectedAddr || document.hidden) return;
   const providerCandidate = _ethWalletProvider || window.ethereum || _reownProviderState?.provider || _reownAppKit?.getWalletProvider?.();
@@ -8636,6 +8643,7 @@ async function resumeEthWalletHandoffIfPossible() {
       _ethWalletProvider = providerCandidate;
       _ethProvider = new ethers.providers.Web3Provider(providerCandidate, 'any');
       clearEthWalletHandoff();
+      closeEthWalletConnectSurfaces();
       renderEthPanel();
       showToast('Wallet connected \u2736');
       return;
@@ -8942,6 +8950,7 @@ async function ethConnectWallet() {
     _ethWalletProvider = ethProvider;
     _ethProvider      = new ethers.providers.Web3Provider(ethProvider);
     clearEthWalletHandoff();
+    closeEthWalletConnectSurfaces();
 
     // Listen for account changes
     ethProvider.on?.('accountsChanged', accs => {
@@ -9703,6 +9712,32 @@ window.addEventListener('resize', placeShopDiscoveryExtras, { passive: true });
 /* Load shop data from API */
 let _shopProductsLoadedOnce = false;
 let _shopLoadPromise = null;
+
+function renderProductsSafely() {
+  try {
+    renderProducts();
+    _shopCatalogueRenderedOnce = true;
+  } catch (e) {
+    console.error('[shop] Product render failed:', e);
+    const allGrid = document.getElementById('allProductsGrid');
+    if (allGrid && !allGrid.children.length) {
+      allGrid.style.display = '';
+      allGrid.innerHTML = `<div class="shop-empty-state" style="grid-column:1/-1;padding:4rem 1rem;text-align:center">
+        <p style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;margin-bottom:0.8rem">The shop loaded, but rendering hit a snag</p>
+        <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:1.4rem">Refresh once. If this repeats, Kay can check the product data causing it.</p>
+        <button onclick="location.reload()" style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.18em;text-transform:uppercase;padding:0.7rem 1.6rem;background:var(--rust);color:#fff;border:none;border-radius:10px;cursor:pointer">Refresh the page</button>
+      </div>`;
+    }
+  }
+}
+
+function withShopConfigTimeout(promise, ms = 4500) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => window.setTimeout(() => reject(new Error('Configuration request timed out')), ms)),
+  ]);
+}
+
 async function loadShopData() {
   // Coalesce overlapping refreshes (initial load, wallet retry, post-purchase)
   // so a slower failed request cannot overwrite a successful catalogue load.
@@ -9714,10 +9749,10 @@ async function loadShopData() {
       if (!Array.isArray(rows)) throw new Error('Products response was not an array');
       return rows;
     });
-    const configTask = fetch('/api/shop/config').then(async response => {
+    const configTask = withShopConfigTimeout(fetch('/api/shop/config').then(async response => {
       if (!response.ok) throw new Error(`Configuration request failed (${response.status})`);
       return response.json();
-    });
+    }));
     const [productsResult, configResult] = await Promise.allSettled([productsTask, configTask]);
 
     if (productsResult.status === 'fulfilled') {
@@ -9805,7 +9840,7 @@ async function loadShopData() {
 
     // Storefront failures never inject demo/sample products. An empty successful
     // response renders the genuine empty-shop state; a failed first load renders retry.
-    renderProducts();
+    renderProductsSafely();
     // A checkout handed off from a product page opens immediately from the
     // shared cart. Refresh it once authoritative product/config data arrives so
     // live prices, edition stock and shipping metadata replace cached values.

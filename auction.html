@@ -4992,6 +4992,12 @@ function _wcCloseModal() {
   if (overlay) overlay.classList.remove("show");
 }
 
+function _closeEthWalletConnectSurfaces() {
+  _wcCloseModal();
+  try { _reownAppKit?.close?.(); } catch(_) {}
+  try { _reownAppKit?.closeModal?.(); } catch(_) {}
+}
+
 function _wcShowWalletOptionsLoading() {
   const overlay = document.getElementById("wc-modal-overlay");
   const body = document.getElementById("wc-modal-body");
@@ -5249,6 +5255,7 @@ async function _wcFinishConnect(addr, method) {
   signerAddress = addr; tezosAddress = null;
   sessionStorage.removeItem("wallet_disconnected");
   _clearEthWalletHandoff();
+  _closeEthWalletConnectSurfaces();
   setWalletUi("connected", addr);
   console.debug(`[eth] connected via ${method}:`, addr);
   if (auctionContract) {
@@ -5262,6 +5269,7 @@ async function _wcFinishConnect(addr, method) {
 
 function _wcHandleError(e) {
   signer = null; signerAddress = null; setWalletUi("failed");
+  _closeEthWalletConnectSurfaces();
   const text = e?.message || "";
   if (/timed out|did not return|stalled/i.test(text)) {
     _resetReownConnectionState().catch(() => {});
