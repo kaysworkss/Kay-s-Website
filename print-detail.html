@@ -1288,6 +1288,30 @@ function shopHref(path = '') {
   }
   return '/shop' + (path ? '/' + path.replace(/^\/+/, '') : '');
 }
+function hasActiveHolderMerchClaimCache() {
+  try {
+    const cached = JSON.parse(localStorage.getItem('kwHolderMerchClaimCache') || 'null');
+    return !!(
+      cached &&
+      cached.selected &&
+      cached.selected.verified === true &&
+      Date.now() - Number(cached.at || 0) < 24 * 60 * 60 * 1000
+    );
+  } catch (_) {
+    return false;
+  }
+}
+function shopCheckoutHref(hash = 'checkout') {
+  const base = shopHref();
+  const holderQuery = hasActiveHolderMerchClaimCache() ? 'holder=apoti' : '';
+  if (location.protocol === 'file:') {
+    const url = new URL(base, location.href);
+    if (holderQuery) url.search = holderQuery;
+    url.hash = hash;
+    return url.href;
+  }
+  return '/shop' + (holderQuery ? '?' + holderQuery : '') + '#' + hash;
+}
 function slugify(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
 function printOptionKey(type, size) { return `${type}|${size}`; }
 function labelPrintOption(type, size) { return `${type} · ${size}`; }
@@ -2640,8 +2664,7 @@ function initCartLinks() {
     closeCart();
     const overlay = document.getElementById('checkoutLoading');
     if (overlay) overlay.classList.add('show');
-    const base = shopHref();
-    const dest = base + (base.includes('#') ? '' : '#checkout');
+    const dest = shopCheckoutHref('checkout');
     // Give the overlay a frame to paint before the navigation begins.
     requestAnimationFrame(() => { window.location.href = dest; });
   });
