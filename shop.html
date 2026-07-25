@@ -7818,11 +7818,16 @@ async function confirmPendingOrder(orderRef, opts) {
   // internal receipt poll, then the browser retries quickly for up to 6 minutes.
   // The server returns 409 for ALL
   // "not yet" states so we only stop on genuine hard business failures.
- const maxAttempts = 180; // 180 2s = 6 minutes
+  const maxAttempts = 180; // 180 2s = 6 minutes
   const RETRY_MS = 2000;
   const isHardFail = (data, errMsg) =>
     data.sold_out ||
-    /sold.out|amount.*below|failed.on-chain|sender.*mismatch|does.not.match|invalid.*hash|invalid.*operation/i.test(errMsg);
+    /sold.out|amount.*below|failed.on-chain|sender.*mismatch|does.not.match|invalid.*hash|invalid.*operation|invalid.or.expired|order.not.found|valid.quote|locked.crypto|payment.method|wallet.address|required|already.*recorded|shop.eth.address/i.test(errMsg);
+  const shouldRetryConfirm = (status, errMsg) =>
+    status === 409 && !isHardFail({}, errMsg) ||
+    status === 502 ||
+    status === 503 ||
+    status === 504;
   let lastErr = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -7844,6 +7849,11 @@ async function confirmPendingOrder(orderRef, opts) {
       const errMsg = data.error || rawText || '';
  // Hard failure stop immediately
       if (isHardFail(data, errMsg)) {
+        const e = new Error(errMsg || `Order confirmation failed (${res.status})`);
+        e.nonRetryable = true;
+        throw e;
+      }
+      if (!shouldRetryConfirm(res.status, errMsg)) {
         const e = new Error(errMsg || `Order confirmation failed (${res.status})`);
         e.nonRetryable = true;
         throw e;
