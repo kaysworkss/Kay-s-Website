@@ -4011,6 +4011,13 @@ body.dark { --text-muted: #b3a392; }
 <script>
 'use strict';
 
+// The shared shop utilities keep example products for admin templates. The
+// public storefront must start empty and wait for the live catalogue, otherwise
+// a slow/offline product API can briefly show demo merch as real stock.
+if (typeof SHOP_CONFIG !== 'undefined') {
+  SHOP_CONFIG.products = [];
+}
+
 /* Cart state */
 let cart = [];
 // Live sync: when any other tab/page updates the shared cart, reflect it here
@@ -6473,6 +6480,7 @@ function applyHolderMerchContext() {
 }
 (function initHolderMerchClaim() {
   const holderAccessVisible = applyHolderMerchContext();
+  restoreHolderMerchClaimCache();
   if (!holderAccessVisible) return;
   document.getElementById('holderMerchAccordion')?.addEventListener('toggle', () => saveHolderMerchState());
   window.addEventListener('pagehide', () => saveHolderMerchState(), { passive: true });
@@ -6485,7 +6493,6 @@ function applyHolderMerchContext() {
   document.getElementById('holderConnectBtn')?.addEventListener('click', connectApotiHolderWallet);
   document.getElementById('holderConnectTezosBtn')?.addEventListener('click', connectApotiTezosHolderWallet);
   updateHolderMerchLockState();
-  restoreHolderMerchClaimCache();
   setInterval(updateHolderMerchLockState, 1000);
   document.querySelectorAll('[data-holder-add]').forEach(btn => {
     btn.addEventListener('click', () => addHolderMerchToCart(btn.dataset.holderAdd));
@@ -8172,6 +8179,10 @@ function lockPayerAddress(method) {
   return (typeof _ethConnectedAddr !== 'undefined' && _ethConnectedAddr) || '';
 }
 
+function hasLiveEthPaymentProvider() {
+  return !!(_ethConnectedAddr && (_ethWalletProvider || _ethProvider));
+}
+
 // Render the lock UI (amount, order hash, countdown) into the given panel.
 function renderLockUI(method) {
   const ids = method === 'tezos'
@@ -8763,9 +8774,11 @@ function readRecentEthWalletHandoff() {
 
 async function requestEthWalletAccounts(ethProvider) {
   if (ethProvider?.accounts?.length) return ethProvider.accounts;
-  if (_ethConnectedAddr) return [_ethConnectedAddr];
   if (_reownProviderState?.address) return [_reownProviderState.address];
-  if (!ethProvider?.request) throw new Error('Wallet provider is unavailable. Reopen the wallet chooser and try again.');
+  if (!ethProvider?.request) {
+    if (_ethConnectedAddr && hasLiveEthPaymentProvider()) return [_ethConnectedAddr];
+    throw new Error('Wallet provider is unavailable. Reopen the wallet chooser and try again.');
+  }
   markEthWalletHandoff('accounts');
   const accounts = await withEthWalletFeedbackTimeout(
     ethProvider.request({ method: 'eth_requestAccounts' })
@@ -9192,6 +9205,7 @@ function renderEthPanel() {
   const manualBtn  = document.getElementById('cryptoConfirmBtn');
   const manualFlds = document.getElementById('ethManualFields');
   const rateReady = addr && ethAmt !== null;
+  const ethReadyToSend = hasLiveEthPaymentProvider();
 
   if (manual) {
     // Manual mode: hide wallet connect/send buttons, show the manual confirm.
@@ -9208,7 +9222,7 @@ function renderEthPanel() {
     // (including the USDC/USDT send buttons once a wallet is connected).
     if (manualBtn) manualBtn.style.display = 'none';
     if (manualFlds) { manualFlds.style.display = 'none'; }
-    if (_ethConnectedAddr) {
+    if (ethReadyToSend) {
       if (walletInfo) walletInfo.style.display = '';
       document.getElementById('ethWalletAddr').textContent = ethShortAddr(_ethConnectedAddr);
       if (connectBtn) connectBtn.style.display = 'none';
@@ -9218,6 +9232,7 @@ function renderEthPanel() {
     } else {
       if (walletInfo) walletInfo.style.display = 'none';
       if (connectBtn) connectBtn.style.display = '';
+      if (connectBtn) connectBtn.textContent = _ethConnectedAddr ? 'Reconnect ETH Wallet' : 'Connect ETH Wallet';
       if (sendBtn)    sendBtn.style.display    = 'none';
       document.getElementById('ethSendUsdcBtn').style.display = 'none';
       document.getElementById('ethSendUsdtBtn').style.display = 'none';
@@ -9227,7 +9242,8 @@ function renderEthPanel() {
 
 /* Connect ETH wallet */
 async function ethConnectWallet() {
-  if (_ethConnectedAddr || _ethConnecting) return;
+  if (_ethConnecting) return;
+  if (_ethConnectedAddr && hasLiveEthPaymentProvider()) return;
 
   if (typeof ethers === 'undefined') {
  showToast('Payment library still loading please try again in a moment');
@@ -9280,6 +9296,7 @@ async function ethConnectWallet() {
   } finally {
     _ethConnecting = false;
     if (btn) { btn.disabled = false; btn.textContent = 'Connect ETH Wallet'; }
+    renderEthPanel();
   }
 }
 
