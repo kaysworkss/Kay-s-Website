@@ -1569,8 +1569,12 @@ async function resolveHolderRecordForClaim(supabase, claim) {
 
 async function reserveHolderMerchClaimForOrder(supabase, orderRef, orderId, body, checkout) {
   const claim = checkout.holderMerchClaim;
-  if (!claim || !claim.covered_tote_qty) return null;
+  const requestedQty = Number(claim?.covered_tote_qty ?? claim?.coveredToteQty ?? 0);
+  if (!claim || !requestedQty) return null;
   const holder = await resolveHolderRecordForClaim(supabase, claim);
+  const entitlementKey = String(claim.entitlement_key || claim.entitlementKey || '').trim();
+  const tokenIds = claim.token_ids || claim.tokenIds || [];
+  const tokenBalance = Number(claim.token_balance ?? claim.tokenBalance ?? 0);
   const metadata = {
     customer_email: String(body.email || '').trim().toLowerCase(),
     customer_name: String(body.name || '').slice(0, 200),
@@ -1580,7 +1584,7 @@ async function reserveHolderMerchClaimForOrder(supabase, orderRef, orderId, body
     free_tote_ngn: checkout.holderMerchBenefit?.freeToteNgn || 0,
   };
   const { data, error } = await supabase.rpc('reserve_holder_merch_claim', {
-    p_entitlement_key: claim.entitlement_key,
+    p_entitlement_key: entitlementKey,
     p_project: claim.project,
     p_holder_id: holder.id || null,
     p_auth_user_id: holder.auth_user_id || null,
@@ -1588,14 +1592,36 @@ async function reserveHolderMerchClaimForOrder(supabase, orderRef, orderId, body
     p_wallet_address: claim.wallet,
     p_chain: claim.chain,
     p_contract_address: claim.contract,
-    p_token_ids: claim.token_ids,
-    p_token_balance: claim.token_balance,
-    p_requested_qty: claim.covered_tote_qty,
+    p_token_ids: tokenIds,
+    p_token_balance: tokenBalance,
+    p_requested_qty: requestedQty,
     p_order_ref: orderRef,
     p_order_id: orderId ? String(orderId) : null,
     p_metadata: metadata,
   });
   if (error) {
+    const msg = String(error.message || error || '');
+    const missingRpc = error.code === 'PGRST202' ||
+      /could not find the function/i.test(msg) ||
+      /schema cache/i.test(msg);
+    if (missingRpc) {
+      return {
+        ok: false,
+        manual_review_required: true,
+        reservation_unavailable: true,
+        reservation_error: msg.slice(0, 1000),
+        order_ref: orderRef,
+        order_id: orderId ? String(orderId) : null,
+        requested_qty: requestedQty,
+        fulfilled_qty: 0,
+        wallet_address: claim.wallet,
+        chain: claim.chain,
+        tier: claim.tier,
+        token_balance: tokenBalance,
+        token_ids: tokenIds,
+        metadata,
+      };
+    }
     const err = new Error('Could not reserve holder merch claim: ' + error.message);
     err.statusCode = 500;
     throw err;
@@ -3398,7 +3424,11 @@ async function handleShopOrderConfirm(req, res, supabase) {
       ...checkout,
       holderMerchClaim: checkout.holderMerchClaim,
     });
-    holderClaimReservation = result ? { ok: true, result } : null;
+    holderClaimReservation = result
+      ? (result.ok === false
+          ? { ok: false, manual_review_required: true, reservation_unavailable: !!result.reservation_unavailable, error: result.reservation_error || result.error || 'Holder claim reservation needs admin review', result }
+          : { ok: true, result })
+      : null;
   } catch (e) {
     holderClaimReservation = {
       ok: false,

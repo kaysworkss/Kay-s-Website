@@ -618,7 +618,7 @@ async function handleShopOrderUpdate(req, res, supabase) {
   if (body.holder_claim_manual_review === true) {
     const { data: order, error: loadErr } = await supabase
       .from('shop_orders')
-      .select('payment_metadata')
+      .select('order_ref,payment_metadata')
       .eq('id', id)
       .maybeSingle();
     if (loadErr) return json(500, { error: loadErr.message });
@@ -653,6 +653,50 @@ async function handleShopOrderUpdate(req, res, supabase) {
       reviewed_at: reviewedAt,
     };
     patch.payment_metadata = metadata;
+
+    const { data: claimLedgerRow, error: claimLedgerLoadError } = await supabase
+      .from('holder_merch_claims')
+      .select('requested_qty,metadata')
+      .eq('order_ref', order.order_ref)
+      .maybeSingle();
+    if (claimLedgerLoadError && claimLedgerLoadError.code !== '42P01') {
+      return json(500, { error: `Holder claim ledger lookup failed: ${claimLedgerLoadError.message}` });
+    }
+
+    const requestedQty = Math.max(0, Math.floor(Number(
+      claimLedgerRow?.requested_qty ||
+      previousReservation?.result?.requested_qty ||
+      previousReservation?.result?.reserved_qty ||
+      previousReservation?.result?.covered_tote_qty ||
+      metadata.holder_merch_claim?.covered_tote_qty ||
+      metadata.checkout_quote?.holder_merch_claim?.covered_tote_qty ||
+      fulfilledQty
+    )));
+    const claimStatus = requestedQty > 0 && fulfilledQty >= requestedQty
+      ? 'fulfilled'
+      : fulfilledQty > 0
+        ? 'partial_fulfilled'
+        : 'reserved';
+    const ledgerPatch = {
+      fulfilled_qty: Math.min(fulfilledQty, requestedQty || fulfilledQty),
+      status: claimStatus,
+      metadata: {
+        ...(claimLedgerRow?.metadata && typeof claimLedgerRow.metadata === 'object' ? claimLedgerRow.metadata : {}),
+        ...(previousReservation?.result?.metadata || {}),
+        manual_reconciliation: {
+          fulfilled_qty: fulfilledQty,
+          note: String(body.holder_claim_note || '').slice(0, 1000),
+          reviewed_at: reviewedAt,
+        },
+      },
+    };
+    const ledgerUpdate = await supabase
+      .from('holder_merch_claims')
+      .update(ledgerPatch)
+      .eq('order_ref', order.order_ref);
+    if (ledgerUpdate.error && ledgerUpdate.error.code !== '42P01') {
+      return json(500, { error: `Order note saved failed because holder claim ledger could not update: ${ledgerUpdate.error.message}` });
+    }
   }
 
   const { error } = await supabase.from('shop_orders').update(patch).eq('id', id);
