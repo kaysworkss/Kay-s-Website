@@ -2196,6 +2196,8 @@ const ERC20_CONTRACTS = {
 };
 const ERC20_DECIMALS = { usdc: 6, usdt: 6 };
 const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+const ETH_VERIFY_RECEIPT_POLL_ATTEMPTS = Math.max(1, Number(process.env.ETH_VERIFY_RECEIPT_POLL_ATTEMPTS || 5));
+const ETH_VERIFY_RECEIPT_POLL_MS = Math.max(250, Number(process.env.ETH_VERIFY_RECEIPT_POLL_MS || 1500));
 
 function normEvmAddress(addr) {
   return String(addr || '').trim().toLowerCase();
@@ -2240,6 +2242,10 @@ async function ethRpc(method, params = []) {
   return data.result;
 }
 
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function getShopPaymentAddresses(supabase) {
   const { data } = await supabase
     .from('shop_config')
@@ -2255,8 +2261,14 @@ async function getShopPaymentAddresses(supabase) {
 
 async function verifyEvmPayment({ method, txHash, payerAddress, quote, payeeAddress }) {
   if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) throw new Error('Invalid Ethereum transaction hash');
-  const tx = await ethRpc('eth_getTransactionByHash', [txHash]);
-  const receipt = await ethRpc('eth_getTransactionReceipt', [txHash]);
+  let tx = null;
+  let receipt = null;
+  for (let attempt = 1; attempt <= ETH_VERIFY_RECEIPT_POLL_ATTEMPTS; attempt++) {
+    tx = tx || await ethRpc('eth_getTransactionByHash', [txHash]);
+    receipt = await ethRpc('eth_getTransactionReceipt', [txHash]);
+    if (tx && receipt) break;
+    if (attempt < ETH_VERIFY_RECEIPT_POLL_ATTEMPTS) await wait(ETH_VERIFY_RECEIPT_POLL_MS);
+  }
   if (!tx || !receipt) {
     const err = new Error('Transaction is not confirmed yet');
     err.statusCode = 409;
