@@ -8338,8 +8338,10 @@ let _ethWalletProvider   = null;
 let _walletConnectEthProvider = null;
 let _reownAppKit         = null;
 let _reownProviderState  = null;
+let _reownConnectAttempt = 0;
 
 const WALLETCONNECT_PROJECT_ID = '42dc845feb4ebf8f5cbe5725c2e07672';
+const ETH_WALLET_FEEDBACK_TIMEOUT_MS = 45000;
 
 const REOWN_METADATA = {
   name: "Kay's Works",
@@ -8362,6 +8364,10 @@ async function loadReownAppKit() {
     projectId: WALLETCONNECT_PROJECT_ID,
     metadata: REOWN_METADATA,
     allWallets: 'SHOW',
+    enableWallets: true,
+    enableReconnect: false,
+    enableNetworkSwitch: false,
+    enableMobileFullScreen: true,
     features: {
       analytics: false,
       email: false,
@@ -8381,12 +8387,23 @@ async function loadReownAppKit() {
   return _reownAppKit;
 }
 
+async function resetReownConnectionState() {
+  try { await _reownAppKit?.disconnect?.(); } catch (_) {}
+  try { await _reownAppKit?.adapter?.connectionControllerClient?.disconnect?.(); } catch (_) {}
+  try { await _walletConnectEthProvider?.disconnect?.(); } catch (_) {}
+  _reownProviderState = null;
+  _ethWalletProvider = null;
+  _walletConnectEthProvider = null;
+}
+
 async function connectReownAppKitProvider() {
   const modal = await loadReownAppKit();
+  const attempt = ++_reownConnectAttempt;
   const existing = modal.getWalletProvider?.() || _reownProviderState?.provider;
   if (existing) {
     const accounts = await existing.request?.({ method: 'eth_accounts' }).catch(() => []);
     if (accounts?.[0] || _reownProviderState?.address) return existing;
+    await resetReownConnectionState();
   }
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -8407,12 +8424,13 @@ async function connectReownAppKitProvider() {
         finish(state.provider);
       }
     });
-    modal.open?.({ view: 'Connect' });
-    window.setTimeout(() => {
+    modal.open?.({ view: 'Connect', namespace: 'eip155' });
+    window.setTimeout(async () => {
       if (settled) return;
       try { unsubscribe?.(); } catch (_) {}
-      reject(new Error('Wallet connection timed out. Close the wallet window and try again.'));
-    }, 90000);
+      if (attempt === _reownConnectAttempt) await resetReownConnectionState();
+      reject(new Error('Wallet did not return an account. Reopen the wallet chooser and try again.'));
+    }, ETH_WALLET_FEEDBACK_TIMEOUT_MS);
   });
 }
 
@@ -8760,6 +8778,9 @@ async function ethConnectWallet() {
     const msg = e?.message || String(e);
     if (/rejected|denied|cancel/i.test(msg)) {
       showToast('Connection cancelled');
+    } else if (/timed out|did not return/i.test(msg)) {
+      showToast('Wallet connection stalled. Please try again.');
+      console.warn('[ETH] connect timeout:', e);
     } else {
       showToast('Could not connect wallet \u2014 try again');
       console.error('[ETH] connect error:', e);

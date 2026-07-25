@@ -4792,6 +4792,8 @@ let _reownAppKit = null;
 let _reownAppKitPromise = null;
 let _reownProviderState = null;
 let _ethWalletProvider = null;
+let _reownConnectAttempt = 0;
+const _ETH_WALLET_FEEDBACK_TIMEOUT_MS = 45000;
 
 function _reownEip155ProviderFromState(state) {
   return state?.eip155 || state?.provider || null;
@@ -4959,11 +4961,12 @@ else window.addEventListener("load", _warmReownAppKitSoon, { once: true });
 
 async function _connectReownProvider() {
   const modal = await _loadReownAppKit();
+  const attempt = ++_reownConnectAttempt;
   const existing = modal.getProviders?.()?.eip155 || modal.getWalletProvider?.() || _reownEip155ProviderFromState(_reownProviderState);
   if (existing) {
     const accounts = await existing.request?.({ method: "eth_accounts" }).catch(() => []);
     if (accounts?.[0] || _reownAddressFromState(_reownProviderState, modal)) return existing;
-    try { await modal.adapter?.connectionControllerClient?.disconnect?.(); } catch(_) {}
+    await _resetReownConnectionState();
   }
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -5000,12 +5003,21 @@ async function _connectReownProvider() {
       try { unsubscribeProviders?.(); } catch(_) {}
     };
     modal.open?.({ view: "Connect", namespace: "eip155" });
-    window.setTimeout(() => {
+    window.setTimeout(async () => {
       if (settled) return;
       try { unsubscribe?.(); } catch(_) {}
-      reject(new Error("Wallet connection timed out. Close the wallet window and try again."));
-    }, 90000);
+      if (attempt === _reownConnectAttempt) await _resetReownConnectionState();
+      reject(new Error("Wallet did not return an account. Reopen the wallet chooser and try again."));
+    }, _ETH_WALLET_FEEDBACK_TIMEOUT_MS);
   });
+}
+
+async function _resetReownConnectionState() {
+  try { await _wcProvider?.disconnect?.(); } catch(_) {}
+  try { await _reownAppKit?.disconnect?.(); } catch(_) {}
+  try { await _reownAppKit?.adapter?.connectionControllerClient?.disconnect?.(); } catch(_) {}
+  _reownProviderState = null;
+  _ethWalletProvider = null;
 }
 
 async function _wcConnectAppKit() {
@@ -5073,11 +5085,7 @@ async function _wcConnectWC(walletHint) {
   return _wcConnectAppKit();
 }
 async function _wcDisconnectWC() {
-  try { await _wcProvider?.disconnect?.(); } catch(_) {}
-  try { await _reownAppKit?.disconnect?.(); } catch(_) {}
-  try { await _reownAppKit?.adapter?.connectionControllerClient?.disconnect?.(); } catch(_) {}
-  _reownProviderState = null;
-  _ethWalletProvider = null;
+  await _resetReownConnectionState();
   _wcCloseModal();
   _walletConnecting = false;
   if (!signerAddress) setWalletUi("disconnected");
@@ -5105,8 +5113,12 @@ async function _wcFinishConnect(addr, method) {
 
 function _wcHandleError(e) {
   signer = null; signerAddress = null; setWalletUi("failed");
-  const msg = (e.code === 4001 || /rejected|denied|cancelled/i.test(e.message || ""))
-    ? "Connection cancelled" : e.message || "Connection failed";
+  const text = e?.message || "";
+  const msg = (e.code === 4001 || /rejected|denied|cancelled/i.test(text))
+    ? "Connection cancelled"
+    : (/timed out|did not return|stalled/i.test(text)
+      ? "Wallet did not return an account. Tap Connect ETH again and choose the wallet once more."
+      : text || "Connection failed");
   notify("err", "Connection failed", msg);
 }
 
