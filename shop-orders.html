@@ -137,6 +137,9 @@ nav{
 .status-shipped    {background:rgba(107,124,92,0.18);color:var(--moss);}
 .status-fulfilled  {background:rgba(107,124,92,0.25);color:var(--moss);font-weight:600;}
 .status-cancelled  {background:rgba(158,79,46,0.15);color:var(--rust);}
+.status-confirming {background:rgba(201,153,58,0.15);color:var(--amber);}
+.status-review_required{background:rgba(158,79,46,0.18);color:var(--rust);}
+.status-expired    {background:rgba(138,112,96,0.15);color:var(--text-muted);}
 
 /* Payment badge */
 .pay-badge{
@@ -399,6 +402,8 @@ body.dark .toast{background:#2a1c14;}
       <button class="filter-pill" data-status="pending_payment">Pending payment</button>
       <button class="filter-pill" data-status="paid_unshipped">Paid, not shipped</button>
       <button class="filter-pill" data-status="paid">Paid</button>
+      <button class="filter-pill" data-status="confirming">Confirming</button>
+      <button class="filter-pill" data-status="review_required">Review</button>
       <button class="filter-pill" data-status="pending">Pending</button>
       <button class="filter-pill" data-status="processing">Processing</button>
       <button class="filter-pill" data-status="shipped">Shipped</button>
@@ -521,6 +526,14 @@ function paymentMeta(o) {
 function orderRef(o) {
   const meta = paymentMeta(o) || {};
   return o.order_ref || meta.order_hash || o.payment_ref || o.id || '';
+}
+function paymentRef(o) {
+  const meta = paymentMeta(o) || {};
+  return o.payment_ref || meta.payment_ref || '';
+}
+function payerAddress(o) {
+  const meta = paymentMeta(o) || {};
+  return meta.payer_address || meta.wallet || '';
 }
 function inferredCarrier(o) {
   if (o.tracking_carrier) return o.tracking_carrier;
@@ -665,6 +678,14 @@ function renderOrders() {
     const items = Array.isArray(o.items) ? o.items : [];
     const itemsSummary = items.slice(0,2).map(i=>`${short(i.name,20)} - ${i.variant}`).join('<br/>');
     const moreItems = items.length > 2 ? `<span style="color:var(--text-muted);font-size:0.78rem">+${items.length-2} more</span>` : '';
+    const tx = paymentRef(o);
+    const meta = paymentMeta(o) || {};
+    const proofLine = tx
+      ? `<div style="font-family:'Montserrat',sans-serif;font-size:0.58rem;color:var(--clay);margin-top:0.28rem">${short(tx,18)}</div>`
+      : (['eth','tezos','usdc','usdt'].includes(String(o.payment_method || '').toLowerCase()) ? `<div style="font-size:0.68rem;color:var(--amber);margin-top:0.25rem">Awaiting proof</div>` : '');
+    const failureLine = o.failure_reason
+      ? `<div style="font-size:0.66rem;color:var(--rust);margin-top:0.25rem">${escapeHtml(short(o.failure_reason,42))}</div>`
+      : '';
     return `<tr>
       <td><div class="order-ref">${short(orderRef(o),18)}</div><div style="font-size:0.68rem;color:var(--text-muted);margin-top:0.2rem">${o.status==='pending' ? orderAgeLabel(o) : ''}</div></td>
       <td>
@@ -676,7 +697,7 @@ function renderOrders() {
         <div class="order-total">${fmt(o.total_ngn)}</div>
         <div class="order-total-usd">${fmtUsd(o.total_usd)}</div>
       </td>
-      <td><span class="pay-badge">${(o.payment_method||'-').toUpperCase()}</span></td>
+      <td><span class="pay-badge">${(o.payment_method||'-').toUpperCase()}</span>${proofLine}${failureLine}</td>
       <td style="font-size:0.82rem;color:var(--text-muted)">${o.delivery_method==='pickup'?'Pickup - Kaduna':(o.delivery_zone||'-')}</td>
       <td><span class="status-badge status-${o.status||'pending'}">${o.status||'pending'}</span></td>
       <td style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap">
@@ -832,8 +853,9 @@ function openDetail(id) {
       <div class="detail-section-label">Payment</div>
       <div class="detail-row"><span class="detail-row-label">Method</span><span class="detail-row-val">${(o.payment_method||'-').toUpperCase()}</span></div>
       <div class="detail-row"><span class="detail-row-label">Order hash</span><span class="detail-row-val" style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--clay)">${orderRef(o)||'-'}</span></div>
-      <div class="detail-row"><span class="detail-row-label">Transaction</span><span class="detail-row-val" style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--clay)">${o.payment_ref||'-'}</span></div>
-      ${meta?.payer_address ? `<div class="detail-row"><span class="detail-row-label">Wallet</span><span class="detail-row-val" style="font-family:'Montserrat',sans-serif;font-size:0.72rem">${meta.payer_address}</span></div>` : ''}
+      <div class="detail-row"><span class="detail-row-label">Transaction</span><span class="detail-row-val" style="font-family:'Montserrat',sans-serif;font-size:0.72rem;color:var(--clay)">${paymentRef(o)||'-'}</span></div>
+      ${payerAddress(o) ? `<div class="detail-row"><span class="detail-row-label">Wallet</span><span class="detail-row-val" style="font-family:'Montserrat',sans-serif;font-size:0.72rem">${payerAddress(o)}</span></div>` : ''}
+      ${o.failure_reason ? `<div class="detail-row"><span class="detail-row-label">Verification note</span><span class="detail-row-val" style="color:var(--rust)">${escapeHtml(o.failure_reason)}</span></div>` : ''}
       ${meta?.crypto_amount ? `<div class="detail-row"><span class="detail-row-label">Locked amount</span><span class="detail-row-val">${meta.crypto_amount} ${(meta.crypto_symbol || o.payment_method || '').toUpperCase()}</span></div>` : ''}
       <div class="detail-row"><span class="detail-row-label">Subtotal</span><span class="detail-row-val">${fmt(o.total_ngn - (o.delivery_fee_ngn||0))}</span></div>
       <div class="detail-row"><span class="detail-row-label">Delivery fee</span><span class="detail-row-val">${o.delivery_fee_ngn ? fmt(o.delivery_fee_ngn) : '—'}</span></div>

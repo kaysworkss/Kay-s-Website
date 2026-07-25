@@ -7565,7 +7565,44 @@ function getManualCryptoProof(chain) {
   return { order_ref: orderRef, payer_address: sender, payment_ref: txHash };
 }
 
-function revealManualCryptoFields(chain) {
+async function ensureManualPendingOrder(chain) {
+  const method = chain === 'tezos' ? 'tezos' : 'eth';
+  if (!checkoutReadyForCryptoLock()) {
+    showToast('Fill in your delivery details first so we can save the order reference.');
+    return null;
+  }
+  let lock = (window.__activeLock && window.__activeLock.method === method) ? window.__activeLock : null;
+  if (!lock || !lock.order_ref || !lock.quote) {
+    lock = await refreshLock(method, false);
+  }
+  if (!lock || !lock.order_ref || !lock.quote) {
+    throw new Error('Could not create a payment quote yet. Try again in a moment.');
+  }
+  const remembered = latestPendingOrder(method);
+  if (remembered?.ref === lock.order_ref && remembered.server_logged === true) {
+    fillManualCryptoFields(method);
+    return lock;
+  }
+  const d = getFormData();
+  const pending = await createPendingOrder(d, method, lock.quote);
+  const orderRef = pending?.order_ref || pending?.orderRef || lock.order_ref;
+  if (orderRef && orderRef !== lock.order_ref) {
+    lock.order_ref = orderRef;
+    window.__activeLock = lock;
+  }
+  rememberPendingOrder(orderRef, {
+    method,
+    payer_address: lock.payerAddress || '',
+    quote: lock.quote,
+    customer: d,
+    server_logged: true,
+  });
+  fillManualCryptoFields(method);
+  renderLockUI(method);
+  return lock;
+}
+
+async function revealManualCryptoFields(chain) {
   const fields = document.getElementById(chain === 'tezos' ? 'tezosManualFields' : 'ethManualFields');
   const btn = document.getElementById(chain === 'tezos' ? 'tezosManualBtn' : 'cryptoConfirmBtn');
   if (!fields || !btn) return false;
@@ -7577,10 +7614,21 @@ function revealManualCryptoFields(chain) {
     fields.style.display = '';
     window.__manualCryptoMode = chain;
     stopLockTimer();
-    btn.textContent = 'Confirm manual payment';
+    btn.textContent = 'Saving order...';
+    btn.disabled = true;
+    try {
+      await ensureManualPendingOrder(chain);
+    } catch (err) {
+      showToast(err.message || 'Could not save the manual order reference yet.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Confirm manual payment';
+    }
     const lock = window.__activeLock;
     const refInput = document.getElementById(chain === 'tezos' ? 'tezosManualRef' : 'ethManualRef');
     const senderInput = document.getElementById(chain === 'tezos' ? 'tezosManualSender' : 'ethManualSender');
+    const txInput = document.getElementById(chain === 'tezos' ? 'tezosManualTx' : 'ethManualTx');
+    const remembered = latestPendingOrder(chain);
     // Resolve the order reference in priority order:
     //  1. the live price-lock for this method
     //  2. the most recent remembered order for this method (survives reload /
@@ -7589,15 +7637,17 @@ function revealManualCryptoFields(chain) {
     if (refInput && !refInput.value) {
       let ref = (lock && lock.method === chain) ? lock.order_ref : '';
       if (!ref) {
-        const remembered = latestPendingOrder(chain);
         if (remembered) ref = remembered.ref;
       }
       if (ref) refInput.value = ref;
     }
     if (senderInput && !senderInput.value) {
       senderInput.value = chain === 'tezos'
-        ? ((_tezosConnectedAddr || lock?.payerAddress || latestPendingOrder(chain)?.payer_address || '') || '')
-        : ((_ethConnectedAddr || lock?.payerAddress || latestPendingOrder(chain)?.payer_address || '') || '');
+        ? ((_tezosConnectedAddr || lock?.payerAddress || remembered?.payer_address || '') || '')
+        : ((_ethConnectedAddr || lock?.payerAddress || remembered?.payer_address || '') || '');
+    }
+    if (txInput && !txInput.value && remembered?.payment_ref) {
+      txInput.value = remembered.payment_ref;
     }
     const firstInput = fields.querySelector('input');
     if (firstInput) firstInput.focus();
@@ -7628,7 +7678,7 @@ function cancelManualCrypto(chain) {
 }
 
 async function submitManualCrypto(chain) {
-  if (revealManualCryptoFields(chain)) return;
+  if (await revealManualCryptoFields(chain)) return;
   const proof = getManualCryptoProof(chain);
   if (!proof) return;
   const method = chain === 'tezos' ? 'tezos' : 'eth';
@@ -8744,16 +8794,21 @@ window.__cryptoMode = window.__cryptoMode || { eth: 'connect', tezos: 'connect' 
 function fillManualCryptoFields(chain) {
   const refInput = document.getElementById(chain === 'tezos' ? 'tezosManualRef' : 'ethManualRef');
   const senderInput = document.getElementById(chain === 'tezos' ? 'tezosManualSender' : 'ethManualSender');
+  const txInput = document.getElementById(chain === 'tezos' ? 'tezosManualTx' : 'ethManualTx');
   const lock = window.__activeLock;
+  const remembered = latestPendingOrder(chain);
   if (refInput && !refInput.value) {
     let ref = (lock && lock.method === chain) ? lock.order_ref : '';
-    if (!ref) { const r = latestPendingOrder(chain); if (r) ref = r.ref; }
+    if (!ref && remembered) ref = remembered.ref;
     if (ref) refInput.value = ref;
   }
   if (senderInput && !senderInput.value) {
     senderInput.value = chain === 'tezos'
-      ? ((_tezosConnectedAddr || lock?.payerAddress || latestPendingOrder(chain)?.payer_address || '') || '')
-      : ((_ethConnectedAddr || lock?.payerAddress || latestPendingOrder(chain)?.payer_address || '') || '');
+      ? ((_tezosConnectedAddr || lock?.payerAddress || remembered?.payer_address || '') || '')
+      : ((_ethConnectedAddr || lock?.payerAddress || remembered?.payer_address || '') || '');
+  }
+  if (txInput && !txInput.value && remembered?.payment_ref) {
+    txInput.value = remembered.payment_ref;
   }
 }
 
@@ -8784,6 +8839,10 @@ function setCryptoMode(chain, mode) {
       fields.style.display = '';
       fillManualCryptoFields(chain);
     }
+    ensureManualPendingOrder(chain).catch(err => {
+      showToast(err.message || 'Could not save the manual order reference yet.');
+      console.error('[crypto] manual pending order failed:', err);
+    });
   } else {
     if (window.__manualCryptoMode === chain) window.__manualCryptoMode = null;
     const fields = document.getElementById(chain === 'tezos' ? 'tezosManualFields' : 'ethManualFields');
@@ -9184,10 +9243,17 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
       throw new Error('Wallet did not return a transaction hash');
     }
 
-    btn.textContent = 'Waiting for chain\u2026';
-    await waitForEthTransactionReady(tx, txHash, 60000);
-    // Transaction is broadcast now wait for server-side verification.
+    rememberPendingOrder(orderRef, {
+      method: 'eth',
+      payer_address: _ethConnectedAddr,
+      payment_ref: txHash,
+      quote: lock.quote,
+      customer: d,
+    });
+    // Transaction is broadcast. Log the hash on the server immediately, then
+    // let confirmation retry while the chain/RPC catches up.
     // Confirm against the locked pending order (raw 0x tx hash).
+    btn.textContent = 'Logging payment\u2026';
     await confirmPendingOrder(orderRef, {
       payment_method: 'eth',
       payment_ref: txHash,
@@ -9249,6 +9315,13 @@ async function sendErc20(token) {
     const amount   = ethers.utils.parseUnits(usd.toFixed(2), decimals);
 
     const tx  = await contract.transfer(toAddr, amount);
+    rememberPendingOrder(orderRef, {
+      method: token,
+      payer_address: _ethConnectedAddr,
+      payment_ref: tx.hash,
+      quote: quoteData.quote,
+      customer: d,
+    });
 
     // 2. Confirm against the pending order (raw 0x tx hash for verification).
     await confirmPendingOrder(orderRef, {
