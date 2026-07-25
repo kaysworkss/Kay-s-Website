@@ -7584,19 +7584,7 @@ async function ensureManualPendingOrder(chain) {
     return lock;
   }
   const d = getFormData();
-  const pending = await createPendingOrder(d, method, lock.quote);
-  const orderRef = pending?.order_ref || pending?.orderRef || lock.order_ref;
-  if (orderRef && orderRef !== lock.order_ref) {
-    lock.order_ref = orderRef;
-    window.__activeLock = lock;
-  }
-  rememberPendingOrder(orderRef, {
-    method,
-    payer_address: lock.payerAddress || '',
-    quote: lock.quote,
-    customer: d,
-    server_logged: true,
-  });
+  await ensurePendingOrderForPayment(method, lock, d, { payer_address: lock.payerAddress || '' });
   fillManualCryptoFields(method);
   renderLockUI(method);
   return lock;
@@ -7828,7 +7816,7 @@ document.getElementById('ethManualCancel')?.addEventListener('click', () => {
 
 // PENDING-FIRST ORDER HELPERS 
 // Create a pending order on the server BEFORE payment. Returns { order_ref, ... }.
-async function createPendingOrder(customer, method, checkoutQuote) {
+async function createPendingOrder(customer, method, checkoutQuote, extra = {}) {
   // Reuse the current lock's pending order if one exists for this method, so
   // repeated price-lock refreshes don't litter the DB with orphan pending rows.
   const existingRef = (window.__activeLock && window.__activeLock.method === method)
@@ -7837,7 +7825,33 @@ async function createPendingOrder(customer, method, checkoutQuote) {
   return postShopJson('/api/shop/order-create', checkoutPayload(customer, method, {
     checkout_quote: checkoutQuote,
     reuse_order_ref: existingRef || '',
+    ...extra,
   }));
+}
+
+async function ensurePendingOrderForPayment(method, lock, customer, extra = {}) {
+  if (!lock || lock.method !== method || !lock.order_ref || !lock.quote) {
+    throw new Error('Could not prepare the order reference. Please refresh the quote and try again.');
+  }
+  const remembered = latestPendingOrder(method);
+  if (remembered?.ref === lock.order_ref && remembered.server_logged === true) {
+    return { order_ref: lock.order_ref };
+  }
+  const pending = await createPendingOrder(customer, method, lock.quote, extra);
+  const orderRef = pending?.order_ref || pending?.orderRef || lock.order_ref;
+  if (orderRef && orderRef !== lock.order_ref) {
+    lock.order_ref = orderRef;
+    window.__activeLock = lock;
+    renderLockUI(method);
+  }
+  rememberPendingOrder(orderRef, {
+    method,
+    payer_address: extra.payer_address || lock.payerAddress || '',
+    quote: lock.quote,
+    customer,
+    server_logged: true,
+  });
+  return pending || { order_ref: orderRef };
 }
 
 // Confirm payment against an existing pending order by its order_ref. Retries
@@ -8073,10 +8087,10 @@ function updateLockCountdown() {
 }
 
 // Create (or replace) the price lock for a crypto method. `silent` suppresses
-// toasts. IMPORTANT: this no longer writes a pending order to the database it
-// just holds the signed quote (which carries a server-generated order_ref).
-// The pending order row is created only when the customer actually initiates
-// payment, so abandoned checkouts and price-lock refreshes leave no DB rows.
+// toasts. This holds a signed quote carrying a server-generated order_ref.
+// The pending order row is created when the customer initiates payment or
+// opens manual payment details, so every submitted transaction has a durable
+// order record to confirm against.
 async function refreshLock(method, silent) {
   const seq = ++_lockSeq;
   const d = getFormData();
@@ -9227,6 +9241,8 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
       btn.disabled = false; btn.textContent = 'Send ETH';
       return;
     }
+    btn.textContent = 'Saving order...';
+    await ensurePendingOrderForPayment('eth', lock, d, { payer_address: _ethConnectedAddr || lock.payerAddress || '' });
     const orderRef = lock.order_ref;
     console.log('[ETH] calling sendTransaction, to:', toAddr, 'amount:', ethAmt, 'ETH');
 
@@ -9323,9 +9339,15 @@ async function sendErc20(token) {
     if (!usd) { showToast(label + ' quote unavailable'); return; }
 
     // 1. Create the pending order before sending.
-    const pending = await createPendingOrder(d, token, quoteData.quote);
-    const orderRef = pending.order_ref;
-    rememberPendingOrder(orderRef, { method: token, payer_address: _ethConnectedAddr, quote: quoteData.quote, customer: d });
+    const ercLock = {
+      method: token,
+      order_ref: quoteData.order_ref || quoteData.orderRef || quoteData.quote?.order_ref || quoteData.quote?.orderRef || '',
+      quote: quoteData.quote,
+      payerAddress: _ethConnectedAddr,
+    };
+    window.__activeLock = ercLock;
+    const pending = await ensurePendingOrderForPayment(token, ercLock, d, { payer_address: _ethConnectedAddr });
+    const orderRef = pending.order_ref || ercLock.order_ref;
 
     const signer       = _ethProvider.getSigner();
     const contractAddr = ERC20_CONTRACTS[token];
@@ -9824,8 +9846,11 @@ document.getElementById('tezosSendBtn').addEventListener('click', async () => {
     if (!lock || !lock.order_ref) { showToast('XTZ quote unavailable - try again in a moment'); return; }
     const xtzAmt = lock.quote?.crypto_amount;
     if (!xtzAmt) { showToast('XTZ quote unavailable - try again in a moment'); return; }
+    btn.textContent = 'Saving order...';
+    await ensurePendingOrderForPayment('tezos', lock, d, { payer_address: _tezosConnectedAddr || lock.payerAddress || '' });
     const orderRef = lock.order_ref;
 
+    btn.textContent = 'Waiting for wallet...';
     const mutez = String(Math.round(parseFloat(xtzAmt) * 1_000_000));
     const opHash = await _tezosWalletProvider.sendOperations([{
       kind: 'transaction',
