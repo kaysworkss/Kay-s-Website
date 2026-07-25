@@ -2266,7 +2266,11 @@ async function getShopPaymentAddresses(supabase) {
 }
 
 async function verifyEvmPayment({ method, txHash, payerAddress, quote, payeeAddress }) {
-  if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) throw new Error('Invalid Ethereum transaction hash');
+  if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+    const err = new Error('Invalid Ethereum transaction hash');
+    err.statusCode = 400;
+    throw err;
+  }
   const tx = await ethRpc('eth_getTransactionByHash', [txHash]);
   const receipt = await ethRpc('eth_getTransactionReceipt', [txHash]);
   if (!tx || !receipt) {
@@ -2274,7 +2278,11 @@ async function verifyEvmPayment({ method, txHash, payerAddress, quote, payeeAddr
     err.statusCode = 409;
     throw err;
   }
-  if (String(receipt.status).toLowerCase() !== '0x1') throw new Error('Transaction failed on-chain');
+  if (String(receipt.status).toLowerCase() !== '0x1') {
+    const err = new Error('Transaction failed on-chain');
+    err.statusCode = 400;
+    throw err;
+  }
   const latestBlockHex = await ethRpc('eth_blockNumber', []);
   const confirmations = Number(BigInt(latestBlockHex) - BigInt(receipt.blockNumber) + 1n);
   const minConfirmations = Number(process.env.CRYPTO_MIN_CONFIRMATIONS || 1);
@@ -2286,14 +2294,30 @@ async function verifyEvmPayment({ method, txHash, payerAddress, quote, payeeAddr
 
   const claimedFrom = normEvmAddress(payerAddress);
   const expectedTo = normEvmAddress(payeeAddress);
-  if (!expectedTo) throw new Error('Shop ETH address is not configured');
+  if (!expectedTo) {
+    const err = new Error('Shop ETH address is not configured');
+    err.statusCode = 500;
+    throw err;
+  }
 
   if (method === 'eth') {
-    if (normEvmAddress(tx.from) !== claimedFrom) throw new Error('Transaction sender does not match claimed wallet');
-    if (normEvmAddress(tx.to) !== expectedTo) throw new Error('Transaction was not sent to the shop wallet');
+    if (normEvmAddress(tx.from) !== claimedFrom) {
+      const err = new Error('Transaction sender does not match claimed wallet');
+      err.statusCode = 400;
+      throw err;
+    }
+    if (normEvmAddress(tx.to) !== expectedTo) {
+      const err = new Error('Transaction was not sent to the shop wallet');
+      err.statusCode = 400;
+      throw err;
+    }
     const paidWei = BigInt(tx.value || '0x0');
     const requiredWei = decimalToUnits(quote.crypto_amount, 18);
-    if (paidWei < requiredWei) throw new Error('Transaction amount is below the quoted ETH amount');
+    if (paidWei < requiredWei) {
+      const err = new Error('Transaction amount is below the quoted ETH amount');
+      err.statusCode = 400;
+      throw err;
+    }
     return { confirmations, received_amount: Number(paidWei) / 1e18 };
   }
 
@@ -2307,7 +2331,11 @@ async function verifyEvmPayment({ method, txHash, payerAddress, quote, payeeAddr
     evmTopicAddress(log.topics?.[2]) === expectedTo &&
     BigInt(log.data || '0x0') >= required
   );
-  if (!matchingLog) throw new Error(`${method.toUpperCase()} transfer to the shop wallet was not found for the quoted amount`);
+  if (!matchingLog) {
+    const err = new Error(`${method.toUpperCase()} transfer to the shop wallet was not found for the quoted amount`);
+    err.statusCode = 400;
+    throw err;
+  }
   return { confirmations, received_amount: Number(BigInt(matchingLog.data || '0x0')) / (10 ** decimals) };
 }
 
