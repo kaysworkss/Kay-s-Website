@@ -317,6 +317,10 @@ nav.scrolled .nav-cart:hover { color: var(--rust); opacity: 1; }
     background-position: center 50%;
   }
 }
+.wallet-browser-note { display: none; }
+@media (max-width: 600px) {
+  .wallet-browser-note { display: block; }
+}
 .shop-hero:hover .shop-hero-bg-img { transform: scale(1.04); }
 .shop-hero-vignette {
   display: none;
@@ -2533,23 +2537,33 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
   max-width: 100%;
 }
 .holder-merch-panel.is-quiet .holder-merch-summary {
-  width: max-content;
+  width: min(420px, 100%);
   max-width: 100%;
   min-height: 42px;
-  padding: 0.5rem 3rem 0.5rem 0.92rem;
+  padding: 0.5rem 0.78rem;
   border: 1px solid rgba(201,153,58,0.42);
   border-radius: 999px;
   background: linear-gradient(135deg, rgba(201,153,58,0.96), rgba(245,216,120,0.92));
-  box-shadow: 0 8px 22px rgba(201,153,58,0.18);
+  box-shadow: 0 12px 28px rgba(201,153,58,0.24), inset 0 1px 0 rgba(255,255,255,0.42);
   color: #2d1508;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
+  justify-content: stretch;
   text-align: center;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+.holder-merch-panel.is-quiet .holder-merch-summary:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+  box-shadow: 0 16px 34px rgba(201,153,58,0.3), inset 0 1px 0 rgba(255,255,255,0.48);
 }
 .holder-merch-panel.is-quiet .holder-merch-summary-main {
   width: 100%;
+  grid-column: 2;
 }
 .holder-merch-panel.is-quiet .holder-merch-summary-row {
   justify-content: center;
+  text-align: center;
 }
 body.dark .holder-merch-panel.is-quiet .holder-merch-summary {
   border-color: rgba(245,216,120,0.42);
@@ -2578,9 +2592,13 @@ body.dark .holder-merch-panel.is-quiet .holder-merch-summary {
   background: rgba(255,255,255,0.42);
 }
 .holder-merch-panel.is-quiet .holder-merch-summary::after {
+  position: static;
+  grid-column: 3;
+  justify-self: end;
+  align-self: center;
+  transform: none;
   width: 24px;
   height: 24px;
-  right: 9px;
   font-size: 0.82rem;
   border-color: rgba(45,21,8,0.22);
   color: #2d1508;
@@ -3640,7 +3658,7 @@ body.dark { --text-muted: #b3a392; }
         <!-- ETH/Crypto panel -->
         <div class="pay-panel" id="panel-eth">
  <p class="pay-info" id="ethPayInfo">Connect your <strong style="color:#8b9cf7">Ethereum wallet</strong> and we'll fill in the amount just approve the send.</p>
-          <p style="font-size:0.72rem;color:var(--text-muted);line-height:1.55;margin:-0.45rem 0 0.85rem;font-style:italic">For ETH payments only: if WalletConnect feels slow or fussy on mobile, open this site inside your wallet's in-app browser. That connection path is the most reliable.</p>
+          <p class="wallet-browser-note" style="font-size:0.72rem;color:var(--text-muted);line-height:1.55;margin:-0.45rem 0 0.85rem;font-style:italic">For ETH payments only: if WalletConnect feels slow or fussy on mobile, open this site inside your wallet's in-app browser. That connection path is the most reliable.</p>
           <div class="crypto-mode-toggle" style="display:flex;gap:0.4rem;margin-bottom:1rem">
             <button type="button" class="crypto-mode-btn active" data-chain="eth" data-mode="connect" style="flex:1;padding:0.6rem;border:1px solid var(--border);border-radius:8px;background:transparent;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text);cursor:pointer">Connect &amp; pay</button>
             <button type="button" class="crypto-mode-btn" data-chain="eth" data-mode="manual" style="flex:1;padding:0.6rem;border:1px solid var(--border);border-radius:8px;background:transparent;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);cursor:pointer">Pay manually</button>
@@ -6266,6 +6284,31 @@ const APOTI_HOLDER_CONFIG = {
 };
 let _holderMerchClaim = null;
 let _holderMerchChainClaims = {};
+const HOLDER_MERCH_STATE_KEY = 'kwHolderMerchState';
+
+function saveHolderMerchState(extra = {}) {
+  const panel = document.getElementById('apotiHolderMerch');
+  const accordion = document.getElementById('holderMerchAccordion');
+  if (!panel || panel.hidden) return;
+  try {
+    sessionStorage.setItem(HOLDER_MERCH_STATE_KEY, JSON.stringify({
+      open: !!accordion?.open,
+      scrollY: Math.max(0, window.scrollY || 0),
+      at: Date.now(),
+      ...extra,
+    }));
+  } catch (_) {}
+}
+
+function readHolderMerchState() {
+  try {
+    const state = JSON.parse(sessionStorage.getItem(HOLDER_MERCH_STATE_KEY) || 'null');
+    return state && Date.now() - Number(state.at || 0) < 30 * 60 * 1000 ? state : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 function shouldShowHolderMerchAccess() {
   const params = new URLSearchParams(window.location.search || '');
   const holderParam = String(params.get('holder') || params.get('holderAccess') || '').toLowerCase();
@@ -6279,15 +6322,26 @@ function applyHolderMerchContext() {
   panel.hidden = !visible;
   panel.classList.toggle('is-holder-context-hidden', !visible);
   panel.setAttribute('aria-hidden', visible ? 'false' : 'true');
-  if (visible && accordion) accordion.open = true;
+  const saved = visible ? readHolderMerchState() : null;
+  if (visible && accordion) accordion.open = saved?.open ?? true;
   if (visible && (window.location.hash || '').toLowerCase()) {
     requestAnimationFrame(() => panel.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  } else if (visible && saved?.scrollY != null) {
+    requestAnimationFrame(() => window.scrollTo({ top: Math.max(0, Number(saved.scrollY) || 0), behavior: 'auto' }));
   }
   return visible;
 }
 (function initHolderMerchClaim() {
   const holderAccessVisible = applyHolderMerchContext();
   if (!holderAccessVisible) return;
+  document.getElementById('holderMerchAccordion')?.addEventListener('toggle', () => saveHolderMerchState());
+  window.addEventListener('pagehide', () => saveHolderMerchState(), { passive: true });
+  window.addEventListener('beforeunload', () => saveHolderMerchState(), { passive: true });
+  let holderStateScrollTimer = null;
+  window.addEventListener('scroll', () => {
+    window.clearTimeout(holderStateScrollTimer);
+    holderStateScrollTimer = window.setTimeout(saveHolderMerchState, 160);
+  }, { passive: true });
   document.getElementById('holderConnectBtn')?.addEventListener('click', connectApotiHolderWallet);
   document.getElementById('holderConnectTezosBtn')?.addEventListener('click', connectApotiTezosHolderWallet);
   updateHolderMerchLockState();
@@ -7039,14 +7093,14 @@ async function placeFreeOrder() {
     const d = getFormData();
     // Get a fresh signed quote (records the discount), then submit as a free order.
     const q = await getServerCheckoutQuote(d, 'discount');
-    await postShopJson('/api/shop/order', checkoutPayload(d, 'discount', {
+    const orderRes = await postShopJson('/api/shop/order', checkoutPayload(d, 'discount', {
       checkout_quote: q.quote,
     }));
     clearAppliedDiscount();
     cart = [];
     saveCart();
     if (typeof updateCartUI === 'function') updateCartUI();
-    showConfirmation('discount', 'FREE-' + Date.now());
+    showConfirmation('discount', orderRes?.order_ref || q?.order_ref || q?.quote?.order_ref || '');
   } catch (e) {
     showToast(e.message || 'Could not place free order');
   } finally {
@@ -7688,7 +7742,7 @@ document.getElementById('flwPayBtn').addEventListener('click', async () => {
             });
             sessionStorage.removeItem('kwPendingCheckout');
             hidePaymentBanner();
-            showConfirmScreen(init.reference, 'flutterwave');
+            showConfirmation('flutterwave', init.reference);
           } catch(e) {
             hidePaymentBanner();
  showToast('Payment received but confirmation failed please contact Kay with ref: ' + init.reference);
@@ -8369,7 +8423,6 @@ let _reownConnectAttempt = 0;
 const WALLETCONNECT_PROJECT_ID = '42dc845feb4ebf8f5cbe5725c2e07672';
 const ETH_WALLET_FEEDBACK_TIMEOUT_MS = 25000;
 const ETH_WALLET_HANDOFF_KEY = 'kwEthWalletHandoff';
-let _shopCatalogueRenderedOnce = false;
 
 const REOWN_METADATA = {
   name: "Kay's Works",
@@ -8619,7 +8672,6 @@ async function clearEthWalletConnectionAfterStall() {
 }
 
 async function resumeEthWalletHandoffIfPossible() {
-  if (!_shopCatalogueRenderedOnce && !_shopProductsLoadedOnce) return;
   const handoff = readRecentEthWalletHandoff();
   if (!handoff || _ethConnectedAddr || document.hidden) return;
   const providerCandidate = _ethWalletProvider || window.ethereum || _reownProviderState?.provider || _reownAppKit?.getWalletProvider?.();
@@ -9713,31 +9765,6 @@ window.addEventListener('resize', placeShopDiscoveryExtras, { passive: true });
 let _shopProductsLoadedOnce = false;
 let _shopLoadPromise = null;
 
-function renderProductsSafely() {
-  try {
-    renderProducts();
-    _shopCatalogueRenderedOnce = true;
-  } catch (e) {
-    console.error('[shop] Product render failed:', e);
-    const allGrid = document.getElementById('allProductsGrid');
-    if (allGrid && !allGrid.children.length) {
-      allGrid.style.display = '';
-      allGrid.innerHTML = `<div class="shop-empty-state" style="grid-column:1/-1;padding:4rem 1rem;text-align:center">
-        <p style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;margin-bottom:0.8rem">The shop loaded, but rendering hit a snag</p>
-        <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:1.4rem">Refresh once. If this repeats, Kay can check the product data causing it.</p>
-        <button onclick="location.reload()" style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.18em;text-transform:uppercase;padding:0.7rem 1.6rem;background:var(--rust);color:#fff;border:none;border-radius:10px;cursor:pointer">Refresh the page</button>
-      </div>`;
-    }
-  }
-}
-
-function withShopConfigTimeout(promise, ms = 4500) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => window.setTimeout(() => reject(new Error('Configuration request timed out')), ms)),
-  ]);
-}
-
 async function loadShopData() {
   // Coalesce overlapping refreshes (initial load, wallet retry, post-purchase)
   // so a slower failed request cannot overwrite a successful catalogue load.
@@ -9749,10 +9776,10 @@ async function loadShopData() {
       if (!Array.isArray(rows)) throw new Error('Products response was not an array');
       return rows;
     });
-    const configTask = withShopConfigTimeout(fetch('/api/shop/config').then(async response => {
+    const configTask = fetch('/api/shop/config').then(async response => {
       if (!response.ok) throw new Error(`Configuration request failed (${response.status})`);
       return response.json();
-    }));
+    });
     const [productsResult, configResult] = await Promise.allSettled([productsTask, configTask]);
 
     if (productsResult.status === 'fulfilled') {
@@ -9840,7 +9867,7 @@ async function loadShopData() {
 
     // Storefront failures never inject demo/sample products. An empty successful
     // response renders the genuine empty-shop state; a failed first load renders retry.
-    renderProductsSafely();
+    renderProducts();
     // A checkout handed off from a product page opens immediately from the
     // shared cart. Refresh it once authoritative product/config data arrives so
     // live prices, edition stock and shipping metadata replace cached values.
