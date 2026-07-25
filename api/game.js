@@ -2250,17 +2250,26 @@ async function ethRpc(method, params = []) {
     }
   });
 
+  try {
+    const firstHit = await Promise.any(checks.map(p => p.then(result => {
+      if (result.ok && !result.empty) return result;
+      throw result;
+    })));
+    return firstHit.result;
+  } catch (_) {}
+
   const settled = await Promise.all(checks);
   const hit = settled.find(x => x.ok && !x.empty);
   if (hit) return hit.result;
   const sawNull = settled.some(x => x.ok && x.empty);
   if (sawNull) return null;
+  const configuredLabels = configured.map(rpcLabel).join(', ') || 'none';
   const failures = settled
     .filter(x => !x.ok)
     .slice(0, 4)
     .map(x => `${x.rpcUrl}: ${x.error?.message || x.error || 'failed'}`)
     .join('; ');
-  const e = new Error('Transaction is not confirmed yet - ETH RPC temporarily unreachable' + (failures ? ': ' + failures : ''));
+  const e = new Error(`Transaction is not confirmed yet - ETH RPC temporarily unreachable. Configured RPC(s): ${configuredLabels}` + (failures ? `. Failures: ${failures}` : ''));
   e.statusCode = 409;
   throw e;
 }
