@@ -1419,38 +1419,39 @@ body.dark .cart-note-toggle { color: var(--sand); }
   }
 }
 @media(max-width: 719px) {
-  /* Keep the form immediately reachable; the full order detail opens on demand. */
+  /* Keep the order details visible, then let the form flow naturally below it. */
   #formScreen { flex-direction: column; }
   #orderSummaryCol {
     order: 1;
-    padding: 0.8rem 1rem;
+    padding: 0.9rem 1rem 1rem;
     border-bottom: 1px solid var(--border);
     background: var(--bg-alt);
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    box-shadow: 0 5px 18px rgba(64, 46, 35, 0.06);
+    position: static;
+    box-shadow: none;
   }
   #ckFormCol {
     order: 2;
     padding: 1.15rem 1rem 2rem;
   }
-  /* On mobile the summary collapses to keep the form + Pay button reachable. */
-  #ckSummaryChevron { display: inline-block !important; }
-  #ckSummaryHeadTotal { display: inline-block !important; }
+  #ckSummaryChevron,
+  #ckSummaryHeadTotal { display: none !important; }
   #ckSummaryCollapsible {
-    max-height: 0; overflow: hidden;
-    transition: max-height 0.3s ease;
+    max-height: none;
+    overflow: visible;
+    transition: none;
   }
   #orderSummaryCol.expanded #ckSummaryCollapsible {
-    max-height: calc(100vh - 92px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding-right: 0.15rem;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
   }
-  #orderSummaryCol.expanded #ckSummaryChevron { transform: rotate(180deg); }
-  #ckSummaryToggle { min-height: 42px; margin: 0; }
-  #orderSummaryCol.expanded #ckSummaryToggle { margin-bottom: 0.25rem; }
+  #ckSummaryToggle {
+    min-height: auto;
+    margin: 0 0 0.35rem;
+    cursor: default !important;
+    pointer-events: none;
+  }
+  #orderSummaryCol.expanded #ckSummaryToggle { margin-bottom: 0.35rem; }
   #orderSummaryCol.summary-attention {
     animation: summary-bar-cue 1.55s ease-out 0.45s 2;
   }
@@ -3525,6 +3526,42 @@ body.dark { --text-muted: #b3a392; }
           </div>
         </div>
 
+        <div id="checkoutAdjustments" style="margin:0.2rem 0 1.35rem;padding:0.95rem 1rem;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px">
+          <!-- Discount code -->
+          <div style="margin:0 0 0.85rem;padding-bottom:0.85rem;border-bottom:1px solid var(--border)">
+            <label class="form-label" style="margin-bottom:0.4rem">Discount code</label>
+            <div style="display:flex;gap:0.5rem">
+              <input class="form-input" id="discountInput" type="text" placeholder="Enter code" autocomplete="off" style="text-transform:uppercase;flex:1"/>
+              <button type="button" id="discountApplyBtn" class="ck-delivery-btn" style="flex:0 0 auto;padding:0.7rem 1.1rem;border-color:var(--clay);color:var(--clay)">Apply</button>
+            </div>
+            <div id="discountMsg" style="font-size:0.72rem;margin-top:0.4rem;display:none"></div>
+          </div>
+          <!-- Optional studio support: deliberately quiet and placed after delivery details. -->
+          <div id="tipBlock" style="margin:0">
+            <div style="color:var(--text-muted);font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.14em;text-transform:uppercase">Support future releases <span style="letter-spacing:0;text-transform:none;font-family:'Montserrat',sans-serif;font-size:0.62rem">(optional)</span></div>
+            <div id="tipOptions" style="padding-top:0.75rem">
+              <div style="display:flex;gap:0.4rem;margin-bottom:0.6rem" id="tipPresets">
+                <button type="button" class="tip-preset" data-pct="3" style="flex:1;padding:0.6rem 0.3rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);text-align:center;line-height:1.3">
+                  <div style="font-family:'Cinzel',serif;font-size:0.8rem">3%</div>
+                  <div class="tip-preset-amt" style="font-size:0.62rem;color:var(--text-muted)"></div>
+                </button>
+                <button type="button" class="tip-preset" data-pct="5" style="flex:1;padding:0.6rem 0.3rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);text-align:center;line-height:1.3">
+                  <div style="font-family:'Cinzel',serif;font-size:0.8rem">5%</div>
+                  <div class="tip-preset-amt" style="font-size:0.62rem;color:var(--text-muted)"></div>
+                </button>
+                <button type="button" class="tip-preset" data-pct="10" style="flex:1;padding:0.6rem 0.3rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);text-align:center;line-height:1.3">
+                  <div style="font-family:'Cinzel',serif;font-size:0.8rem">10%</div>
+                  <div class="tip-preset-amt" style="font-size:0.62rem;color:var(--text-muted)"></div>
+                </button>
+              </div>
+              <div style="display:flex;gap:0.5rem;align-items:center">
+                <input class="form-input" id="tipCustomInput" type="number" min="0" step="100" placeholder="Custom ()" inputmode="decimal" style="flex:1"/>
+                <button type="button" id="tipClearBtn" class="ck-delivery-btn" style="flex:0 0 auto;padding:0.6rem 0.9rem;border-color:var(--border);color:var(--text-muted)">Clear</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Collector consent -->
         <label style="display:flex;align-items:flex-start;gap:0.6rem;margin:1.2rem 0 1.6rem;cursor:pointer">
           <input type="checkbox" id="ckCollectorConsent" style="accent-color:var(--clay);width:16px;height:16px;margin-top:2px;flex-shrink:0"/>
@@ -3719,41 +3756,8 @@ body.dark { --text-muted: #b3a392; }
         </button>
         <div id="ckSummaryCollapsible">
         <div id="orderSummaryItems"></div>
-        <!-- Discount code -->
-        <div style="margin:0.9rem 0;padding-top:0.8rem;border-top:1px solid var(--border)">
-          <label class="form-label" style="margin-bottom:0.4rem">Discount code</label>
-          <div style="display:flex;gap:0.5rem">
-            <input class="form-input" id="discountInput" type="text" placeholder="Enter code" autocomplete="off" style="text-transform:uppercase;flex:1"/>
-            <button type="button" id="discountApplyBtn" class="ck-delivery-btn" style="flex:0 0 auto;padding:0.7rem 1.1rem;border-color:var(--clay);color:var(--clay)">Apply</button>
-          </div>
-          <div id="discountMsg" style="font-size:0.72rem;margin-top:0.4rem;display:none"></div>
-        </div>
         <div id="orderSummaryTotals" style="padding-top:0.8rem;margin-top:0.4rem"></div>
         <div id="orderSummaryNote" style="display:none;margin-top:0.9rem;padding-top:0.9rem;border-top:1px solid var(--border)"></div>
-        <!-- Optional studio support: deliberately quiet and placed after the complete order total. -->
-        <div id="tipBlock" style="margin:0.8rem 0 0;padding-top:0.75rem;border-top:1px solid var(--border)">
-          <div style="color:var(--text-muted);font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.14em;text-transform:uppercase">Support future releases <span style="letter-spacing:0;text-transform:none;font-family:'Montserrat',sans-serif;font-size:0.62rem">(optional)</span></div>
-          <div id="tipOptions" style="padding-top:0.75rem">
-            <div style="display:flex;gap:0.4rem;margin-bottom:0.6rem" id="tipPresets">
-              <button type="button" class="tip-preset" data-pct="3" style="flex:1;padding:0.6rem 0.3rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);text-align:center;line-height:1.3">
-                <div style="font-family:'Cinzel',serif;font-size:0.8rem">3%</div>
-                <div class="tip-preset-amt" style="font-size:0.62rem;color:var(--text-muted)"></div>
-              </button>
-              <button type="button" class="tip-preset" data-pct="5" style="flex:1;padding:0.6rem 0.3rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);text-align:center;line-height:1.3">
-                <div style="font-family:'Cinzel',serif;font-size:0.8rem">5%</div>
-                <div class="tip-preset-amt" style="font-size:0.62rem;color:var(--text-muted)"></div>
-              </button>
-              <button type="button" class="tip-preset" data-pct="10" style="flex:1;padding:0.6rem 0.3rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);text-align:center;line-height:1.3">
-                <div style="font-family:'Cinzel',serif;font-size:0.8rem">10%</div>
-                <div class="tip-preset-amt" style="font-size:0.62rem;color:var(--text-muted)"></div>
-              </button>
-            </div>
-            <div style="display:flex;gap:0.5rem;align-items:center">
- <input class="form-input" id="tipCustomInput" type="number" min="0" step="100" placeholder="Custom ()" inputmode="decimal" style="flex:1"/>
-              <button type="button" id="tipClearBtn" class="ck-delivery-btn" style="flex:0 0 auto;padding:0.6rem 0.9rem;border-color:var(--border);color:var(--text-muted)">Clear</button>
-            </div>
-          </div>
-        </div>
         </div><!-- /ckSummaryCollapsible -->
         <!-- Mobile inline summary (hidden on desktop) -->
         <div class="order-summary" id="orderSummary" style="display:none"></div>
@@ -6799,20 +6803,18 @@ setDeliveryMethod('ship');
   });
 })();
 
-// Mobile order-summary collapse toggle (no effect on desktop pointer-events
-// are disabled there via CSS so it stays permanently expanded).
+// Order summary remains expanded; keep the old button harmless for any saved DOM
+// state or keyboard activation that reaches it.
 (function() {
   const toggle = document.getElementById('ckSummaryToggle');
   const col = document.getElementById('orderSummaryCol');
   const label = document.getElementById('ckSummaryLabel');
   if (toggle && col) {
     toggle.addEventListener('click', () => {
-      const expanded = col.classList.toggle('expanded');
-      toggle.setAttribute('aria-expanded', String(expanded));
+      col.classList.add('expanded');
+      toggle.setAttribute('aria-expanded', 'true');
       col.classList.remove('summary-attention');
-      if (label && window.matchMedia('(max-width: 719px)').matches) {
-        label.textContent = expanded ? 'Hide order details' : 'Show order details';
-      }
+      if (label && window.matchMedia('(max-width: 719px)').matches) label.textContent = 'Order details';
       try { sessionStorage.setItem('kwSummaryDiscovered', '1'); } catch (_) {}
     });
   }
@@ -6961,19 +6963,16 @@ function openCheckout(defaultTab) {
   document.getElementById('formScreen').style.display='';
   document.getElementById('confirmScreen').classList.remove('active');
   document.getElementById('checkoutOverlay').classList.add('open');
-  // Mobile opens compact so customers reach the contact and payment form first.
-  // Desktop CSS keeps the summary permanently visible.
+  // Keep the order details visible on every viewport.
   const sumCol = document.getElementById('orderSummaryCol');
   const sumToggle = document.getElementById('ckSummaryToggle');
   const sumLabel = document.getElementById('ckSummaryLabel');
   const isMobileCheckout = window.matchMedia('(max-width: 719px)').matches;
-  if (sumCol) sumCol.classList.remove('expanded');
-  if (sumToggle) sumToggle.setAttribute('aria-expanded', 'false');
-  if (sumLabel) sumLabel.textContent = isMobileCheckout ? 'Show order details' : 'Order summary';
+  if (sumCol) sumCol.classList.add('expanded');
+  if (sumToggle) sumToggle.setAttribute('aria-expanded', 'true');
+  if (sumLabel) sumLabel.textContent = isMobileCheckout ? 'Order details' : 'Order summary';
   if (sumCol) {
-    let summaryDiscovered = false;
-    try { summaryDiscovered = sessionStorage.getItem('kwSummaryDiscovered') === '1'; } catch (_) {}
-    sumCol.classList.toggle('summary-attention', isMobileCheckout && !summaryDiscovered);
+    sumCol.classList.remove('summary-attention');
   }
   if (defaultTab) switchPayTab(defaultTab);
   else switchPayTab('flutterwave');
@@ -7228,7 +7227,7 @@ function buildOrderSummary() {
   // Refresh local currency prices if toggle is active
   if (_showLocalCurrency) refreshAllPrices();
 
-  // Mobile collapsed-summary header total (shown next to the chevron).
+  // Header total is kept in sync for any responsive summary affordance.
   const headTotal = document.getElementById('ckSummaryHeadTotal');
   if (headTotal) {
     const itemCount = cart.reduce((a, c) => a + c.qty, 0);
@@ -7237,6 +7236,16 @@ function buildOrderSummary() {
 }
 
 /* renderEthPanel is defined below in the ETH wallet section */
+
+function scrollCryptoPaymentIntoView(tab) {
+  if (tab !== 'eth' && tab !== 'tezos') return;
+  const panel = document.getElementById(`panel-${tab}`);
+  const target = document.getElementById(tab === 'tezos' ? 'tezosPayBlock' : 'ethPayBlock') || panel;
+  if (!target || !panel || !panel.classList.contains('active')) return;
+  window.setTimeout(() => {
+    target.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+  }, 120);
+}
 
 function switchPayTab(tab) {
   document.querySelectorAll('.pay-tab').forEach(t=>t.classList.toggle('active', t.dataset.pay===tab));
@@ -7249,6 +7258,7 @@ function switchPayTab(tab) {
     if (window.__cryptoMode) window.__cryptoMode[tab] = 'connect';
     if (typeof setCryptoMode === 'function') setCryptoMode(tab, 'connect');
     startLock(tab);
+    scrollCryptoPaymentIntoView(tab);
   } else {
     stopLockTimer();
     window.__activeLock = null;
@@ -8539,6 +8549,7 @@ function setCryptoMode(chain, mode) {
     if (fields) { fields.dataset.revealed = '0'; fields.style.display = 'none'; }
   }
   if (chain === 'eth') renderEthPanel(); else renderTezosPanel();
+  scrollCryptoPaymentIntoView(chain);
 }
 
 // Wire the mode toggle buttons (once).
