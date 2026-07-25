@@ -9007,7 +9007,7 @@ async function ethConnectWallet() {
     if (!connectedAccount) throw new Error('No account returned');
     _ethConnectedAddr = connectedAccount;
     _ethWalletProvider = ethProvider;
-    _ethProvider      = new ethers.providers.Web3Provider(ethProvider);
+    _ethProvider      = new ethers.providers.Web3Provider(ethProvider, 'any');
     clearEthWalletHandoff();
     closeEthWalletConnectSurfaces();
 
@@ -9062,6 +9062,30 @@ async function ensureEthereumMainnet() {
     if (e && e.code === 4001) throw e;
     throw new Error('Switch your wallet to Ethereum Mainnet and try again');
   }
+}
+
+async function waitForEthTransactionReady(tx, txHash, timeoutMs = 60000) {
+  const start = Date.now();
+  const provider = _ethProvider || new ethers.providers.Web3Provider(await getEthereumWalletProvider(), 'any');
+  while (Date.now() - start < timeoutMs) {
+    try {
+      if (tx && typeof tx.wait === 'function') {
+        const receipt = await Promise.race([
+          tx.wait(1),
+          new Promise(resolve => setTimeout(() => resolve(null), 12000)),
+        ]);
+        if (receipt) return receipt;
+      }
+      if (provider && typeof provider.getTransactionReceipt === 'function') {
+        const receipt = await provider.getTransactionReceipt(txHash);
+        if (receipt) return receipt;
+      }
+    } catch (err) {
+      console.warn('[ETH] local receipt wait failed:', err);
+    }
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+  return null;
 }
 
 /* Send ETH via connected wallet */
@@ -9125,24 +9149,34 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
     const from = (activeAccounts && activeAccounts[0]) || _ethConnectedAddr || _reownProviderState?.address || '';
  if (!from) throw new Error('Wallet disconnected connect it and try again');
     _ethConnectedAddr = from;
+    _ethProvider = _ethProvider || new ethers.providers.Web3Provider(ethProvider, 'any');
 
-    // Ask the injected wallet directly so account/network changes cannot leave
-    // ethers holding a stale signer that never opens the payment prompt.
-    txHash = await ethProvider.request({
-      method: 'eth_sendTransaction',
-      params: [{
-        from,
+    let tx = null;
+    try {
+      const signer = _ethProvider.getSigner();
+      tx = await signer.sendTransaction({
         to: toAddr,
-        value: ethers.utils.parseEther(String(ethAmt)).toHexString(),
-      }],
-    });
+        value: ethers.utils.parseEther(String(ethAmt)),
+      });
+      txHash = tx?.hash || '';
+    } catch (signerErr) {
+      console.warn('[ETH] signer send failed, retrying raw provider request:', signerErr);
+      txHash = await ethProvider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: toAddr,
+          value: ethers.utils.parseEther(String(ethAmt)).toHexString(),
+        }],
+      });
+    }
     if (!/^0x[a-fA-F0-9]{64}$/.test(String(txHash || ''))) {
       throw new Error('Wallet did not return a transaction hash');
     }
 
- // Transaction is broadcast now wait for chain indexing before confirming.
- // ETH nodes typically need 1560s to mine and index. We show a clear status
-    // and let confirmPendingOrder retry for up to 6 minutes.
+    btn.textContent = 'Waiting for chain\u2026';
+    await waitForEthTransactionReady(tx, txHash, 60000);
+    // Transaction is broadcast now wait for server-side verification.
     // Confirm against the locked pending order (raw 0x tx hash).
     await confirmPendingOrder(orderRef, {
       payment_method: 'eth',
