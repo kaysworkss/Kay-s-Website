@@ -1430,6 +1430,14 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;
   color:var(--text-muted);font-family:'Cinzel',serif;
 }
+.wallet-browser-note{
+  font-family:'Crimson Pro',serif;
+  font-size:0.82rem;
+  line-height:1.45;
+  color:var(--text-muted);
+  font-style:italic;
+}
+.wallet-browser-note{ margin:8px 0 18px; }
 .wc-cancel-btn{
   width:100%;text-align:center;font-family:'Cinzel',serif;font-size:0.6rem;
   letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);
@@ -2174,6 +2182,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
               <button class="btn-sm danger" id="disconnect-btn" style="display:none" onclick="disconnectWallet()">Disconnect</button>
             </div>
           </div>
+          <p class="wallet-browser-note">For ETH only: if WalletConnect feels slow or fussy on mobile, open this auction inside your wallet's in-app browser. Tezos connection should remain instant.</p>
 
           <!-- Outbid notifications — shown after wallet connects -->
           <div id="notif-optin" style="display:none;margin-bottom:20px;padding:13px 15px;background:var(--bg-alt);border:1px solid var(--divider);border-radius:3px">
@@ -4884,6 +4893,9 @@ function _readRecentEthWalletHandoff() {
 
 async function _requestEthAccounts(ethProvider) {
   if (ethProvider?.accounts?.length) return ethProvider.accounts;
+  if (signerAddress && walletChain === "eth") return [signerAddress];
+  const reownAddress = _reownAddressFromState(_reownProviderState, _reownAppKit);
+  if (reownAddress) return [reownAddress];
   if (!ethProvider?.request) throw new Error("Wallet provider is unavailable. Reopen the wallet chooser and try again.");
   _markEthWalletHandoff("accounts");
   const accounts = await _withEthWalletTimeout(ethProvider.request({ method: "eth_requestAccounts" }));

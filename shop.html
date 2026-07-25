@@ -2537,14 +2537,23 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
   max-width: 100%;
   min-height: 42px;
   padding: 0.5rem 3rem 0.5rem 0.92rem;
-  border: 1px solid rgba(42,35,30,0.18);
+  border: 1px solid rgba(201,153,58,0.42);
   border-radius: 999px;
-  background: rgba(255,255,255,0.72);
-  box-shadow: 0 8px 22px rgba(42,35,30,0.06);
+  background: linear-gradient(135deg, rgba(201,153,58,0.96), rgba(245,216,120,0.92));
+  box-shadow: 0 8px 22px rgba(201,153,58,0.18);
+  color: #2d1508;
+  justify-content: center;
+  text-align: center;
+}
+.holder-merch-panel.is-quiet .holder-merch-summary-main {
+  width: 100%;
+}
+.holder-merch-panel.is-quiet .holder-merch-summary-row {
+  justify-content: center;
 }
 body.dark .holder-merch-panel.is-quiet .holder-merch-summary {
-  border-color: rgba(246,236,222,0.18);
-  background: rgba(35,31,28,0.72);
+  border-color: rgba(245,216,120,0.42);
+  background: linear-gradient(135deg, rgba(184,130,30,0.95), rgba(232,196,90,0.9));
 }
 .holder-merch-panel.is-quiet .holder-merch-kicker {
   position: absolute;
@@ -2558,18 +2567,24 @@ body.dark .holder-merch-panel.is-quiet .holder-merch-summary {
   font-size: 0.72rem;
   letter-spacing: 0.14em;
   white-space: nowrap;
+  color: #2d1508;
 }
 .holder-merch-panel.is-quiet .holder-merch-lock-pill {
   padding: 0.18rem 0.5rem;
   font-size: 0.55rem;
   white-space: nowrap;
+  border-color: rgba(45,21,8,0.22);
+  color: #2d1508;
+  background: rgba(255,255,255,0.42);
 }
 .holder-merch-panel.is-quiet .holder-merch-summary::after {
   width: 24px;
   height: 24px;
   right: 9px;
   font-size: 0.82rem;
-  background: transparent;
+  border-color: rgba(45,21,8,0.22);
+  color: #2d1508;
+  background: rgba(255,255,255,0.28);
 }
 .holder-merch-panel.is-quiet .holder-merch-body {
   width: min(820px, calc(100vw - 2rem));
@@ -3117,7 +3132,7 @@ body.dark { --text-muted: #b3a392; }
         </span>
       </summary>
       <div class="holder-merch-body">
-        <p class="holder-merch-copy">For Apoti Olowe holders. Wooden Token (#1) unlocks a merch discount. Bronze Token (#2) unlocks one free tote — you only pay delivery.</p>
+        <p class="holder-merch-copy">For Apoti Olowe holders. Wooden Token (#1) unlocks the holder merch discount. Bronze Token (#2) includes that holder discount and also unlocks one free tote — you only pay delivery.</p>
 
         <div class="holder-merch-step">
           <div class="holder-merch-step-head"><span class="holder-merch-step-num">1</span>Check your wallet</div>
@@ -3625,6 +3640,7 @@ body.dark { --text-muted: #b3a392; }
         <!-- ETH/Crypto panel -->
         <div class="pay-panel" id="panel-eth">
  <p class="pay-info" id="ethPayInfo">Connect your <strong style="color:#8b9cf7">Ethereum wallet</strong> and we'll fill in the amount just approve the send.</p>
+          <p style="font-size:0.72rem;color:var(--text-muted);line-height:1.55;margin:-0.45rem 0 0.85rem;font-style:italic">For ETH payments only: if WalletConnect feels slow or fussy on mobile, open this site inside your wallet's in-app browser. That connection path is the most reliable.</p>
           <div class="crypto-mode-toggle" style="display:flex;gap:0.4rem;margin-bottom:1rem">
             <button type="button" class="crypto-mode-btn active" data-chain="eth" data-mode="connect" style="flex:1;padding:0.6rem;border:1px solid var(--border);border-radius:8px;background:transparent;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text);cursor:pointer">Connect &amp; pay</button>
             <button type="button" class="crypto-mode-btn" data-chain="eth" data-mode="manual" style="flex:1;padding:0.6rem;border:1px solid var(--border);border-radius:8px;background:transparent;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);cursor:pointer">Pay manually</button>
@@ -5492,7 +5508,7 @@ function holderVerificationMessage(detected, short) {
   } else {
     parts.push('No Bronze Token tote redemption found across the checked wallets.');
   }
-  if (discount > 0) parts.push(`${discount}% holder merch discount is active.`);
+  if (discount > 0) parts.push(`${discount}% holder merch discount is also active.`);
   return parts.join(' ');
 }
 function revealHolderMerchProduct(kind) {
@@ -8449,6 +8465,8 @@ function readRecentEthWalletHandoff() {
 
 async function requestEthWalletAccounts(ethProvider) {
   if (ethProvider?.accounts?.length) return ethProvider.accounts;
+  if (_ethConnectedAddr) return [_ethConnectedAddr];
+  if (_reownProviderState?.address) return [_reownProviderState.address];
   if (!ethProvider?.request) throw new Error('Wallet provider is unavailable. Reopen the wallet chooser and try again.');
   markEthWalletHandoff('accounts');
   const accounts = await withEthWalletFeedbackTimeout(
@@ -8612,8 +8630,9 @@ async function resumeEthWalletHandoffIfPossible() {
       providerCandidate.request({ method: 'eth_accounts' }),
       5000
     ).catch(() => []);
-    if (accounts?.[0]) {
-      _ethConnectedAddr = accounts[0];
+    const resumedAccount = accounts?.[0] || _reownProviderState?.address || '';
+    if (resumedAccount) {
+      _ethConnectedAddr = resumedAccount;
       _ethWalletProvider = providerCandidate;
       _ethProvider = new ethers.providers.Web3Provider(providerCandidate, 'any');
       clearEthWalletHandoff();
@@ -8917,8 +8936,9 @@ async function ethConnectWallet() {
       await ethProvider.connect?.({ chains: [1], rpcMap: { 1: 'https://ethereum.publicnode.com' } });
     }
     const accounts = await requestEthWalletAccounts(ethProvider);
-    if (!accounts || !accounts[0]) throw new Error('No account returned');
-    _ethConnectedAddr = accounts[0];
+    const connectedAccount = accounts?.[0] || _reownProviderState?.address || '';
+    if (!connectedAccount) throw new Error('No account returned');
+    _ethConnectedAddr = connectedAccount;
     _ethWalletProvider = ethProvider;
     _ethProvider      = new ethers.providers.Web3Provider(ethProvider);
     clearEthWalletHandoff();
@@ -9031,8 +9051,10 @@ document.getElementById('ethSendBtn').addEventListener('click', async () => {
     btn.textContent = 'Opening wallet\u2026';
     await ensureEthereumMainnet();
     const ethProvider = await getEthereumWalletProvider();
-    const activeAccounts = await ethProvider.request({ method: 'eth_accounts' });
-    const from = activeAccounts && activeAccounts[0];
+    const activeAccounts = ethProvider.request
+      ? await withEthWalletFeedbackTimeout(ethProvider.request({ method: 'eth_accounts' }), 5000).catch(() => [])
+      : [];
+    const from = (activeAccounts && activeAccounts[0]) || _ethConnectedAddr || _reownProviderState?.address || '';
  if (!from) throw new Error('Wallet disconnected connect it and try again');
     _ethConnectedAddr = from;
 
