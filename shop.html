@@ -5629,6 +5629,13 @@ function refreshCheckoutAfterHolderMerchClaim() {
   buildOrderSummary();
   updateCartUI();
   updateFreeOrderUI();
+  applyHolderMerchPaymentLimit();
+  const checkout = document.getElementById('checkoutOverlay');
+  const activeTab = document.querySelector('.ck-pay-method.active')?.dataset.pay
+    || document.querySelector('.pay-tab.active')?.dataset.pay;
+  if (checkout && checkout.classList.contains('open') && isHolderMerchCryptoOnlyCheckout() && activeTab !== 'eth' && activeTab !== 'tezos') {
+    clearActivePaymentTab();
+  }
   recalibrateCryptoForTotals();
   if (typeof scheduleCryptoLockFromForm === 'function') scheduleCryptoLockFromForm();
 }
@@ -7175,6 +7182,40 @@ function grandTotalUsd() { return Math.max(0, +(cartUsdTotal() + deliveryFeeUsd(
 // An order is only "free" when there's nothing to pay AND no tip was added.
 function orderIsFree() { return grandTotalNgn() <= 0 && grandTotalUsd() <= 0; }
 
+function isHolderMerchCryptoOnlyCheckout() {
+  return !!(_holderMerchClaim && _holderMerchClaim.verified === true);
+}
+
+function applyHolderMerchPaymentLimit() {
+  const restricted = isHolderMerchCryptoOnlyCheckout();
+  const allowed = new Set(['eth', 'tezos']);
+  const payMethods = document.querySelector('.ck-pay-methods');
+  document.querySelectorAll('.ck-pay-method, .pay-tab').forEach(el => {
+    const method = el.dataset.pay;
+    if (!method) return;
+    const show = !restricted || allowed.has(method);
+    el.style.display = show ? '' : 'none';
+    el.toggleAttribute('aria-hidden', !show);
+  });
+  let note = document.getElementById('holderCryptoOnlyNote');
+  if (!note && payMethods) {
+    note = document.createElement('p');
+    note.id = 'holderCryptoOnlyNote';
+    note.style.cssText = "display:none;margin:0.65rem 0 0;font-size:0.74rem;color:var(--text-muted);line-height:1.5";
+    payMethods.insertAdjacentElement('afterend', note);
+  }
+  if (note) {
+    note.textContent = 'Holder claim checkout is available by ETH or Tezos only.';
+    note.style.display = restricted ? '' : 'none';
+  }
+}
+
+function clearActivePaymentTab() {
+  document.querySelectorAll('.pay-tab, .ck-pay-method').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.pay-panel').forEach(panel => panel.classList.remove('active'));
+  stopLockTimer();
+  window.__activeLock = null;
+}
 
 function openCheckout(defaultTab) {
   if (!cart.length) return;
@@ -7198,8 +7239,13 @@ function openCheckout(defaultTab) {
   if (sumCol) {
     sumCol.classList.remove('summary-attention');
   }
-  if (defaultTab) switchPayTab(defaultTab);
-  else switchPayTab('flutterwave');
+  applyHolderMerchPaymentLimit();
+  const requestedTab = defaultTab || 'flutterwave';
+  if (isHolderMerchCryptoOnlyCheckout() && requestedTab !== 'eth' && requestedTab !== 'tezos') {
+    clearActivePaymentTab();
+  } else {
+    switchPayTab(requestedTab);
+  }
   // Restore any applied discount into the input + refresh the free-order view
   const di = document.getElementById('discountInput');
   if (di && _appliedDiscount) di.value = _appliedDiscount.code;
@@ -7236,6 +7282,7 @@ function updateFreeOrderUI() {
     // visibility again (switchPayTab toggles .active; inline styles would win
     // over the stylesheet and freeze the panel, so we must remove them).
     panels.forEach(p => { p.style.removeProperty('display'); });
+    applyHolderMerchPaymentLimit();
   }
 }
 
@@ -7475,6 +7522,13 @@ function scrollCryptoPaymentIntoView(tab) {
 }
 
 function switchPayTab(tab) {
+  if (isHolderMerchCryptoOnlyCheckout() && tab !== 'eth' && tab !== 'tezos') {
+    clearActivePaymentTab();
+    applyHolderMerchPaymentLimit();
+    saveCheckoutDraft();
+    return;
+  }
+  applyHolderMerchPaymentLimit();
   document.querySelectorAll('.pay-tab').forEach(t=>t.classList.toggle('active', t.dataset.pay===tab));
   document.querySelectorAll('.pay-panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+tab));
   // Update new radio-style payment method UI
