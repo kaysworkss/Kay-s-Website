@@ -7814,11 +7814,12 @@ async function confirmPendingOrder(orderRef, opts) {
     delivery_zone: customer.deliveryZone || _deliveryZone || '',
     delivery_carrier: customer.deliveryCarrier || _deliveryCarrier || '',
   }, confirmOpts);
-  // Chain indexers (TzKT, ETH RPC) can lag 30-120s after broadcast.
-  // Retry every 5s for up to 6 minutes. The server returns 409 for ALL
+  // Chain indexers/RPCs can lag after broadcast. The server does a short
+  // internal receipt poll, then the browser retries quickly for up to 6 minutes.
+  // The server returns 409 for ALL
   // "not yet" states so we only stop on genuine hard business failures.
- const maxAttempts = 72; // 72 5s = 6 minutes
-  const RETRY_MS = 5000;
+ const maxAttempts = 180; // 180 2s = 6 minutes
+  const RETRY_MS = 2000;
   const isHardFail = (data, errMsg) =>
     data.sold_out ||
     /sold.out|amount.*below|failed.on-chain|sender.*mismatch|does.not.match|invalid.*hash|invalid.*operation/i.test(errMsg);
@@ -7850,7 +7851,7 @@ async function confirmPendingOrder(orderRef, opts) {
  // Everything else 409 not indexed yet, 502 indexer down, 5xx keep retrying
       lastErr = new Error(errMsg || `HTTP ${res.status}`);
  if (attempt === 1) showToast('Payment sent confirming on-chain, please wait');
- if (attempt % 6 === 0) showToast(`Still confirming (${Math.round(attempt * RETRY_MS / 60000)} min). Keep this page open.`);
+ if (attempt % 15 === 0) showToast(`Still confirming (${Math.round(attempt * RETRY_MS / 60000)} min). Do not pay again.`);
       await new Promise(r => setTimeout(r, RETRY_MS));
     } catch (e) {
       lastErr = e;
