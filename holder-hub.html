@@ -1859,6 +1859,7 @@ const CONFIG = {
   verifyEndpoint: '/api/holder?action=verify',
   claimEndpoint: '/api/holder?action=claim',
   emailEndpoint: '/api/holder?action=send-auth-email',
+  profileEndpoint: '/api/holder?action=profile',
   merchClaimsEndpoint: '/api/holder?action=merch-claims',
   reverifyDays: 30,                       // how often holdership is re-checked
 };
@@ -2052,6 +2053,34 @@ function mergeLinkedHolderRows(rows) {
 }
 
 // ── Returning holder: sign in with email, no wallet reconnect needed ──
+async function hydrateCurrentHolderProfile() {
+  if (!currentHolder) return;
+  const headers = {};
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) headers.Authorization = 'Bearer ' + session.access_token;
+    else if (pendingClaimToken) headers['x-holder-claim'] = pendingClaimToken;
+  } catch (_) {
+    if (pendingClaimToken) headers['x-holder-claim'] = pendingClaimToken;
+  }
+
+  if (!headers.Authorization && !headers['x-holder-claim']) return;
+  try {
+    const response = await fetch(CONFIG.profileEndpoint, { headers, cache: 'no-store' });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not load holder profile.');
+    const merged = mergeLinkedHolderRows(result.linked_wallets || result.wallets || []);
+    currentHolder = {
+      ...currentHolder,
+      ...(result.holder || {}),
+      ...(merged || {}),
+      linked_wallets: result.linked_wallets || result.wallets || currentHolder.linked_wallets || [],
+    };
+  } catch (err) {
+    console.warn('Holder paired-wallet profile lookup failed:', err);
+  }
+}
+
 els.showEmailLoginBtn.addEventListener('click', () => {
   isEmailLoginFlow = true;
   document.getElementById('emailStepTitle').textContent = 'Sign in';
@@ -2406,6 +2435,7 @@ els.emailUpdatesOptIn?.addEventListener('change', async () => {
 async function enterDashboard() {
   els.gate.style.display = 'none';
   els.dashboard.classList.add('show');
+  await hydrateCurrentHolderProfile();
 
   els.walletPill.textContent = shortAddr(currentHolder.wallet_address) + ' · ' + currentHolder.chain;
   els.walletPill.classList.add('show');
@@ -2594,7 +2624,9 @@ async function renderMerchEntitlement() {
   const availableQty = Math.max(0, bronzeBalance - reservedQty);
   let toteText = '';
   if (reservedQty > 0) {
-    toteText = `${reservedQty} of ${bronzeBalance} tote redemption${bronzeBalance === 1 ? '' : 's'} already claimed or reserved; ${availableQty} still available`;
+    toteText = bronzeBalance > 0
+      ? `${reservedQty} of ${bronzeBalance} tote redemption${bronzeBalance === 1 ? '' : 's'} already claimed or reserved; ${availableQty} still available`
+      : `${reservedQty} tote redemption${reservedQty === 1 ? '' : 's'} already claimed or reserved; reconnect or recheck your holder wallet to refresh availability`;
   } else {
     toteText = availableQty === 1 ? '1 tote bag available to redeem' : `${availableQty} tote bags available to redeem`;
   }

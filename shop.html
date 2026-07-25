@@ -1748,7 +1748,13 @@ body.dark .cart-note-toggle { color: var(--sand); }
   display: none; text-align: center;
   padding: 2.5rem 2rem;
 }
-.confirm-screen.active { display: block; }
+.confirm-screen.active {
+  display: flex;
+  min-height: min(72vh, 620px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
 .confirm-icon { font-size: 3rem; margin-bottom: 1.2rem; }
 .confirm-screen { text-align: center; }
 .confirm-icon {
@@ -6425,14 +6431,14 @@ function restoreHolderMerchClaimCache() {
     _holderMerchClaim = selected;
     const wallet = selected.wallet || selected.selectedWallet || '';
     const short = wallet ? wallet.slice(0, 6) + '...' + wallet.slice(-4) : 'saved wallet';
-    updateHolderMerchStatus(holderVerificationMessage(selected, short) + ' Saved access was restored after refresh; checkout will revalidate it server-side.', 'verified');
+    updateHolderMerchStatus(holderVerificationMessage(selected, short), 'verified');
     refreshHolderClaimUsageForClaim(selected).then(updated => {
       if (!updated) return;
       _holderMerchClaim = updated;
       const restoredChain = normalizeHolderChain(updated.chain);
       if (restoredChain && _holderMerchChainClaims[restoredChain]) _holderMerchChainClaims[restoredChain] = updated;
       persistHolderMerchClaimCache();
-      updateHolderMerchStatus(holderVerificationMessage(updated, short) + ' Saved access was restored after refresh; checkout will revalidate it server-side.', 'verified');
+      updateHolderMerchStatus(holderVerificationMessage(updated, short), 'verified');
       refreshCheckoutAfterHolderMerchClaim();
     }).catch(() => {});
     refreshCheckoutAfterHolderMerchClaim();
@@ -7656,12 +7662,12 @@ function showConfirmation(method, ref) {
   document.getElementById('formScreen').style.display='none';
   const screen = document.getElementById('confirmScreen');
   screen.classList.add('active');
-  document.getElementById('confirmMsg').textContent =
+ document.getElementById('confirmMsg').textContent =
     (method === 'eth' || method === 'tezos' || method === 'crypto')
- ? 'Your crypto payment is confirmed on-chain thank you! I\'ll pack this with care and be in touch about shipping.'
+ ? 'Your crypto payment is confirmed on-chain thank you! I\'ll handle this with care and be in touch about shipping.'
       : (method === 'discount')
- ? 'No payment needed your discount covers it. Thank you! I\'ll be in touch about shipping, with everything sent to your email.'
- : 'Thank you so much I\'ll be in touch about shipping, with everything sent to your email.';
+ ? 'No payment needed your discount covers it. Thank you! I\'ll handle this with care and be in touch about shipping.'
+ : 'Thank you so much I\'ll handle this with care and be in touch about shipping.';
   document.getElementById('confirmRef').textContent = ref ? 'Reference: ' + ref : '';
   cart = [];
   cartOrderNote = '';
