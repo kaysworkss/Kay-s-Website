@@ -717,11 +717,19 @@ function paymentFailureNeedsReview(error) {
   return /invalid|mismatch|does not match|amount.*below|failed on-chain|already.*recorded|sold.?out|wrong (wallet|network|recipient)/i.test(text);
 }
 
-async function markOrderVerificationAttempt(supabase, order, paymentRef) {
+async function markOrderVerificationAttempt(supabase, order, paymentRef, details = {}) {
   const now = new Date().toISOString();
+  const metadata = {
+    ...(order.payment_metadata && typeof order.payment_metadata === 'object' ? order.payment_metadata : {}),
+    payment_ref: paymentRef || order.payment_ref || null,
+    payer_address: details.payerAddress || order.payment_metadata?.payer_address || null,
+    payment_started_at: order.payment_started_at || now,
+  };
+  Object.keys(metadata).forEach(key => metadata[key] == null && delete metadata[key]);
   const patch = {
     status: 'confirming',
     payment_ref: paymentRef || order.payment_ref || null,
+    payment_metadata: metadata,
     payment_started_at: order.payment_started_at || now,
     last_checked_at: now,
     verification_attempts: (Number(order.verification_attempts) || 0) + 1,
@@ -3246,7 +3254,7 @@ async function handleShopOrderConfirm(req, res, supabase) {
     return json(400, { error: 'Payment reference / transaction hash is required' });
   }
 
-  if (paymentRef) await markOrderVerificationAttempt(supabase, order, paymentRef);
+  if (paymentRef) await markOrderVerificationAttempt(supabase, order, paymentRef, { payerAddress });
 
   // Guard against the same payment_ref being used for a different order.
   if (paymentRef) {
