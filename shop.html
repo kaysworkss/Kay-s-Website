@@ -2539,16 +2539,17 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
 .holder-merch-panel.is-quiet .holder-merch-summary {
   width: min(420px, 100%);
   max-width: 100%;
-  min-height: 42px;
-  padding: 0.5rem 0.78rem;
+  min-height: 46px;
+  padding: 0.45rem 0.82rem;
   border: 1px solid rgba(201,153,58,0.42);
   border-radius: 999px;
   background: linear-gradient(135deg, rgba(201,153,58,0.96), rgba(245,216,120,0.92));
   box-shadow: 0 12px 28px rgba(201,153,58,0.24), inset 0 1px 0 rgba(255,255,255,0.42);
   color: #2d1508;
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 24px;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
   justify-content: stretch;
+  align-items: center;
   text-align: center;
   transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
 }
@@ -2560,10 +2561,16 @@ nav.scrolled .grid-toggle:hover { color: var(--clay); }
 .holder-merch-panel.is-quiet .holder-merch-summary-main {
   width: 100%;
   grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
 }
 .holder-merch-panel.is-quiet .holder-merch-summary-row {
   justify-content: center;
+  align-items: center;
   text-align: center;
+  gap: 0.55rem;
 }
 body.dark .holder-merch-panel.is-quiet .holder-merch-summary {
   border-color: rgba(245,216,120,0.42);
@@ -2578,14 +2585,22 @@ body.dark .holder-merch-panel.is-quiet .holder-merch-summary {
   white-space: nowrap;
 }
 .holder-merch-panel.is-quiet .holder-merch-title {
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.86rem;
+  letter-spacing: 0.12em;
+  line-height: 1;
   white-space: nowrap;
   color: #2d1508;
 }
 .holder-merch-panel.is-quiet .holder-merch-lock-pill {
-  padding: 0.18rem 0.5rem;
-  font-size: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.58rem;
+  line-height: 1;
   white-space: nowrap;
   border-color: rgba(45,21,8,0.22);
   color: #2d1508;
@@ -2599,6 +2614,7 @@ body.dark .holder-merch-panel.is-quiet .holder-merch-summary {
   transform: none;
   width: 24px;
   height: 24px;
+  line-height: 1;
   font-size: 0.82rem;
   border-color: rgba(45,21,8,0.22);
   color: #2d1508;
@@ -4988,7 +5004,7 @@ function holderMerchBenefit(currency) {
     ? Number(_appliedDiscount.percent || 0)
     : 0;
   let freeTote = 0;
-  let freeToteRemaining = _holderMerchClaim.freeTote ? Number(_holderMerchClaim.freeToteQty || 1) : 0;
+  let freeToteRemaining = _holderMerchClaim.freeTote ? Number(_holderMerchClaim.availableFreeToteQty ?? _holderMerchClaim.freeToteQty ?? 1) : 0;
   let addOn = 0;
   cart.forEach(item => {
     const product = SHOP_CONFIG.products.find(p => p.id === item.id) || {};
@@ -5022,7 +5038,7 @@ function holderDiscountExcludedSubtotal(currency) {
   const appliedProductPercent = Number(_appliedDiscount.percent || 0);
   const holderPercent = holderMerchDiscountPercent();
   let excluded = 0;
-  let freeToteRemaining = _holderMerchClaim.freeTote ? Number(_holderMerchClaim.freeToteQty || 1) : 0;
+  let freeToteRemaining = _holderMerchClaim.freeTote ? Number(_holderMerchClaim.availableFreeToteQty ?? _holderMerchClaim.freeToteQty ?? 1) : 0;
   cart.forEach(item => {
     const product = SHOP_CONFIG.products.find(p => p.id === item.id) || {};
     if (String(product.category || '').toLowerCase() !== 'merch') return;
@@ -5066,7 +5082,7 @@ function holderClaimPayload() {
     token_balances: _holderMerchClaim.tokenBalances || {},
     entitlement_key: _holderMerchClaim.entitlementKey || APOTI_HOLDER_CONFIG.entitlementKey,
     free_tote: _holderMerchClaim.freeTote === true,
-    free_tote_qty: Number(_holderMerchClaim.freeToteQty || 0),
+    free_tote_qty: Number(_holderMerchClaim.availableFreeToteQty ?? _holderMerchClaim.freeToteQty ?? 0),
     token_balance: Number(_holderMerchClaim.tokenBalance || 0),
     merch_discount_percent: holderMerchDiscountPercent(),
     benefit_ngn: ngn.total,
@@ -5316,6 +5332,47 @@ function holderClaimFromGateBalances(balances, chain, source) {
     freeTote: bronzeBalance > 0,
   };
 }
+async function fetchHolderClaimUsageForClaim(claim) {
+  if (!claim || !claim.wallet || !claim.chain) return null;
+  const chain = normalizeHolderChain(claim.selectedChain || claim.chain);
+  const tokenBalance = holderClaimTierCount(claim);
+  const params = new URLSearchParams({
+    wallet: claim.wallet,
+    chain,
+    contract: claim.source || (chain === 'tezos' ? HOLDER_GATE_TEZOS_CONTRACT : HOLDER_GATE_ETH_CONTRACT),
+    token_balance: String(tokenBalance),
+  });
+  const response = await fetch('/api/shop-holder-claim-summary?' + params.toString(), { cache: 'no-store' });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result?.error || 'Could not read holder claim history');
+  return result;
+}
+function applyHolderClaimUsage(claim, usage) {
+  if (!claim || !usage) return claim;
+  const bronzeBalance = Number(normalizeGateBalances(claim.tokenBalances)['2'] || 0);
+  const reservedQty = Math.max(0, Number(usage.reserved_qty || 0));
+  const fulfilledQty = Math.max(0, Number(usage.fulfilled_qty || 0));
+  const availableQty = Math.max(0, bronzeBalance - reservedQty);
+  return Object.assign(claim, {
+    claimUsage: usage,
+    lifetimeFreeToteQty: bronzeBalance,
+    reservedToteQty: reservedQty,
+    fulfilledToteQty: fulfilledQty,
+    availableFreeToteQty: availableQty,
+    freeToteQty: availableQty,
+    freeTote: availableQty > 0,
+  });
+}
+async function refreshHolderClaimUsageForClaim(claim) {
+  if (!claim || holderClaimTierRank(claim) < 2) return claim;
+  try {
+    return applyHolderClaimUsage(claim, await fetchHolderClaimUsageForClaim(claim));
+  } catch (err) {
+    console.warn('[holder merch] claim history lookup failed:', err);
+    claim.claimUsageError = err?.message || String(err);
+    return claim;
+  }
+}
 function holderClaimTierRank(claim) {
   const balances = normalizeGateBalances(claim?.tokenBalances);
   if (Number(balances['2'] || 0) > 0 || /bronze/i.test(String(claim?.tier || ''))) return 2;
@@ -5518,12 +5575,18 @@ async function detectApotiTezosHolderTier(wallet) {
   return holderClaimFromGateBalances(balances, 'tezos', HOLDER_GATE_TEZOS_CONTRACT);
 }
 function holderVerificationMessage(detected, short) {
-  const toteQty = Number(detected?.freeToteQty || 0);
+  const lifetimeQty = Number(detected?.lifetimeFreeToteQty ?? normalizeGateBalances(detected?.tokenBalances)['2'] ?? detected?.freeToteQty ?? 0);
+  const reservedQty = Number(detected?.reservedToteQty || detected?.claimUsage?.reserved_qty || 0);
+  const availableQty = Number(detected?.availableFreeToteQty ?? detected?.freeToteQty ?? 0);
   const discount = Number(detected?.discountPercent || 0);
   const chainName = normalizeHolderChain(detected?.selectedChain || detected?.chain) === 'tezos' ? 'Tezos' : 'ETH';
   const parts = [`Verified ${detected.tier}: using ${chainName} wallet ${short} for this claim.`];
-  if (toteQty > 0) {
-    parts.push(`${toteQty} Bronze Token tote redemption${toteQty === 1 ? '' : 's'} available on the selected wallet.`);
+  if (lifetimeQty > 0) {
+    if (reservedQty > 0) {
+      parts.push(`${reservedQty} of ${lifetimeQty} Bronze Token tote redemption${lifetimeQty === 1 ? '' : 's'} already claimed or reserved; ${availableQty} still available on this wallet.`);
+    } else {
+      parts.push(`${availableQty} Bronze Token tote redemption${availableQty === 1 ? '' : 's'} available on the selected wallet.`);
+    }
   } else {
     parts.push('No Bronze Token tote redemption found on the selected wallet.');
   }
@@ -5583,6 +5646,7 @@ async function connectApotiHolderWallet() {
       refreshCheckoutAfterHolderMerchClaim();
       return;
     }
+    await refreshHolderClaimUsageForClaim(detected);
     const merged = rememberHolderMerchChainClaim('eth', wallet, detected);
     if (typeof _ethConnectedAddr !== 'undefined') _ethConnectedAddr = wallet;
     if (typeof _ethProvider !== 'undefined') _ethProvider = new ethers.providers.Web3Provider(await getEthereumWalletProvider());
@@ -5628,6 +5692,7 @@ async function connectApotiTezosHolderWallet() {
       refreshCheckoutAfterHolderMerchClaim();
       return;
     }
+    await refreshHolderClaimUsageForClaim(detected);
     const merged = rememberHolderMerchChainClaim('tezos', wallet, detected);
     const displayWallet = merged.wallet || wallet;
     const short = displayWallet.slice(0, 6) + '...' + displayWallet.slice(-4);
@@ -6348,6 +6413,15 @@ function restoreHolderMerchClaimCache() {
     const wallet = selected.wallet || selected.selectedWallet || '';
     const short = wallet ? wallet.slice(0, 6) + '...' + wallet.slice(-4) : 'saved wallet';
     updateHolderMerchStatus(holderVerificationMessage(selected, short) + ' Saved access was restored after refresh; checkout will revalidate it server-side.', 'verified');
+    refreshHolderClaimUsageForClaim(selected).then(updated => {
+      if (!updated) return;
+      _holderMerchClaim = updated;
+      const restoredChain = normalizeHolderChain(updated.chain);
+      if (restoredChain && _holderMerchChainClaims[restoredChain]) _holderMerchChainClaims[restoredChain] = updated;
+      persistHolderMerchClaimCache();
+      updateHolderMerchStatus(holderVerificationMessage(updated, short) + ' Saved access was restored after refresh; checkout will revalidate it server-side.', 'verified');
+      refreshCheckoutAfterHolderMerchClaim();
+    }).catch(() => {});
     refreshCheckoutAfterHolderMerchClaim();
     return true;
   } catch (_) {
