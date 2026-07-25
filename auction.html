@@ -4793,7 +4793,102 @@ let _reownAppKitPromise = null;
 let _reownProviderState = null;
 let _ethWalletProvider = null;
 let _reownConnectAttempt = 0;
-const _ETH_WALLET_FEEDBACK_TIMEOUT_MS = 45000;
+const _ETH_WALLET_FEEDBACK_TIMEOUT_MS = 25000;
+const _ETH_WALLET_HANDOFF_KEY = "kwAuctionEthWalletHandoff";
+
+function _ethWalletTimeoutError() {
+  return new Error("Wallet did not return an account. Reopen the wallet chooser and try again.");
+}
+
+function _withEthWalletTimeout(promise, ms = _ETH_WALLET_FEEDBACK_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let visibleElapsed = 0;
+    let lastTick = Date.now();
+    let timer = null;
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+    const settle = fn => value => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      fn(value);
+    };
+    const onVisibility = () => { lastTick = Date.now(); };
+    const tick = () => {
+      if (settled) return;
+      const now = Date.now();
+      if (!document.hidden) visibleElapsed += now - lastTick;
+      lastTick = now;
+      if (visibleElapsed >= ms) return settle(reject)(_ethWalletTimeoutError());
+      timer = window.setTimeout(tick, 500);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    Promise.resolve(promise).then(settle(resolve), settle(reject));
+    tick();
+  });
+}
+
+function _runEthWalletVisibleTimeout(callback, ms = _ETH_WALLET_FEEDBACK_TIMEOUT_MS) {
+  let visibleElapsed = 0;
+  let lastTick = Date.now();
+  let timer = null;
+  let cancelled = false;
+  const onVisibility = () => { lastTick = Date.now(); };
+  const tick = () => {
+    if (cancelled) return;
+    const now = Date.now();
+    if (!document.hidden) visibleElapsed += now - lastTick;
+    lastTick = now;
+    if (visibleElapsed >= ms) {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      callback();
+      return;
+    }
+    timer = window.setTimeout(tick, 500);
+  };
+  document.addEventListener("visibilitychange", onVisibility);
+  tick();
+  return () => {
+    cancelled = true;
+    window.clearTimeout(timer);
+    document.removeEventListener("visibilitychange", onVisibility);
+  };
+}
+
+function _markEthWalletHandoff(source) {
+  try {
+    localStorage.setItem(_ETH_WALLET_HANDOFF_KEY, JSON.stringify({
+      source: source || "eth",
+      at: Date.now(),
+      url: location.href,
+    }));
+  } catch(_) {}
+}
+
+function _clearEthWalletHandoff() {
+  try { localStorage.removeItem(_ETH_WALLET_HANDOFF_KEY); } catch(_) {}
+}
+
+function _readRecentEthWalletHandoff() {
+  try {
+    const data = JSON.parse(localStorage.getItem(_ETH_WALLET_HANDOFF_KEY) || "null");
+    return data && Date.now() - Number(data.at || 0) < 5 * 60 * 1000 ? data : null;
+  } catch(_) {
+    return null;
+  }
+}
+
+async function _requestEthAccounts(ethProvider) {
+  if (ethProvider?.accounts?.length) return ethProvider.accounts;
+  if (!ethProvider?.request) throw new Error("Wallet provider is unavailable. Reopen the wallet chooser and try again.");
+  _markEthWalletHandoff("accounts");
+  const accounts = await _withEthWalletTimeout(ethProvider.request({ method: "eth_requestAccounts" }));
+  return accounts || [];
+}
 
 function _reownEip155ProviderFromState(state) {
   return state?.eip155 || state?.provider || null;
@@ -4964,16 +5059,20 @@ async function _connectReownProvider() {
   const attempt = ++_reownConnectAttempt;
   const existing = modal.getProviders?.()?.eip155 || modal.getWalletProvider?.() || _reownEip155ProviderFromState(_reownProviderState);
   if (existing) {
-    const accounts = await existing.request?.({ method: "eth_accounts" }).catch(() => []);
+    const accounts = existing.request
+      ? await _withEthWalletTimeout(existing.request({ method: "eth_accounts" }), 8000).catch(() => [])
+      : [];
     if (accounts?.[0] || _reownAddressFromState(_reownProviderState, modal)) return existing;
     await _resetReownConnectionState();
   }
   return new Promise((resolve, reject) => {
     let settled = false;
     let unsubscribe = null;
+    let cancelFeedbackTimeout = null;
     const finish = providerLike => {
       if (settled) return;
       settled = true;
+      try { cancelFeedbackTimeout?.(); } catch(_) {}
       try { unsubscribe?.(); } catch(_) {}
       resolve(providerLike);
     };
@@ -4989,7 +5088,7 @@ async function _connectReownProvider() {
     const unsubscribeProviders = modal.subscribeProviders?.(async state => {
       const nextProvider = state?.eip155 || null;
       const accounts = nextProvider?.request
-        ? await nextProvider.request({ method: "eth_accounts" }).catch(() => [])
+        ? await _withEthWalletTimeout(nextProvider.request({ method: "eth_accounts" }), 8000).catch(() => [])
         : [];
       const nextAddress = accounts?.[0] || _reownAddressFromState(_reownProviderState, modal);
       if (nextProvider && nextAddress) {
@@ -5002,8 +5101,9 @@ async function _connectReownProvider() {
       try { stop?.(); } catch(_) {}
       try { unsubscribeProviders?.(); } catch(_) {}
     };
+    _markEthWalletHandoff("reown");
     modal.open?.({ view: "Connect", namespace: "eip155" });
-    window.setTimeout(async () => {
+    cancelFeedbackTimeout = _runEthWalletVisibleTimeout(async () => {
       if (settled) return;
       try { unsubscribe?.(); } catch(_) {}
       if (attempt === _reownConnectAttempt) await _resetReownConnectionState();
@@ -5020,6 +5120,41 @@ async function _resetReownConnectionState() {
   _ethWalletProvider = null;
 }
 
+async function _resumeEthWalletHandoffIfPossible() {
+  const handoff = _readRecentEthWalletHandoff();
+  if (!handoff || signerAddress || document.hidden) return;
+  const candidate = _ethWalletProvider
+    || window.ethereum
+    || window.phantom?.ethereum
+    || _reownEip155ProviderFromState(_reownProviderState)
+    || _reownAppKit?.getProviders?.()?.eip155
+    || _reownAppKit?.getWalletProvider?.();
+  if (!candidate?.request) {
+    if (_walletConnecting) {
+      _walletConnecting = false;
+      setWalletUi("disconnected");
+    }
+    notify("info", "Wallet opened separately", "Return here and tap Connect ETH again if MetaMask did not complete the connection.");
+    return;
+  }
+  try {
+    const accounts = await _withEthWalletTimeout(candidate.request({ method: "eth_accounts" }), 5000).catch(() => []);
+    const addr = accounts?.[0] || _reownAddressFromState(_reownProviderState, _reownAppKit);
+    if (!addr) throw new Error("No account returned");
+    _ethWalletProvider = candidate;
+    _wcProvider = candidate;
+    provider = new ethers.BrowserProvider(candidate);
+    signer = await _withEthWalletTimeout(provider.getSigner(), 5000);
+    await _wcFinishConnect(addr, "handoff-resume");
+  } catch(e) {
+    if (_walletConnecting) {
+      _walletConnecting = false;
+      await _resetReownConnectionState();
+      setWalletUi("disconnected");
+    }
+  }
+}
+
 async function _wcConnectAppKit() {
   _wcShowWalletOptionsLoading();
   if (_walletConnecting) return;
@@ -5027,16 +5162,15 @@ async function _wcConnectAppKit() {
   walletChain = "eth";
   setWalletUi("connecting");
   try {
+    _markEthWalletHandoff("auction-appkit");
     const ethProvider = await _connectReownProvider();
-    const accounts = ethProvider.accounts?.length
-      ? ethProvider.accounts
-      : await ethProvider.request?.({ method: "eth_requestAccounts" });
+    const accounts = await _requestEthAccounts(ethProvider);
     const addr = accounts?.[0] || _reownAddressFromState(_reownProviderState, _reownAppKit);
     if (!addr) throw new Error("No account returned");
     _ethWalletProvider = ethProvider;
     _wcProvider = ethProvider;
     provider = new ethers.BrowserProvider(ethProvider);
-    signer = await provider.getSigner();
+    signer = await _withEthWalletTimeout(provider.getSigner());
     await _wcFinishConnect(addr, "reown-appkit");
     ethProvider.on?.("accountsChanged", () => location.reload());
     ethProvider.on?.("chainChanged", () => location.reload());
@@ -5054,13 +5188,14 @@ async function _wcConnectInjected(walletHint) {
   if (_walletConnecting) return;
   _walletConnecting = true; walletChain = "eth"; setWalletUi("connecting");
   try {
+    _markEthWalletHandoff(walletHint || "injected");
     const injected = walletHint === "phantom"
       ? window.phantom?.ethereum
       : window.ethereum;
     if (!injected) throw new Error("No browser wallet found. Use a mobile wallet option instead.");
-    await injected.request({ method: "eth_requestAccounts" });
+    await _requestEthAccounts(injected);
     provider = new ethers.BrowserProvider(injected);
-    signer   = await provider.getSigner();
+    signer   = await _withEthWalletTimeout(provider.getSigner());
     await _wcFinishConnect(await signer.getAddress(), walletHint === "phantom" ? "phantom" : "injected");
     if (!_walletEventsBound && injected?.on) {
       injected.on("accountsChanged", () => location.reload());
@@ -5086,6 +5221,7 @@ async function _wcConnectWC(walletHint) {
 }
 async function _wcDisconnectWC() {
   await _resetReownConnectionState();
+  _clearEthWalletHandoff();
   _wcCloseModal();
   _walletConnecting = false;
   if (!signerAddress) setWalletUi("disconnected");
@@ -5095,11 +5231,12 @@ async function _wcFinishConnect(addr, method) {
   setWalletUi("signing");
   const ts  = Date.now();
   const msg = `Gated Auction \u2014 wallet verification\n\nAddress: ${addr}\nTimestamp: ${ts}\n\nThis signature proves wallet ownership. It does not cost gas or authorise any transaction.`;
-  const sig = await signer.signMessage(msg);
+  const sig = await _withEthWalletTimeout(signer.signMessage(msg));
   const rec = ethers.verifyMessage(msg, sig);
   if (rec.toLowerCase() !== addr.toLowerCase()) throw new Error("Signature mismatch");
   signerAddress = addr; tezosAddress = null;
   sessionStorage.removeItem("wallet_disconnected");
+  _clearEthWalletHandoff();
   setWalletUi("connected", addr);
   console.debug(`[eth] connected via ${method}:`, addr);
   if (auctionContract) {
@@ -5114,6 +5251,11 @@ async function _wcFinishConnect(addr, method) {
 function _wcHandleError(e) {
   signer = null; signerAddress = null; setWalletUi("failed");
   const text = e?.message || "";
+  if (/timed out|did not return|stalled/i.test(text)) {
+    _resetReownConnectionState().catch(() => {});
+  } else {
+    _clearEthWalletHandoff();
+  }
   const msg = (e.code === 4001 || /rejected|denied|cancelled/i.test(text))
     ? "Connection cancelled"
     : (/timed out|did not return|stalled/i.test(text)
@@ -5121,6 +5263,13 @@ function _wcHandleError(e) {
       : text || "Connection failed");
   notify("err", "Connection failed", msg);
 }
+
+window.addEventListener("pageshow", () => window.setTimeout(_resumeEthWalletHandoffIfPossible, 500));
+window.addEventListener("focus", () => window.setTimeout(_resumeEthWalletHandoffIfPossible, 500));
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && _walletConnecting && walletChain === "eth") _markEthWalletHandoff("hidden");
+  if (!document.hidden) window.setTimeout(_resumeEthWalletHandoffIfPossible, 500);
+});
 
 function _tezosRpcForSlot(slot = _activeCfg()) {
   return slot?.tezosRpcUrl
@@ -5358,6 +5507,7 @@ function disconnectWallet() {
   _wcProvider = null;
   _reownProviderState = null;
   _ethWalletProvider = null;
+  _clearEthWalletHandoff();
   if (wc?.disconnect) wc.disconnect().catch(() => {});
   try { _reownAppKit?.disconnect?.(); } catch(_) {}
   try { _reownAppKit?.adapter?.connectionControllerClient?.disconnect?.(); } catch(_) {}

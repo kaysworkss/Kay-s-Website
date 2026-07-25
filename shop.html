@@ -8351,7 +8351,8 @@ let _reownProviderState  = null;
 let _reownConnectAttempt = 0;
 
 const WALLETCONNECT_PROJECT_ID = '42dc845feb4ebf8f5cbe5725c2e07672';
-const ETH_WALLET_FEEDBACK_TIMEOUT_MS = 45000;
+const ETH_WALLET_FEEDBACK_TIMEOUT_MS = 25000;
+const ETH_WALLET_HANDOFF_KEY = 'kwEthWalletHandoff';
 
 const REOWN_METADATA = {
   name: "Kay's Works",
@@ -8359,6 +8360,102 @@ const REOWN_METADATA = {
   url: 'https://www.kaysworks.com',
   icons: ['https://www.kaysworks.com/images/kaysworkslogo.svg'],
 };
+
+function ethWalletTimeoutError() {
+  return new Error('Wallet did not return an account. Reopen the wallet chooser and try again.');
+}
+
+function withEthWalletFeedbackTimeout(promise, ms = ETH_WALLET_FEEDBACK_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let visibleElapsed = 0;
+    let lastTick = Date.now();
+    let timer = null;
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+    const settle = fn => value => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      fn(value);
+    };
+    const onVisibility = () => { lastTick = Date.now(); };
+    const tick = () => {
+      if (settled) return;
+      const now = Date.now();
+      if (!document.hidden) visibleElapsed += now - lastTick;
+      lastTick = now;
+      if (visibleElapsed >= ms) return settle(reject)(ethWalletTimeoutError());
+      timer = window.setTimeout(tick, 500);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    Promise.resolve(promise).then(settle(resolve), settle(reject));
+    tick();
+  });
+}
+
+function runEthWalletVisibleTimeout(callback, ms = ETH_WALLET_FEEDBACK_TIMEOUT_MS) {
+  let visibleElapsed = 0;
+  let lastTick = Date.now();
+  let timer = null;
+  let cancelled = false;
+  const onVisibility = () => { lastTick = Date.now(); };
+  const tick = () => {
+    if (cancelled) return;
+    const now = Date.now();
+    if (!document.hidden) visibleElapsed += now - lastTick;
+    lastTick = now;
+    if (visibleElapsed >= ms) {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+      callback();
+      return;
+    }
+    timer = window.setTimeout(tick, 500);
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+  tick();
+  return () => {
+    cancelled = true;
+    window.clearTimeout(timer);
+    document.removeEventListener('visibilitychange', onVisibility);
+  };
+}
+
+function markEthWalletHandoff(source) {
+  try {
+    localStorage.setItem(ETH_WALLET_HANDOFF_KEY, JSON.stringify({
+      source: source || 'eth',
+      at: Date.now(),
+      url: location.href,
+    }));
+  } catch (_) {}
+}
+
+function clearEthWalletHandoff() {
+  try { localStorage.removeItem(ETH_WALLET_HANDOFF_KEY); } catch (_) {}
+}
+
+function readRecentEthWalletHandoff() {
+  try {
+    const data = JSON.parse(localStorage.getItem(ETH_WALLET_HANDOFF_KEY) || 'null');
+    return data && Date.now() - Number(data.at || 0) < 5 * 60 * 1000 ? data : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function requestEthWalletAccounts(ethProvider) {
+  if (ethProvider?.accounts?.length) return ethProvider.accounts;
+  if (!ethProvider?.request) throw new Error('Wallet provider is unavailable. Reopen the wallet chooser and try again.');
+  markEthWalletHandoff('accounts');
+  const accounts = await withEthWalletFeedbackTimeout(
+    ethProvider.request({ method: 'eth_requestAccounts' })
+  );
+  return accounts || [];
+}
 
 async function loadReownAppKit() {
   if (_reownAppKit) return _reownAppKit;
@@ -8411,16 +8508,20 @@ async function connectReownAppKitProvider() {
   const attempt = ++_reownConnectAttempt;
   const existing = modal.getWalletProvider?.() || _reownProviderState?.provider;
   if (existing) {
-    const accounts = await existing.request?.({ method: 'eth_accounts' }).catch(() => []);
+    const accounts = existing.request
+      ? await withEthWalletFeedbackTimeout(existing.request({ method: 'eth_accounts' }), 8000).catch(() => [])
+      : [];
     if (accounts?.[0] || _reownProviderState?.address) return existing;
     await resetReownConnectionState();
   }
   return new Promise((resolve, reject) => {
     let settled = false;
     let unsubscribe = null;
+    let cancelFeedbackTimeout = null;
     const finish = provider => {
       if (settled) return;
       settled = true;
+      try { cancelFeedbackTimeout?.(); } catch (_) {}
       try { unsubscribe?.(); } catch (_) {}
       resolve(provider);
     };
@@ -8435,7 +8536,8 @@ async function connectReownAppKitProvider() {
       }
     });
     modal.open?.({ view: 'Connect', namespace: 'eip155' });
-    window.setTimeout(async () => {
+    markEthWalletHandoff('reown');
+    cancelFeedbackTimeout = runEthWalletVisibleTimeout(async () => {
       if (settled) return;
       try { unsubscribe?.(); } catch (_) {}
       if (attempt === _reownConnectAttempt) await resetReownConnectionState();
@@ -8482,6 +8584,49 @@ async function getEthereumWalletProvider() {
     return _ethWalletProvider;
   }
   return connectReownAppKitProvider();
+}
+
+async function clearEthWalletConnectionAfterStall() {
+  await resetReownConnectionState();
+  _ethConnectedAddr = null;
+  _ethProvider = null;
+  _ethWalletProvider = null;
+  renderEthPanel();
+}
+
+async function resumeEthWalletHandoffIfPossible() {
+  const handoff = readRecentEthWalletHandoff();
+  if (!handoff || _ethConnectedAddr || document.hidden) return;
+  const providerCandidate = _ethWalletProvider || window.ethereum || _reownProviderState?.provider || _reownAppKit?.getWalletProvider?.();
+  const btn = document.getElementById('ethConnectBtn');
+  if (!providerCandidate?.request) {
+    if (_ethConnecting) {
+      _ethConnecting = false;
+      if (btn) { btn.disabled = false; btn.textContent = 'Connect ETH Wallet'; }
+    }
+    showToast('Wallet opened separately. Return here and tap Connect ETH again if it did not complete.');
+    return;
+  }
+  try {
+    const accounts = await withEthWalletFeedbackTimeout(
+      providerCandidate.request({ method: 'eth_accounts' }),
+      5000
+    ).catch(() => []);
+    if (accounts?.[0]) {
+      _ethConnectedAddr = accounts[0];
+      _ethWalletProvider = providerCandidate;
+      _ethProvider = new ethers.providers.Web3Provider(providerCandidate, 'any');
+      clearEthWalletHandoff();
+      renderEthPanel();
+      showToast('Wallet connected \u2736');
+      return;
+    }
+  } catch (_) {}
+  if (_ethConnecting) {
+    _ethConnecting = false;
+    await clearEthWalletConnectionAfterStall();
+    if (btn) { btn.disabled = false; btn.textContent = 'Connect ETH Wallet'; }
+  }
 }
 
 function ethShortAddr(addr) {
@@ -8763,18 +8908,20 @@ async function ethConnectWallet() {
 
   _ethConnecting = true;
   const btn = document.getElementById('ethConnectBtn');
-  btn.disabled = true; btn.textContent = window.ethereum ? 'Connecting\u2026' : 'Opening wallet options\u2026';
+  if (btn) { btn.disabled = true; btn.textContent = window.ethereum ? 'Connecting\u2026' : 'Opening wallet options\u2026'; }
 
   try {
+    markEthWalletHandoff('checkout');
     const ethProvider = await getEthereumWalletProvider();
     if (ethProvider === _walletConnectEthProvider && !ethProvider.session) {
       await ethProvider.connect?.({ chains: [1], rpcMap: { 1: 'https://ethereum.publicnode.com' } });
     }
-    const accounts = ethProvider.accounts?.length ? ethProvider.accounts : await ethProvider.request({ method: 'eth_requestAccounts' });
+    const accounts = await requestEthWalletAccounts(ethProvider);
     if (!accounts || !accounts[0]) throw new Error('No account returned');
     _ethConnectedAddr = accounts[0];
     _ethWalletProvider = ethProvider;
     _ethProvider      = new ethers.providers.Web3Provider(ethProvider);
+    clearEthWalletHandoff();
 
     // Listen for account changes
     ethProvider.on?.('accountsChanged', accs => {
@@ -8788,19 +8935,30 @@ async function ethConnectWallet() {
   } catch (e) {
     const msg = e?.message || String(e);
     if (/rejected|denied|cancel/i.test(msg)) {
+      clearEthWalletHandoff();
       showToast('Connection cancelled');
     } else if (/timed out|did not return/i.test(msg)) {
+      await clearEthWalletConnectionAfterStall();
+      clearEthWalletHandoff();
       showToast('Wallet connection stalled. Please try again.');
       console.warn('[ETH] connect timeout:', e);
     } else {
       showToast('Could not connect wallet \u2014 try again');
       console.error('[ETH] connect error:', e);
+      clearEthWalletHandoff();
     }
   } finally {
     _ethConnecting = false;
-    btn.disabled = false; btn.textContent = 'Connect ETH Wallet';
+    if (btn) { btn.disabled = false; btn.textContent = 'Connect ETH Wallet'; }
   }
 }
+
+window.addEventListener('pageshow', () => window.setTimeout(resumeEthWalletHandoffIfPossible, 500));
+window.addEventListener('focus', () => window.setTimeout(resumeEthWalletHandoffIfPossible, 500));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && _ethConnecting) markEthWalletHandoff('hidden');
+  if (!document.hidden) window.setTimeout(resumeEthWalletHandoffIfPossible, 500);
+});
 
 async function ensureEthereumMainnet() {
   const ethProvider = await getEthereumWalletProvider();
