@@ -5342,10 +5342,22 @@ async function fetchHolderClaimUsageForClaim(claim) {
     contract: claim.source || (chain === 'tezos' ? HOLDER_GATE_TEZOS_CONTRACT : HOLDER_GATE_ETH_CONTRACT),
     token_balance: String(tokenBalance),
   });
-  const response = await fetch('/api/shop-holder-claim-summary?' + params.toString(), { cache: 'no-store' });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result?.error || 'Could not read holder claim history');
-  return result;
+  const paths = [
+    '/api/shop-holder-claim-summary?' + params.toString(),
+    '/api/game?action=shop-holder-claim-summary&' + params.toString(),
+  ];
+  let lastError = null;
+  for (const path of paths) {
+    try {
+      const response = await fetch(path, { cache: 'no-store' });
+      const result = await response.json().catch(() => ({}));
+      if (response.ok) return result;
+      lastError = new Error(result?.error || `Claim history returned ${response.status}`);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('Could not read holder claim history');
 }
 function applyHolderClaimUsage(claim, usage) {
   if (!claim || !usage) return claim;
@@ -5591,6 +5603,7 @@ function holderVerificationMessage(detected, short) {
     parts.push('No Bronze Token tote redemption found on the selected wallet.');
   }
   if (discount > 0) parts.push(`${discount}% holder merch discount is also active.`);
+  if (detected?.claimUsageError) parts.push('Claim history could not be refreshed yet; checkout will still verify server-side.');
   return parts.join(' ');
 }
 function refreshCheckoutAfterHolderMerchClaim() {
