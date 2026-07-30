@@ -1339,11 +1339,11 @@
   }
   .lightbox-inner {
     position: relative;
-    max-width: 90vw; max-height: 90vh;
+    max-width: min(90vw, calc(100vw - 11rem)); max-height: 90vh;
     display: flex; align-items: center; justify-content: center;
   }
   .lightbox-inner img {
-    max-width: 90vw; max-height: 88vh;
+    max-width: min(90vw, calc(100vw - 11rem)); max-height: 88vh;
     object-fit: contain; border-radius: 6px;
     box-shadow: 0 30px 80px rgba(0,0,0,0.7);
     transform: scale(0.92);
@@ -2937,7 +2937,7 @@ body.kwp-viewer-open {
       <div class="aor-timeline">
       <div class="aor-track"></div>
 
-      <div class="aor-row pre" data-month="3" data-year="2026">
+      <div class="aor-row pre" data-start="2026-04-01">
         <div class="aor-date"><div class="aor-date-m">April<br>2026</div><div class="aor-date-d">Apr 1–May 2</div></div>
         <div class="aor-dot pre"></div>
         <div class="aor-card">
@@ -2948,7 +2948,7 @@ body.kwp-viewer-open {
         </div>
       </div>
 
-      <div class="aor-row ch" data-month="4" data-year="2026">
+      <div class="aor-row ch" data-start="2026-05-03">
         <div class="aor-date"><div class="aor-date-m">May<br>2026</div><div class="aor-date-d">May 3rd</div></div>
         <div class="aor-dot ch"></div>
         <div class="aor-card">
@@ -2960,7 +2960,7 @@ body.kwp-viewer-open {
         </div>
       </div>
 
-      <div class="aor-row ch" data-month="5" data-year="2026">
+      <div class="aor-row ch" data-start="2026-06-01">
         <div class="aor-date"><div class="aor-date-m">June<br>2026</div><div class="aor-date-d">Jun 1st</div></div>
         <div class="aor-dot ch"></div>
         <div class="aor-card">
@@ -2972,7 +2972,7 @@ body.kwp-viewer-open {
         </div>
       </div>
 
-      <div class="aor-row ch" data-month="7" data-year="2026">
+      <div class="aor-row ch" data-start="2026-08-03">
         <div class="aor-date"><div class="aor-date-m">August<br>2026</div><div class="aor-date-d">Aug 3rd</div></div>
         <div class="aor-dot ch"></div>
         <div class="aor-card">
@@ -2984,7 +2984,7 @@ body.kwp-viewer-open {
         </div>
       </div>
 
-      <div class="aor-row ch" data-month="8" data-year="2026">
+      <div class="aor-row ch" data-start="2026-09-03">
         <div class="aor-date"><div class="aor-date-m">September<br>2026</div><div class="aor-date-d">Sep 3rd</div></div>
         <div class="aor-dot ch"></div>
         <div class="aor-card">
@@ -2996,7 +2996,7 @@ body.kwp-viewer-open {
         </div>
       </div>
 
-      <div class="aor-row ch" data-month="9" data-year="2026" data-day-end="28">
+      <div class="aor-row ch" data-start="2026-10-03">
         <div class="aor-date"><div class="aor-date-m">October<br>2026</div><div class="aor-date-d">Oct 3rd</div></div>
         <div class="aor-dot ch"></div>
         <div class="aor-card">
@@ -3008,7 +3008,7 @@ body.kwp-viewer-open {
         </div>
       </div>
 
-      <div class="aor-row fin" data-month="9" data-year="2026" data-day-start="29">
+      <div class="aor-row fin" data-start="2026-10-29">
         <div class="aor-date"><div class="aor-date-m">October<br>2026</div><div class="aor-date-d">Oct 29th</div></div>
         <div class="aor-dot fin"></div>
         <div class="aor-card">
@@ -3020,7 +3020,7 @@ body.kwp-viewer-open {
         </div>
       </div>
 
-      <div class="aor-row post" data-month-start="10" data-month-end="10" data-year="2026">
+      <div class="aor-row post" data-start="2026-11-01">
         <div class="aor-date"><div class="aor-date-m">Oct &ndash; Nov<br>2026</div><div class="aor-date-d">Post-series</div></div>
         <div class="aor-dot post"></div>
         <div class="aor-card">
@@ -3047,54 +3047,36 @@ body.kwp-viewer-open {
 
   <script>
     (function() {
-      var now = new Date();
-      var m = now.getMonth(); // 0=Jan
-      var d = now.getDate();
-      var y = now.getFullYear();
+      var today = new Date();
+      today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
       var rows = document.querySelectorAll('.aor-timeline .aor-row');
+      var currentRow = null;
+
       rows.forEach(function(row) {
-        var rm = parseInt(row.getAttribute('data-month'));
-        var ry = parseInt(row.getAttribute('data-year'));
-        var rms = parseInt(row.getAttribute('data-month-start'));
-        var rme = parseInt(row.getAttribute('data-month-end'));
-        var rdayEnd = parseInt(row.getAttribute('data-day-end'));
-        var rdayStart = parseInt(row.getAttribute('data-day-start'));
-        var active = false;
-
-        if (ry && ry === y) {
-          // Single month rows
-          if (!isNaN(rm)) {
-            // Sep chapter 5: Sep 1–26
-            if (!isNaN(rdayEnd) && m === rm) {
-              active = d <= rdayEnd;
-            }
-            // Sep chapter 6: Sep 27+
-            else if (!isNaN(rdayStart) && m === rm) {
-              active = d >= rdayStart;
-            }
-            else {
-              active = m === rm;
-            }
-          }
-          // Oct–Nov post-series
-          if (!isNaN(rms) && !isNaN(rme)) {
-            active = m >= rms && m <= rme;
-          }
-        }
-
-        if (active) {
-          row.classList.add('aor-current');
-          // Inject "Now" badge next to the title
-          var title = row.querySelector('.aor-title');
-          if (title && !title.querySelector('.aor-now-badge')) {
-            var badge = document.createElement('span');
-            badge.className = 'aor-now-badge';
-            badge.textContent = 'Now';
-            title.appendChild(badge);
-          }
+        var raw = row.getAttribute('data-start');
+        if (!raw) return;
+        var parts = raw.split('-').map(Number);
+        var startDate = new Date(parts[0], parts[1] - 1, parts[2]);
+        // The "live" row is the most recent release whose start date has
+        // already passed — it stays live through any gap until the next
+        // release begins (e.g. Chapter 2 stays live all through July,
+        // right up until Chapter 3 opens on Aug 3).
+        if (startDate <= today) {
+          currentRow = row;
         }
       });
+
+      if (currentRow) {
+        currentRow.classList.add('aor-current');
+        var title = currentRow.querySelector('.aor-title');
+        if (title && !title.querySelector('.aor-now-badge')) {
+          var badge = document.createElement('span');
+          badge.className = 'aor-now-badge';
+          badge.textContent = 'Now';
+          title.appendChild(badge);
+        }
+      }
     })();
   </script>
 
