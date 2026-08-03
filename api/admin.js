@@ -819,7 +819,7 @@ async function handleGetHolderParticipants(req, res, supabase) {
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
   const { data, error } = await supabase
     .from('holders')
-    .select('id, wallet_address, chain, display_name, tier, is_public, email_updates_opt_in, token_balance, last_verified_at, created_at')
+    .select('id, auth_user_id, wallet_address, chain, display_name, tier, is_public, email_updates_opt_in, token_balance, last_verified_at, created_at')
     .order('created_at', { ascending: true });
   if (error) return json(500, { error: error.message });
   return json(200, data || []);
