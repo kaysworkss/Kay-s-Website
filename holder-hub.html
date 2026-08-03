@@ -639,6 +639,8 @@
   .msg-item .msg-date { color:var(--text-muted); font-size:0.78rem; margin-top:0.4rem; }
   .msg-reply { margin-top:0.9rem; padding:0.85rem 1rem; border-left:2px solid var(--gold); border-radius:0 6px 6px 0; background:rgba(201,153,58,0.08); }
   .msg-reply-label { font-family:'Cinzel',serif; color:var(--gold); font-size:0.54rem; letter-spacing:0.14em; text-transform:uppercase; margin-bottom:0.35rem; }
+  .asset-summary a { color:var(--gold); font-weight:700; text-decoration:underline; text-underline-offset:3px; }
+  .asset-summary a:hover, .asset-summary a:focus { color:var(--gold-light); }
 
   .empty-state { color:var(--text-muted); font-style:italic; padding:2rem 0; text-align:center; }
   .owned-empty {
@@ -1418,7 +1420,7 @@
         <h2>All Artworks</h2>
         <p>Explore the story in sequence, from recent releases to the works that opened the series.</p>
       </header>
-      <div class="tabs" style="border-bottom:none;margin-bottom:1.2rem;padding-bottom:0;">
+      <div class="tabs" id="available-artworks" style="border-bottom:none;margin-bottom:1.2rem;padding-bottom:0;">
         <button class="tab-btn active" data-artstatus="all">All</button>
         <button class="tab-btn" data-artstatus="available">Available</button>
         <button class="tab-btn" data-artstatus="sold">Sold</button>
@@ -1617,7 +1619,7 @@
       <section class="artwork-chapter" data-chapter="opa">
         <div class="artwork-group-label">The Opa Collection</div>
         <div class="grid opa-artwork-grid">
-        <div class="card" data-owner-piece="Ọ̀pá I — Ọ̀pá Orísun" data-status="auction">
+        <div class="card" data-owner-piece="Ọ̀pá I — Ọ̀pá Orísun" data-status="available">
           <div class="card-img-wrap">
             <img class="card-img opa-artwork-image" src="images/orisun5.jpg" alt="Ọ̀pá Orísun — open fullscreen" tabindex="0" role="button" />
           </div>
@@ -1638,7 +1640,7 @@
             </div>
           </div>
         </div>
-        <div class="card" data-owner-piece="Ọ̀pá II — Ọ̀pá Ìrántí" data-status="auction">
+        <div class="card" data-owner-piece="Ọ̀pá II — Ọ̀pá Ìrántí" data-status="available">
           <div class="card-img-wrap">
             <img class="card-img opa-artwork-image" src="images/iranti5.png" alt="Ọ̀pá Ìrántí — open fullscreen" tabindex="0" role="button" />
           </div>
@@ -1659,7 +1661,7 @@
             </div>
           </div>
         </div>
-        <div class="card" data-owner-piece="Ọ̀pá III — Ọ̀pá Ẹkùn" data-status="auction">
+        <div class="card" data-owner-piece="Ọ̀pá III — Ọ̀pá Ẹkùn" data-status="available">
           <div class="card-img-wrap">
             <img class="card-img opa-artwork-image" src="images/ekun1.jpg" alt="Ọ̀pá Ẹkùn — open fullscreen" tabindex="0" role="button" />
           </div>
@@ -2779,6 +2781,15 @@ function applyArtworkFilter(mode) {
 }
 applyArtworkFilter('all');
 
+function openAvailableArtworks(event) {
+  event?.preventDefault();
+  document.querySelector('.tabs .tab-btn[data-tab="artworks"]')?.click();
+  document.querySelector('[data-artstatus="available"]')?.click();
+  setTimeout(() => {
+    document.getElementById('available-artworks')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 50);
+}
+
 // ── Reserve-a-piece (all content below is hardcoded; only reserve offers and
 //    messages/participants stay dynamic — see the architecture note in the README) ──
 function bindReserveForms() {
@@ -3162,7 +3173,21 @@ function setOwnedAssetSummary(count, message = '') {
   if (!Number.isFinite(count)) {
     el.textContent = '';
   } else if (count === 0) {
-    el.textContent = 'Wallet checked — no collection assets were found on this chain.';
+    const balances = normalizeGateBalances(
+      currentHolder?.balancesByTokenId || currentHolder?.balances_by_token_id || currentHolder?.tokenBalances
+    );
+    const tier = String(currentHolder?.tier || '').toLowerCase();
+    const tokenId = String(currentHolder?.token_id ?? currentHolder?.tokenId ?? '');
+    const entryToken = balances['2'] > 0 || tier.includes('bronze') || tokenId === '2'
+      ? 'Bronze'
+      : 'Wooden';
+    el.replaceChildren();
+    el.append(`Your ${entryToken} entry token is confirmed. No paintings or sculptures are connected to this wallet yet — please explore `);
+    const link = document.createElement('a');
+    link.href = '#available-artworks';
+    link.textContent = 'Available artworks';
+    link.addEventListener('click', openAvailableArtworks);
+    el.append(link, '.');
   } else {
     el.textContent = `Wallet confirmed — ${count} collection asset${count === 1 ? '' : 's'} held on this chain.`;
   }
