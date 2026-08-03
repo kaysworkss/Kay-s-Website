@@ -745,6 +745,41 @@ async function handleHolderReservation(req, res, supabase) {
   return json(200, { ok: true });
 }
 
+// holder-message-new (POST a new private message to a holder)
+async function handleCreateHolderMessage(req, res, supabase) {
+  if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
+
+  const holderId = String(req.body?.holder_id || '').trim();
+  const subject = String(req.body?.subject || '').trim().slice(0, 200);
+  const message = String(req.body?.message || '').trim().slice(0, 12000);
+  if (!holderId) return json(422, { error: 'Choose a holder.' });
+  if (!message) return json(422, { error: 'Write a message.' });
+
+  const { data: holder, error: holderError } = await supabase
+    .from('holders')
+    .select('id')
+    .eq('id', holderId)
+    .maybeSingle();
+  if (holderError) return json(500, { error: holderError.message });
+  if (!holder) return json(404, { error: 'Holder not found.' });
+
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      holder_id: holder.id,
+      subject: subject || null,
+      message: '',
+      admin_reply: message,
+      replied_at: now,
+      status: 'read',
+    })
+    .select('id')
+    .single();
+  if (error) return json(500, { error: error.message });
+  return json(201, { ok: true, id: data.id });
+}
+
 // holder-messages (GET inbox)
 async function handleGetHolderMessages(req, res, supabase) {
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' });
@@ -803,7 +838,7 @@ async function handleHolderParticipant(req, res, supabase) {
   if (body.tier          !== undefined) patch.tier          = ['gold', 'bronze', 'wood'].includes(body.tier) ? body.tier : null;
   const { error } = await supabase.from('holders').update(patch).eq('id', id);
   if (error) return json(500, { error: error.message });
-  return json(200, { ok: true, production_email_sent: productionEmailSent });
+  return json(200, { ok: true });
 }
 
 // holder-update-notify (POST email alert to opted-in holders)
@@ -913,6 +948,7 @@ module.exports = async (req, res) => {
     case 'shop-orders':   return handleShopOrders(req, res, supabase);
     case 'shop-order':    return handleShopOrderUpdate(req, res, supabase);
     case 'holder-messages':     return handleGetHolderMessages(req, res, supabase);
+    case 'holder-message-new':  return handleCreateHolderMessage(req, res, supabase);
     case 'holder-message':      return handleHolderMessage(req, res, supabase);
     case 'holder-reservations': return handleGetHolderReservations(req, res, supabase);
     case 'holder-reservation':  return handleHolderReservation(req, res, supabase);
