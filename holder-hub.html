@@ -3113,7 +3113,7 @@ function highlightPieceByName(onChainName) {
   });
 }
 
-async function scanTezosHoldings(address) {
+async function scanTezosHoldings(address, updateSummary = true) {
   try {
     const url =
       'https://api.tzkt.io/v1/tokens/balances' +
@@ -3123,25 +3123,27 @@ async function scanTezosHoldings(address) {
     const r = await fetch(url);
     if (!r.ok) throw new Error('TzKT returned ' + r.status);
     const rows = await r.json();
-    setOwnedAssetSummary((rows || []).length);
+    if (updateSummary) setOwnedAssetSummary((rows || []).length);
     (rows || []).forEach(row => {
       const tokenId = String(row?.token?.tokenId ?? '');
       const mappedName = TEZOS_TOKEN_PIECES[tokenId];
       const name = mappedName || row?.token?.metadata?.name;
       if (name) highlightPieceByName(name);
     });
+    return (rows || []).length;
   } catch (err) {
     console.warn('Tezos asset recognition failed:', err);
-    setOwnedAssetSummary(null, 'Could not confirm collection assets right now.');
+    if (updateSummary) setOwnedAssetSummary(null, 'Could not confirm collection assets right now.');
+    return null;
   }
 }
 
-async function scanEthHoldings(address) {
-  if (typeof ethers === 'undefined') return;
+async function scanEthHoldings(address, updateSummary = true) {
+  if (typeof ethers === 'undefined') return null;
   let provider;
   try {
     provider = new ethers.JsonRpcProvider(ETH_READONLY_RPC);
-  } catch (err) { return; }
+  } catch (err) { return null; }
 
   const nftInterface = new ethers.Interface([
     'function ownerOf(uint256 tokenId) view returns (address)',
@@ -3209,7 +3211,7 @@ async function scanEthHoldings(address) {
     console.warn('Edition ownership check failed:', err);
   }
 
-  setOwnedAssetSummary(ownedTokens.length);
+  if (updateSummary) setOwnedAssetSummary(ownedTokens.length);
 
   for (let start = 0; start < ownedTokens.length; start += 100) {
     const batch = ownedTokens.slice(start, start + 100).filter(token => !token.skipMetadata);
@@ -3230,6 +3232,7 @@ async function scanEthHoldings(address) {
       }));
     } catch (_) { /* keep the confirmed count even if metadata lookup fails */ }
   }
+  return ownedTokens.length;
 }
 
 function setOwnedAssetSummary(count, message = '') {
@@ -3335,11 +3338,28 @@ function renderOwnedWorks() {
 
 async function highlightOwnedPieces() {
   if (!currentHolder || !currentHolder.wallet_address) { renderOwnedWorks(); return; }
+  document.querySelectorAll('#artworksList .owned').forEach(item => item.classList.remove('owned'));
+  document.querySelectorAll('#artworksList .owned-ribbon').forEach(ribbon => ribbon.remove());
+  const wallets = holderWalletsForEntitlement(currentHolder);
+  const results = [];
   try {
-    if (currentHolder.chain === 'tezos') {
-      await scanTezosHoldings(currentHolder.wallet_address);
-    } else if (currentHolder.chain === 'ethereum') {
-      await scanEthHoldings(currentHolder.wallet_address);
+    for (const wallet of wallets) {
+      if (wallet.chain === 'tezos') {
+        results.push(await scanTezosHoldings(wallet.wallet_address, false));
+      } else if (wallet.chain === 'ethereum' || wallet.chain === 'eth') {
+        results.push(await scanEthHoldings(wallet.wallet_address, false));
+      }
+    }
+    const successfulScans = results.filter(result => Number.isFinite(result));
+    if (!successfulScans.length) {
+      setOwnedAssetSummary(null, 'Could not confirm collection assets right now.');
+    } else {
+      const uniqueWorks = new Set(
+        Array.from(document.querySelectorAll('#artworksList .card.owned'))
+          .map(card => card.dataset.ownerPiece || card.querySelector('.card-title')?.textContent || '')
+          .filter(Boolean)
+      );
+      setOwnedAssetSummary(uniqueWorks.size);
     }
   } finally {
     renderOwnedWorks();
