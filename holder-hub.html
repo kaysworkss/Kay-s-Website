@@ -352,9 +352,10 @@
   /* Left-to-right gallery: consistent columns, natural image heights. */
   #artworksList { display:flex; flex-direction:column; }
   #artworksList [data-chapter="opa"] { order:1; }
-  #artworksList [data-chapter="chapter2"] { order:2; }
-  #artworksList [data-chapter="chapter1"] { order:3; }
-  #artworksList [data-chapter="precursor"] { order:4; }
+  #artworksList [data-chapter="chapter3"] { order:2; }
+  #artworksList [data-chapter="chapter2"] { order:3; }
+  #artworksList [data-chapter="chapter1"] { order:4; }
+  #artworksList [data-chapter="precursor"] { order:5; }
   #artworksList .grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1589,6 +1590,29 @@
                 <p class="reserve-error"></p>
                 <p class="reserve-note">I'll reach out directly if I'd like to accept your offer and reserve this piece for you.</p>
               </div>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+
+      <section class="artwork-chapter" data-chapter="chapter3">
+        <div class="artwork-group-label">Chapter 3 <span class="card-desc">(Editions)</span></div>
+        <div class="grid">
+        <div class="card" data-owner-piece="Lábẹ́ igi òrònbó I" data-status="sold" data-eth-contract="0x611cca3635b0f05b103031ee8d4f3261633292b4" data-eth-token-id="4" data-token-standard="erc1155">
+          <div class="card-img-wrap">
+            <img class="card-img" src="images/labe-igi.webp" alt="Lábẹ́ igi òrònbó I" />
+            <span class="sold-sticker" aria-label="Edition held">Edition</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Lábẹ́ igi òrònbó I</div>
+            <div class="card-desc">This painting is a close up of Ayo and Morenike under the orange tree, sharing a moment; their joys, woes and also an orange.</div>
+            <div class="card-meta">
+              <span class="badge">edition of 2</span>
+              <span class="card-desc">Ethereum · ERC-1155 · Token #4</span>
+            </div>
+            <div class="auction-cta">
+              <a class="btn ghost" href="https://opensea.io/item/ethereum/0x611cca3635b0f05b103031ee8d4f3261633292b4/4" target="_blank" rel="noopener">View token</a>
             </div>
           </div>
         </div>
@@ -3028,6 +3052,9 @@ const ETH_COLLECTION_CONTRACTS = [
   '0x824b9144174d0b5c00dbcf39d43d290701e0ffcb',
   '0xd7066137225cb0e1eb3220a2b814ff228e2c0249',
 ];
+const ETH_EDITION_CONTRACT = '0x611cca3635b0f05b103031ee8d4f3261633292b4';
+const ETH_EDITION_TOKEN_ID = 4;
+const ETH_EDITION_PIECE = 'Lábẹ́ igi òrònbó I';
 const ETH_READONLY_RPC = 'https://ethereum.publicnode.com';
 const ETH_MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11';
 
@@ -3145,10 +3172,34 @@ async function scanEthHoldings(address) {
     } catch (_) { /* one contract failing must not hide assets from the other */ }
   }
 
+  // Chapter 3 editions use ERC-1155, so ownership is a balance check rather
+  // than the ERC-721 ownerOf scan used by the earlier collection contracts.
+  try {
+    const editionInterface = new ethers.Interface([
+      'function balanceOf(address account,uint256 id) view returns (uint256)',
+    ]);
+    const rawBalance = await provider.call({
+      to: ETH_EDITION_CONTRACT,
+      data: editionInterface.encodeFunctionData('balanceOf', [address, ETH_EDITION_TOKEN_ID]),
+    });
+    const editionBalance = Number(editionInterface.decodeFunctionResult('balanceOf', rawBalance)[0]);
+    if (editionBalance > 0) {
+      ownedTokens.push({
+        contractAddress: ETH_EDITION_CONTRACT,
+        tokenId: ETH_EDITION_TOKEN_ID,
+        skipMetadata: true,
+      });
+      highlightPieceByName(ETH_EDITION_PIECE);
+    }
+  } catch (err) {
+    console.warn('Edition ownership check failed:', err);
+  }
+
   setOwnedAssetSummary(ownedTokens.length);
 
   for (let start = 0; start < ownedTokens.length; start += 100) {
-    const batch = ownedTokens.slice(start, start + 100);
+    const batch = ownedTokens.slice(start, start + 100).filter(token => !token.skipMetadata);
+    if (!batch.length) continue;
     try {
       const results = await multicall.aggregate3.staticCall(batch.map(token => ({
         target: token.contractAddress,
