@@ -144,6 +144,23 @@
 
     <!-- MESSAGES -->
     <div class="panel-view show" id="view-messages">
+      <div class="panel">
+        <div class="panel-title">Send a private message</div>
+        <div class="field">
+          <label for="newMessageHolder">Member</label>
+          <select id="newMessageHolder"><option value="">Choose a member</option></select>
+        </div>
+        <div class="field">
+          <label for="newMessageSubject">Subject</label>
+          <input id="newMessageSubject" maxlength="200" placeholder="Message subject" />
+        </div>
+        <div class="field">
+          <label for="newMessageBody">Message</label>
+          <textarea id="newMessageBody" maxlength="12000" placeholder="Write your private message…"></textarea>
+        </div>
+        <button class="btn" id="sendNewHolderMessageBtn" type="button">Send message</button>
+        <div class="status" id="newHolderMessageStatus"></div>
+      </div>
       <div id="msg-list"></div>
     </div>
 
@@ -224,6 +241,7 @@ async function render() {
   els.dashboard.classList.add('show');
   els.signoutBtn.classList.add('show');
   loadMessages();
+  loadMessageRecipients();
   loadReservations();
   loadParticipants();
 }
@@ -318,6 +336,38 @@ async function setReservationStatus(id, status) {
 }
 
 // ══════════ MESSAGES ══════════
+async function loadMessageRecipients() {
+  const r = await adminFetch('holder-participants');
+  const select = document.getElementById('newMessageHolder');
+  if (!select || !r.ok) return;
+  const holders = r.rows || [];
+  select.innerHTML = '<option value="">Choose a member</option>' + holders.map(holder => {
+    const name = holder.display_name || holder.wallet_address;
+    return `<option value="${esc(holder.id)}">${esc(name + ' — ' + holder.chain)}</option>`;
+  }).join('');
+}
+
+document.getElementById('sendNewHolderMessageBtn').addEventListener('click', async () => {
+  const holderId = document.getElementById('newMessageHolder').value;
+  const subject = document.getElementById('newMessageSubject').value.trim();
+  const message = document.getElementById('newMessageBody').value.trim();
+  const status = document.getElementById('newHolderMessageStatus');
+  if (!holderId) { setStatus(status, 'err', 'Choose a member.'); return; }
+  if (!message) { setStatus(status, 'err', 'Write a message first.'); return; }
+
+  setStatus(status, '', 'Sending…');
+  const result = await adminFetch('holder-message-new', {
+    method: 'POST',
+    body: { holder_id: holderId, subject, message }
+  });
+  if (!result.ok) { setStatus(status, 'err', result.error); return; }
+
+  document.getElementById('newMessageSubject').value = '';
+  document.getElementById('newMessageBody').value = '';
+  setStatus(status, 'ok', 'Message sent. It will appear privately in this member’s Messages tab.');
+  loadMessages();
+});
+
 async function loadMessages() {
   const r = await adminFetch('holder-messages');
   const listEl = document.getElementById('msg-list');
