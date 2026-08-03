@@ -390,6 +390,25 @@ async function handleClaim(req, res, supabase) {
 
   if (upsertErr) return res.status(500).json({ error: 'Could not save holder record: ' + upsertErr.message });
 
+  // If an admin pre-registered paired wallets under the same display name,
+  // attach any still-unclaimed companion rows to this account on first claim.
+  // Never overwrite a row that is already linked to another auth account.
+  const { data: claimedHolder } = await supabase
+    .from('holders')
+    .select('display_name')
+    .eq('wallet_address', pending.wallet_address)
+    .eq('chain', pending.chain)
+    .maybeSingle();
+  const pairedDisplayName = String(claimedHolder?.display_name || '').trim();
+  if (pairedDisplayName) {
+    const { error: pairError } = await supabase
+      .from('holders')
+      .update({ auth_user_id: userData.user.id })
+      .eq('display_name', pairedDisplayName)
+      .is('auth_user_id', null);
+    if (pairError) console.warn('Could not attach pre-registered paired wallets:', pairError.message);
+  }
+
   await supabase.from('pending_verifications').update({ consumed: true }).eq('id', token);
 
   return res.status(200).json({ ok: true });
