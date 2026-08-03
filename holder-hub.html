@@ -2796,8 +2796,12 @@ function bindReserveForms() {
   document.querySelectorAll('.reserve-toggle').forEach(btn => {
     if (btn.dataset.bound) return;
     btn.dataset.bound = '1';
+    btn.setAttribute('aria-expanded', 'false');
     btn.addEventListener('click', () => {
-      btn.nextElementSibling.classList.toggle('show');
+      const form = btn.nextElementSibling;
+      const isOpen = form.classList.toggle('show');
+      btn.setAttribute('aria-expanded', String(isOpen));
+      btn.textContent = isOpen ? 'Close reservation form' : 'Ask to reserve';
     });
   });
   document.querySelectorAll('.reserve-submit').forEach(btn => {
