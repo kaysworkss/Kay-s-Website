@@ -340,10 +340,26 @@ async function loadMessageRecipients() {
   const r = await adminFetch('holder-participants');
   const select = document.getElementById('newMessageHolder');
   if (!select || !r.ok) return;
-  const holders = r.rows || [];
-  select.innerHTML = '<option value="">Choose a member</option>' + holders.map(holder => {
-    const name = holder.display_name || holder.wallet_address;
-    return `<option value="${esc(holder.id)}">${esc(name + ' — ' + holder.chain)}</option>`;
+  const accounts = new Map();
+  (r.rows || []).forEach(holder => {
+    const name = String(holder.display_name || '').trim();
+    // Linked wallets share auth_user_id. The name fallback also keeps named,
+    // pre-linked wallet records together before their first email sign-in.
+    const key = holder.auth_user_id
+      ? 'user:' + holder.auth_user_id
+      : (name ? 'name:' + name.toLowerCase() : 'wallet:' + holder.id);
+    let account = accounts.get(key);
+    if (!account) {
+      account = { holderId: holder.id, name: name || holder.wallet_address, chains: new Set() };
+      accounts.set(key, account);
+    }
+    account.chains.add(holder.chain);
+    if (!account.name && name) account.name = name;
+  });
+  select.innerHTML = '<option value="">Choose a member</option>' + Array.from(accounts.values()).map(account => {
+    const chains = Array.from(account.chains);
+    const walletLabel = chains.length > 1 ? 'paired ' + chains.join(' + ') : chains[0];
+    return `<option value="${esc(account.holderId)}">${esc(account.name + ' — ' + walletLabel)}</option>`;
   }).join('');
 }
 

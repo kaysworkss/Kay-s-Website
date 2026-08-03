@@ -3321,7 +3321,12 @@ async function loadParticipants() {
 async function loadMessages() {
   const el = document.getElementById('msgHistory');
   if (!currentHolder?.id) return;
-  const { data, error } = await sb.from('messages').select('*').eq('holder_id', currentHolder.id).order('created_at', { ascending: false });
+  const holderIds = [...new Set(
+    (currentHolder.linked_wallets?.length ? currentHolder.linked_wallets : [currentHolder])
+      .map(holder => holder.id)
+      .filter(Boolean)
+  )];
+  const { data, error } = await sb.from('messages').select('*').in('holder_id', holderIds).order('created_at', { ascending: false });
   if (error || !data?.length) { el.innerHTML = ''; return; }
   el.innerHTML = data.map(m => `
     <div class="msg-item">
