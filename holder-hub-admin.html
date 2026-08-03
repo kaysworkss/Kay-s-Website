@@ -95,6 +95,12 @@
   .item-card { border:1px solid var(--line); border-radius:8px; background:rgba(30,20,16,0.3); padding:1rem 1.2rem; margin-bottom:0.8rem; }
   .item-card .item-title { font-family:'Cormorant Garamond',serif; font-size:1.25rem; margin-bottom:0.25rem; }
   .item-card .item-sub { color:var(--text-muted); font-size:0.85rem; margin-bottom:0.6rem; }
+  .admin-message-bubble { border:1px solid; border-radius:8px; padding:0.75rem 0.9rem; margin:0.55rem 0; }
+  .admin-message-bubble.holder { background:rgba(107,124,92,0.18); border-color:rgba(143,166,123,0.5); }
+  .admin-message-bubble.kay { background:rgba(201,153,58,0.12); border-color:rgba(201,153,58,0.5); }
+  .admin-message-sender { font-family:'Cinzel',serif; font-size:0.55rem; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.3rem; }
+  .admin-message-bubble.holder .admin-message-sender { color:#b9d0a4; }
+  .admin-message-bubble.kay .admin-message-sender { color:var(--gold); }
   .future-plan-editor { border:1px solid var(--line); border-radius:8px; background:rgba(30,20,16,0.3); padding:1rem; margin-bottom:0.8rem; }
   .future-plan-editor textarea { min-height:150px; }
   .badge { font-family:'Cinzel',serif; font-size:0.55rem; letter-spacing:0.1em; text-transform:uppercase; padding:0.25rem 0.55rem; border-radius:12px; border:1px solid var(--line); color:var(--text-muted); }
@@ -393,7 +399,9 @@ async function loadMessages() {
     <div class="item-card">
       <div class="item-title">${esc(m.subject || '(no subject)')} <span class="badge ${m.status}">${esc(m.status)}</span></div>
       <div class="item-sub">${esc(m.holders?.display_name || m.holders?.wallet_address || 'Unknown holder')} · ${new Date(m.created_at).toLocaleString()}</div>
-      <div style="margin:0.5rem 0;">${esc(m.message)}</div>
+      ${m.parent_message_id ? '<div class="item-sub">Reply to a specific message from Kay</div>' : ''}
+      ${m.message ? `<div class="admin-message-bubble holder"><div class="admin-message-sender">Holder</div>${esc(m.message)}</div>` : ''}
+      ${m.admin_reply ? `<div class="admin-message-bubble kay"><div class="admin-message-sender">Kay</div>${esc(m.admin_reply)}</div>` : ''}
       <div class="field" style="margin-top:0.9rem;">
         <label for="reply-${m.id}">Private reply to this holder</label>
         <textarea id="reply-${m.id}" placeholder="Write your reply…">${esc(m.admin_reply || '')}</textarea>

@@ -633,11 +633,22 @@
   .future-plans-heading { margin:0 0 1rem; padding-top:2rem; border-top:1px solid var(--line); }
   .future-plans-heading h3 { font-size:1.75rem; }
 
-  .msg-history { margin-top:2rem; }
-  .msg-item { border:1px solid var(--line); border-radius:6px; padding:0.9rem 1.1rem; margin-bottom:0.6rem; background:rgba(30,20,16,0.22); }
-  .msg-item .msg-subject { font-family:'Cormorant Garamond',serif; font-size:1.1rem; margin-bottom:0.3rem; }
-  .msg-item .msg-date { color:var(--text-muted); font-size:0.78rem; margin-top:0.4rem; }
-  .msg-reply { margin-top:0.9rem; padding:0.85rem 1rem; border-left:2px solid var(--gold); border-radius:0 6px 6px 0; background:rgba(201,153,58,0.08); }
+  .msg-history { margin-top:2rem; display:flex; flex-direction:column; gap:1rem; }
+  .msg-thread { display:flex; flex-direction:column; gap:0.55rem; }
+  .msg-bubble { width:min(82%,680px); border:1px solid var(--line); border-radius:12px; padding:0.9rem 1.05rem; }
+  .msg-bubble.holder { align-self:flex-end; background:rgba(107,124,92,0.2); border-color:rgba(143,166,123,0.5); border-bottom-right-radius:3px; }
+  .msg-bubble.kay { align-self:flex-start; background:rgba(201,153,58,0.13); border-color:rgba(201,153,58,0.52); border-bottom-left-radius:3px; }
+  .msg-bubble.kay.is-replyable { cursor:pointer; }
+  .msg-bubble.kay.is-replyable:hover, .msg-bubble.kay.is-replyable:focus { background:rgba(201,153,58,0.2); border-color:var(--gold); }
+  .msg-bubble .msg-subject { font-family:'Cormorant Garamond',serif; font-size:1.1rem; margin-bottom:0.3rem; }
+  .msg-bubble .msg-date { color:var(--text-muted); font-size:0.78rem; margin-top:0.4rem; }
+  .msg-sender { font-family:'Cinzel',serif; font-size:0.54rem; letter-spacing:0.14em; text-transform:uppercase; margin-bottom:0.35rem; }
+  .msg-bubble.holder .msg-sender { color:#b9d0a4; text-align:right; }
+  .msg-bubble.kay .msg-sender { color:var(--gold); }
+  .msg-reply-action { display:inline-block; margin-top:0.55rem; color:var(--gold); font-size:0.78rem; text-decoration:underline; text-underline-offset:3px; }
+  .msg-reply-context { display:none; margin-bottom:0.9rem; padding:0.75rem 0.9rem; border-left:3px solid var(--gold); background:rgba(201,153,58,0.09); color:var(--text-muted); }
+  .msg-reply-context.show { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+  .msg-reply-context button { border:0; background:transparent; color:var(--gold); cursor:pointer; text-decoration:underline; }
   .msg-reply-label { font-family:'Cinzel',serif; color:var(--gold); font-size:0.54rem; letter-spacing:0.14em; text-transform:uppercase; margin-bottom:0.35rem; }
   .asset-summary a { color:var(--gold); font-weight:700; text-decoration:underline; text-underline-offset:3px; }
   .asset-summary a:hover, .asset-summary a:focus { color:var(--gold-light); }
@@ -1838,6 +1849,10 @@
       </header>
       <div class="panel">
         <div class="panel-title">Send a message or suggestion</div>
+        <div class="msg-reply-context" id="msgReplyContext">
+          <span id="msgReplyContextText"></span>
+          <button type="button" id="cancelMsgReply">Cancel reply</button>
+        </div>
         <div class="field">
           <label for="msgSubject">Subject (optional)</label>
           <input type="text" id="msgSubject" placeholder="What's this about?" />
@@ -3405,17 +3420,62 @@ async function loadMessages() {
       .map(holder => holder.id)
       .filter(Boolean)
   )];
-  const { data, error } = await sb.from('messages').select('*').in('holder_id', holderIds).order('created_at', { ascending: false });
+  const { data, error } = await sb.from('messages').select('*').in('holder_id', holderIds).order('created_at', { ascending: true });
   if (error || !data?.length) { el.innerHTML = ''; return; }
   el.innerHTML = data.map(m => `
-    <div class="msg-item">
-      ${m.subject ? `<div class="msg-subject">${m.subject}</div>` : ''}
-      <div>${m.message}</div>
-      <div class="msg-date">${new Date(m.created_at).toLocaleString()}</div>
-      ${m.admin_reply ? `<div class="msg-reply"><div class="msg-reply-label">Reply from Kay</div><div>${m.admin_reply}</div><div class="msg-date">${m.replied_at ? new Date(m.replied_at).toLocaleString() : ''}</div></div>` : ''}
+    <div class="msg-thread">
+      ${m.message ? `<div class="msg-bubble holder">
+        <div class="msg-sender">You</div>
+        ${m.subject ? `<div class="msg-subject">${escapeMessageHtml(m.subject)}</div>` : ''}
+        <div>${escapeMessageHtml(m.message)}</div>
+        <div class="msg-date">${new Date(m.created_at).toLocaleString()}</div>
+      </div>` : ''}
+      ${m.admin_reply ? `<div class="msg-bubble kay is-replyable" role="button" tabindex="0" data-reply-message="${m.id}" data-reply-subject="${encodeURIComponent(m.subject || '')}">
+        <div class="msg-sender">Kay</div>
+        ${m.subject ? `<div class="msg-subject">${escapeMessageHtml(m.subject)}</div>` : ''}
+        <div>${escapeMessageHtml(m.admin_reply)}</div>
+        <div class="msg-date">${m.replied_at ? new Date(m.replied_at).toLocaleString() : ''}</div>
+        <span class="msg-reply-action">Reply to this message</span>
+      </div>` : ''}
     </div>
   `).join('');
 }
+
+function escapeMessageHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, char => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  })[char]);
+}
+
+let replyingToMessage = null;
+function startMessageReply(id, subject) {
+  replyingToMessage = { id, subject };
+  const context = document.getElementById('msgReplyContext');
+  document.getElementById('msgReplyContextText').textContent = subject
+    ? `Replying to Kay: ${subject}`
+    : 'Replying to this message from Kay';
+  context.classList.add('show');
+  document.getElementById('msgSubject').value = subject ? `Re: ${subject.replace(/^Re:\s*/i, '')}` : '';
+  document.getElementById('msgBody').focus();
+}
+
+function cancelMessageReply() {
+  replyingToMessage = null;
+  document.getElementById('msgReplyContext').classList.remove('show');
+}
+
+document.getElementById('cancelMsgReply').addEventListener('click', cancelMessageReply);
+document.getElementById('msgHistory').addEventListener('click', event => {
+  const bubble = event.target.closest('[data-reply-message]');
+  if (bubble) startMessageReply(bubble.dataset.replyMessage, decodeURIComponent(bubble.dataset.replySubject || ''));
+});
+document.getElementById('msgHistory').addEventListener('keydown', event => {
+  const bubble = event.target.closest('[data-reply-message]');
+  if (bubble && (event.key === 'Enter' || event.key === ' ')) {
+    event.preventDefault();
+    startMessageReply(bubble.dataset.replyMessage, decodeURIComponent(bubble.dataset.replySubject || ''));
+  }
+});
 
 document.getElementById('sendMsgBtn').addEventListener('click', async () => {
   const subject = document.getElementById('msgSubject').value.trim();
@@ -3423,7 +3483,12 @@ document.getElementById('sendMsgBtn').addEventListener('click', async () => {
   const statusEl = document.getElementById('msgStatus');
   if (!message) { setStatus(statusEl, 'err', 'Write a message first.'); return; }
   if (!currentHolder?.id) { setStatus(statusEl, 'err', 'Save your email access first so this message can be securely linked to you.'); return; }
-  const { error } = await sb.from('messages').insert({ holder_id: currentHolder.id, subject, message });
+  const { error } = await sb.from('messages').insert({
+    holder_id: currentHolder.id,
+    subject,
+    message,
+    parent_message_id: replyingToMessage?.id || null,
+  });
   if (error) { setStatus(statusEl, 'err', error.message); return; }
 
   notifySiteForm({
@@ -3437,6 +3502,7 @@ document.getElementById('sendMsgBtn').addEventListener('click', async () => {
   setStatus(statusEl, 'ok', 'Sent — thank you.');
   document.getElementById('msgSubject').value = '';
   document.getElementById('msgBody').value = '';
+  cancelMessageReply();
   loadMessages();
 });
 
