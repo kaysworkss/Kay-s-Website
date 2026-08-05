@@ -3368,6 +3368,12 @@ function namesMatch(a, b) {
   if (!a || !b) return false;
   const na = normalizePieceName(a), nb = normalizePieceName(b);
   if (!na || !nb) return false;
+  if (na === nb) return true;
+  // A numbered edition is a distinct work from its unnumbered main painting.
+  // Never let "Labe Igi Oronbo" partially match "Labe Igi Oronbo 1".
+  const numberA = na.match(/\b\d+\b/g)?.at(-1) || null;
+  const numberB = nb.match(/\b\d+\b/g)?.at(-1) || null;
+  if (numberA !== numberB) return false;
   const escape = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp('\\b' + escape(na) + '\\b').test(nb) || new RegExp('\\b' + escape(nb) + '\\b').test(na);
 }
