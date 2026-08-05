@@ -3173,6 +3173,13 @@ const ETH_COLLECTION_CONTRACTS = [
   '0x824b9144174d0b5c00dbcf39d43d290701e0ffcb',
   '0xd7066137225cb0e1eb3220a2b814ff228e2c0249',
 ];
+// Explicit fallbacks for contracts whose tokenURI metadata is unavailable.
+const ETH_TOKEN_PIECES = {
+  '0x824b9144174d0b5c00dbcf39d43d290701e0ffcb:1': 'Ìgbáradì',
+};
+function ethereumPieceName(contractAddress,tokenId) {
+  return ETH_TOKEN_PIECES[`${String(contractAddress).toLowerCase()}:${String(tokenId)}`] || '';
+}
 const ETH_EDITION_CONTRACT = '0x611cca3635b0f05b103031ee8d4f3261633292b4';
 const ETH_EDITION_TOKEN_ID = 4;
 const ETH_EDITION_PIECE = 'Lábẹ́ igi òrònbó I';
@@ -3285,13 +3292,14 @@ async function discoverEthWorks(address) {
   } catch (_) {}
 
   for (const token of ownedTokens) {
+    const mappedName = ethereumPieceName(token.contractAddress,token.tokenId);
     try {
       const raw = await provider.call({to:token.contractAddress,data:nftInterface.encodeFunctionData('tokenURI',[token.tokenId])});
       const uri = nftInterface.decodeFunctionResult('tokenURI',raw)[0];
       const metadata = await fetchTokenMetadata(uri);
-      names.push(metadata?.name || `Collected work #${token.tokenId}`);
+      names.push(metadata?.name || mappedName || `Collected work #${token.tokenId}`);
     } catch (_) {
-      names.push(`Collected work #${token.tokenId}`);
+      names.push(mappedName || `Collected work #${token.tokenId}`);
     }
   }
   return names;
@@ -3501,6 +3509,13 @@ async function scanEthHoldings(address, updateSummary = true) {
   }
 
   if (updateSummary) setOwnedAssetSummary(ownedTokens.length);
+
+  // Resolve known works immediately even when tokenURI or its remote metadata
+  // is unavailable. Metadata below can still identify any unmapped tokens.
+  ownedTokens.forEach(token => {
+    const mappedName = ethereumPieceName(token.contractAddress,token.tokenId);
+    if (mappedName) highlightPieceByName(mappedName);
+  });
 
   for (let start = 0; start < ownedTokens.length; start += 100) {
     const batch = ownedTokens.slice(start, start + 100).filter(token => !token.skipMetadata);
