@@ -2609,6 +2609,12 @@ const HOLDER_GATE_TOKEN_TIERS = { '1': 'wood', '2': 'bronze' };
 const HOLDER_GATE_ETH_CONTRACT = '0x611cca3635b0f05b103031ee8d4f3261633292b4';
 const HOLDER_GATE_ETH_RPC = 'https://ethereum.publicnode.com';
 const HOLDER_GATE_TEZOS_CONTRACT = 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8';
+// Approved collection-only wallet links. The authenticated API supplies these
+// normally; this fallback keeps participant ownership accurate during cached
+// or staggered deployments of the page and server endpoint.
+const PARTICIPANT_COLLECTION_WALLET_LINKS = [
+  { display_name:'Spitfingers', chain:'ethereum', wallet_address:'0x958b84f8a709fe789b1dfaeb7f76640d5d4970a9' },
+];
 
 function normalizeGateBalances(rawBalances) {
   const balances = { '1': 0, '2': 0, '3': 0 };
@@ -3683,6 +3689,22 @@ async function loadParticipants() {
       chain: row.chain || currentHolder.chain,
     }));
   }
+
+  PARTICIPANT_COLLECTION_WALLET_LINKS.forEach(linkedWallet => {
+    const alreadyPresent = data.some(row =>
+      String(row.chain || '').toLowerCase() === linkedWallet.chain &&
+      String(row.wallet_address || row.walletAddress || '').toLowerCase() === linkedWallet.wallet_address
+    );
+    if (alreadyPresent) return;
+    const namedHolder = data.find(row =>
+      String(row.display_name || '').trim().toLowerCase() === linkedWallet.display_name.toLowerCase()
+    );
+    data.push({
+      ...linkedWallet,
+      auth_user_id:namedHolder?.auth_user_id || null,
+      tier:null,
+    });
+  });
 
   // The API supplies the private participant wallets. Read those wallets here
   // as well so the visual circle remains accurate even before the enriched API
