@@ -490,7 +490,9 @@
     position:relative; display:grid; place-items:center; width:86px; aspect-ratio:1; margin:0 auto 0.8rem;
     border:1px solid rgba(255,255,255,0.18); border-radius:50%; color:#f5e6c8;
     box-shadow:inset 0 2px 8px rgba(255,255,255,0.16),inset 0 -9px 18px rgba(0,0,0,0.36),0 10px 25px rgba(0,0,0,0.28);
+    cursor:pointer; font:inherit;
   }
+  .participant-token:hover, .participant-token:focus-visible { transform:translateY(-3px); border-color:var(--gold); }
   .participant-token::before {
     content:''; position:absolute; inset:9px; border:1px solid rgba(255,255,255,0.16); border-radius:50%;
   }
@@ -515,6 +517,21 @@
   .legend-dot.work { background:transparent; border:2px solid #d06836; }
   .legend-dot.gold { background:transparent; border:2px solid #e8c45a; box-shadow:0 0 6px rgba(232,196,90,0.65); }
   @keyframes holderPulse { 50% { transform:translateY(-3px); } }
+  .participant-works-modal {
+    position:fixed; inset:0; z-index:120; display:none; align-items:center; justify-content:center; padding:1rem;
+    background:rgba(13,8,6,0.82); backdrop-filter:blur(7px);
+  }
+  .participant-works-modal.show { display:flex; }
+  .participant-works-panel {
+    position:relative; width:min(860px,100%); max-height:min(82vh,760px); overflow:auto; padding:2rem;
+    border:1px solid var(--line); border-radius:14px; background:#2b1c16; box-shadow:0 28px 80px rgba(0,0,0,0.52);
+  }
+  .participant-works-close { position:absolute; top:0.8rem; right:0.9rem; border:0; background:transparent; color:var(--sand); font-size:1.7rem; cursor:pointer; }
+  .participant-works-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; margin-top:1.25rem; }
+  .participant-owned-card { overflow:hidden; border:1px solid var(--line); border-radius:8px; background:rgba(20,12,9,0.34); }
+  .participant-owned-card img { display:block; width:100%; max-height:290px; object-fit:contain; background:rgba(0,0,0,0.18); }
+  .participant-owned-card h4 { padding:0.9rem 1rem; font-size:1.2rem; }
+  @media (max-width:620px) { .participant-works-grid { grid-template-columns:1fr; } .participant-works-panel { padding:1.5rem 1rem; } }
   .participant-you {
     margin-left: 0.55rem; padding: 0.18rem 0.5rem; border-radius: 999px;
     border: 1px solid rgba(201,153,58,0.5); color: var(--gold);
@@ -1952,6 +1969,15 @@
   <button class="art-lightbox-nav art-lightbox-next" id="artLightboxNext" type="button" aria-label="Next merch mockup">›</button>
 </div>
 
+<div class="participant-works-modal" id="participantWorksModal" role="dialog" aria-modal="true" aria-labelledby="participantWorksTitle">
+  <div class="participant-works-panel">
+    <button class="participant-works-close" id="participantWorksClose" type="button" aria-label="Close participant collection">&times;</button>
+    <span class="eyebrow">Collected Works</span>
+    <h2 id="participantWorksTitle">Holder Collection</h2>
+    <div id="participantWorksContent"><p class="empty-state">Loading collection…</p></div>
+  </div>
+</div>
+
 <!-- Tezos wallet choice modal -->
 <div class="wallet-modal" id="tezosWalletModal">
   <div class="wallet-box">
@@ -3180,6 +3206,149 @@ async function walletOwnsCollectionWork(wallet) {
   return false;
 }
 
+const participantWorksCache = new Map();
+let participantGroups = [];
+
+async function discoverTezosWorks(address) {
+  const url =
+    'https://api.tzkt.io/v1/tokens/balances' +
+    '?account=' + encodeURIComponent(address) +
+    '&token.contract=' + encodeURIComponent(TEZOS_COLLECTION_CONTRACT) +
+    '&balance.gt=0&limit=200';
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('TzKT returned ' + response.status);
+  const rows = await response.json();
+  return (Array.isArray(rows) ? rows : []).map(row => {
+    const tokenId = String(row?.token?.tokenId ?? '');
+    return TEZOS_TOKEN_PIECES[tokenId] || row?.token?.metadata?.name || `Collected work #${tokenId}`;
+  });
+}
+
+async function discoverEthWorks(address) {
+  if (typeof ethers === 'undefined') throw new Error('ethers.js is unavailable');
+  const provider = new ethers.JsonRpcProvider(ETH_READONLY_RPC);
+  const nftInterface = new ethers.Interface([
+    'function balanceOf(address owner) view returns (uint256)',
+    'function ownerOf(uint256 tokenId) view returns (address)',
+    'function tokenURI(uint256 tokenId) view returns (string)',
+    'function totalSupply() view returns (uint256)',
+  ]);
+  const multicall = new ethers.Contract(ETH_MULTICALL3, [
+    'function aggregate3((address target,bool allowFailure,bytes callData)[] calls) payable returns ((bool success,bytes returnData)[] returnData)',
+  ], provider);
+  const ownedTokens = [];
+
+  for (const contractAddress of ETH_COLLECTION_CONTRACTS) {
+    try {
+      const balanceRaw = await provider.call({
+        to:contractAddress,
+        data:nftInterface.encodeFunctionData('balanceOf',[address]),
+      });
+      const holderBalance = Number(nftInterface.decodeFunctionResult('balanceOf',balanceRaw)[0]);
+      if (!holderBalance) continue;
+
+      let scanMax = 1500;
+      try {
+        const supplyRaw = await provider.call({ to:contractAddress, data:nftInterface.encodeFunctionData('totalSupply') });
+        const supply = Number(nftInterface.decodeFunctionResult('totalSupply',supplyRaw)[0]);
+        if (Number.isFinite(supply)) scanMax = Math.min(5000,Math.max(250,supply + 50));
+      } catch (_) {}
+
+      for (let start=0; start<=scanMax && ownedTokens.filter(t => t.contractAddress === contractAddress).length < holderBalance; start+=300) {
+        const ids = Array.from({length:Math.min(300,scanMax-start+1)},(_,i)=>start+i);
+        const results = await multicall.aggregate3.staticCall(ids.map(id => ({
+          target:contractAddress, allowFailure:true, callData:nftInterface.encodeFunctionData('ownerOf',[id]),
+        })));
+        results.forEach((result,index) => {
+          if (!result.success) return;
+          try {
+            const owner = nftInterface.decodeFunctionResult('ownerOf',result.returnData)[0];
+            if (String(owner).toLowerCase() === String(address).toLowerCase()) ownedTokens.push({contractAddress,tokenId:ids[index]});
+          } catch (_) {}
+        });
+      }
+    } catch (err) {
+      console.warn('Participant collection enumeration failed:', contractAddress, err);
+    }
+  }
+
+  const names = [];
+  try {
+    const edition = new ethers.Contract(ETH_EDITION_CONTRACT,['function balanceOf(address account,uint256 id) view returns (uint256)'],provider);
+    if (Number(await edition.balanceOf(address,ETH_EDITION_TOKEN_ID)) > 0) names.push(ETH_EDITION_PIECE);
+  } catch (_) {}
+
+  for (const token of ownedTokens) {
+    try {
+      const raw = await provider.call({to:token.contractAddress,data:nftInterface.encodeFunctionData('tokenURI',[token.tokenId])});
+      const uri = nftInterface.decodeFunctionResult('tokenURI',raw)[0];
+      const metadata = await fetchTokenMetadata(uri);
+      names.push(metadata?.name || `Collected work #${token.tokenId}`);
+    } catch (_) {
+      names.push(`Collected work #${token.tokenId}`);
+    }
+  }
+  return names;
+}
+
+async function discoverParticipantWorks(group) {
+  const cacheKey = group.wallets.map(wallet => `${wallet.chain}:${String(wallet.address).toLowerCase()}`).sort().join('|');
+  if (participantWorksCache.has(cacheKey)) return participantWorksCache.get(cacheKey);
+  const results = await Promise.allSettled(group.wallets.map(wallet => {
+    const chain = String(wallet.chain || '').toLowerCase();
+    if (chain === 'tezos') return discoverTezosWorks(wallet.address);
+    if (chain === 'ethereum' || chain === 'eth') return discoverEthWorks(wallet.address);
+    return [];
+  }));
+  const names = [...new Set(results.flatMap(result => result.status === 'fulfilled' ? result.value : []).filter(Boolean))];
+  participantWorksCache.set(cacheKey,names);
+  return names;
+}
+
+function localArtworkForName(name) {
+  return Array.from(document.querySelectorAll('#artworksList .card[data-owner-piece]')).find(card => namesMatch(card.dataset.ownerPiece,name));
+}
+
+async function openParticipantWorks(index) {
+  const group = participantGroups[index];
+  if (!group) return;
+  const modal = document.getElementById('participantWorksModal');
+  const title = document.getElementById('participantWorksTitle');
+  const content = document.getElementById('participantWorksContent');
+  title.textContent = `${group.display_name || 'Anonymous Holder'}’s Collection`;
+  content.innerHTML = '<p class="empty-state">Reading linked wallets…</p>';
+  modal.classList.add('show');
+  document.getElementById('participantWorksClose').focus();
+  const works = await discoverParticipantWorks(group);
+  if (!works.length) {
+    content.innerHTML = '<p class="empty-state">No works from the connected collections were found in this holder’s linked wallets.</p>';
+    return;
+  }
+  const grid = document.createElement('div');
+  grid.className = 'participant-works-grid';
+  works.forEach(name => {
+    const card = document.createElement('article');
+    card.className = 'participant-owned-card';
+    const local = localArtworkForName(name);
+    const image = local?.querySelector('img');
+    if (image) {
+      const img = document.createElement('img');
+      img.src = image.currentSrc || image.src;
+      img.alt = name;
+      card.appendChild(img);
+    }
+    const heading = document.createElement('h4');
+    heading.textContent = name;
+    card.appendChild(heading);
+    grid.appendChild(card);
+  });
+  content.replaceChildren(grid);
+}
+
+function closeParticipantWorks() {
+  document.getElementById('participantWorksModal')?.classList.remove('show');
+}
+
 function normalizePieceName(name) {
   let normalized = (name || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip accents (Ìjòkòó → Ijokoo)
@@ -3564,21 +3733,33 @@ async function loadParticipants() {
   });
   // Stable sort: move only the connected participant; preserve everyone else's order.
   groups.sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent));
+  participantGroups = groups;
 
-  el.innerHTML = `<div class="participant-circle">${groups.map(g => {
+  el.innerHTML = `<div class="participant-circle">${groups.map((g,index) => {
     const name = g.display_name || 'Anonymous Holder';
     const tokenClass = `tier-${g.tier || 'none'}${g.ownsWork ? ' has-work' : ''}${g.hasGoldToken ? ' has-gold' : ''}${g.isCurrent ? ' is-current' : ''}`;
     const badges = [g.tier ? `${g.tier} token` : 'holder', g.ownsWork ? 'work owner' : '', g.hasGoldToken ? 'gold' : ''].filter(Boolean).join(' · ');
     const label = `${name}, ${badges}${g.isCurrent ? ', you' : ''}`;
     return `<div class="participant-node">
-      <div class="participant-token ${tokenClass}" role="img" aria-label="${escapeMessageHtml(label)}">
+      <button class="participant-token ${tokenClass}" type="button" data-participant-index="${index}" aria-label="View works owned by ${escapeMessageHtml(label)}">
         <span class="participant-initial" aria-hidden="true">${escapeMessageHtml(name.trim().charAt(0).toUpperCase() || 'H')}</span>
-      </div>
+      </button>
       <div class="participant-name">${escapeMessageHtml(name)}${g.isCurrent ? '<span class="participant-you">You</span>' : ''}</div>
       <div class="participant-badges">${escapeMessageHtml(badges)}</div>
     </div>`;
   }).join('')}</div>`;
+  el.querySelectorAll('[data-participant-index]').forEach(button => {
+    button.addEventListener('click', () => openParticipantWorks(Number(button.dataset.participantIndex)));
+  });
 }
+
+document.getElementById('participantWorksClose')?.addEventListener('click',closeParticipantWorks);
+document.getElementById('participantWorksModal')?.addEventListener('click',event => {
+  if (event.target.id === 'participantWorksModal') closeParticipantWorks();
+});
+document.addEventListener('keydown',event => {
+  if (event.key === 'Escape') closeParticipantWorks();
+});
 
 async function loadMessages() {
   const el = document.getElementById('msgHistory');
