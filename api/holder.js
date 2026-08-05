@@ -697,7 +697,17 @@ async function handleParticipants(req, res, supabase) {
       String(row.chain || '').toLowerCase() === linkedWallet.chain &&
       String(row.wallet_address || '').toLowerCase() === linkedWallet.wallet_address
     );
-    if (!alreadyPresent) participantRows.push({ ...linkedWallet, tier: null, created_at: null });
+    if (!alreadyPresent) {
+      const namedHolder = participantRows.find(row =>
+        holderDisplayName(row).toLowerCase() === holderDisplayName(linkedWallet).toLowerCase()
+      );
+      participantRows.push({
+        ...linkedWallet,
+        auth_user_id: namedHolder?.auth_user_id || null,
+        tier: null,
+        created_at: null,
+      });
+    }
   });
 
   // Enrich the private participant feed with Gold-token status while returning
