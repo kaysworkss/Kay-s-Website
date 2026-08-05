@@ -29,16 +29,18 @@
  * it's fixed, public, on-chain info (contract addresses, token standard)
  * rather than a secret or something that varies by deployment - same
  * contract/token that claim-token.html checks, confirmed from its CLAIM
- * config. Holder tokens are IDs 1 and 2 on both chains - a wallet is
- * eligible if it holds either one.
+ * config. Wood and Bronze entry tokens are IDs 1 and 2 on both chains;
+ * token ID 3 is the Gold distinction displayed inside the Holder Hub.
  */
 
 const { getSupabase, cors, handleOptions } = require('./_lib');
 
 const PENDING_TTL_MINUTES = 60;
 
-// Both chains gate on the same two token IDs - holding either one qualifies.
-const HOLDER_TOKEN_IDS = [1, 2];
+// IDs 1 and 2 grant entry. ID 3 is checked as an additional Gold distinction,
+// but does not replace the Wood/Bronze token used for access and identity.
+const ENTRY_TOKEN_IDS = [1, 2];
+const HOLDER_TOKEN_IDS = [1, 2, 3];
 const HOLDER_TOKEN_TIERS = { 1: 'wood', 2: 'bronze' };
 
 const ETH_CONTRACT_ADDRESS = '0x611cca3635b0f05b103031ee8d4f3261633292b4';
@@ -109,12 +111,13 @@ function summarizeTokenBalances(balancesByTokenId) {
   HOLDER_TOKEN_IDS.forEach(id => {
     normalized[String(id)] = Number(balancesByTokenId && balancesByTokenId[String(id)] || 0);
   });
-  const totalBalance = Object.values(normalized).reduce((sum, value) => sum + value, 0);
+  const totalBalance = ENTRY_TOKEN_IDS.reduce((sum, id) => sum + normalized[String(id)], 0);
   const tokenId = normalized['2'] > 0 ? 2 : normalized['1'] > 0 ? 1 : null;
   return {
     totalBalance,
     tokenId,
     tier: tokenId ? HOLDER_TOKEN_TIERS[tokenId] : null,
+    hasGoldToken: normalized['3'] > 0,
     balancesByTokenId: normalized,
   };
 }
@@ -665,7 +668,24 @@ async function handleParticipants(req, res, supabase) {
   }
 
   if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json({ participants: Array.isArray(data) ? data : [] });
+
+  // Enrich the private participant feed with Gold-token status while returning
+  // no additional public wallet information beyond what this holder-only route
+  // already provides. Failure to reach a chain never invents Gold ownership.
+  const participants = await Promise.all((Array.isArray(data) ? data : []).map(async row => {
+    try {
+      const balancesByTokenId = await checkHolderRowBalances(row);
+      return {
+        ...row,
+        has_gold_token: Number(balancesByTokenId?.['3'] || 0) > 0,
+      };
+    } catch (err) {
+      console.warn('Could not check participant Gold token:', row.chain, row.wallet_address, err.message || err);
+      return { ...row, has_gold_token: false };
+    }
+  }));
+
+  return res.status(200).json({ participants });
 }
 
 // -- action=email-updates ----
