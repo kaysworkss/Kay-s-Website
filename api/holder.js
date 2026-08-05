@@ -653,15 +653,18 @@ async function handleParticipants(req, res, supabase) {
   const authorised = await isHolderAuthorised(req, supabase);
   if (!authorised) return res.status(403).json({ error: 'Holder access required.' });
 
+  // This route is holder-authorised, so read the minimal wallet-linking fields
+  // directly. auth_user_id lets the client merge a collector's entry-token and
+  // artwork wallets even when one row has no display name.
   let { data, error } = await supabase
-    .from('holder_public')
-    .select('*')
+    .from('holders')
+    .select('id,auth_user_id,wallet_address,chain,display_name,tier,created_at')
     .order('created_at', { ascending: true });
 
   if (error) {
     const fallback = await supabase
-      .from('holders')
-      .select('id,wallet_address,chain,display_name,tier,created_at')
+      .from('holder_public')
+      .select('*')
       .order('created_at', { ascending: true });
     data = fallback.data;
     error = fallback.error;
