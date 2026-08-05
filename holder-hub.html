@@ -500,7 +500,7 @@
   .participant-token.tier-bronze {
     background:radial-gradient(circle at 32% 24%,#d39561 0 6%,transparent 28%),linear-gradient(145deg,#a85e35,#4b2519 76%);
   }
-  .participant-token.tier-none { background:linear-gradient(145deg,#665448,#2c211c); }
+  .participant-token.tier-none, .participant-token.tier-gold { background:linear-gradient(145deg,#665448,#2c211c); }
   .participant-token.has-work { box-shadow:0 0 0 5px rgba(208,104,54,0.32),0 0 22px rgba(208,104,54,0.62),inset 0 2px 8px rgba(255,255,255,0.16),inset 0 -9px 18px rgba(0,0,0,0.36); }
   .participant-token.has-gold { outline:2px solid #e8c45a; outline-offset:9px; filter:drop-shadow(0 0 8px rgba(232,196,90,0.72)); }
   .participant-token.has-work.has-gold { outline-offset:11px; }
@@ -2576,14 +2576,16 @@ async function enterDashboard() {
   }, 1500);
 }
 
-const HOLDER_GATE_TOKEN_IDS = ['1', '2'];
+// IDs 1 and 2 define the participant's Wood/Bronze core. ID 3 is read from
+// the same wallets as an additional Gold distinction, never as a replacement.
+const HOLDER_GATE_TOKEN_IDS = ['1', '2', '3'];
 const HOLDER_GATE_TOKEN_TIERS = { '1': 'wood', '2': 'bronze' };
 const HOLDER_GATE_ETH_CONTRACT = '0x611cca3635b0f05b103031ee8d4f3261633292b4';
 const HOLDER_GATE_ETH_RPC = 'https://ethereum.publicnode.com';
 const HOLDER_GATE_TEZOS_CONTRACT = 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8';
 
 function normalizeGateBalances(rawBalances) {
-  const balances = { '1': 0, '2': 0 };
+  const balances = { '1': 0, '2': 0, '3': 0 };
   if (!rawBalances) return balances;
   HOLDER_GATE_TOKEN_IDS.forEach(id => {
     const value = Number(rawBalances[id] ?? rawBalances[Number(id)] ?? 0);
@@ -2625,7 +2627,7 @@ async function fetchTezosGateBalances(address) {
   const response = await fetch(url);
   if (!response.ok) throw new Error('TzKT returned ' + response.status);
   const rows = await response.json();
-  const balances = { '1': 0, '2': 0 };
+  const balances = { '1': 0, '2': 0, '3': 0 };
   (Array.isArray(rows) ? rows : []).forEach(row => {
     const tokenId = String(row?.token?.tokenId ?? '');
     if (!Object.prototype.hasOwnProperty.call(balances, tokenId)) return;
@@ -2649,8 +2651,8 @@ async function fetchEthGateBalances(address) {
 
 async function fetchWalletGateBalances(wallet) {
   if (wallet.chain === 'tezos') return fetchTezosGateBalances(wallet.wallet_address);
-  if (wallet.chain === 'ethereum') return fetchEthGateBalances(wallet.wallet_address);
-  return { '1': 0, '2': 0 };
+  if (wallet.chain === 'ethereum' || wallet.chain === 'eth') return fetchEthGateBalances(wallet.wallet_address);
+  return { '1': 0, '2': 0, '3': 0 };
 }
 
 async function resolveMerchEntitlement(holder) {
@@ -3145,6 +3147,39 @@ const ETH_EDITION_PIECE = 'Lábẹ́ igi òrònbó I';
 const ETH_READONLY_RPC = 'https://ethereum.publicnode.com';
 const ETH_MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11';
 
+async function walletOwnsCollectionWork(wallet) {
+  const chain = String(wallet?.chain || '').toLowerCase();
+  const address = wallet?.wallet_address || wallet?.walletAddress || wallet?.address;
+  if (!address) return false;
+
+  if (chain === 'tezos') {
+    const url =
+      'https://api.tzkt.io/v1/tokens/balances' +
+      '?account=' + encodeURIComponent(address) +
+      '&token.contract=' + encodeURIComponent(TEZOS_COLLECTION_CONTRACT) +
+      '&balance.gt=0&limit=1';
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('TzKT returned ' + response.status);
+    const rows = await response.json();
+    return Array.isArray(rows) && rows.length > 0;
+  }
+
+  if (chain === 'ethereum' || chain === 'eth') {
+    if (typeof ethers === 'undefined') throw new Error('ethers.js is unavailable');
+    const provider = new ethers.JsonRpcProvider(ETH_READONLY_RPC);
+    const erc721 = ['function balanceOf(address owner) view returns (uint256)'];
+    const erc1155 = ['function balanceOf(address account,uint256 id) view returns (uint256)'];
+    const checks = ETH_COLLECTION_CONTRACTS.map(contractAddress =>
+      new ethers.Contract(contractAddress, erc721, provider).balanceOf(address)
+    );
+    checks.push(new ethers.Contract(ETH_EDITION_CONTRACT, erc1155, provider).balanceOf(address, ETH_EDITION_TOKEN_ID));
+    const balances = await Promise.allSettled(checks);
+    return balances.some(result => result.status === 'fulfilled' && Number(result.value) > 0);
+  }
+
+  return false;
+}
+
 function normalizePieceName(name) {
   let normalized = (name || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip accents (Ìjòkòó → Ijokoo)
@@ -3473,6 +3508,31 @@ async function loadParticipants() {
     }));
   }
 
+  // The API supplies the private participant wallets. Read those wallets here
+  // as well so the visual circle remains accurate even before the enriched API
+  // response is deployed or when an older database tier is stale.
+  data = await Promise.all(data.map(async holder => {
+    const enriched = { ...holder };
+    try {
+      const gateBalances = await fetchWalletGateBalances({
+        wallet_address: holder.wallet_address || holder.walletAddress,
+        chain: String(holder.chain || '').toLowerCase(),
+      });
+      enriched.balancesByTokenId = gateBalances;
+      enriched.has_gold_token = Number(gateBalances['3'] || 0) > 0;
+      if (Number(gateBalances['2'] || 0) > 0) enriched.tier = 'bronze';
+      else if (Number(gateBalances['1'] || 0) > 0) enriched.tier = 'wood';
+    } catch (err) {
+      console.warn('Participant entry-token lookup failed:', holder.chain, err);
+    }
+    try {
+      enriched.owns_work = await walletOwnsCollectionWork(holder);
+    } catch (err) {
+      console.warn('Participant artwork lookup failed:', holder.chain, err);
+    }
+    return enriched;
+  }));
+
   // Group by display_name so a holder with both an ETH and a Tezos wallet
   // shows once, not twice. Anonymous holders (no display_name) stay separate.
   const groups = [];
@@ -3488,7 +3548,7 @@ async function loadParticipants() {
     group.wallets.push({ address: h.wallet_address, chain: h.chain });
     if (!group.tier) group.tier = h.tier;
     group.ownsWork = group.ownsWork || h.owns_work === true || h.ownsWork === true;
-    group.hasGoldToken = group.hasGoldToken || h.has_gold_token === true || h.hasGoldToken === true || Number(h?.balancesByTokenId?.['3'] || 0) > 0;
+    group.hasGoldToken = group.hasGoldToken || h.has_gold_token === true || h.hasGoldToken === true || String(h.tier || '').toLowerCase() === 'gold' || Number(h?.balancesByTokenId?.['3'] || 0) > 0;
   });
 
   const activeAddress = String(currentHolder?.wallet_address || '').toLowerCase();
