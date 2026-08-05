@@ -48,6 +48,17 @@ const ETH_TOKEN_STANDARD = 'erc1155'; // balanceOf(address, tokenId) - confirmed
 const ETH_RPC_URL = process.env.ETH_RPC_URL || 'https://ethereum.publicnode.com';
 const TEZOS_CONTRACT_ADDRESS = 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8';
 
+// Additional collection wallets explicitly linked by their holders. These are
+// returned only by the authenticated participant feed and are never embedded
+// in the public Holder Hub HTML.
+const PARTICIPANT_COLLECTION_WALLETS = [
+  {
+    display_name: 'Spitfingers',
+    chain: 'ethereum',
+    wallet_address: '0x958b84f8a709fe789b1dfaeb7f76640d5d4970a9',
+  },
+];
+
 const AUTH_EMAIL_FROM = process.env.HOLDER_AUTH_FROM_EMAIL || "Kay's Works <auction@mail.kaysworks.com>";
 
 function escapeHtml(value) {
@@ -181,6 +192,14 @@ async function findLinkedHolderRows(supabase, chain, walletAddress, connectedBal
       .eq('display_name', displayName);
     if (nameError) console.warn('Could not look up name-linked holder wallets:', nameError.message);
     else addRows(nameRows);
+
+    // Include explicitly linked collection-only wallets in the signed-in
+    // holder response as well as the participant circle. This lets the normal
+    // ownership scanner populate "Works You Own" without granting hub access
+    // from a wallet that does not contain an entry token.
+    addRows(PARTICIPANT_COLLECTION_WALLETS
+      .filter(row => holderDisplayName(row).toLowerCase() === displayName.toLowerCase())
+      .map(row => ({ ...row, token_balance: 0, tier: null })));
   }
 
   addRows({
@@ -672,10 +691,19 @@ async function handleParticipants(req, res, supabase) {
 
   if (error) return res.status(500).json({ error: error.message });
 
+  const participantRows = Array.isArray(data) ? [...data] : [];
+  PARTICIPANT_COLLECTION_WALLETS.forEach(linkedWallet => {
+    const alreadyPresent = participantRows.some(row =>
+      String(row.chain || '').toLowerCase() === linkedWallet.chain &&
+      String(row.wallet_address || '').toLowerCase() === linkedWallet.wallet_address
+    );
+    if (!alreadyPresent) participantRows.push({ ...linkedWallet, tier: null, created_at: null });
+  });
+
   // Enrich the private participant feed with Gold-token status while returning
   // no additional public wallet information beyond what this holder-only route
   // already provides. Failure to reach a chain never invents Gold ownership.
-  const participants = await Promise.all((Array.isArray(data) ? data : []).map(async row => {
+  const participants = await Promise.all(participantRows.map(async row => {
     try {
       const balancesByTokenId = await checkHolderRowBalances(row);
       return {
