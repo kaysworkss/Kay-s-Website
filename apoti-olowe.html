@@ -899,11 +899,20 @@
   .sm-reader-nav button { color:#211207; border-color:#d4aa51; background:linear-gradient(145deg,#e3bf6b,#b67a2f); font-weight:700; box-shadow:0 5px 16px rgba(130,75,22,0.28); }
   .sm-reader-nav button:hover { color:#160b04; border-color:#f0d68c; filter:brightness(1.08); }
   .sm-reader-nav button:disabled { opacity:0.32; cursor:not-allowed; filter:saturate(0.45); }
-  .sm-chapter-label { width:max-content; min-width:178px; max-width:100%; min-height:42px; display:flex; align-items:center; justify-content:center; gap:0.5rem; margin:0 auto; padding:0 0.8rem; color:var(--gold); font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.12em; text-transform:uppercase; border:1px solid rgba(201,153,58,0.38); border-radius:4px; background:#17100c; cursor:pointer; }
+  .sm-chapter-picker { position:relative; width:max-content; max-width:100%; margin:0 auto; }
+  .sm-chapter-label { width:max-content; min-width:178px; max-width:100%; min-height:42px; display:flex; align-items:center; justify-content:center; gap:0.5rem; margin:0; padding:0 0.8rem; color:var(--gold); font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.12em; text-transform:uppercase; border:1px solid rgba(201,153,58,0.38); border-radius:4px; background:#17100c; cursor:pointer; }
+  .sm-reader-nav .sm-chapter-label { color:var(--gold); border-color:rgba(201,153,58,0.38); background:#17100c; box-shadow:none; filter:none; }
   .sm-chapter-menu-icon { flex:0 0 auto; width:14px; height:14px; display:grid; place-items:center; color:var(--text-muted); font-family:Arial,sans-serif; font-size:0.82rem; line-height:14px; }
-  .sm-chapter-select { flex:0 0 auto; width:9ch; min-height:40px; color:var(--gold); background:transparent; border:0; padding:0; text-align:center; text-align-last:center; box-shadow:none; outline:0; appearance:none; -webkit-appearance:none; font-weight:700; }
+  .sm-chapter-current { flex:0 0 auto; min-width:9ch; text-align:center; font-weight:700; line-height:1; }
   .sm-chapter-chevron { flex:0 0 auto; width:6px; height:6px; border-right:1px solid var(--text-muted); border-bottom:1px solid var(--text-muted); transform:rotate(45deg) translateY(-2px); transform-origin:center; }
-  .sm-chapter-label:hover, .sm-chapter-label:focus-within { border-color:rgba(201,153,58,0.68); }
+  .sm-chapter-label[aria-expanded="true"] .sm-chapter-chevron { transform:rotate(225deg) translate(-1px,-1px); }
+  .sm-chapter-label:hover, .sm-chapter-label:focus-visible { border-color:rgba(201,153,58,0.68); color:#f0c96c; outline:0; }
+  .sm-reader-nav .sm-chapter-label:hover, .sm-reader-nav .sm-chapter-label:focus-visible { color:#f0c96c; border-color:rgba(201,153,58,0.68); background:#17100c; box-shadow:none; filter:none; }
+  .sm-chapter-menu { position:absolute; left:50%; bottom:calc(100% + 0.55rem); z-index:12; width:min(330px,calc(100vw - 2rem)); max-height:min(360px,55vh); overflow-y:auto; padding:0.38rem; border:1px solid rgba(201,153,58,0.46); border-radius:5px; background:#17110e; box-shadow:0 -18px 42px rgba(0,0,0,0.52); transform:translateX(-50%); }
+  .sm-chapter-menu[hidden] { display:none; }
+  .sm-chapter-menu button { display:block; width:100%; min-height:44px; padding:0.65rem 0.78rem; border:0; border-radius:3px; background:transparent; box-shadow:none; color:var(--text-muted); font-family:'Cinzel',serif; font-size:0.65rem; font-weight:600; letter-spacing:0.08em; line-height:1.35; text-align:left; text-transform:none; }
+  .sm-chapter-menu button:hover, .sm-chapter-menu button:focus-visible { color:var(--gold); background:rgba(201,153,58,0.09); outline:0; filter:none; }
+  .sm-chapter-menu button[aria-current="true"] { color:#f0c96c; background:rgba(120,70,151,0.28); }
   .sm-reader-heading { min-width:0; }
   .sm-reader-heading #scriptModalKicker, .sm-reader-heading #scriptModalTitle { white-space:normal; overflow:visible; text-overflow:clip; }
   .sm-icon-btn { width:42px; padding:0 !important; display:grid; place-items:center; font-size:1.05rem !important; letter-spacing:0 !important; }
@@ -917,7 +926,7 @@
     .sm-reader-heading #scriptModalTitle { font-size:0.94rem !important; }
     .sm-reader-nav { grid-template-columns:auto minmax(0,1fr) auto; gap:0.45rem; }
     .sm-chapter-label { min-width:0; }
-    .sm-chapter-select { width:9ch; min-width:0; }
+    .sm-chapter-current { min-width:9ch; }
     .sm-reader-nav button { padding-left:0.62rem; padding-right:0.62rem; }
   }
   /* Modal fade-up animation */
@@ -2989,7 +2998,10 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
     <div class="sm-reader-footer">
       <div class="sm-reader-nav" aria-label="Script chapter navigation">
           <button id="scriptPrevChapter" type="button" aria-label="Read previous chapter">&#8249;&nbsp; Prev</button>
-        <label class="sm-chapter-label" for="scriptChapterSelect"><span class="sm-chapter-menu-icon" aria-hidden="true">&#9776;</span><select class="sm-chapter-select" id="scriptChapterSelect" aria-label="Choose a chapter"></select><span class="sm-chapter-chevron" aria-hidden="true"></span></label>
+        <div class="sm-chapter-picker">
+          <button class="sm-chapter-label" id="scriptChapterToggle" type="button" aria-label="Choose a chapter" aria-expanded="false" aria-controls="scriptChapterMenu"><span class="sm-chapter-menu-icon" aria-hidden="true">&#9776;</span><span class="sm-chapter-current" id="scriptChapterCurrent">Chapter 1</span><span class="sm-chapter-chevron" aria-hidden="true"></span></button>
+          <div class="sm-chapter-menu" id="scriptChapterMenu" role="menu" hidden></div>
+        </div>
           <button id="scriptNextChapter" type="button" aria-label="Read next chapter">Next &nbsp;&#8250;</button>
       </div>
     </div>
@@ -4073,7 +4085,9 @@ lbPanel.addEventListener('touchend', function(e) {
   // ── Modal elements ──
   var modal    = document.getElementById('scriptModal');
   var panel    = document.getElementById('scriptModalPanel');
-  var chapterSelect = document.getElementById('scriptChapterSelect');
+  var chapterToggle = document.getElementById('scriptChapterToggle');
+  var chapterCurrent = document.getElementById('scriptChapterCurrent');
+  var chapterMenu = document.getElementById('scriptChapterMenu');
   var prevBtn  = document.getElementById('scriptPrevChapter');
   var nextBtn  = document.getElementById('scriptNextChapter');
   var kicker   = document.getElementById('scriptModalKicker');
@@ -4090,15 +4104,21 @@ lbPanel.addEventListener('touchend', function(e) {
   }
 
   function renderChapterNavigation(activeId) {
-    if (!chapterSelect.options.length) {
+    if (!chapterMenu.children.length) {
       scripts.forEach(function(s) {
-        var option = document.createElement('option');
-        option.value = s.id;
-        option.textContent = s.tab;
-        chapterSelect.appendChild(option);
+        var option = document.createElement('button');
+        option.type = 'button';
+        option.setAttribute('role', 'menuitem');
+        option.setAttribute('data-chapter-id', s.id);
+        option.textContent = s.tab + ' — ' + s.title;
+        chapterMenu.appendChild(option);
       });
     }
-    chapterSelect.value = activeId;
+    var activeScript = scripts.find(function(s) { return s.id === activeId; });
+    chapterCurrent.textContent = activeScript ? activeScript.tab : 'Chapter';
+    chapterMenu.querySelectorAll('[data-chapter-id]').forEach(function(option) {
+      option.setAttribute('aria-current', option.getAttribute('data-chapter-id') === activeId ? 'true' : 'false');
+    });
     var activeIndex = scripts.findIndex(function(s) { return s.id === activeId; });
     prevBtn.disabled = activeIndex <= 0;
     nextBtn.disabled = activeIndex < 0 || activeIndex >= scripts.length - 1;
@@ -4123,9 +4143,24 @@ lbPanel.addEventListener('touchend', function(e) {
     setScriptHash(scripts[nextIndex].id);
   }
 
-  chapterSelect.addEventListener('change', function() {
-    loadScript(chapterSelect.value);
-    setScriptHash(chapterSelect.value);
+  chapterToggle.addEventListener('click', function() {
+    var willOpen = chapterMenu.hidden;
+    chapterMenu.hidden = !willOpen;
+    chapterToggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    if (willOpen) {
+      var activeOption = chapterMenu.querySelector('[aria-current="true"]');
+      if (activeOption) activeOption.focus();
+    }
+  });
+  chapterMenu.addEventListener('click', function(event) {
+    var option = event.target.closest('[data-chapter-id]');
+    if (!option) return;
+    var id = option.getAttribute('data-chapter-id');
+    chapterMenu.hidden = true;
+    chapterToggle.setAttribute('aria-expanded', 'false');
+    loadScript(id);
+    setScriptHash(id);
+    chapterToggle.focus();
   });
   prevBtn.addEventListener('click', function() { moveChapter(-1); });
   nextBtn.addEventListener('click', function() { moveChapter(1); });
@@ -4206,6 +4241,10 @@ lbPanel.addEventListener('touchend', function(e) {
   });
 
   document.addEventListener('click', function(event) {
+    if (chapterMenu && !chapterMenu.hidden && !event.target.closest('.sm-chapter-picker')) {
+      chapterMenu.hidden = true;
+      chapterToggle.setAttribute('aria-expanded', 'false');
+    }
     if (!shareMenu || shareMenu.hidden) return;
     if (!event.target.closest('.sm-share-wrap')) {
       shareMenu.hidden = true;
@@ -4219,7 +4258,16 @@ lbPanel.addEventListener('touchend', function(e) {
   // ── Close triggers ──
   closeBtn.addEventListener('click', closeModal);
   modal.addEventListener('click', function(e) { if (e.target === modal) closeModal(); });
-  document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && modal.style.display !== 'none') closeModal(); });
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape' || modal.style.display === 'none') return;
+    if (chapterMenu && !chapterMenu.hidden) {
+      chapterMenu.hidden = true;
+      chapterToggle.setAttribute('aria-expanded', 'false');
+      chapterToggle.focus();
+      return;
+    }
+    closeModal();
+  });
 
 }());
 </script>
