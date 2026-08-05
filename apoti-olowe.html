@@ -887,9 +887,10 @@
     border-color: rgba(201,153,58,0.6);
     background: rgba(201,153,58,0.08);
   }
-  .sm-reader-header { padding:clamp(0.85rem,3vw,1.5rem) clamp(0.85rem,3vw,2rem) 1rem; border-bottom:1px solid rgba(201,153,58,0.15); flex-shrink:0; background:#0f0c09; }
-  .sm-reader-toolbar { display:flex; align-items:center; justify-content:space-between; gap:0.8rem; margin-bottom:1rem; }
-  .sm-reader-nav, .sm-reader-actions { display:flex; align-items:center; gap:0.5rem; }
+  .sm-reader-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0.8rem clamp(0.85rem,3vw,1.5rem); border-bottom:1px solid rgba(201,153,58,0.15); flex-shrink:0; background:#14100d; }
+  .sm-reader-footer { flex-shrink:0; padding:0.75rem clamp(0.75rem,3vw,1.4rem); border-top:1px solid rgba(201,153,58,0.18); background:rgba(20,16,13,0.98); box-shadow:0 -10px 30px rgba(0,0,0,0.28); }
+  .sm-reader-nav { display:grid; grid-template-columns:minmax(94px,auto) minmax(190px,360px) minmax(94px,auto); justify-content:space-between; align-items:center; gap:0.75rem; max-width:900px; margin:0 auto; }
+  .sm-reader-actions { position:relative; display:flex; align-items:center; gap:0.45rem; flex-shrink:0; }
   .sm-reader-nav button, .sm-reader-actions button, .sm-chapter-select {
     min-height:42px; border:1px solid rgba(201,153,58,0.38); border-radius:4px; background:rgba(201,153,58,0.05); color:var(--text-muted);
     font-family:'Cinzel',serif; font-size:0.61rem; letter-spacing:0.13em; text-transform:uppercase; cursor:pointer; padding:0.55rem 0.75rem;
@@ -899,13 +900,21 @@
   .sm-chapter-label { display:flex; align-items:center; gap:0.45rem; color:var(--gold); font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.12em; text-transform:uppercase; }
   .sm-chapter-select { color:var(--gold); background:#17100c; padding-right:1.7rem; }
   .sm-reader-heading { min-width:0; }
+  .sm-reader-heading #scriptModalKicker { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sm-reader-heading #scriptModalTitle { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sm-icon-btn { width:42px; padding:0 !important; display:grid; place-items:center; font-size:1.05rem !important; letter-spacing:0 !important; }
+  .sm-share-wrap { position:relative; }
+  .sm-share-menu { position:absolute; top:calc(100% + 0.55rem); right:0; z-index:5; width:190px; padding:0.4rem; border:1px solid rgba(201,153,58,0.35); border-radius:6px; background:#211610; box-shadow:0 16px 42px rgba(0,0,0,0.5); }
+  .sm-share-menu[hidden] { display:none; }
+  .sm-share-menu button { width:100%; min-height:38px; justify-content:flex-start; text-align:left; border:0; background:transparent; padding:0.55rem 0.65rem; }
+  .sm-share-menu button:hover { background:rgba(201,153,58,0.09); }
   @media (max-width:680px) {
-    .sm-reader-toolbar { align-items:stretch; flex-direction:column; }
-    .sm-reader-nav { display:grid; grid-template-columns:auto minmax(0,1fr) auto; }
+    .sm-reader-header { padding:0.7rem 0.75rem; }
+    .sm-reader-heading #scriptModalTitle { font-size:0.94rem !important; }
+    .sm-reader-nav { grid-template-columns:auto minmax(0,1fr) auto; gap:0.45rem; }
     .sm-chapter-label { min-width:0; }
     .sm-chapter-label > span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
     .sm-chapter-select { width:100%; min-width:0; }
-    .sm-reader-actions { justify-content:flex-end; }
     .sm-reader-nav button { padding-left:0.62rem; padding-right:0.62rem; }
   }
   /* Modal fade-up animation */
@@ -2956,23 +2965,31 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
 <div id="scriptModal" role="dialog" aria-modal="true" aria-labelledby="scriptModalTitle" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(6,4,3,0.97);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);overflow:hidden;display:none;align-items:center;justify-content:center;padding:clamp(0px,2vw,1.5rem);">
   <div id="scriptModalPanel" style="position:relative;width:min(1100px,100%);height:min(88vh,100%);max-height:100%;background:#0f0c09;display:flex;flex-direction:column;box-shadow:0 32px 80px rgba(0,0,0,0.8);border:1px solid rgba(201,153,58,0.2);border-radius:clamp(0px,1vw,6px);overflow:hidden;">
     <div class="sm-reader-header">
-      <div class="sm-reader-toolbar">
-        <div class="sm-reader-nav" aria-label="Script chapter navigation">
-          <button id="scriptPrevChapter" type="button" aria-label="Read previous chapter">&larr; Previous</button>
-          <label class="sm-chapter-label" for="scriptChapterSelect"><span>Chapter</span><select class="sm-chapter-select" id="scriptChapterSelect" aria-label="Choose a chapter"></select></label>
-          <button id="scriptNextChapter" type="button" aria-label="Read next chapter">Next &rarr;</button>
-        </div>
-        <div class="sm-reader-actions">
-          <button id="scriptShareLink" type="button" aria-label="Copy link to this script">Copy story link</button>
-          <button id="scriptModalClose" type="button" aria-label="Close script">Close</button>
-        </div>
-      </div>
       <div class="sm-reader-heading">
         <p id="scriptModalKicker" class="ao-script-kicker" style="margin-bottom:0.25rem;"></p>
         <h2 id="scriptModalTitle" style="font-family:'Cinzel',serif;font-size:clamp(1.1rem,3vw,1.4rem);font-weight:400;letter-spacing:0.1em;text-transform:uppercase;font-variant:normal;color:var(--text);margin:0;"></h2>
       </div>
+      <div class="sm-reader-actions">
+        <div class="sm-share-wrap">
+          <button class="sm-icon-btn" id="scriptShareLink" type="button" aria-label="Share this chapter" aria-expanded="false" aria-controls="scriptShareMenu">&#8599;</button>
+          <div class="sm-share-menu" id="scriptShareMenu" hidden>
+            <button type="button" data-script-share="copy">Copy link</button>
+            <button type="button" data-script-share="x">Post to X</button>
+            <button type="button" data-script-share="facebook">Share on Facebook</button>
+            <button type="button" data-script-share="whatsapp">Send on WhatsApp</button>
+          </div>
+        </div>
+        <button class="sm-icon-btn" id="scriptModalClose" type="button" aria-label="Close script">&times;</button>
+      </div>
     </div>
     <div id="scriptModalBody" style="flex:1;overflow-y:auto;padding:clamp(1.25rem,4vw,2.5rem) clamp(1rem,4vw,2.5rem);-webkit-overflow-scrolling:touch;background:#0f0c09;"></div>
+    <div class="sm-reader-footer">
+      <div class="sm-reader-nav" aria-label="Script chapter navigation">
+        <button id="scriptPrevChapter" type="button" aria-label="Read previous chapter">&larr; Previous</button>
+        <label class="sm-chapter-label" for="scriptChapterSelect"><span>Chapter</span><select class="sm-chapter-select" id="scriptChapterSelect" aria-label="Choose a chapter"></select></label>
+        <button id="scriptNextChapter" type="button" aria-label="Read next chapter">Next &rarr;</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -4061,6 +4078,7 @@ lbPanel.addEventListener('touchend', function(e) {
   var body     = document.getElementById('scriptModalBody');
   var closeBtn = document.getElementById('scriptModalClose');
   var shareBtn = document.getElementById('scriptShareLink');
+  var shareMenu = document.getElementById('scriptShareMenu');
   var currentId = null;
   var canonicalStoryUrl = 'https://www.kaysworks.com/apoti-olowe';
 
@@ -4119,6 +4137,8 @@ lbPanel.addEventListener('touchend', function(e) {
   }
 
   function closeModal() {
+    if (shareMenu) shareMenu.hidden = true;
+    if (shareBtn) shareBtn.setAttribute('aria-expanded', 'false');
     modal.classList.remove('sm-open');
     modal.style.display = 'none';
     document.body.style.overflow = '';
@@ -4144,21 +4164,51 @@ lbPanel.addEventListener('touchend', function(e) {
 
   if (shareBtn) {
     shareBtn.addEventListener('click', function() {
-      var shareUrl = canonicalStoryUrl + '#script-' + (currentId || 'ch1');
-      var originalText = shareBtn.textContent;
-      function showCopied() {
-        shareBtn.textContent = 'Link copied';
-        setTimeout(function() { shareBtn.textContent = originalText; }, 1800);
-      }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(shareUrl).then(showCopied).catch(function() {
-          window.prompt('Copy this story link:', shareUrl);
-        });
-      } else {
-        window.prompt('Copy this story link:', shareUrl);
-      }
+      var willOpen = shareMenu.hidden;
+      shareMenu.hidden = !willOpen;
+      shareBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
     });
   }
+
+  document.querySelectorAll('[data-script-share]').forEach(function(action) {
+    action.addEventListener('click', function() {
+      var shareUrl = canonicalStoryUrl + '#script-' + (currentId || 'ch1');
+      var activeScript = scripts.find(function(s) { return s.id === currentId; }) || scripts[0];
+      var shareText = activeScript.title + ' — Àpótí Ọlọ́wẹ̀ by Kay’s Works';
+      var kind = action.getAttribute('data-script-share');
+      if (kind === 'copy') {
+        var originalText = action.textContent;
+        var copied = function() {
+          action.textContent = 'Link copied';
+          setTimeout(function() { action.textContent = originalText; }, 1600);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(shareUrl).then(copied).catch(function() { window.prompt('Copy this link:', shareUrl); });
+        } else {
+          window.prompt('Copy this link:', shareUrl);
+        }
+      } else {
+        var targets = {
+          x: 'https://x.com/intent/post?text=' + encodeURIComponent(shareText) + '&url=' + encodeURIComponent(shareUrl),
+          facebook: 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(shareUrl),
+          whatsapp: 'https://wa.me/?text=' + encodeURIComponent(shareText + ' ' + shareUrl)
+        };
+        if (targets[kind]) window.open(targets[kind], '_blank', 'noopener,noreferrer,width=720,height=640');
+      }
+      if (kind !== 'copy') {
+        shareMenu.hidden = true;
+        shareBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+  });
+
+  document.addEventListener('click', function(event) {
+    if (!shareMenu || shareMenu.hidden) return;
+    if (!event.target.closest('.sm-share-wrap')) {
+      shareMenu.hidden = true;
+      shareBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
 
   window.addEventListener('hashchange', openFromHash);
   openFromHash();
