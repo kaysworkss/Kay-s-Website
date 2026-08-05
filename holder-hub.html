@@ -3503,6 +3503,7 @@ async function loadParticipants() {
     data = fallbackRows.map(row => ({
       display_name: holderDisplayName(row) || currentHolder.display_name || null,
       tier: row.tier || currentHolder.tier || null,
+      auth_user_id: row.auth_user_id || currentHolder.auth_user_id || null,
       wallet_address: row.wallet_address || row.walletAddress || currentHolder.wallet_address,
       chain: row.chain || currentHolder.chain,
     }));
@@ -3533,18 +3534,22 @@ async function loadParticipants() {
     return enriched;
   }));
 
-  // Group by display_name so a holder with both an ETH and a Tezos wallet
-  // shows once, not twice. Anonymous holders (no display_name) stay separate.
+  // Group linked ETH/Tezos wallets by holder account first, then by display
+  // name. This ensures artwork held in a second wallet contributes its halo to
+  // the same participant node even if that wallet row has no display name.
   const groups = [];
-  const byName = new Map();
+  const byHolder = new Map();
   data.forEach(h => {
-    const key = h.display_name || null;
-    let group = key ? byName.get(key) : null;
+    const accountKey = h.auth_user_id ? `account:${h.auth_user_id}` : '';
+    const nameKey = h.display_name ? `name:${String(h.display_name).trim().toLowerCase()}` : '';
+    const key = accountKey || nameKey || null;
+    let group = key ? byHolder.get(key) : null;
     if (!group) {
-      group = { display_name: h.display_name, tier: h.tier, wallets: [], ownsWork: false, hasGoldToken: false };
-      if (key) byName.set(key, group);
+      group = { display_name: h.display_name, tier: h.tier, auth_user_id: h.auth_user_id, wallets: [], ownsWork: false, hasGoldToken: false };
+      if (key) byHolder.set(key, group);
       groups.push(group);
     }
+    if (!group.display_name && h.display_name) group.display_name = h.display_name;
     group.wallets.push({ address: h.wallet_address, chain: h.chain });
     if (!group.tier) group.tier = h.tier;
     group.ownsWork = group.ownsWork || h.owns_work === true || h.ownsWork === true;
