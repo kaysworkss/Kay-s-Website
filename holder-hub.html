@@ -480,21 +480,41 @@
   .auction-cta .btn { width: auto; padding: 0.7rem 1.3rem; display: inline-flex; }
   .auction-cta .reserve-note { margin-top: 0.7rem; }
 
-  .participant-row {
-    display:flex; align-items:center; justify-content:space-between;
-    border:1px solid var(--line); border-radius:6px; padding:0.85rem 1.1rem; margin-bottom:0.6rem;
-    background:rgba(30,20,16,0.28);
+  .participant-circle {
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:2rem 1.4rem;
+    align-items:start; padding:2.2rem 1.2rem; border:1px solid var(--line); border-radius:50% / 18%;
+    background:radial-gradient(circle at 50% 46%,rgba(201,153,58,0.10),transparent 48%),rgba(30,20,16,0.2);
   }
-  .participant-row .name {
-    font-family:'Cormorant Garamond',serif; font-size:1.15rem;
-    color:oklch(76% 0.105 60);
+  .participant-node { min-width:0; text-align:center; }
+  .participant-token {
+    position:relative; display:grid; place-items:center; width:86px; aspect-ratio:1; margin:0 auto 0.8rem;
+    border:1px solid rgba(255,255,255,0.18); border-radius:50%; color:#f5e6c8;
+    box-shadow:inset 0 2px 8px rgba(255,255,255,0.16),inset 0 -9px 18px rgba(0,0,0,0.36),0 10px 25px rgba(0,0,0,0.28);
   }
-  .participant-row .addr { color:var(--text-muted); font-size:0.82rem; font-family:monospace; }
-  .participant-row.is-current {
-    border-color: rgba(201,153,58,0.72);
-    background: rgba(201,153,58,0.11);
-    box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+  .participant-token::before {
+    content:''; position:absolute; inset:9px; border:1px solid rgba(255,255,255,0.16); border-radius:50%;
   }
+  .participant-token.tier-wood {
+    background:repeating-radial-gradient(ellipse at 35% 30%,rgba(255,221,168,0.17) 0 2px,transparent 3px 8px),linear-gradient(145deg,#8c572e,#4b2817);
+  }
+  .participant-token.tier-bronze {
+    background:radial-gradient(circle at 32% 24%,#d39561 0 6%,transparent 28%),linear-gradient(145deg,#a85e35,#4b2519 76%);
+  }
+  .participant-token.tier-none { background:linear-gradient(145deg,#665448,#2c211c); }
+  .participant-token.has-work { box-shadow:0 0 0 5px rgba(208,104,54,0.32),0 0 22px rgba(208,104,54,0.62),inset 0 2px 8px rgba(255,255,255,0.16),inset 0 -9px 18px rgba(0,0,0,0.36); }
+  .participant-token.has-gold { outline:2px solid #e8c45a; outline-offset:9px; filter:drop-shadow(0 0 8px rgba(232,196,90,0.72)); }
+  .participant-token.has-work.has-gold { outline-offset:11px; }
+  .participant-token.is-current { animation:holderPulse 2.4s ease-in-out infinite; }
+  .participant-initial { position:relative; z-index:1; font-family:'Cinzel',serif; font-size:1.35rem; }
+  .participant-name { font-family:'Cormorant Garamond',serif; font-size:1.08rem; color:var(--sand); line-height:1.15; overflow-wrap:anywhere; }
+  .participant-badges { min-height:1.3rem; margin-top:0.36rem; color:var(--text-muted); font-size:0.66rem; letter-spacing:0.08em; text-transform:uppercase; }
+  .participant-legend { display:flex; flex-wrap:wrap; justify-content:center; gap:0.7rem 1.25rem; margin:0 0 1.3rem; color:var(--text-muted); font-size:0.76rem; }
+  .participant-legend span { display:inline-flex; align-items:center; gap:0.42rem; }
+  .legend-dot { width:11px; height:11px; border-radius:50%; background:#76502f; border:1px solid rgba(255,255,255,0.2); }
+  .legend-dot.bronze { background:#a85e35; }
+  .legend-dot.work { background:transparent; border:2px solid #d06836; }
+  .legend-dot.gold { background:transparent; border:2px solid #e8c45a; box-shadow:0 0 6px rgba(232,196,90,0.65); }
+  @keyframes holderPulse { 50% { transform:translateY(-3px); } }
   .participant-you {
     margin-left: 0.55rem; padding: 0.18rem 0.5rem; border-radius: 999px;
     border: 1px solid rgba(201,153,58,0.5); color: var(--gold);
@@ -506,6 +526,10 @@
   .name.tier-bronze { color:oklch(76% 0.105 48); }
   .name.tier-wood { color:oklch(76% 0.105 25); }
   .name.tier-none { color:oklch(76% 0.105 60); }
+  @media (max-width:620px) {
+    .participant-circle { grid-template-columns:repeat(2,minmax(0,1fr)); gap:1.7rem 0.8rem; padding:1.6rem 0.7rem; border-radius:28px; }
+    .participant-token { width:76px; }
+  }
 
   .chapter-card {
     border:1px solid var(--line); border-radius:8px; background:rgba(30,20,16,0.34);
@@ -1072,7 +1096,7 @@
       <div class="status" id="walletEmailStatus"></div>
     </div>
 
-    <button class="hub-tab-toggle" id="hubTabToggle" type="button" aria-expanded="false" aria-controls="hubTabs"><span id="hubTabCurrent">Opa Collection</span><span class="hub-tab-toggle-icon">☰</span></button>
+    <button class="hub-tab-toggle" id="hubTabToggle" type="button" aria-expanded="false" aria-controls="hubTabs"><span id="hubTabCurrent">Current Drop</span><span class="hub-tab-toggle-icon">☰</span></button>
     <div class="notification-hub">
       <button class="notification-bell" id="notificationBell" type="button" aria-label="Open holder notifications" aria-expanded="false" aria-controls="notificationPopover">
         <span aria-hidden="true">&#128276;</span>
@@ -1099,7 +1123,8 @@
       </div>
     </div>
     <div class="tabs" id="hubTabs">
-      <button class="tab-btn active" data-tab="opa">Opa Collection</button>
+      <button class="tab-btn active" data-tab="current">Current Drop</button>
+      <button class="tab-btn" data-tab="previous">Previous Drops</button>
       <button class="tab-btn" data-tab="updates">Updates</button>
       <button class="tab-btn" data-tab="merch">Merch</button>
       <button class="tab-btn" data-tab="artworks">All Artworks</button>
@@ -1163,23 +1188,41 @@
       </section>
     </div>
 
-    <!-- ══════════ OPA COLLECTION (hardcoded — edit directly per drop) ══════════ -->
-    <div class="panel-view show" id="view-opa">
+    <!-- ══════════ CURRENT DROP — CHAPTER 3 ══════════ -->
+    <div class="panel-view show" id="view-current">
       <div class="drop-intro">
-        <span class="eyebrow">Now Introducing</span>
-        <h2>The Opa Collection</h2>
-        <p>Three digitally sculpted works, each viewable in the round — rotate, zoom, and look closely at the surface work. Opa means "staff" — each piece carries a different chapter of the Àpótí Ọlọ́wẹ̀ story forward.</p>
+        <span class="eyebrow">Chapter 3 &middot; Current Drop</span>
+        <h2>L&aacute;b&#7865;&#769; Igi &#7884;&#768;r&#7885;&#768;nb&oacute;</h2>
+        <p>Under the Orange Tree. Ayo and Morenike share a quiet morning away from the market bustle, where affection turns toward family, commitment and the future.</p>
       </div>
 
-      <div class="opa-countdown" id="opaCountdown" data-auction-start="2026-07-03T20:00:00Z">
-        <div class="opa-countdown-label">Opa Collection auction opens</div>
-        <div class="opa-countdown-units" id="opaCountdownUnits">
+      <div class="opa-countdown" id="chapter3Countdown" data-auction-start="2026-08-06T20:00:00Z">
+        <div class="opa-countdown-label">Chapter 3 auction opens</div>
+        <div class="opa-countdown-units">
           <div class="opa-countdown-unit"><strong data-countdown="days">00</strong><span>Days</span></div>
           <div class="opa-countdown-unit"><strong data-countdown="hours">00</strong><span>Hours</span></div>
           <div class="opa-countdown-unit"><strong data-countdown="minutes">00</strong><span>Minutes</span></div>
           <div class="opa-countdown-unit"><strong data-countdown="seconds">00</strong><span>Seconds</span></div>
         </div>
-        <div class="opa-countdown-note">3 July 2026 · 9:00 PM GMT+1</div>
+        <div class="opa-countdown-note">6 August 2026 &middot; 9:00 PM GMT+1</div>
+      </div>
+
+      <img class="drop-feature" src="images/orombo main.webp" alt="Lábẹ́ Igi Ọ̀rọ̀nbó — Chapter 3 painting" />
+      <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:0.75rem;margin-bottom:2.2rem;">
+        <a class="btn ghost" href="https://www.kaysworks.com/apoti-olowe#script-ch3" target="_blank" rel="noopener">Read the Chapter 3 story</a>
+      </div>
+      <div class="auction-notes" style="max-width:760px;margin:0 auto;">
+        <strong>A note from Kay</strong>
+        Thank you for supporting the project so far. We are now in Chapter 3, the halfway mark of this six-chapter drop. Read the chapter for the full context behind the painting before the auction begins.
+      </div>
+    </div>
+
+    <!-- ══════════ PREVIOUS DROP — OPA COLLECTION ══════════ -->
+    <div class="panel-view" id="view-previous">
+      <div class="drop-intro">
+        <span class="eyebrow">Previous Drop &middot; Chapter 2</span>
+        <h2>The Opa Collection</h2>
+        <p>Three digitally sculpted works, each viewable in the round — rotate, zoom, and look closely at the surface work. Opa means "staff" — each piece carries a different chapter of the Àpótí Ọlọ́wẹ̀ story forward.</p>
       </div>
 
       <img class="drop-feature" src="images/opatg.jpg" alt="The Opa Collection" />
@@ -1391,9 +1434,22 @@
     <div class="panel-view" id="view-updates">
       <header class="section-intro">
         <span class="eyebrow">Holder Update</span>
-        <h2>Auction Access Going Forward</h2>
-        <p>A note on phased auction access and the collector privileges that continue with your token.</p>
+        <h2>Project Updates</h2>
+        <p>Current auction notices, chapter releases and collector information.</p>
       </header>
+      <article class="holder-update-card">
+        <div class="holder-update-meta">
+          <span>Upcoming auction</span>
+          6 August 2026
+        </div>
+        <h3>Chapter 3: L&aacute;b&#7865;&#769; Igi &#7884;&#768;r&#7885;&#768;nb&oacute;</h3>
+        <p>The Chapter 3 main painting goes to auction on <strong>6 August 2026 at 9:00 PM GMT+1</strong>.</p>
+        <p>Thank you for supporting the project so far. We are now at Chapter 3, the halfway mark of this six-chapter drop. Read the story before the auction for the full context behind Ayo and Morenike&rsquo;s moment beneath the orange tree.</p>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:0.75rem;margin-top:1.25rem;">
+          <button class="btn" type="button" data-jump-tab="current">View Current Drop</button>
+          <a class="btn ghost" href="https://www.kaysworks.com/apoti-olowe#script-ch3" target="_blank" rel="noopener">Read Chapter 3</a>
+        </div>
+      </article>
       <article class="holder-update-card">
         <div class="holder-update-meta">
           <span>Project note</span>
@@ -1609,6 +1665,17 @@
       <section class="artwork-chapter" data-chapter="chapter3">
         <div class="artwork-group-label">Chapter 3</div>
         <div class="grid">
+        <div class="card" data-owner-piece="Lábẹ́ Igi Ọ̀rọ̀nbó" data-status="available">
+          <div class="card-img-wrap">
+            <img class="card-img" src="images/orombo main.webp" alt="Lábẹ́ Igi Ọ̀rọ̀nbó" />
+          </div>
+          <div class="card-body">
+            <div class="card-title">L&aacute;b&#7865;&#769; Igi &#7884;&#768;r&#7885;&#768;nb&oacute;</div>
+            <div class="card-desc">Chapter 3&rsquo;s central painting &mdash; Ayo and Morenike beneath the orange tree, speaking about family, commitment and their future.</div>
+            <div class="card-meta"><span class="badge available">auction opens 6 August</span></div>
+            <div class="auction-cta"><a class="btn ghost" href="https://www.kaysworks.com/apoti-olowe#script-ch3" target="_blank" rel="noopener">Read Chapter 3</a></div>
+          </div>
+        </div>
         <div class="card" data-owner-piece="Lábẹ́ igi òrònbó I" data-status="sold" data-eth-contract="0x611cca3635b0f05b103031ee8d4f3261633292b4" data-eth-token-id="4" data-token-standard="erc1155">
           <div class="card-img-wrap">
             <img class="card-img" src="images/labe-igi.webp" alt="Lábẹ́ igi òrònbó I" />
@@ -1836,8 +1903,14 @@
       <header class="section-intro">
         <span class="eyebrow">The Community</span>
         <h2>Participants</h2>
-        <p>The collectors helping this story travel, grow and find a life beyond the studio.</p>
+        <p>A living circle of the collectors helping this story travel, grow and find a life beyond the studio.</p>
       </header>
+      <div class="participant-legend" aria-label="Participant token legend">
+        <span><i class="legend-dot" aria-hidden="true"></i>Wood token</span>
+        <span><i class="legend-dot bronze" aria-hidden="true"></i>Bronze token</span>
+        <span><i class="legend-dot work" aria-hidden="true"></i>Owns a work</span>
+        <span><i class="legend-dot gold" aria-hidden="true"></i>Gold token</span>
+      </div>
       <div id="participantsList"></div>
     </div>
 
@@ -2781,7 +2854,7 @@ document.querySelectorAll('.tabs .tab-btn[data-tab]').forEach(btn => {
     btn.classList.add('active');
     document.querySelectorAll('.panel-view').forEach(v => v.classList.remove('show'));
     document.getElementById('view-' + btn.dataset.tab).classList.add('show');
-    els.dashboard.classList.toggle('first-tab-active', btn.dataset.tab === 'opa');
+    els.dashboard.classList.toggle('first-tab-active', btn.dataset.tab === 'current');
     if (hubTabCurrent) hubTabCurrent.textContent = btn.textContent.trim();
     hubTabs?.classList.remove('open');
     hubTabToggle?.setAttribute('aria-expanded', 'false');
@@ -3408,12 +3481,14 @@ async function loadParticipants() {
     const key = h.display_name || null;
     let group = key ? byName.get(key) : null;
     if (!group) {
-      group = { display_name: h.display_name, tier: h.tier, wallets: [] };
+      group = { display_name: h.display_name, tier: h.tier, wallets: [], ownsWork: false, hasGoldToken: false };
       if (key) byName.set(key, group);
       groups.push(group);
     }
     group.wallets.push({ address: h.wallet_address, chain: h.chain });
     if (!group.tier) group.tier = h.tier;
+    group.ownsWork = group.ownsWork || h.owns_work === true || h.ownsWork === true;
+    group.hasGoldToken = group.hasGoldToken || h.has_gold_token === true || h.hasGoldToken === true || Number(h?.balancesByTokenId?.['3'] || 0) > 0;
   });
 
   const activeAddress = String(currentHolder?.wallet_address || '').toLowerCase();
@@ -3425,11 +3500,19 @@ async function loadParticipants() {
   // Stable sort: move only the connected participant; preserve everyone else's order.
   groups.sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent));
 
-  el.innerHTML = groups.map(g => `
-    <div class="participant-row${g.isCurrent ? ' is-current' : ''}">
-      <span class="name tier-${g.tier || 'none'}">${g.display_name || 'Anonymous Holder'}${g.isCurrent ? '<span class="participant-you">You</span>' : ''}</span>
-    </div>
-  `).join('');
+  el.innerHTML = `<div class="participant-circle">${groups.map(g => {
+    const name = g.display_name || 'Anonymous Holder';
+    const tokenClass = `tier-${g.tier || 'none'}${g.ownsWork ? ' has-work' : ''}${g.hasGoldToken ? ' has-gold' : ''}${g.isCurrent ? ' is-current' : ''}`;
+    const badges = [g.tier ? `${g.tier} token` : 'holder', g.ownsWork ? 'work owner' : '', g.hasGoldToken ? 'gold' : ''].filter(Boolean).join(' · ');
+    const label = `${name}, ${badges}${g.isCurrent ? ', you' : ''}`;
+    return `<div class="participant-node">
+      <div class="participant-token ${tokenClass}" role="img" aria-label="${escapeMessageHtml(label)}">
+        <span class="participant-initial" aria-hidden="true">${escapeMessageHtml(name.trim().charAt(0).toUpperCase() || 'H')}</span>
+      </div>
+      <div class="participant-name">${escapeMessageHtml(name)}${g.isCurrent ? '<span class="participant-you">You</span>' : ''}</div>
+      <div class="participant-badges">${escapeMessageHtml(badges)}</div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 async function loadMessages() {
@@ -3526,9 +3609,9 @@ document.getElementById('sendMsgBtn').addEventListener('click', async () => {
   loadMessages();
 });
 
-// ── Opa auction countdown ──
+// ── Current Chapter 3 auction countdown ──
 (() => {
-  const countdown = document.getElementById('opaCountdown');
+  const countdown = document.getElementById('chapter3Countdown');
   if (!countdown) return;
   const startsAt = Date.parse(countdown.dataset.auctionStart); // 20:00 UTC = 21:00 GMT+1
   const units = countdown.querySelector('.opa-countdown-units');
@@ -3544,7 +3627,7 @@ document.getElementById('sendMsgBtn').addEventListener('click', async () => {
     const remaining = startsAt - Date.now();
     if (remaining <= 0) {
       clearInterval(timer);
-      units.innerHTML = '<a class="opa-countdown-live" href="https://www.kaysworks.com/auction">The Opa Collection auction is now live →</a>';
+      units.innerHTML = '<a class="opa-countdown-live" href="https://www.kaysworks.com/auction">The Chapter 3 auction is now live →</a>';
       return;
     }
     const totalSeconds = Math.floor(remaining / 1000);
