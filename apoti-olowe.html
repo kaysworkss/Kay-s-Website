@@ -797,9 +797,13 @@
     margin-bottom: 0.65rem;
   }
   .ao-script-title {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Cinzel', serif;
     font-size: clamp(1.35rem, 2.8vw, 1.9rem);
     font-weight: 400;
+    letter-spacing: 0.08em;
+    line-height: 1.35;
+    text-transform: uppercase;
+    font-variant: normal;
     color: var(--text);
     margin-bottom: 1.1rem;
   }
@@ -1730,8 +1734,15 @@
 
   /* ── COLLECTION GALLERY (public) ── */
   .ao-collection-grid {
-    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-    align-items: flex-start; gap: 1.1rem;
+    --collection-row: 8px;
+    --collection-gap: 1.1rem;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: var(--collection-row);
+    grid-auto-flow: row dense;
+    align-items: start;
+    column-gap: var(--collection-gap);
+    row-gap: var(--collection-gap);
   }
   .ao-collection-group { grid-column: 1 / -1; font-family: 'Cinzel', serif; font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--rust); border-bottom: 1px solid var(--divider); padding-bottom: 0.5rem; margin: 0.6rem 0 0.2rem; }
   .ao-collection-group:first-child { margin-top: 0; }
@@ -1780,7 +1791,9 @@
     .ao-collection-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 520px) {
-    .ao-collection-grid { grid-template-columns: 1fr; }
+    .ao-collection-grid { display: block; }
+    .ao-collection-group { margin-top: 1.5rem; }
+    .ao-collection-card { margin-top: 1.1rem; }
   }
 
   /* ── FOOTER ── */
@@ -2923,7 +2936,7 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
       <div>
         <div id="scriptModalTabs" style="display:flex;gap:0.5rem;margin-bottom:0.85rem;" role="tablist"></div>
         <p id="scriptModalKicker" class="ao-script-kicker" style="margin-bottom:0.25rem;"></p>
-        <h2 id="scriptModalTitle" style="font-family:'Cinzel',serif;font-size:clamp(1.1rem,3vw,1.4rem);font-weight:400;letter-spacing:0.1em;color:var(--text);margin:0;"></h2>
+        <h2 id="scriptModalTitle" style="font-family:'Cinzel',serif;font-size:clamp(1.1rem,3vw,1.4rem);font-weight:400;letter-spacing:0.1em;text-transform:uppercase;font-variant:normal;color:var(--text);margin:0;"></h2>
       </div>
       <div style="display:flex;gap:0.55rem;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-left:1rem;margin-top:0.25rem;">
         <button id="scriptShareLink" type="button" aria-label="Copy link to this script" style="font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold);background:none;border:1px solid rgba(201,153,58,0.45);border-radius:3px;padding:0.5rem 0.8rem;cursor:pointer;min-height:44px;">Copy story link</button>
@@ -3396,6 +3409,38 @@ lbNext.addEventListener('click',  function(e) { e.stopPropagation(); goNext(); }
 lbPrev.addEventListener('click',  function(e) { e.stopPropagation(); goPrev(); });
 lbClose.addEventListener('click', closeLight);
 lbBg.addEventListener('click',    closeLight);
+
+// ── Collection masonry: preserve left-to-right reading order ──
+(function() {
+  var grid = document.querySelector('.ao-collection-grid');
+  if (!grid) return;
+  var resizeTimer;
+
+  function layoutCollectionMasonry() {
+    var items = Array.prototype.slice.call(grid.children);
+    items.forEach(function(item) { item.style.gridRowEnd = ''; });
+    if (window.matchMedia('(max-width: 520px)').matches) return;
+
+    var styles = window.getComputedStyle(grid);
+    var row = parseFloat(styles.gridAutoRows) || 8;
+    var gap = parseFloat(styles.rowGap) || 0;
+    items.forEach(function(item) {
+      var height = item.getBoundingClientRect().height;
+      item.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((height + gap) / (row + gap)));
+    });
+  }
+
+  grid.querySelectorAll('img').forEach(function(img) {
+    if (!img.complete) img.addEventListener('load', layoutCollectionMasonry, { once: true });
+  });
+  window.addEventListener('load', layoutCollectionMasonry);
+  window.addEventListener('resize', function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(layoutCollectionMasonry, 120);
+  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutCollectionMasonry);
+  requestAnimationFrame(layoutCollectionMasonry);
+})();
 
 // ── Collection full-screen viewer ──
 document.querySelectorAll('.ao-collection-img-wrap').forEach(function(wrap) {
