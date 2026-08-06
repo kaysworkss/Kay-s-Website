@@ -709,6 +709,7 @@ async function handleProfile(req, res, supabase) {
 // dashboard does not depend on a public-view RLS policy being perfectly open.
 async function handleParticipants(req, res, supabase, publicAccess = false) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (publicAccess) res.setHeader('Access-Control-Allow-Origin', '*');
   if (!publicAccess) {
     const authorised = await isHolderAuthorised(req, supabase);
     if (!authorised) return res.status(403).json({ error: 'Holder access required.' });
