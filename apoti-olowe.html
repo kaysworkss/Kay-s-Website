@@ -4393,6 +4393,36 @@ lbPanel.addEventListener('touchend', function(e) {
   const modal=document.getElementById('aoParticipantModal'),modalTitle=document.getElementById('aoParticipantModalTitle'),worksEl=document.getElementById('aoParticipantWorks');
   const TEZOS='KT1RF7ck9WMY6oXQnaZbTyJhwuLx7cPyvbEz',ETH=['0x824b9144174d0b5c00dbcf39d43d290701e0ffcb','0xd7066137225cb0e1eb3220a2b814ff228e2c0249'],EDITION='0x611cca3635b0f05b103031ee8d4f3261633292b4',RPC='https://ethereum.publicnode.com';
   const PARTICIPANT_API=(location.protocol==='file:'?'https://www.kaysworks.com':'')+'/api/holder?action=public-participants';
+  const PARTICIPANT_CACHE_KEY='ao-public-patrons-v1';
+  const PARTICIPANT_FALLBACK=[
+    {participant_key:'name:kaysworks',display_name:'kaysworks',tier:'bronze'},
+    {participant_key:'name:lord pirate',display_name:'Lord Pirate',tier:'gold'},
+    {participant_key:'name:carolyn',display_name:'Carolyn',tier:'bronze'},
+    {participant_key:'name:kubti',display_name:'Kubti',tier:'wood'},
+    {participant_key:'name:dreams',display_name:'Dreams',tier:'wood'},
+    {participant_key:'name:raha',display_name:'Raha',tier:'wood'},
+    {participant_key:'name:spitfingers',display_name:'Spitfingers',tier:'gold',chain:'ethereum',wallet_address:'0x958b84f8a709fe789b1dfaeb7f76640d5d4970a9'},
+    {participant_key:'name:batsoupyum',display_name:'Batsoupyum',tier:'gold',chain:'ethereum',wallet_address:'0x75bed855bc13f15f0ad4faa961093b2b9cfc5c3f'},
+    {participant_key:'name:batsoupyum',display_name:'Batsoupyum',tier:'gold',chain:'ethereum',wallet_address:'0xcc6c1d21e8474b3578e69eb036c712ab08ffdfbb'},
+    {participant_key:'name:tino chan',display_name:'Tino Chan',tier:'wood'},
+    {participant_key:'name:anonymous holder',display_name:'Anonymous Holder',tier:'wood'},
+    {participant_key:'name:sierra renee',display_name:'Sierra Renee',tier:'wood'}
+  ];
+  const nativeParticipantFetch=window.fetch.bind(window);
+  window.fetch=async function(input,init){
+    if(String(input)!==PARTICIPANT_API)return nativeParticipantFetch(input,init);
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6500);
+    try{
+      const response=await nativeParticipantFetch(input,{...(init||{}),signal:controller.signal});
+      if(!response.ok)throw new Error('Patron endpoint unavailable');
+      try{const payload=await response.clone().json();if(Array.isArray(payload?.participants)&&payload.participants.length)localStorage.setItem(PARTICIPANT_CACHE_KEY,JSON.stringify(payload.participants));}catch(_){}
+      return response;
+    }catch(_){
+      let participants=PARTICIPANT_FALLBACK;
+      try{const cached=JSON.parse(localStorage.getItem(PARTICIPANT_CACHE_KEY)||'null');if(Array.isArray(cached)&&cached.length)participants=cached;}catch(_){}
+      return new Response(JSON.stringify({participants}),{status:200,headers:{'Content-Type':'application/json'}});
+    }finally{clearTimeout(timer);}
+  };
   // Identity links only. Artwork ownership is never stored here; every linked
   // address is checked live against the configured collection contracts.
   const PARTICIPANT_WALLET_LINKS=[
@@ -4436,7 +4466,16 @@ lbPanel.addEventListener('touchend', function(e) {
     try{const e=new ethersLib.Contract(EDITION,['function balanceOf(address,uint256) view returns(uint256)'],p);if(Number(await e.balanceOf(address,4))>0){owns=true;if(full)names.push('Lábẹ́ Igi Òroǹbó I');}}catch(_){}
     return{owns,names};
   }
-  async function walletWorks(w,full){if(String(w.chain).toLowerCase()==='tezos'){const names=await tezosWorks(w.address);return{owns:names.length>0,names:full?names:[]};}return ethSummary(w.address,full);}
+  async function walletWorks(w,full){
+    const scan=String(w.chain).toLowerCase()==='tezos'
+      ? tezosWorks(w.address).then(names=>({owns:names.length>0,names:full?names:[]}))
+      : ethSummary(w.address,full);
+    const timeoutMs=full?12000:4500;
+    return Promise.race([
+      scan,
+      new Promise(resolve=>setTimeout(()=>resolve({owns:false,names:[]}),timeoutMs))
+    ]);
+  }
   function localArt(name){const cards=[...document.querySelectorAll('#collection .ao-collection-card')],normalized=norm(name);let file='';if(/oronbo 1(?:\s|$)/.test(normalized))file='labe-igi';else if(normalized.includes('labe igi oronbo'))file='orombo main';else if(normalized.includes('igbaradi'))file='igbaradi';else if(normalized.includes('chiefs meeting'))file='CM1';else if(normalized.includes('ipade 1'))file='ipadeIj';else{const seat=normalized.match(/ijokoo\s*([1-6])\b/);if(seat)file='ijoko '+seat[1];}if(file){const byFile=cards.find(c=>c.querySelector('img')?.getAttribute('src')?.toLowerCase().includes(file.toLowerCase()));if(byFile)return byFile;}return cards.find(c=>pieceNamesMatch(c.querySelector('.ao-collection-title')?.textContent,name));}
   async function openGroup(i){const g=groups[i];if(!g)return;modalTitle.textContent=(g.display_name||'Anonymous Holder')+'’s Collection';worksEl.innerHTML='<p class="ao-participant-status">Reading linked wallets…</p>';modal.classList.add('show');document.body.style.overflow='hidden';const settled=await Promise.allSettled(g.wallets.map(w=>walletWorks(w,true))),names=[...new Set([...(g.workNames||[]),...settled.flatMap(x=>x.status==='fulfilled'?x.value.names:[])])];if(!names.length){worksEl.innerHTML='<p class="ao-participant-status">No collected works are currently visible from the linked wallets.</p>';return;}const grid=document.createElement('div');grid.className='ao-owned-grid';names.forEach(name=>{const card=document.createElement('article');card.className='ao-owned-card';const local=localArt(name),img=local?.querySelector('img');if(img){const clone=document.createElement('img');clone.src=img.getAttribute('src');clone.alt=name;card.appendChild(clone);}const h=document.createElement('h4');h.textContent=name;card.appendChild(h);grid.appendChild(card);});worksEl.replaceChildren(grid);}
   function close(){modal.classList.remove('show');document.body.style.overflow='';}
