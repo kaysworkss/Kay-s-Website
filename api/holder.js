@@ -718,8 +718,14 @@ async function handleParticipants(req, res, supabase, publicAccess = false) {
   const participants = await Promise.all(participantRows.map(async row => {
     try {
       const balancesByTokenId = await checkHolderRowBalances(row);
+      const detectedTier = Number(balancesByTokenId?.['2'] || 0) > 0
+        ? 'bronze'
+        : Number(balancesByTokenId?.['1'] || 0) > 0
+          ? 'wood'
+          : row.tier;
       return {
         ...row,
+        tier: detectedTier || null,
         has_gold_token: Number(balancesByTokenId?.['3'] || 0) > 0,
       };
     } catch (err) {
