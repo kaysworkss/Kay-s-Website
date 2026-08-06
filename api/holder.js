@@ -29,22 +29,35 @@
  * it's fixed, public, on-chain info (contract addresses, token standard)
  * rather than a secret or something that varies by deployment - same
  * contract/token that claim-token.html checks, confirmed from its CLAIM
- * config. Holder tokens are IDs 1 and 2 on both chains - a wallet is
- * eligible if it holds either one.
+ * config. Wood and Bronze entry tokens are IDs 1 and 2 on both chains;
+ * token ID 3 is the Gold distinction displayed inside the Holder Hub.
  */
 
 const { getSupabase, cors, handleOptions } = require('./_lib');
 
 const PENDING_TTL_MINUTES = 60;
 
-// Both chains gate on the same two token IDs - holding either one qualifies.
-const HOLDER_TOKEN_IDS = [1, 2];
+// IDs 1 and 2 grant entry. ID 3 is checked as an additional Gold distinction,
+// but does not replace the Wood/Bronze token used for access and identity.
+const ENTRY_TOKEN_IDS = [1, 2];
+const HOLDER_TOKEN_IDS = [1, 2, 3];
 const HOLDER_TOKEN_TIERS = { 1: 'wood', 2: 'bronze' };
 
 const ETH_CONTRACT_ADDRESS = '0x611cca3635b0f05b103031ee8d4f3261633292b4';
 const ETH_TOKEN_STANDARD = 'erc1155'; // balanceOf(address, tokenId) - confirmed from claim-token.html
 const ETH_RPC_URL = process.env.ETH_RPC_URL || 'https://ethereum.publicnode.com';
 const TEZOS_CONTRACT_ADDRESS = 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8';
+
+// Additional collection wallets explicitly linked by their holders. These are
+// returned only by the authenticated participant feed and are never embedded
+// in the public Holder Hub HTML.
+const PARTICIPANT_COLLECTION_WALLETS = [
+  {
+    display_name: 'Spitfingers',
+    chain: 'ethereum',
+    wallet_address: '0x958b84f8a709fe789b1dfaeb7f76640d5d4970a9',
+  },
+];
 
 const AUTH_EMAIL_FROM = process.env.HOLDER_AUTH_FROM_EMAIL || "Kay's Works <auction@mail.kaysworks.com>";
 
@@ -109,12 +122,13 @@ function summarizeTokenBalances(balancesByTokenId) {
   HOLDER_TOKEN_IDS.forEach(id => {
     normalized[String(id)] = Number(balancesByTokenId && balancesByTokenId[String(id)] || 0);
   });
-  const totalBalance = Object.values(normalized).reduce((sum, value) => sum + value, 0);
+  const totalBalance = ENTRY_TOKEN_IDS.reduce((sum, id) => sum + normalized[String(id)], 0);
   const tokenId = normalized['2'] > 0 ? 2 : normalized['1'] > 0 ? 1 : null;
   return {
     totalBalance,
     tokenId,
     tier: tokenId ? HOLDER_TOKEN_TIERS[tokenId] : null,
+    hasGoldToken: normalized['3'] > 0,
     balancesByTokenId: normalized,
   };
 }
@@ -178,6 +192,14 @@ async function findLinkedHolderRows(supabase, chain, walletAddress, connectedBal
       .eq('display_name', displayName);
     if (nameError) console.warn('Could not look up name-linked holder wallets:', nameError.message);
     else addRows(nameRows);
+
+    // Include explicitly linked collection-only wallets in the signed-in
+    // holder response as well as the participant circle. This lets the normal
+    // ownership scanner populate "Works You Own" without granting hub access
+    // from a wallet that does not contain an entry token.
+    addRows(PARTICIPANT_COLLECTION_WALLETS
+      .filter(row => holderDisplayName(row).toLowerCase() === displayName.toLowerCase())
+      .map(row => ({ ...row, token_balance: 0, tier: null })));
   }
 
   addRows({
@@ -645,27 +667,78 @@ async function handleProfile(req, res, supabase) {
 // -- action=participants ----
 // Holder-only participant list, served through the service-role API so the
 // dashboard does not depend on a public-view RLS policy being perfectly open.
-async function handleParticipants(req, res, supabase) {
+async function handleParticipants(req, res, supabase, publicAccess = false) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  const authorised = await isHolderAuthorised(req, supabase);
-  if (!authorised) return res.status(403).json({ error: 'Holder access required.' });
+  if (!publicAccess) {
+    const authorised = await isHolderAuthorised(req, supabase);
+    if (!authorised) return res.status(403).json({ error: 'Holder access required.' });
+  }
 
+  // This route is holder-authorised, so read the minimal wallet-linking fields
+  // directly. auth_user_id lets the client merge a collector's entry-token and
+  // artwork wallets even when one row has no display name.
   let { data, error } = await supabase
-    .from('holder_public')
-    .select('*')
+    .from('holders')
+    .select('id,auth_user_id,wallet_address,chain,display_name,tier,created_at')
     .order('created_at', { ascending: true });
 
   if (error) {
     const fallback = await supabase
-      .from('holders')
-      .select('id,wallet_address,chain,display_name,tier,created_at')
+      .from('holder_public')
+      .select('*')
       .order('created_at', { ascending: true });
     data = fallback.data;
     error = fallback.error;
   }
 
   if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json({ participants: Array.isArray(data) ? data : [] });
+
+  const participantRows = Array.isArray(data) ? [...data] : [];
+  PARTICIPANT_COLLECTION_WALLETS.forEach(linkedWallet => {
+    const alreadyPresent = participantRows.some(row =>
+      String(row.chain || '').toLowerCase() === linkedWallet.chain &&
+      String(row.wallet_address || '').toLowerCase() === linkedWallet.wallet_address
+    );
+    if (!alreadyPresent) {
+      const namedHolder = participantRows.find(row =>
+        holderDisplayName(row).toLowerCase() === holderDisplayName(linkedWallet).toLowerCase()
+      );
+      participantRows.push({
+        ...linkedWallet,
+        auth_user_id: namedHolder?.auth_user_id || null,
+        tier: null,
+        created_at: null,
+      });
+    }
+  });
+
+  // Enrich the private participant feed with Gold-token status while returning
+  // no additional public wallet information beyond what this holder-only route
+  // already provides. Failure to reach a chain never invents Gold ownership.
+  const participants = await Promise.all(participantRows.map(async row => {
+    try {
+      const balancesByTokenId = await checkHolderRowBalances(row);
+      return {
+        ...row,
+        has_gold_token: Number(balancesByTokenId?.['3'] || 0) > 0,
+      };
+    } catch (err) {
+      console.warn('Could not check participant Gold token:', row.chain, row.wallet_address, err.message || err);
+      return { ...row, has_gold_token: false };
+    }
+  }));
+
+  if (publicAccess) {
+    return res.status(200).json({ participants: participants.map(row => ({
+      participant_key: row.auth_user_id ? `account:${row.auth_user_id}` : `name:${holderDisplayName(row).toLowerCase()}`,
+      display_name: holderDisplayName(row) || null,
+      wallet_address: row.wallet_address,
+      chain: row.chain,
+      tier: row.tier || null,
+      has_gold_token: row.has_gold_token === true,
+    })) });
+  }
+  return res.status(200).json({ participants });
 }
 
 // -- action=email-updates ----
@@ -731,6 +804,7 @@ module.exports = async (req, res) => {
       case 'profile': return await handleProfile(req, res, supabase);
       case 'merch-claims': return await handleMerchClaims(req, res, supabase);
       case 'participants': return await handleParticipants(req, res, supabase);
+      case 'public-participants': return await handleParticipants(req, res, supabase, true);
       case 'email-updates': return await handleEmailUpdates(req, res, supabase);
       default:
         return res.status(404).json({ error: `Unknown holder action: ${action}` });
