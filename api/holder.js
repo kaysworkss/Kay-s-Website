@@ -47,6 +47,10 @@ const ETH_CONTRACT_ADDRESS = '0x611cca3635b0f05b103031ee8d4f3261633292b4';
 const ETH_TOKEN_STANDARD = 'erc1155'; // balanceOf(address, tokenId) - confirmed from claim-token.html
 const ETH_RPC_URL = process.env.ETH_RPC_URL || 'https://ethereum.publicnode.com';
 const TEZOS_CONTRACT_ADDRESS = 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8';
+const TEZOS_COLLECTION_CONTRACT = 'KT1RF7ck9WMY6oXQnaZbTyJhwuLx7cPyvbEz';
+const TEZOS_COLLECTION_NAMES = { '0':'Ìjòkòó IV','1':'Ìjòkòó I','2':'Ìjòkòó II','3':'Ìjòkòó III','4':'Ìjòkòó V','5':'Ìjòkòó VI','6':'Ìpàdé I' };
+const ETH_COLLECTION_CONTRACTS = ['0x824b9144174d0b5c00dbcf39d43d290701e0ffcb','0xd7066137225cb0e1eb3220a2b814ff228e2c0249'];
+const ETH_EDITION_TOKEN_ID = 4;
 
 // Additional collection wallets explicitly linked by their holders. These are
 // returned only by the authenticated participant feed and are never embedded
@@ -293,6 +297,37 @@ async function ethCallBalance(rpcUrl, contract, data) {
   }
   if (!jsonRes.result || jsonRes.result === '0x') return 0;
   return parseInt(jsonRes.result, 16);
+}
+
+async function checkCollectionWorks(row) {
+  const chain = String(row?.chain || '').toLowerCase();
+  const address = String(row?.wallet_address || row?.walletAddress || '');
+  if (!address) return { ownsWork:false, workNames:[] };
+  if (chain === 'tezos') {
+    const url = 'https://api.tzkt.io/v1/tokens/balances?account=' + encodeURIComponent(address) +
+      '&token.contract=' + encodeURIComponent(TEZOS_COLLECTION_CONTRACT) + '&balance.gt=0&limit=200';
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('TzKT collection lookup returned ' + response.status);
+    const rows = await response.json();
+    const workNames = (Array.isArray(rows) ? rows : []).map(item => {
+      const id = String(item?.token?.tokenId ?? '');
+      return TEZOS_COLLECTION_NAMES[id] || item?.token?.metadata?.name || `Collected work #${id}`;
+    });
+    return { ownsWork:workNames.length > 0, workNames };
+  }
+  if (chain === 'ethereum' || chain === 'eth') {
+    const padded = address.toLowerCase().replace('0x','').padStart(64,'0');
+    const erc721Balances = await Promise.all(ETH_COLLECTION_CONTRACTS.map(contract =>
+      ethCallBalance(ETH_RPC_URL, contract, '0x70a08231' + padded).catch(() => 0)
+    ));
+    const editionData = '0x00fdd58e' + padded + BigInt(ETH_EDITION_TOKEN_ID).toString(16).padStart(64,'0');
+    const editionBalance = await ethCallBalance(ETH_RPC_URL, ETH_CONTRACT_ADDRESS, editionData).catch(() => 0);
+    const workNames = [];
+    if (erc721Balances[0] > 0) workNames.push('Ìgbáradì');
+    if (editionBalance > 0) workNames.push('Lábẹ́ Igi Òroǹbó I');
+    return { ownsWork:erc721Balances.some(Number) || editionBalance > 0, workNames };
+  }
+  return { ownsWork:false, workNames:[] };
 }
 
 // -- action=verify ----
@@ -717,7 +752,10 @@ async function handleParticipants(req, res, supabase, publicAccess = false) {
   // already provides. Failure to reach a chain never invents Gold ownership.
   const participants = await Promise.all(participantRows.map(async row => {
     try {
-      const balancesByTokenId = await checkHolderRowBalances(row);
+      const [balancesByTokenId, collection] = await Promise.all([
+        checkHolderRowBalances(row),
+        checkCollectionWorks(row).catch(() => ({ ownsWork:false, workNames:[] })),
+      ]);
       const detectedTier = Number(balancesByTokenId?.['2'] || 0) > 0
         ? 'bronze'
         : Number(balancesByTokenId?.['1'] || 0) > 0
@@ -727,6 +765,8 @@ async function handleParticipants(req, res, supabase, publicAccess = false) {
         ...row,
         tier: detectedTier || null,
         has_gold_token: Number(balancesByTokenId?.['3'] || 0) > 0,
+        owns_work: collection.ownsWork,
+        work_names: collection.workNames,
       };
     } catch (err) {
       console.warn('Could not check participant Gold token:', row.chain, row.wallet_address, err.message || err);
@@ -742,6 +782,8 @@ async function handleParticipants(req, res, supabase, publicAccess = false) {
       chain: row.chain,
       tier: row.tier || null,
       has_gold_token: row.has_gold_token === true,
+      owns_work: row.owns_work === true,
+      work_names: Array.isArray(row.work_names) ? row.work_names : [],
     })) });
   }
   return res.status(200).json({ participants });
