@@ -3493,9 +3493,12 @@ window.addEventListener("load", async () => {
   if (cfg._preview) {
     routeStatus = globalStatus;
   } else {
+    const linkedIdx = _linkedPieceIndex();
+    const linkedStatus = linkedIdx >= 0 ? _auctions[linkedIdx]._effectiveStatus : "";
     const anyLive     = _auctions.some(p => p._effectiveStatus === "live");
     const anyUpcoming = _auctions.some(p => p._effectiveStatus === "upcoming");
-    if      (anyLive)     routeStatus = "live";
+    if      (linkedStatus === "live" || linkedStatus === "upcoming") routeStatus = linkedStatus;
+    else if (anyLive)     routeStatus = "live";
     else if (anyUpcoming) routeStatus = "upcoming";
     else                  routeStatus = "off";
   }
@@ -3601,6 +3604,23 @@ function _activeCfg() {
   return _auctions[_activeIdx] || _auctions[0] || cfg;
 }
 
+// Stable share links use the admin-generated pieceId rather than an array index
+// or marketplace auction id, both of which may change as the series evolves.
+function _linkedPieceIndex() {
+  const requestedId = String(new URLSearchParams(location.search).get("piece") || "").trim();
+  if (!requestedId) return -1;
+  return _auctions.findIndex(slot => String(slot?.pieceId || "").trim() === requestedId);
+}
+
+function _syncPieceUrl(slot) {
+  const pieceId = String(slot?.pieceId || "").trim();
+  if (!pieceId || cfg._preview) return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("piece", pieceId);
+  url.searchParams.delete("preview");
+  history.replaceState({ pieceId }, "", url);
+}
+
 function _slotMatchesStatus(slot, status) {
   return slot?._effectiveStatus === status || (cfg._preview && slot?._effectiveStatus === "off");
 }
@@ -3616,8 +3636,11 @@ function initUpcoming() {
   //   - Otherwise default to the first piece whose effective status is 'upcoming'
   //     (falling back to index 0 if none — e.g. preview mode showing all)
   let startIdx;
+  const linkedIdx = _linkedPieceIndex();
   if (cfg._preview && typeof cfg._pieceIdx === "number") {
     startIdx = cfg._pieceIdx;
+  } else if (linkedIdx >= 0 && _slotMatchesStatus(_auctions[linkedIdx], "upcoming")) {
+    startIdx = linkedIdx;
   } else {
     const firstUpcoming = _auctions.findIndex(p => p._effectiveStatus === "upcoming");
     startIdx = firstUpcoming >= 0 ? firstUpcoming : 0;
@@ -3719,6 +3742,7 @@ function _loadUpcomingPiece(idx) {
     return;
   }
   const slot = _auctions[idx] || _auctions[0] || {};
+  _syncPieceUrl(slot);
   const strip = document.getElementById("upcoming-piece-selector");
   if (strip) {
     strip.dataset.activeIdx = idx;
@@ -3839,8 +3863,11 @@ async function initLive() {
 
   // Pick start piece — preview override > first live-status piece > 0
   let startIdx;
+  const linkedIdx = _linkedPieceIndex();
   if (cfg._preview && typeof cfg._pieceIdx === "number") {
     startIdx = cfg._pieceIdx;
+  } else if (linkedIdx >= 0 && _slotMatchesStatus(_auctions[linkedIdx], "live")) {
+    startIdx = linkedIdx;
   } else {
     const firstLive = _visibleLiveIndexes[0] ?? _auctions.findIndex(p => p._effectiveStatus === "live");
     startIdx = firstLive >= 0 ? firstLive : 0;
@@ -4301,6 +4328,7 @@ async function _switchAuction(idx) {
   });
 
   const slot = _activeCfg();
+  _syncPieceUrl(slot);
 
   // Reset JS state
   clearInterval(countdownTimer);
