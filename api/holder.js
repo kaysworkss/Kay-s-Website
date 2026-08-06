@@ -51,7 +51,6 @@ const TEZOS_COLLECTION_CONTRACT = 'KT1RF7ck9WMY6oXQnaZbTyJhwuLx7cPyvbEz';
 const TEZOS_COLLECTION_NAMES = { '0':'Ìjòkòó IV','1':'Ìjòkòó I','2':'Ìjòkòó II','3':'Ìjòkòó III','4':'Ìjòkòó V','5':'Ìjòkòó VI','6':'Ìpàdé I' };
 const ETH_COLLECTION_CONTRACTS = ['0x824b9144174d0b5c00dbcf39d43d290701e0ffcb','0xd7066137225cb0e1eb3220a2b814ff228e2c0249'];
 const ETH_EDITION_TOKEN_ID = 4;
-
 // Additional collection wallets explicitly linked by their holders. These are
 // returned only by the authenticated participant feed and are never embedded
 // in the public Holder Hub HTML.
@@ -330,7 +329,7 @@ async function checkCollectionWorks(row) {
     const workNames = [];
     if (erc721Balances[0] > 0) workNames.push('Ìgbáradì');
     if (editionBalance > 0) workNames.push('Lábẹ́ Igi Òroǹbó I');
-    return { ownsWork:erc721Balances.some(Number) || editionBalance > 0, workNames };
+    return { ownsWork:erc721Balances.some(Number) || editionBalance > 0, workNames:[...new Set(workNames)] };
   }
   return { ownsWork:false, workNames:[] };
 }
