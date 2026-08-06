@@ -61,6 +61,11 @@ const PARTICIPANT_COLLECTION_WALLETS = [
     chain: 'ethereum',
     wallet_address: '0x958b84f8a709fe789b1dfaeb7f76640d5d4970a9',
   },
+  {
+    display_name: 'Batsoupyum',
+    chain: 'ethereum',
+    wallet_address: '0xcc6c1d21e8474b3578e69eb036c712ab08ffdfbb',
+  },
 ];
 
 const AUTH_EMAIL_FROM = process.env.HOLDER_AUTH_FROM_EMAIL || "Kay's Works <auction@mail.kaysworks.com>";
