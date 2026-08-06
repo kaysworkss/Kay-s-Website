@@ -51,6 +51,10 @@ const TEZOS_COLLECTION_CONTRACT = 'KT1RF7ck9WMY6oXQnaZbTyJhwuLx7cPyvbEz';
 const TEZOS_COLLECTION_NAMES = { '0':'Ìjòkòó IV','1':'Ìjòkòó I','2':'Ìjòkòó II','3':'Ìjòkòó III','4':'Ìjòkòó V','5':'Ìjòkòó VI','6':'Ìpàdé I' };
 const ETH_COLLECTION_CONTRACTS = ['0x824b9144174d0b5c00dbcf39d43d290701e0ffcb','0xd7066137225cb0e1eb3220a2b814ff228e2c0249'];
 const ETH_EDITION_TOKEN_ID = 4;
+const ETH_COLLECTION_TOKEN_NAMES = {
+  '0x824b9144174d0b5c00dbcf39d43d290701e0ffcb:1': 'Ìgbáradì',
+  '0xd7066137225cb0e1eb3220a2b814ff228e2c0249:1': "The Chiefs' Meeting",
+};
 // Additional collection wallets explicitly linked by their holders. These are
 // returned only by the authenticated participant feed and are never embedded
 // in the public Holder Hub HTML.
@@ -303,6 +307,81 @@ async function ethCallBalance(rpcUrl, contract, data) {
   return parseInt(jsonRes.result, 16);
 }
 
+async function ethCallHex(rpcUrl, contract, data) {
+  const payload = { jsonrpc:'2.0', id:1, method:'eth_call', params:[{ to:contract, data }, 'latest'] };
+  const response = await fetch(rpcUrl, {
+    method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(payload),
+  });
+  const result = await response.json();
+  if (result.error) throw new Error(result.error.message || 'Ethereum call failed');
+  if (!result.result || result.result === '0x') throw new Error('Ethereum call returned no data');
+  return result.result;
+}
+
+function decodeAbiString(result) {
+  const hex = String(result || '').replace(/^0x/, '');
+  if (hex.length < 128) return '';
+  const offset = Number.parseInt(hex.slice(0,64),16) * 2;
+  const length = Number.parseInt(hex.slice(offset,offset + 64),16) * 2;
+  if (!Number.isFinite(offset) || !Number.isFinite(length)) return '';
+  return Buffer.from(hex.slice(offset + 64,offset + 64 + length),'hex').toString('utf8');
+}
+
+async function metadataNameFromUri(uri) {
+  try {
+    if (uri.startsWith('data:application/json;base64,')) {
+      return JSON.parse(Buffer.from(uri.split(',')[1],'base64').toString('utf8'))?.name || '';
+    }
+    const url = uri.startsWith('ipfs://') ? 'https://ipfs.io/ipfs/' + uri.slice(7) : uri;
+    const response = await fetch(url);
+    if (!response.ok) return '';
+    return (await response.json())?.name || '';
+  } catch (_) { return ''; }
+}
+
+async function discoverErc721Names(address, contract, balance) {
+  const paddedAddress = address.toLowerCase().replace('0x','').padStart(64,'0');
+  let tokenIds = [];
+  // Prefer ERC-721 Enumerable: it returns only this owner's current tokens and
+  // avoids guessing from historical transfers.
+  try {
+    tokenIds = await Promise.all(Array.from({ length:balance }, async (_,index) => {
+      const raw = await ethCallHex(ETH_RPC_URL,contract,'0x2f745c59' + paddedAddress + BigInt(index).toString(16).padStart(64,'0'));
+      return Number.parseInt(raw,16);
+    }));
+  } catch (_) {
+    // Some older contracts omit ERC-721 Enumerable. Mirror the Holder Hub's
+    // ownerOf scan and verify every match against the current owner.
+    let scanMax = 1500;
+    try {
+      const supply = await ethCallBalance(ETH_RPC_URL,contract,'0x18160ddd');
+      if (Number.isFinite(supply)) scanMax = Math.min(5000,Math.max(250,supply + 50));
+    } catch (_) {}
+    const wanted = address.toLowerCase();
+    for (let start=0; start<=scanMax && tokenIds.length<balance; start+=100) {
+      const ids = Array.from({ length:Math.min(100,scanMax-start+1) },(_,i)=>start+i);
+      const owners = await Promise.all(ids.map(async id => {
+        try {
+          const raw = await ethCallHex(ETH_RPC_URL,contract,'0x6352211e' + BigInt(id).toString(16).padStart(64,'0'));
+          return '0x' + raw.slice(-40).toLowerCase();
+        } catch (_) { return ''; }
+      }));
+      owners.forEach((owner,index) => { if (owner === wanted) tokenIds.push(ids[index]); });
+    }
+  }
+  const names = [];
+  for (const id of tokenIds) {
+    const mapped = ETH_COLLECTION_TOKEN_NAMES[contract.toLowerCase() + ':' + id] || '';
+    let name = '';
+    try {
+      const raw = await ethCallHex(ETH_RPC_URL,contract,'0xc87b56dd' + BigInt(id).toString(16).padStart(64,'0'));
+      name = await metadataNameFromUri(decodeAbiString(raw));
+    } catch (_) {}
+    names.push(name || mapped || `Collected work #${id}`);
+  }
+  return names;
+}
+
 async function checkCollectionWorks(row) {
   const chain = String(row?.chain || '').toLowerCase();
   const address = String(row?.wallet_address || row?.walletAddress || '');
@@ -326,8 +405,10 @@ async function checkCollectionWorks(row) {
     ));
     const editionData = '0x00fdd58e' + padded + BigInt(ETH_EDITION_TOKEN_ID).toString(16).padStart(64,'0');
     const editionBalance = await ethCallBalance(ETH_RPC_URL, ETH_CONTRACT_ADDRESS, editionData).catch(() => 0);
-    const workNames = [];
-    if (erc721Balances[0] > 0) workNames.push('Ìgbáradì');
+    const discovered = await Promise.all(ETH_COLLECTION_CONTRACTS.map((contract,index) =>
+      erc721Balances[index] > 0 ? discoverErc721Names(address,contract,erc721Balances[index]) : []
+    ));
+    const workNames = discovered.flat();
     if (editionBalance > 0) workNames.push('Lábẹ́ Igi Òroǹbó I');
     return { ownsWork:erc721Balances.some(Number) || editionBalance > 0, workNames:[...new Set(workNames)] };
   }
