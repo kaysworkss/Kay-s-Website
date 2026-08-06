@@ -2654,16 +2654,52 @@ function _findPairedSlotIndex(pairKey, chain) {
   return _auctions.findIndex(slot => _pairKeyForSlot(slot) === key && _slotChain(slot) === chain);
 }
 
+function _positiveNumber(value) {
+  const num = parseFloat(value);
+  return Number.isFinite(num) && num > 0 ? num : null;
+}
+
 // A cross-chain pair has one USD anchor, even though the admin stores the
 // value on an individual slot. Resolve it from either half so a refresh or a
 // chain redirect cannot make the configured price disappear.
-function _usdHardCapForPair(pairKey, preferredSlot) {
+function _usdHardCapForPair(pairKey, preferredSlot, phase = null) {
   const candidates = [preferredSlot, ..._auctions.filter(slot => _pairKeyForSlot(slot) === pairKey)];
+  const phaseField = phase === "public"
+    ? "publicUsdHardCap"
+    : phase === "holder"
+      ? "holderUsdHardCap"
+      : null;
+  if (phaseField) {
+    for (const candidate of candidates) {
+      const cap = _positiveNumber(candidate?.[phaseField]);
+      if (cap) return cap;
+    }
+  }
   for (const candidate of candidates) {
-    const cap = parseFloat(candidate?.usdHardCap);
-    if (Number.isFinite(cap) && cap > 0) return cap;
+    const cap = _positiveNumber(candidate?.usdHardCap);
+    if (cap) return cap;
+  }
+  if (!phaseField) {
+    for (const candidate of candidates) {
+      const holderCap = _positiveNumber(candidate?.holderUsdHardCap);
+      if (holderCap) return holderCap;
+      const publicCap = _positiveNumber(candidate?.publicUsdHardCap);
+      if (publicCap) return publicCap;
+    }
   }
   return null;
+}
+
+function _setCrossChainPhase(phase) {
+  window._ccPhase = phase === "public" ? "public" : phase === "holder" ? "holder" : null;
+  if (_ccPairKey) {
+    window._ccUsdHardCap = _usdHardCapForPair(_ccPairKey, _activeCfg(), window._ccPhase);
+  }
+  return window._ccUsdHardCap || null;
+}
+
+function _activeUsdHardCap() {
+  return _positiveNumber(window._ccUsdHardCap);
 }
 
 function _marketplaceAuctionId(slot) {
@@ -2710,7 +2746,7 @@ function _isEthAuctionSlot(slot) {
 
 function _normaliseMarketplaceState(s) {
   const settled = Boolean(s.settled ?? s[2]) || Boolean(s.cancelled ?? s[3]);
-  return [
+  const out = [
     Boolean(s.deposited ?? s[0]),
     Boolean(s.live ?? s[1]),
     settled,
@@ -2724,6 +2760,11 @@ function _normaliseMarketplaceState(s) {
     s.buyNowPrice ?? s[13],
     s.canBuyNow ?? s[14],
   ];
+  out.cancelled = Boolean(s.cancelled ?? s[3]);
+  out.gateEndsAt = s.gateEndsAt ?? s[11];
+  out.holderOnly = Boolean(s.holderOnly ?? s[12]);
+  out.custodyMode = s.custodyMode ?? s[15];
+  return out;
 }
 
 function _makeMarketplaceAdapter(slot, runner) {
@@ -4130,6 +4171,8 @@ function _setupCrossChainForSlot(slot) {
   const ccKey = _pairKeyForSlot(slot);
   window._ccUsdHardCap = null;
   window._ccEthReserveWei = null;
+  window._ccPhase = null;
+  _ccPairKey = null;
   if (!ccKey) return;
   _ccPairKey = ccKey;
   window._ccUsdHardCap = _usdHardCapForPair(ccKey, slot);
@@ -4150,7 +4193,20 @@ async function _ccPopulateChooserPrices(pairKey) {
   const xtzPriceEl  = document.getElementById("cc-xtz-price");
   const xtzSubEl    = document.getElementById("cc-xtz-price-sub");
   const xtzStatusEl = document.getElementById("cc-xtz-status");
-  const hardCap     = window._ccUsdHardCap || null;
+  let hardCap       = _activeUsdHardCap();
+  let tezosAuction  = null;
+
+  if (tezSlot?.tezosContractAddr) {
+    try {
+      const aucRaw = await _tzktFetchAuction(tezSlot);
+      tezosAuction = _normalizeTezosAuction(aucRaw);
+      if (tezosAuction) {
+        hardCap = _setCrossChainPhase(tezosAuction.isPhased && !tezosAuction.holderOnly ? "public" : "holder");
+      }
+    } catch(e) {
+      console.warn("_ccPopulateChooserPrices phase read:", e);
+    }
+  }
 
   // ── ETH card ──────────────────────────────────────────────────────────────
   if (_isEthAuctionSlot(ethSlot) && provider) {
@@ -4188,9 +4244,9 @@ async function _ccPopulateChooserPrices(pairKey) {
   // ── XTZ card ──────────────────────────────────────────────────────────────
   if (tezSlot?.tezosContractAddr) {
     try {
-      const aucRaw  = await _tzktFetchAuction(tezSlot);
-      const auction = _normalizeTezosAuction(aucRaw);
+      const auction = tezosAuction || _normalizeTezosAuction(await _tzktFetchAuction(tezSlot));
       if (auction) {
+        hardCap = _setCrossChainPhase(auction.isPhased && !auction.holderOnly ? "public" : "holder");
         const noBids = !auction.highestBidder;
         const mutez  = noBids ? auction.minNextBidMutez : auction.highestBidMutez;
         const rate   = _xtzRate();
@@ -5578,6 +5634,11 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     const isOpen        = s[9];
     const buyNowPriceWei = s[10];
     const buyNowAvail    = s[11];
+    const gateEndsAt     = Number(s.gateEndsAt || 0);
+    const holderOnly     = s.holderOnly === true;
+    if (_pairKeyForSlot(_activeCfg()) && gateEndsAt > 0 && typeof s.holderOnly === "boolean") {
+      _setCrossChainPhase(s.holderOnly ? "holder" : "public");
+    }
 
     // A wallet that connected during the token-gated phase may become eligible
     // automatically when the contract enters its public phase. Re-check while
@@ -5619,12 +5680,19 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
 
     if (mode === 1 && !live && noBids && deposited && !settled) {
       countdownSection.style.display = "block";
-      countdownSection.classList.add("reserve-waiting");
-      ["cd-d","cd-h","cd-m","cd-s"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = "00";
-      });
-      sl.textContent = "Open - first bid starts the clock";
+      if (holderOnly && gateEndsAt > now) {
+        countdownSection.classList.remove("reserve-waiting");
+        endTimestamp = gateEndsAt;
+        tickCountdown();
+        sl.textContent = "Holder phase - public opens when countdown ends";
+      } else {
+        countdownSection.classList.add("reserve-waiting");
+        ["cd-d","cd-h","cd-m","cd-s"].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = "00";
+        });
+        sl.textContent = "Open - first bid starts the clock";
+      }
       sl.className = "status-line live";
     }
 
@@ -5634,7 +5702,7 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
       document.getElementById("stat-bid").textContent     = noBids ? "—" : ethers.formatEther(highestBid) + " ETH";
       document.getElementById("stat-bidder").textContent  = noBids ? "No bids yet" : shortAddr(highestBidder);
       // stat-min: show hard cap equivalent when set and no bids yet
-      const _ethStatHardCap = window._ccUsdHardCap || null;
+      const _ethStatHardCap = _activeUsdHardCap();
       const _ethStatUsdNow  = _ethUsd();
       const _ethStatMin     = (_ethStatHardCap && _ethStatUsdNow && noBids)
         ? (_ethStatHardCap / _ethStatUsdNow).toFixed(4).replace(/\.?0+$/, "") + " ETH"
@@ -5696,7 +5764,7 @@ function updateBidHint() {
     const equivFloor = _xtzEthEquivFloor(minNextBidMutez, ethRsv);
     const floor      = (equivFloor && equivFloor > rawMinXtz) ? equivFloor : rawMinXtz;
     const minRounded = Math.ceil(floor);
-    const _usdCap    = ethRsv ? _usdAnchor(ethRsv) : null;
+    const _usdCap    = _usdAnchor(ethRsv);
 
     document.getElementById("bid-hint").textContent = `Minimum bid: ${minRounded.toLocaleString()} XTZ${_usdCap ? ` · ≈ ${_fmtUsd(_usdCap)}` : ""}`;
     if (!bidInput.value) bidInput.value = minRounded;
@@ -5709,7 +5777,7 @@ function updateBidHint() {
   }
   const min = ethers.formatEther(minNextBid);
   // Hard cap: if set and no bids yet, pre-fill with cap-equivalent ETH
-  const _ethHardCap = window._ccUsdHardCap || null;
+  const _ethHardCap = _activeUsdHardCap();
   const _ethUsdNow  = _ethUsd();
   const _ethCapMin  = (_ethHardCap && _ethUsdNow) ? _ethHardCap / _ethUsdNow : null;
   // Use whichever is higher: hard cap or on-chain minimum
@@ -5738,7 +5806,7 @@ function onBidInput() {
     const floor      = (equivFloor && equivFloor > rawMinXtz) ? equivFloor : rawMinXtz;
     min = Math.ceil(floor);
   } else {
-    const _ethHardCap = window._ccUsdHardCap || null;
+    const _ethHardCap = _activeUsdHardCap();
     const _ethUsdNow  = _ethUsd();
     const _ethCapMin  = (_ethHardCap && _ethUsdNow) ? _ethHardCap / _ethUsdNow : null;
     const onChainMin  = parseFloat(ethers.formatEther(minNextBid));
@@ -5946,6 +6014,9 @@ async function refreshTezosState(runToken = _switchToken) {
     const auction = _normalizeTezosAuction(await _readTezosAuction(slot));
     if (!auction) throw new Error("Auction data was empty.");
     if (runToken !== _switchToken) return;
+    if (_pairKeyForSlot(slot)) {
+      _setCrossChainPhase(auction.isPhased && !auction.holderOnly ? "public" : "holder");
+    }
     loadTezosNFTMeta(auction, runToken).catch(() => {});
 
     if (tezosAddress && auction.isPhased && !auction.holderOnly && !_roomEligible) {
@@ -6005,7 +6076,7 @@ async function refreshTezosState(runToken = _switchToken) {
       : `${(auction.minNextBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "")} XTZ`;
     document.getElementById("stat-min").textContent = _statMin;
     // Sub-label: show USD cap when available, otherwise generic label
-    const _statUsd = noBids && _statEthRsv ? _usdAnchor(_statEthRsv) : null;
+    const _statUsd = noBids ? _usdAnchor(_statEthRsv) : null;
     document.getElementById("stat-min-sub").textContent = noBids
       ? (_statUsd ? `≈ ${_fmtUsd(_statUsd)}` : "Minimum bid")
       : "Min increment";
@@ -8117,8 +8188,9 @@ function _xtzEthEquivFloor(minNextBidMutez, ethReserveWei) {
  * Priority: admin-fixed hard cap → derived from ETH reserve at runtime.
  */
 function _usdAnchor(ethReserveWei) {
-  if (window._ccUsdHardCap && isFinite(window._ccUsdHardCap) && window._ccUsdHardCap > 0) {
-    return window._ccUsdHardCap;
+  const hardCap = _activeUsdHardCap();
+  if (hardCap) {
+    return hardCap;
   }
   return _usdFromEthWei(ethReserveWei);
 }

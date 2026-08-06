@@ -1133,7 +1133,19 @@ function _buildPieceForm(idx) {
     <div class="field">
       <label>USD hard cap <span style="font-family:'Crimson Pro',serif;font-style:italic;font-weight:400;letter-spacing:0;text-transform:none;font-size:0.85em;color:var(--text-muted)">cross-chain only</span></label>
       <input id="${_pieceFieldId(idx,'usdHardCap')}" type="number" min="0" step="1" placeholder="e.g. 500" value="${d.usdHardCap||''}"/>
-      <div class="field-hint">Fix the dollar value both chains are anchored to. ETH and XTZ minimums will float to always equal this amount — ignoring on-chain reserve prices. Leave blank to derive from the ETH reserve at runtime.</div>
+      <div class="field-hint">For phased auctions, use the holder/public caps below. This field remains the fallback if either phase is blank.</div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Holder phase USD cap</label>
+        <input id="${_pieceFieldId(idx,'holderUsdHardCap')}" type="number" min="0" step="1" placeholder="e.g. 220" value="${d.holderUsdHardCap||''}"/>
+        <div class="field-hint">Token-holder reserve anchor before the auction opens to everyone.</div>
+      </div>
+      <div class="field">
+        <label>Public phase USD cap</label>
+        <input id="${_pieceFieldId(idx,'publicUsdHardCap')}" type="number" min="0" step="1" placeholder="e.g. 300" value="${d.publicUsdHardCap||''}"/>
+        <div class="field-hint">Public reserve anchor after the holder phase ends.</div>
+      </div>
     </div>
     <div class="field">
       <label>Title</label>
@@ -1649,7 +1661,7 @@ document.addEventListener("keyup", (e) => {
 
 function _savePieceFormValues(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
-  const fields = ["chain","contractAddr","marketplaceAddr","marketplaceAuctionId","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","usdHardCap","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status","chatLocked","chatLockMsg"];
+  const fields = ["chain","contractAddr","marketplaceAddr","marketplaceAuctionId","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","usdHardCap","holderUsdHardCap","publicUsdHardCap","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status","chatLocked","chatLockMsg"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
     if (!el) return;
@@ -1657,7 +1669,7 @@ function _savePieceFormValues(idx) {
       _pieces[idx][f] = _rteSanitize(el.innerHTML || "").trim();
     } else if (f === "chatLocked") {
       _pieces[idx][f] = el.value === "true";
-    } else if (f === "usdHardCap") {
+    } else if (f === "usdHardCap" || f === "holderUsdHardCap" || f === "publicUsdHardCap") {
       const v = parseFloat(el.value);
       _pieces[idx][f] = isFinite(v) && v > 0 ? v : null;
     } else {
@@ -1783,6 +1795,9 @@ function populateForm(cfg) {
       tezosNetwork:      cfg.tezosNetwork      || "mainnet",
       tezosRpcUrl:       cfg.tezosRpcUrl       || "",
       crossChainPairKey: cfg.crossChainPairKey || "",
+      usdHardCap:        cfg.usdHardCap        || null,
+      holderUsdHardCap:  cfg.holderUsdHardCap  || null,
+      publicUsdHardCap:  cfg.publicUsdHardCap  || null,
       artTitle:     cfg.artTitle     || "",
       artArtist:    cfg.artArtist    || "",
       artAbout:     cfg.artAbout     || "",
@@ -2013,6 +2028,8 @@ async function saveConfig() {
     tezosRpcUrl:       primary.tezosRpcUrl       || "",
     crossChainPairKey: primary.crossChainPairKey || "",
     usdHardCap:        primary.usdHardCap        || null,
+    holderUsdHardCap:  primary.holderUsdHardCap  || null,
+    publicUsdHardCap:  primary.publicUsdHardCap  || null,
     artTitle:     primary.artTitle     || "",
     artArtist:    primary.artArtist    || "",
     artAbout:     primary.artAbout     || "",
@@ -2306,6 +2323,8 @@ function _buildPreviewPayload(forcePieceIdx) {
     tezosRpcUrl: primary.tezosRpcUrl || "",
     crossChainPairKey: primary.crossChainPairKey || "",
     usdHardCap:   primary.usdHardCap   || null,
+    holderUsdHardCap: primary.holderUsdHardCap || null,
+    publicUsdHardCap: primary.publicUsdHardCap || null,
     artTitle:    primary.artTitle  || "",
     artArtist:   primary.artArtist || "",
     artAbout:    primary.artAbout  || "",
