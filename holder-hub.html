@@ -519,6 +519,7 @@
   .participant-badges { min-height:1.3rem; margin-top:0.36rem; color:var(--text-muted); font-size:0.66rem; letter-spacing:0.08em; text-transform:uppercase; }
   .participant-legend { display:flex; flex-wrap:wrap; justify-content:center; gap:0.7rem 1.25rem; margin:0 0 1.3rem; color:var(--text-muted); font-size:0.76rem; }
   .participant-legend span { display:inline-flex; align-items:center; gap:0.42rem; }
+  .participant-hint { margin:-.55rem 0 1.2rem; text-align:center; color:var(--gold); font-family:'Cinzel',serif; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; }
   .legend-dot { width:11px; height:11px; border-radius:50%; background:#76502f; border:1px solid rgba(255,255,255,0.2); }
   .legend-dot.bronze { background:linear-gradient(145deg,#4a3010,#a07838 48%,#5a3a10); border-color:rgba(184,144,74,0.68); }
   .legend-dot.work { background:transparent; border:2px solid #d06836; }
@@ -1055,6 +1056,7 @@
   <a class="nav-logo" href="/holder-hub" aria-label="Holder Hub home">KAY'S WORKS</a>
   <div class="nav-right">
     <span class="wallet-pill" id="walletPill"></span>
+    <a class="nav-back" href="#view-participants" data-jump-tab="participants">Patrons</a>
     <button class="signout-btn" id="signoutBtn">Sign out</button>
     <a class="nav-back" href="/apoti-olowe">← Project page</a>
   </div>
@@ -1170,7 +1172,7 @@
       <button class="tab-btn" data-tab="owned">Works You Own (<span id="ownedWorksCount">0</span>)</button>
       <button class="tab-btn" data-tab="chapters">New Chapters</button>
       <button class="tab-btn" data-tab="plans">Milestones &amp; Future Plans</button>
-      <button class="tab-btn" data-tab="participants">Participants</button>
+      <button class="tab-btn" data-tab="participants">Patrons</button>
       <button class="tab-btn" data-tab="messages">Messages</button>
     </div>
     <p class="tabs-scroll-hint">Swipe tabs to see more</p>
@@ -1953,15 +1955,16 @@
     <div class="panel-view" id="view-participants">
       <header class="section-intro">
         <span class="eyebrow">The Community</span>
-        <h2>Participants</h2>
+        <h2>Patrons</h2>
         <p>A living circle of the collectors helping this story travel, grow and find a life beyond the studio.</p>
       </header>
-      <div class="participant-legend" aria-label="Participant token legend">
+      <div class="participant-legend" aria-label="Patron token legend">
         <span><i class="legend-dot" aria-hidden="true"></i>Wood token</span>
         <span><i class="legend-dot bronze" aria-hidden="true"></i>Bronze token</span>
         <span><i class="legend-dot work" aria-hidden="true"></i>Owns a work</span>
         <span><i class="legend-dot gold" aria-hidden="true"></i>Gold token</span>
       </div>
+      <p class="participant-hint">Tap or click a patron token to view their collected works</p>
       <div id="participantsList"></div>
     </div>
 
@@ -2005,7 +2008,7 @@
 
 <div class="participant-works-modal" id="participantWorksModal" role="dialog" aria-modal="true" aria-labelledby="participantWorksTitle">
   <div class="participant-works-panel">
-    <button class="participant-works-close" id="participantWorksClose" type="button" aria-label="Close participant collection">&times;</button>
+    <button class="participant-works-close" id="participantWorksClose" type="button" aria-label="Close patron collection">&times;</button>
     <span class="eyebrow">Collected Works</span>
     <h2 id="participantWorksTitle">Holder Collection</h2>
     <div id="participantWorksContent"><p class="empty-state">Loading collection…</p></div>
@@ -3729,7 +3732,7 @@ async function loadParticipants() {
     ? (currentHolder.linked_wallets && currentHolder.linked_wallets.length ? currentHolder.linked_wallets : [currentHolder])
     : [];
   if (error || !data?.length) {
-    if (!fallbackRows.length) { el.innerHTML = '<p class="empty-state">No participants to show yet.</p>'; return; }
+    if (!fallbackRows.length) { el.innerHTML = '<p class="empty-state">No patrons to show yet.</p>'; return; }
     data = fallbackRows.map(row => ({
       display_name: holderDisplayName(row) || currentHolder.display_name || null,
       tier: row.tier || currentHolder.tier || null,
