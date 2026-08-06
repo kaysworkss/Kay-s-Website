@@ -481,11 +481,13 @@
   .auction-cta .reserve-note { margin-top: 0.7rem; }
 
   .participant-circle {
-    display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:2rem 1.4rem;
-    align-items:start; padding:2.2rem 1.2rem; border:1px solid var(--line); border-radius:50% / 18%;
-    background:radial-gradient(circle at 50% 46%,rgba(201,153,58,0.10),transparent 48%),rgba(30,20,16,0.2);
+    position:relative; height:clamp(470px,44vw,610px); border:1px solid var(--line); border-radius:50%;
+    background:radial-gradient(circle at 50% 50%,rgba(201,153,58,0.10),transparent 48%),rgba(30,20,16,0.2); overflow:visible;
   }
-  .participant-node { min-width:0; text-align:center; }
+  .participant-circle::after { content:''; position:absolute; inset:12%; border:1px solid rgba(201,153,58,.12); border-radius:50%; pointer-events:none; }
+  .participant-node { position:absolute; width:150px; min-width:0; text-align:center; offset-path:ellipse(43% 39% at 50% 50%); offset-distance:var(--orbit-start); offset-rotate:0deg; animation:participantOrbit 72s linear infinite; z-index:1; }
+  .participant-circle:hover .participant-node,.participant-circle:focus-within .participant-node { animation-play-state:paused; }
+  @keyframes participantOrbit { from{offset-distance:var(--orbit-start)} to{offset-distance:calc(var(--orbit-start) + 100%)} }
   .participant-token {
     position:relative; display:grid; place-items:center; width:86px; aspect-ratio:1; margin:0 auto 0.8rem;
     border:1px solid rgba(255,255,255,0.18); border-radius:50%; color:#f5e6c8;
@@ -548,8 +550,11 @@
   .name.tier-bronze { color:oklch(76% 0.105 48); }
   .name.tier-wood { color:oklch(76% 0.105 25); }
   .name.tier-none { color:oklch(76% 0.105 60); }
-  @media (max-width:620px) {
-    .participant-circle { grid-template-columns:repeat(2,minmax(0,1fr)); gap:1.7rem 0.8rem; padding:1.6rem 0.7rem; border-radius:28px; }
+  @media (prefers-reduced-motion:reduce) { .participant-node { animation:none; } }
+  @media (max-width:760px) {
+    .participant-circle { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); height:auto; gap:1.7rem 0.8rem; padding:1.6rem 0.7rem; border-radius:28px; }
+    .participant-circle::after { display:none; }
+    .participant-node { position:static; width:auto; offset-path:none; animation:none; }
     .participant-token { width:76px; }
   }
 
@@ -3788,7 +3793,8 @@ async function loadParticipants() {
     const tokenClass = `tier-${g.tier || 'none'}${g.ownsWork ? ' has-work' : ''}${g.hasGoldToken ? ' has-gold' : ''}${g.isCurrent ? ' is-current' : ''}`;
     const badges = [g.tier ? `${g.tier} token` : 'holder', g.ownsWork ? 'work owner' : '', g.hasGoldToken ? 'gold' : ''].filter(Boolean).join(' · ');
     const label = `${name}, ${badges}${g.isCurrent ? ', you' : ''}`;
-    return `<div class="participant-node">
+    const orbitStart = (index / Math.max(groups.length, 1) * 100).toFixed(3) + '%';
+    return `<div class="participant-node" style="--orbit-start:${orbitStart}">
       <button class="participant-token ${tokenClass}" type="button" data-participant-index="${index}" aria-label="View works owned by ${escapeMessageHtml(label)}">
         <span class="participant-initial" aria-hidden="true">${escapeMessageHtml(name.trim().charAt(0).toUpperCase() || 'H')}</span>
       </button>
