@@ -2286,7 +2286,6 @@
       <p id="ijokoo-hint" style="margin-top:0.8rem;font-family:'Cinzel',serif;font-size:clamp(0.5rem,1.1vw,0.62rem);letter-spacing:0.22em;color:var(--gold);opacity:0.4;text-align:center;text-transform:uppercase;transition:opacity 0.4s;">Triple-tap to unveil &nbsp;&middot;&nbsp; Touch or hover to explore</p>
 
       <!-- Custom cursor dot (gold-tinted to match site) -->
-      <div id="ijokoo-cursor" style="position:fixed;width:7px;height:7px;background:var(--gold);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);display:none;"></div>
 
     </div>
     </div>
@@ -2409,7 +2408,6 @@ const canvas     = document.getElementById('ijokoo-canvas');
 const ctx        = canvas.getContext('2d');
 const interactor = document.getElementById('ijokoo-interactor');
 const fullReveal = document.getElementById('ijokoo-fullReveal');
-const cursorDot  = document.getElementById('ijokoo-cursor');
 
 // ── State ───────────────────────────────────────────────────────────────────
 let W = 0, H = 0;
@@ -2468,18 +2466,12 @@ function endPointer() {
 interactor.addEventListener('pointerenter', e => {
   if (e.pointerType === 'mouse') {
     setPointer(e);
-    cursorDot.style.display = 'block';
   }
 });
 interactor.addEventListener('pointermove', e => {
   if (activePointerId !== null && e.pointerId !== activePointerId) return;
   if (e.pointerType !== 'mouse') e.preventDefault();
   setPointer(e);
-  if (e.pointerType === 'mouse') {
-    cursorDot.style.display = 'block';
-    cursorDot.style.left = e.clientX + 'px';
-    cursorDot.style.top  = e.clientY + 'px';
-  }
 }, { passive: false });
 interactor.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'mouse') e.preventDefault();
@@ -2499,7 +2491,6 @@ interactor.addEventListener('pointercancel', e => {
   endPointer();
 });
 interactor.addEventListener('pointerleave', e => {
-  if (e.pointerType === 'mouse') cursorDot.style.display = 'none';
   if (activePointerId !== null) return;
   endPointer();
 });
@@ -3106,27 +3097,17 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
 (function() {
   var cursor = document.getElementById('aoCursor');
   if (!cursor) return;
-  var dot = cursor.querySelector('.cursor-dot');
-  var ring = cursor.querySelector('.cursor-ring');
-  var mx=0, my=0, rx=0, ry=0;
   var ready=false;
   document.addEventListener('pointermove', function(e) {
     if (e.pointerType && e.pointerType !== 'mouse') return;
-    mx=e.clientX; my=e.clientY;
-    dot.style.left=mx+'px'; dot.style.top=my+'px';
+    cursor.style.transform='translate3d('+e.clientX+'px,'+e.clientY+'px,0)';
     if (!ready) {
-      ready=true; rx=mx; ry=my;
-      ring.style.left=rx+'px'; ring.style.top=ry+'px';
+      ready=true;
       cursor.classList.add('is-ready');
     }
-  });
+  }, {passive:true});
   document.addEventListener('mouseleave', function(){ cursor.classList.remove('is-ready'); });
   document.addEventListener('mouseenter', function(){ if(ready) cursor.classList.add('is-ready'); });
-  (function animRing() {
-    rx+=(mx-rx)*0.12; ry+=(my-ry)*0.12;
-    ring.style.left=rx+'px'; ring.style.top=ry+'px';
-    requestAnimationFrame(animRing);
-  })();
 })();
 
 // ── THEME TOGGLE ──
