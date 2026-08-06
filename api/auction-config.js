@@ -119,6 +119,12 @@ function sanitisePiece(p) {
     usdHardCap:        p.usdHardCap != null && isFinite(parseFloat(p.usdHardCap)) && parseFloat(p.usdHardCap) > 0
       ? parseFloat(p.usdHardCap)
       : null,
+    holderUsdHardCap:  p.holderUsdHardCap != null && isFinite(parseFloat(p.holderUsdHardCap)) && parseFloat(p.holderUsdHardCap) > 0
+      ? parseFloat(p.holderUsdHardCap)
+      : null,
+    publicUsdHardCap:  p.publicUsdHardCap != null && isFinite(parseFloat(p.publicUsdHardCap)) && parseFloat(p.publicUsdHardCap) > 0
+      ? parseFloat(p.publicUsdHardCap)
+      : null,
     artTitle:     String(p.artTitle     || "").slice(0, 200),
     artArtist:    String(p.artArtist    || "").slice(0, 200),
     // Long-form HTML (rich text from the admin editor). 50k chars allows for
@@ -157,6 +163,8 @@ const DEFAULT_CONFIG = {
   tezosRpcUrl:      "",
   crossChainPairKey:"",
   usdHardCap:       null,
+  holderUsdHardCap: null,
+  publicUsdHardCap: null,
   artTitle:         "",
   artArtist:        "",
   artAbout:         "",
@@ -224,6 +232,12 @@ module.exports = async function handler(req, res) {
       crossChainPairKey:String(body.crossChainPairKey || "").slice(0, 100),
       usdHardCap:       body.usdHardCap != null && isFinite(parseFloat(body.usdHardCap)) && parseFloat(body.usdHardCap) > 0
         ? parseFloat(body.usdHardCap)
+        : null,
+      holderUsdHardCap: body.holderUsdHardCap != null && isFinite(parseFloat(body.holderUsdHardCap)) && parseFloat(body.holderUsdHardCap) > 0
+        ? parseFloat(body.holderUsdHardCap)
+        : null,
+      publicUsdHardCap: body.publicUsdHardCap != null && isFinite(parseFloat(body.publicUsdHardCap)) && parseFloat(body.publicUsdHardCap) > 0
+        ? parseFloat(body.publicUsdHardCap)
         : null,
       artTitle:         String(body.artTitle         || "").slice(0, 200),
       artArtist:        String(body.artArtist        || "").slice(0, 200),
