@@ -4388,9 +4388,31 @@ lbPanel.addEventListener('touchend', function(e) {
   async function tezosWorks(address){const r=await fetch('https://api.tzkt.io/v1/tokens/balances?account='+encodeURIComponent(address)+'&token.contract='+encodeURIComponent(TEZOS)+'&balance.gt=0&limit=200');if(!r.ok)return[];const rows=await r.json();return rows.map(x=>tezNames[String(x?.token?.tokenId??'')]||x?.token?.metadata?.name||'Collected work');}
   let ethersReady;
   function ensureEthers(){if(window.ethers)return Promise.resolve(window.ethers);if(ethersReady)return ethersReady;ethersReady=new Promise((resolve,reject)=>{let tries=0;const check=()=>{if(window.ethers)return resolve(window.ethers);if(++tries>120)return reject(new Error('Ethereum reader unavailable'));setTimeout(check,50);};const script=document.getElementById('aoEthersScript');if(script)script.addEventListener('error',()=>reject(new Error('Ethereum reader failed to load')),{once:true});check();});return ethersReady;}
-  async function ethSummary(address,full){const ethersLib=await ensureEthers();const p=new ethersLib.JsonRpcProvider(RPC),nft=['function balanceOf(address owner) view returns(uint256)','function ownerOf(uint256 id) view returns(address)','function tokenURI(uint256 id) view returns(string)'],names=[];let owns=false;
-    for(const contract of ETH){try{const c=new ethersLib.Contract(contract,nft,p),bal=Number(await c.balanceOf(address));if(!bal)continue;owns=true;if(!full)continue;if(contract.toLowerCase()===ETH[0]){try{if(String(await c.ownerOf(1)).toLowerCase()===address.toLowerCase())names.push('Ìgbáradì');}catch(_){}}else{let found=0;for(let id=0;id<=300&&found<bal;id++){try{if(String(await c.ownerOf(id)).toLowerCase()!==address.toLowerCase())continue;found++;let name='Collected work #'+id;try{let uri=await c.tokenURI(id);uri=uri.replace('ipfs://','https://ipfs.io/ipfs/');const meta=await fetch(uri).then(x=>x.json());if(meta?.name)name=meta.name;}catch(_){}names.push(name);}catch(_){}}}}catch(_){} }
-    try{const e=new ethersLib.Contract(EDITION,['function balanceOf(address,uint256) view returns(uint256)'],p);if(Number(await e.balanceOf(address,4))>0){owns=true;if(full)names.push('Lábẹ́ Igi Òroǹbó I');}}catch(_){}return{owns,names};}
+  async function ethSummary(address,full){
+    const ethersLib=await ensureEthers(),p=new ethersLib.JsonRpcProvider(RPC),names=[];
+    const nftInterface=new ethersLib.Interface(['function balanceOf(address owner) view returns(uint256)','function ownerOf(uint256 id) view returns(address)','function tokenURI(uint256 id) view returns(string)','function totalSupply() view returns(uint256)']);
+    const multicall=new ethersLib.Contract('0xcA11bde05977b3631167028862bE2a173976CA11',['function aggregate3((address target,bool allowFailure,bytes callData)[] calls) payable returns ((bool success,bytes returnData)[] returnData)'],p);
+    let owns=false;
+    for(const contract of ETH){
+      try{
+        const balanceRaw=await p.call({to:contract,data:nftInterface.encodeFunctionData('balanceOf',[address])});
+        const balance=Number(nftInterface.decodeFunctionResult('balanceOf',balanceRaw)[0]);
+        if(!balance)continue; owns=true; if(!full)continue;
+        if(contract.toLowerCase()===ETH[0]){names.push('Ìgbáradì');continue;}
+        let scanMax=1500;
+        try{const supplyRaw=await p.call({to:contract,data:nftInterface.encodeFunctionData('totalSupply')});const supply=Number(nftInterface.decodeFunctionResult('totalSupply',supplyRaw)[0]);if(Number.isFinite(supply))scanMax=Math.min(5000,Math.max(250,supply+50));}catch(_){}
+        const owned=[];
+        for(let start=0;start<=scanMax&&owned.length<balance;start+=300){
+          const ids=Array.from({length:Math.min(300,scanMax-start+1)},(_,i)=>start+i);
+          const results=await multicall.aggregate3.staticCall(ids.map(id=>({target:contract,allowFailure:true,callData:nftInterface.encodeFunctionData('ownerOf',[id])})));
+          results.forEach((result,index)=>{if(!result.success)return;try{const owner=nftInterface.decodeFunctionResult('ownerOf',result.returnData)[0];if(String(owner).toLowerCase()===address.toLowerCase())owned.push(ids[index]);}catch(_){}});
+        }
+        for(const id of owned){let name='Collected work #'+id;try{const raw=await p.call({to:contract,data:nftInterface.encodeFunctionData('tokenURI',[id])});let uri=nftInterface.decodeFunctionResult('tokenURI',raw)[0];uri=uri.replace('ipfs://','https://ipfs.io/ipfs/');const meta=await fetch(uri).then(x=>x.json());if(meta?.name)name=meta.name;}catch(_){}names.push(name);}
+      }catch(_){}
+    }
+    try{const e=new ethersLib.Contract(EDITION,['function balanceOf(address,uint256) view returns(uint256)'],p);if(Number(await e.balanceOf(address,4))>0){owns=true;if(full)names.push('Lábẹ́ Igi Òroǹbó I');}}catch(_){}
+    return{owns,names};
+  }
   async function walletWorks(w,full){if(String(w.chain).toLowerCase()==='tezos'){const names=await tezosWorks(w.address);return{owns:names.length>0,names:full?names:[]};}return ethSummary(w.address,full);}
   function localArt(name){const cards=[...document.querySelectorAll('#collection .ao-collection-card')],normalized=norm(name);let file='';if(/oronbo 1(?:\s|$)/.test(normalized))file='labe-igi';else if(normalized.includes('labe igi oronbo'))file='orombo main';else if(normalized.includes('igbaradi'))file='igbaradi';else if(normalized.includes('chiefs meeting'))file='CM1';else if(normalized.includes('ipade 1'))file='ipadeIj';else{const seat=normalized.match(/ijokoo\s*([1-6])\b/);if(seat)file='ijoko '+seat[1];}if(file){const byFile=cards.find(c=>c.querySelector('img')?.getAttribute('src')?.toLowerCase().includes(file.toLowerCase()));if(byFile)return byFile;}return cards.find(c=>pieceNamesMatch(c.querySelector('.ao-collection-title')?.textContent,name));}
   async function openGroup(i){const g=groups[i];if(!g)return;modalTitle.textContent=(g.display_name||'Anonymous Holder')+'’s Collection';worksEl.innerHTML='<p class="ao-participant-status">Reading linked wallets…</p>';modal.classList.add('show');document.body.style.overflow='hidden';const settled=await Promise.allSettled(g.wallets.map(w=>walletWorks(w,true))),names=[...new Set([...(g.workNames||[]),...settled.flatMap(x=>x.status==='fulfilled'?x.value.names:[])])];if(!names.length){worksEl.innerHTML='<p class="ao-participant-status">No collected works are currently visible from the linked wallets.</p>';return;}const grid=document.createElement('div');grid.className='ao-owned-grid';names.forEach(name=>{const card=document.createElement('article');card.className='ao-owned-card';const local=localArt(name),img=local?.querySelector('img');if(img){const clone=document.createElement('img');clone.src=img.getAttribute('src');clone.alt=name;card.appendChild(clone);}const h=document.createElement('h4');h.textContent=name;card.appendChild(h);grid.appendChild(card);});worksEl.replaceChildren(grid);}
