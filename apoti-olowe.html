@@ -4476,7 +4476,30 @@ lbPanel.addEventListener('touchend', function(e) {
       new Promise(resolve=>setTimeout(()=>resolve({owns:false,names:[]}),timeoutMs))
     ]);
   }
-  function localArt(name){const cards=[...document.querySelectorAll('#collection .ao-collection-card')],normalized=norm(name);let file='';if(/oronbo 1(?:\s|$)/.test(normalized))file='labe-igi';else if(normalized.includes('labe igi oronbo'))file='orombo main';else if(normalized.includes('igbaradi'))file='igbaradi';else if(normalized.includes('chiefs meeting'))file='CM1';else if(normalized.includes('ipade 1'))file='ipadeIj';else{const seat=normalized.match(/ijokoo\s*([1-6])\b/);if(seat)file='ijoko '+seat[1];}if(file){const byFile=cards.find(c=>c.querySelector('img')?.getAttribute('src')?.toLowerCase().includes(file.toLowerCase()));if(byFile)return byFile;}return cards.find(c=>pieceNamesMatch(c.querySelector('.ao-collection-title')?.textContent,name));}
+  function localArt(name){
+    const cards=[...document.querySelectorAll('#collection .ao-collection-card')],normalized=norm(name);
+    let file='';
+    if(/oronbo 1(?:\s|$)/.test(normalized))file='labe-igi';
+    else if(normalized.includes('labe igi oronbo'))file='orombo main';
+    else if(normalized.includes('igbaradi'))file='igbaradi';
+    else if(normalized.includes('chiefs meeting'))file='CM1';
+    else if(normalized.includes('ipade 1'))file='ipadeIj';
+    else{const seat=normalized.match(/ijokoo\s*([1-6])\b/);if(seat)file='ijoko '+seat[1];}
+    if(file){
+      const byFile=cards.find(c=>c.querySelector('img')?.getAttribute('src')?.toLowerCase().includes(file.toLowerCase()));
+      if(byFile)return byFile;
+    }
+    const byTitle=cards.find(c=>pieceNamesMatch(c.querySelector('.ao-collection-title')?.textContent,name));
+    if(byTitle)return byTitle;
+    const directSources={
+      'labe-igi':'images/labe-igi.webp','orombo main':'images/orombo main.webp',igbaradi:'images/igbaradi.webp',CM1:'images/CM1.webp',ipadeIj:'images/ipadeIj.webp',
+      'ijoko 1':'images/ijoko 1.webp','ijoko 2':'images/ijoko 2.webp','ijoko 3':'images/ijoko 3.webp','ijoko 4':'images/ijoko 4.webp','ijoko 5':'images/ijoko 5.webp','ijoko 6':'images/ijoko 6.webp'
+    };
+    if(!directSources[file])return null;
+    const fallback=document.createElement('article'),img=document.createElement('img');
+    img.src=directSources[file];img.alt=name;fallback.appendChild(img);
+    return fallback;
+  }
   async function openGroup(i){const g=groups[i];if(!g)return;modalTitle.textContent=(g.display_name||'Anonymous Holder')+'’s Collection';worksEl.innerHTML='<p class="ao-participant-status">Reading linked wallets…</p>';modal.classList.add('show');document.body.style.overflow='hidden';const settled=await Promise.allSettled(g.wallets.map(w=>walletWorks(w,true))),names=[...new Set([...(g.workNames||[]),...settled.flatMap(x=>x.status==='fulfilled'?x.value.names:[])])];if(!names.length){worksEl.innerHTML='<p class="ao-participant-status">No collected works are currently visible from the linked wallets.</p>';return;}const grid=document.createElement('div');grid.className='ao-owned-grid';names.forEach(name=>{const card=document.createElement('article');card.className='ao-owned-card';const local=localArt(name),img=local?.querySelector('img');if(img){const clone=document.createElement('img');clone.src=img.getAttribute('src');clone.alt=name;card.appendChild(clone);}const h=document.createElement('h4');h.textContent=name;card.appendChild(h);grid.appendChild(card);});worksEl.replaceChildren(grid);}
   function close(){modal.classList.remove('show');document.body.style.overflow='';}
   document.getElementById('aoParticipantClose').addEventListener('click',close);modal.addEventListener('click',e=>{if(e.target===modal)close();});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal.classList.contains('show'))close();});
