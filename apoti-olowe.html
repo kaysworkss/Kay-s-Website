@@ -706,6 +706,8 @@
   }
   .ao-chapter-card-image img { width: 100%; max-height: 520px; object-fit: contain; display: block; }
   .ao-ijokoo-stage-wrap { margin-top: 1.45rem; }
+  .ao-ijokoo-reveal-btn { margin-top:.9rem; padding:.68rem 1rem; border:1px solid var(--gold); border-radius:2px; background:transparent; color:var(--gold); font-family:'Cinzel',serif; font-size:.6rem; letter-spacing:.16em; text-transform:uppercase; cursor:pointer; transition:background .25s,color .25s; }
+  .ao-ijokoo-reveal-btn:hover,.ao-ijokoo-reveal-btn:focus-visible,.ao-ijokoo-reveal-btn[aria-pressed="true"] { background:var(--gold); color:var(--bg); }
   .ao-opa-release-grid {
     display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1rem; margin-top: 1.35rem;
@@ -2306,7 +2308,8 @@
       </div>
 
       <!-- Interaction hint -->
-      <p id="ijokoo-hint" style="margin-top:0.8rem;font-family:'Cinzel',serif;font-size:clamp(0.5rem,1.1vw,0.62rem);letter-spacing:0.22em;color:var(--gold);opacity:0.4;text-align:center;text-transform:uppercase;transition:opacity 0.4s;">Triple-tap to unveil &nbsp;&middot;&nbsp; Touch or hover to explore</p>
+      <button class="ao-ijokoo-reveal-btn" id="ijokoo-reveal-btn" type="button" aria-pressed="false">Reveal Full Set</button>
+      <p id="ijokoo-hint" style="margin-top:0.65rem;font-family:'Cinzel',serif;font-size:clamp(0.5rem,1.1vw,0.62rem);letter-spacing:0.22em;color:var(--gold);opacity:0.55;text-align:center;text-transform:uppercase;transition:opacity 0.4s;">Touch, drag or hover across the set to explore</p>
 
       <!-- Custom cursor dot (gold-tinted to match site) -->
 
@@ -2431,6 +2434,7 @@ const canvas     = document.getElementById('ijokoo-canvas');
 const ctx        = canvas.getContext('2d');
 const interactor = document.getElementById('ijokoo-interactor');
 const fullReveal = document.getElementById('ijokoo-fullReveal');
+const revealButton = document.getElementById('ijokoo-reveal-btn');
 
 // ── State ───────────────────────────────────────────────────────────────────
 let W = 0, H = 0;
@@ -2452,8 +2456,7 @@ const SCULPT_POINTS = [
 let hotspot = 0, htimer = 0, hdwell = 110;
 let wx = 0, wy = 0, wvx = 0, wvy = 0, frame = 0;
 
-// Triple-click
-let clicks = 0, clickT = null, revealActive = false;
+let revealActive = false;
 
 // ── Resize ──────────────────────────────────────────────────────────────────
 function resize() {
@@ -2501,7 +2504,6 @@ interactor.addEventListener('pointerdown', e => {
   activePointerId = e.pointerId;
   setPointer(e);
   try { interactor.setPointerCapture(e.pointerId); } catch (_) {}
-  handleClick();
 }, { passive: false });
 interactor.addEventListener('pointerup', e => {
   if (activePointerId !== null && e.pointerId !== activePointerId) return;
@@ -2525,33 +2527,31 @@ interactor.addEventListener('touchmove', e => {
 }, { passive: false });
 interactor.addEventListener('touchend', endPointer);
 
-function handleClick() {
-  if (revealActive) return;
-  clicks++;
-  clearTimeout(clickT);
-  if (clicks >= 3) { doReveal(); clicks = 0; }
-  else clickT = setTimeout(() => { clicks = 0; }, 1400);
-}
 interactor.addEventListener('click', e => {
   if (window.PointerEvent) return;
   setPointer(e);
-  handleClick();
 });
 interactor.addEventListener('touchstart', e => {
   if (window.PointerEvent) return;
   e.preventDefault();
   setPointer(e);
-  handleClick();
 }, { passive: false });
 
 function doReveal() {
   revealActive = true;
+  revealButton.setAttribute('aria-pressed','true');
+  revealButton.textContent = 'Full Set Revealed';
   fullReveal.style.opacity = '1';
   setTimeout(() => {
     fullReveal.style.opacity = '0';
-    setTimeout(() => { revealActive = false; }, 700);
+    setTimeout(() => {
+      revealActive = false;
+      revealButton.setAttribute('aria-pressed','false');
+      revealButton.textContent = 'Reveal Full Set';
+    }, 700);
   }, 3200);
 }
+revealButton.addEventListener('click',()=>{if(!revealActive)doReveal();});
 
 // ── Wander ──────────────────────────────────────────────────────────────────
 function lerp(a, b, t) { return a + (b - a) * t; }
