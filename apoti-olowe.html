@@ -2452,7 +2452,6 @@ const SCULPT_POINTS = [
 let hotspot = 0, htimer = 0, hdwell = 110;
 let wx = 0, wy = 0, wvx = 0, wvy = 0, frame = 0;
 
-// Triple-click
 let clicks = 0, clickT = null, revealActive = false;
 
 // ── Resize ──────────────────────────────────────────────────────────────────
@@ -2639,10 +2638,11 @@ function startLoop() {
   loop();
 }
 
-imgGrey.onload = startLoop;
-imgGrey.onerror = startLoop;   // still run the loop so the dark image stays visible
+document.addEventListener('ao:chapter1-open', function() {
+  resize();
+  startLoop();
+}, { once:true });
 imgGrey.src = SRC_GREY;
-if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
   })();
   </script>
 
@@ -3344,6 +3344,7 @@ if (imgGrey.complete && imgGrey.naturalWidth) startLoop();
     if (window.aoCloseOtherReleasePanels) window.aoCloseOtherReleasePanels(chapterOnePanel);
     chapterOnePanel.classList.add('open');
     chapterOneCard.setAttribute('aria-expanded', 'true');
+    document.dispatchEvent(new CustomEvent('ao:chapter1-open'));
     if (shouldScroll) chapterOnePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -3478,6 +3479,10 @@ var IMGS = [
   {src:"images/tote bag front2.webp",     title:"Totebag design",                   sub:"Tote bag sample mockup"},
   {src:"images/merch.webp",               title:"Totebag design Motif",             sub:"Tote bag motif design"},
   {src:"images/back.webp",                title:"Totebag design",                   sub:"Tote bag sample mockup"},
+  {src:"images/apoti-merch-front-lineup.webp", title:"Àpótí Ọlọ́wẹ̀ Shirts & Hoodies", sub:"Front designs · Holder merchandise"},
+  {src:"images/apoti-merch-back-lineup.webp",  title:"Àpótí Ọlọ́wẹ̀ Shirts & Hoodies", sub:"Back designs · Holder merchandise"},
+  {src:"images/apoti-merch-front-fit.webp",    title:"Àpótí Ọlọ́wẹ̀ Merch",             sub:"Front-print shirts and hoodies"},
+  {src:"images/apoti-merch-back-fit.webp",     title:"Àpótí Ọlọ́wẹ̀ Merch",             sub:"Back-print shirts and hoodies"},
   {src:"images/ijoko 1.webp",             title:"Ìjòkòó I",                         sub:"The Ìjòkòó set"},
   {src:"images/ijoko 2.webp",             title:"Ìjòkòó II",                        sub:"The Ìjòkòó set"},
   {src:"images/ijoko 3.webp",             title:"Ìjòkòó III",                       sub:"The Ìjòkòó set"},
