@@ -2984,6 +2984,7 @@ function _ccShowChooser() {
   _closeOfferPanel();
   document.getElementById("offer-section").style.display     = "block";
   document.getElementById("status-line").textContent         = "";
+  document.getElementById("status-line").className           = "status-line";
 }
 
 function _ccHideChooser() {
@@ -4480,13 +4481,20 @@ async function _switchAuction(idx) {
   _setPieceTabsBusy(false);
 
   if (!_isEthAuctionSlot(slot)) {
+    const isCrossChainChooser = !!String(slot.crossChainPairKey || "").trim();
     const sl = document.getElementById("status-line");
     if (sl) {
-      sl.textContent = _slotChain(slot) === "tezos"
-        ? "Reading Tezos auction..."
-        : "Auction contract not configured";
-      sl.className = "status-line upcoming-line";
-      document.getElementById("countdown-section").style.display = "block";
+      if (isCrossChainChooser) {
+        sl.textContent = "";
+        sl.className = "status-line";
+        document.getElementById("countdown-section").style.display = "none";
+      } else {
+        sl.textContent = _slotChain(slot) === "tezos"
+          ? "Reading Tezos auction..."
+          : "Auction contract not configured";
+        sl.className = "status-line upcoming-line";
+        document.getElementById("countdown-section").style.display = "block";
+      }
     }
     if (_slotChain(slot) === "tezos") {
       await refreshTezosState(switchToken);
