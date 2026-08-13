@@ -2471,10 +2471,10 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
         </div>
         <div class="slabel" style="margin-bottom:6px">Comment as collector</div>
         <div id="room-locked" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:8px 10px;background:rgba(158,79,46,.08);border:1px solid rgba(158,79,46,.25);border-radius:3px;font-family:'Crimson Pro',serif;font-size:.82rem;color:var(--text-muted);font-style:italic">
-          <span style="font-size:14px">🔒</span> Connect an eligible wallet to join the room
+          <span style="font-size:14px">🔒</span> <span id="room-locked-msg">Connect wallet to join the room</span>
         </div>
         <div class="chat-compose-row">
-          <input class="chat-compose-input" id="room-chat-input" placeholder="Connect eligible wallet to chat…" disabled onkeydown="if(event.key==='Enter')sendRoomMsg()"/>
+          <input class="chat-compose-input" id="room-chat-input" placeholder="Connect wallet to chat…" disabled onkeydown="if(event.key==='Enter')sendRoomMsg()"/>
           <button class="chat-send-btn" onclick="sendRoomMsg()" disabled>Send</button>
         </div>
       </div>
@@ -6619,6 +6619,7 @@ function _updateChatInputState() {
   const input        = document.getElementById("room-chat-input");
   const sendBtn      = document.querySelector(".chat-send-btn");
   const locked       = document.getElementById("room-locked");
+  const lockedMsg    = document.getElementById("room-locked-msg");
   const settledLock  = document.getElementById("chat-settled-lock");
   const lockMsg      = document.getElementById("chat-settled-lock-msg");
   const inputZone    = document.getElementById("chat-input-zone");
@@ -6658,8 +6659,12 @@ function _updateChatInputState() {
     if (profilePanel) profilePanel.classList.add("show");
     reacts.forEach(b => b.disabled = false);
   } else {
-    if (input)   { input.disabled = true; input.placeholder = "Connect eligible wallet to chat…"; }
+    const walletCopy = _auctionOpenToEveryone
+      ? { lock: "Connect wallet to join the room", placeholder: "Connect wallet to chat…" }
+      : { lock: "Connect an eligible wallet to join the room", placeholder: "Connect eligible wallet to chat…" };
+    if (input)   { input.disabled = true; input.placeholder = walletCopy.placeholder; }
     if (sendBtn) sendBtn.disabled = true;
+    if (lockedMsg) lockedMsg.textContent = walletCopy.lock;
     if (locked)  locked.style.display = "flex";
     if (profilePanel) profilePanel.classList.remove("show");
     reacts.forEach(b => b.disabled = true);
