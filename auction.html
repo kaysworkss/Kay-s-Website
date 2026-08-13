@@ -2838,6 +2838,15 @@ function _setAuctionOpenToEveryone(open) {
   if (gateNotice && _auctionOpenToEveryone) gateNotice.style.display = "none";
 }
 
+function _activeAuctionNeedsGateToken() {
+  const slot = _activeCfg();
+  return !!(slot?.gateName || cfg.gateName) && !_auctionOpenToEveryone;
+}
+
+function _connectedWalletCanUseOpenChat() {
+  return !!signerAddress && !_activeAuctionNeedsGateToken();
+}
+
 function _showOpenEligibility(label = "Auction open to everyone") {
   const el = document.getElementById("eligibility");
   if (el) {
@@ -4911,6 +4920,7 @@ function setWalletUi(state, addr) {
     const _lgn = document.getElementById("live-gate-notice");
     if (_lgn) _lgn.style.display = "none";
     _syncAuctioneerAccess();
+    if (_connectedWalletCanUseOpenChat()) onRoomEligibilityGranted();
     return;
   }
 
@@ -5726,7 +5736,7 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     if (_pairKeyForSlot(_activeCfg()) && gateEndsAt > 0 && typeof s.holderOnly === "boolean") {
       _setCrossChainPhase(s.holderOnly ? "holder" : "public");
     }
-    if (openToEveryone && signerAddress) onRoomEligibilityGranted();
+    if (signerAddress && (openToEveryone || _connectedWalletCanUseOpenChat())) onRoomEligibilityGranted();
 
     // A wallet that connected during the token-gated phase may become eligible
     // automatically when the contract enters its public phase. Re-check while
@@ -6243,6 +6253,10 @@ async function checkEligibility(runToken = _switchToken, contract = auctionContr
   if (!contract) return false;
   setEligibilityChecking();
   try {
+    if (!_activeCfg()?.gateName && !cfg.gateName) {
+      _setAuctionOpenToEveryone(true);
+      return _showOpenEligibility("Auction open to everyone");
+    }
     const state = await withTimeout(
       contract.auctionState(),
       9000,
@@ -7606,6 +7620,10 @@ function onRoomEligibilityGranted() {
 }
 
 function onRoomEligibilityRevoked() {
+  if (_connectedWalletCanUseOpenChat()) {
+    onRoomEligibilityGranted();
+    return;
+  }
   _roomEligible = false;
   _updateChatInputState();
   hideNotifOptin();
