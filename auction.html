@@ -4910,6 +4910,7 @@ function setWalletUi(state, addr) {
     // Hide gate notice once wallet is connected — eligibility checker takes over
     const _lgn = document.getElementById("live-gate-notice");
     if (_lgn) _lgn.style.display = "none";
+    _syncAuctioneerAccess();
     return;
   }
 
@@ -4918,6 +4919,7 @@ function setWalletUi(state, addr) {
     label.textContent = "Connect failed";
     connectBtn.textContent = "Connect ETH";
     if (connectTezosBtn) connectTezosBtn.textContent = "Connect Tezos";
+    _syncAuctioneerAccess();
     return;
   }
 
@@ -4927,6 +4929,7 @@ function setWalletUi(state, addr) {
   // Re-show gate notice on disconnect if this auction is gated
   const _lgnd = document.getElementById("live-gate-notice");
   if (_lgnd && cfg.gateName && !_auctionOpenToEveryone) _lgnd.style.display = "block";
+  _syncAuctioneerAccess();
 }
 
 // ── ETH Wallet Connection — injected + WalletConnect v2 ──────────────────────
@@ -7597,10 +7600,7 @@ function onRoomEligibilityGranted() {
   _roomEligible = true;
   _updateChatInputState();
   showNotifOptin();
-  if (_isKay()) {
-    document.querySelector(".mode-tabs")?.classList.add("show");
-    document.getElementById("tab-auctioneer").style.display = "block";
-  }
+  _syncAuctioneerAccess();
   _reattachDeleteGestures();
   _upgradePresence("eligible");
 }
@@ -7609,10 +7609,17 @@ function onRoomEligibilityRevoked() {
   _roomEligible = false;
   _updateChatInputState();
   hideNotifOptin();
-  document.querySelector(".mode-tabs")?.classList.remove("show");
-  document.getElementById("tab-auctioneer").style.display = "none";
-  if (_currentMode === "auctioneer") setMode("collector");
+  _syncAuctioneerAccess();
   _upgradePresence("visitor");
+}
+
+function _syncAuctioneerAccess() {
+  const allowed = _isKay();
+  const tabs = document.querySelector(".mode-tabs");
+  const tab = document.getElementById("tab-auctioneer");
+  if (tabs) tabs.classList.toggle("show", allowed);
+  if (tab) tab.style.display = allowed ? "block" : "none";
+  if (!allowed && _currentMode === "auctioneer") setMode("collector");
 }
 
 // ── Notifications ──────────────────────────────────────────────────────────────
