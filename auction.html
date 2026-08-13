@@ -2808,6 +2808,49 @@ function _makeEthAuctionContract(slot, runner) {
   return new ethers.Contract(slot.contractAddr, AUCTION_ABI, runner);
 }
 
+let _auctionOpenToEveryone = false;
+
+function _ethStateOpenToEveryone(s) {
+  if (!s) return false;
+  const deposited = Boolean(s.deposited ?? s[0]);
+  const live      = Boolean(s.live ?? s[1]);
+  const settled   = Boolean(s.settled ?? s[2]);
+  const cancelled = Boolean(s.cancelled ?? false);
+  const mode      = Number(s.mode ?? s[8] ?? 0);
+  const isOpen    = Boolean(s.isOpen ?? s[9]);
+  const hasPhaseFields = s.gateEndsAt !== undefined || s.holderOnly !== undefined || Number(s.length || 0) > 12;
+  const holderOnly = hasPhaseFields && (s.holderOnly ?? s[12]) === true;
+  if (holderOnly) return false;
+  return deposited && !settled && !cancelled && (isOpen || live || mode === 1);
+}
+
+function _tezosAuctionOpenToEveryone(auction) {
+  return !!(auction?.isPhased && !auction.holderOnly && !auction.settled && !auction.cancelled);
+}
+
+function _setAuctionOpenToEveryone(open) {
+  _auctionOpenToEveryone = !!open;
+  const gateNotice = document.getElementById("live-gate-notice");
+  if (gateNotice && _auctionOpenToEveryone) gateNotice.style.display = "none";
+}
+
+function _showOpenEligibility(label = "Auction open to everyone") {
+  const el = document.getElementById("eligibility");
+  if (el) {
+    el.className = "eligibility show yes";
+    el.onclick = null;
+    el.title = "";
+  }
+  const icon = document.getElementById("elig-icon");
+  const text = document.getElementById("elig-text");
+  const detail = document.getElementById("elig-detail");
+  if (icon) icon.textContent = "✓";
+  if (text) text.textContent = label;
+  if (detail) detail.textContent = "";
+  onBidInput();
+  return true;
+}
+
 
 
 // ── Cross-chain chooser UI ────────────────────────────────────────────────────
@@ -4340,6 +4383,7 @@ async function _switchAuction(idx) {
   _auctionSettled     = false;
   _chatLockScheduled  = false;
   _chatManuallyLocked = !!(slot.chatLocked);
+  _setAuctionOpenToEveryone(false);
   _updateChatInputState();
   const _roomSubReset = document.querySelector(".room-sub");
   if (_roomSubReset) _roomSubReset.innerHTML = `<span class="live-dot"></span><span>Live</span>`;
@@ -4406,7 +4450,7 @@ async function _switchAuction(idx) {
   // Show / hide the gate access warning in the live bid panel
   const _lgNotice = document.getElementById("live-gate-notice");
   if (_lgNotice) {
-    if (slot.gateName) {
+    if (slot.gateName && !_auctionOpenToEveryone) {
       _lgNotice.style.display = "block";
       const _lgName = document.getElementById("live-gate-name-inline");
       if (_lgName) _lgName.textContent = slot.gateName;
@@ -4870,7 +4914,7 @@ function setWalletUi(state, addr) {
   if (connectTezosBtn) connectTezosBtn.textContent = "Connect Tezos";
   // Re-show gate notice on disconnect if this auction is gated
   const _lgnd = document.getElementById("live-gate-notice");
-  if (_lgnd && cfg.gateName) _lgnd.style.display = "block";
+  if (_lgnd && cfg.gateName && !_auctionOpenToEveryone) _lgnd.style.display = "block";
 }
 
 // ── ETH Wallet Connection — injected + WalletConnect v2 ──────────────────────
@@ -5662,9 +5706,12 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     const buyNowAvail    = s[11];
     const gateEndsAt     = Number(s.gateEndsAt || 0);
     const holderOnly     = s.holderOnly === true;
+    const openToEveryone = _ethStateOpenToEveryone(s);
+    _setAuctionOpenToEveryone(openToEveryone);
     if (_pairKeyForSlot(_activeCfg()) && gateEndsAt > 0 && typeof s.holderOnly === "boolean") {
       _setCrossChainPhase(s.holderOnly ? "holder" : "public");
     }
+    if (openToEveryone && signerAddress) onRoomEligibilityGranted();
 
     // A wallet that connected during the token-gated phase may become eligible
     // automatically when the contract enters its public phase. Re-check while
@@ -5703,6 +5750,11 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     else if (mode === 0 && !live)                { sl.textContent = "Waiting for seller to start";      sl.className = "status-line upcoming-line"; }
     else if (live && Number(endTime) > now)      { sl.textContent = "Live — bids open";                 sl.className = "status-line live"; }
     else                                         { sl.textContent = "Ended — awaiting settlement";      sl.className = "status-line ended"; }
+
+    const gateNotice = document.getElementById("live-gate-notice");
+    if (gateNotice && cfg.gateName) {
+      gateNotice.style.display = (openToEveryone || signerAddress) ? "none" : "block";
+    }
 
     if (mode === 1 && !live && noBids && deposited && !settled) {
       countdownSection.style.display = "block";
@@ -6040,12 +6092,14 @@ async function refreshTezosState(runToken = _switchToken) {
     const auction = _normalizeTezosAuction(await _readTezosAuction(slot));
     if (!auction) throw new Error("Auction data was empty.");
     if (runToken !== _switchToken) return;
+    const openToEveryone = _tezosAuctionOpenToEveryone(auction);
+    _setAuctionOpenToEveryone(openToEveryone);
     if (_pairKeyForSlot(slot)) {
       _setCrossChainPhase(auction.isPhased && !auction.holderOnly ? "public" : "holder");
     }
     loadTezosNFTMeta(auction, runToken).catch(() => {});
 
-    if (tezosAddress && auction.isPhased && !auction.holderOnly && !_roomEligible) {
+    if (tezosAddress && openToEveryone && !_roomEligible) {
       checkTezosEligibility(runToken)
         .then(ok => {
           if (runToken !== _switchToken) return;
@@ -6087,7 +6141,7 @@ async function refreshTezosState(runToken = _switchToken) {
 
     const gateNotice = document.getElementById("live-gate-notice");
     if (gateNotice && auction.isPhased) {
-      gateNotice.style.display = auction.holderOnly && !tezosAddress ? "block" : "none";
+      gateNotice.style.display = (!openToEveryone && auction.holderOnly && !tezosAddress) ? "block" : "none";
     }
 
     document.getElementById("stats-grid").style.display = "grid";
@@ -6138,15 +6192,15 @@ async function refreshTezosState(runToken = _switchToken) {
 
 async function _checkTezosEligibility(slot, address) {
   if (!slot?.gateName) return true;
-  if (!address) return false;
   // Phased Tezos auctions become wallet-open automatically after the holder
   // window. Legacy Tezos contracts have no phase fields and remain gated.
   try {
     const auction = _normalizeTezosAuction(await _readTezosAuction(slot));
-    if (auction?.isPhased && !auction.holderOnly) return true;
+    if (_tezosAuctionOpenToEveryone(auction)) return true;
   } catch (e) {
     console.warn("_checkTezosEligibility phase read:", e);
   }
+  if (!address) return false;
   const GATE_CONTRACT = "KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8";
   const GATE_TOKEN_ID = "1";
   let gateContract = GATE_CONTRACT;
@@ -6174,6 +6228,16 @@ async function checkEligibility(runToken = _switchToken, contract = auctionContr
   if (!contract) return false;
   setEligibilityChecking();
   try {
+    const state = await withTimeout(
+      contract.auctionState(),
+      9000,
+      "Auction phase check is taking longer than expected."
+    );
+    if (runToken !== _switchToken) return false;
+    if (_ethStateOpenToEveryone(state)) {
+      _setAuctionOpenToEveryone(true);
+      return _showOpenEligibility("Auction open to everyone");
+    }
     const ok = await withTimeout(
       contract.isEligible(signerAddress),
       9000,
@@ -6240,7 +6304,9 @@ async function checkTezosEligibility(runToken = _switchToken) {
       el.title = "Tap to acquire your entry token and join the auction";
     } else { el.onclick = null; el.title = ""; }
     document.getElementById("elig-icon").textContent = ok ? "✓" : "🔑";
-    document.getElementById("elig-text").textContent = ok ? "Tezos wallet eligible" : "Get your Tezos entry token to join";
+    document.getElementById("elig-text").textContent = ok
+      ? (_auctionOpenToEveryone ? "Auction open to everyone" : "Tezos wallet eligible")
+      : "Get your Tezos entry token to join";
     const detail = document.getElementById("elig-detail");
     if (!ok && gateName) {
       if (gateLink) {
@@ -7116,6 +7182,22 @@ async function _refreshRoomEligibilityForPublicPhase(runToken, contract) {
     !contract ||
     runToken !== _switchToken
   ) return;
+
+  try {
+    const state = await withTimeout(
+      contract.auctionState(),
+      9000,
+      "Public-phase auction state check timed out."
+    );
+    if (runToken !== _switchToken) return;
+    if (_ethStateOpenToEveryone(state)) {
+      _setAuctionOpenToEveryone(true);
+      onRoomEligibilityGranted();
+      return;
+    }
+  } catch (e) {
+    console.debug("Public-phase auction state refresh:", e?.message || e);
+  }
 
   // refreshState normally runs every 15 seconds. This guard also protects
   // against extra state refreshes triggered by contract events.
