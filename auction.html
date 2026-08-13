@@ -2810,7 +2810,7 @@ function _makeEthAuctionContract(slot, runner) {
 
 let _auctionOpenToEveryone = false;
 
-function _ethStateOpenToEveryone(s) {
+function _ethStateOpenToEveryone(s, slot = _activeCfg()) {
   if (!s) return false;
   const deposited = Boolean(s.deposited ?? s[0]);
   const live      = Boolean(s.live ?? s[1]);
@@ -2820,8 +2820,12 @@ function _ethStateOpenToEveryone(s) {
   const isOpen    = Boolean(s.isOpen ?? s[9]);
   const hasPhaseFields = s.gateEndsAt !== undefined || s.holderOnly !== undefined || Number(s.length || 0) > 12;
   const holderOnly = hasPhaseFields && (s.holderOnly ?? s[12]) === true;
+  const currentlyOpen = deposited && !settled && !cancelled && (isOpen || live || mode === 1);
+  // A configured gate remains gated unless this auction's own phase fields
+  // explicitly say the holder-only window has ended.
+  if (slot?.gateName && !hasPhaseFields) return false;
   if (holderOnly) return false;
-  return deposited && !settled && !cancelled && (isOpen || live || mode === 1);
+  return currentlyOpen;
 }
 
 function _tezosAuctionOpenToEveryone(auction) {
@@ -5706,7 +5710,7 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     const buyNowAvail    = s[11];
     const gateEndsAt     = Number(s.gateEndsAt || 0);
     const holderOnly     = s.holderOnly === true;
-    const openToEveryone = _ethStateOpenToEveryone(s);
+    const openToEveryone = _ethStateOpenToEveryone(s, _activeCfg());
     _setAuctionOpenToEveryone(openToEveryone);
     if (_pairKeyForSlot(_activeCfg()) && gateEndsAt > 0 && typeof s.holderOnly === "boolean") {
       _setCrossChainPhase(s.holderOnly ? "holder" : "public");
@@ -6234,7 +6238,7 @@ async function checkEligibility(runToken = _switchToken, contract = auctionContr
       "Auction phase check is taking longer than expected."
     );
     if (runToken !== _switchToken) return false;
-    if (_ethStateOpenToEveryone(state)) {
+    if (_ethStateOpenToEveryone(state, _activeCfg())) {
       _setAuctionOpenToEveryone(true);
       return _showOpenEligibility("Auction open to everyone");
     }
@@ -7195,7 +7199,7 @@ async function _refreshRoomEligibilityForPublicPhase(runToken, contract) {
       "Public-phase auction state check timed out."
     );
     if (runToken !== _switchToken) return;
-    if (_ethStateOpenToEveryone(state)) {
+    if (_ethStateOpenToEveryone(state, _activeCfg())) {
       _setAuctionOpenToEveryone(true);
       onRoomEligibilityGranted();
       return;
