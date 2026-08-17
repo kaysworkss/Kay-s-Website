@@ -1107,10 +1107,10 @@
 
     <div class="panel">
 
-      <!-- Step 1: connect + verify wallet -->
+      <!-- Wallet connect verifies token ownership in the same action. -->
       <div class="step show" id="stepWallet">
-        <div class="panel-title" id="walletStepTitle">Step 1 — Verify your token</div>
-        <p class="step-note" style="margin-top:0;margin-bottom:1rem;" id="walletStepNote">Connect the wallet that holds your Àpótí Ọlọ́wẹ̀ token. If this is your first time here, you can add email access after verification.</p>
+        <div class="panel-title" id="walletStepTitle">Connect holder wallet</div>
+        <p class="step-note" style="margin-top:0;margin-bottom:1rem;" id="walletStepNote">Choose the wallet that holds your Àpótí Ọlọ́wẹ̀ token. Connecting also checks token ownership and opens the hub when access is confirmed.</p>
         <div class="connect-grid">
           <button class="chain-btn" id="connectEth">Ethereum Wallet</button>
           <button class="chain-btn" id="connectTez">Tezos Wallet</button>
@@ -1119,10 +1119,10 @@
         <button type="button" class="btn ghost small" id="showEmailLoginBtn" style="width:auto;margin-top:1.1rem;">Already saved email access?</button>
       </div>
 
-      <!-- Step 2: email / magic link (after a fresh wallet verify, or via "sign in with email" for returning holders) -->
+      <!-- Email access after wallet confirmation, or email sign-in for returning holders. -->
       <div class="step" id="stepEmail">
-        <div class="panel-title" id="emailStepTitle">Step 2 — Save your access</div>
-        <p class="step-note" style="margin-top:0;margin-bottom:1rem;" id="emailStepNote">Verified. Enter your email and we'll send a one-time link — after this, you sign in with email alone, no wallet needed, until it's time to re-verify.</p>
+        <div class="panel-title" id="emailStepTitle">Save email access</div>
+        <p class="step-note" style="margin-top:0;margin-bottom:1rem;" id="emailStepNote">Access confirmed. Enter your email and we'll send a one-time link. After this, you can sign in with email alone until access needs a fresh holder-wallet check.</p>
         <div class="field">
           <label for="emailInput">Email address</label>
           <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email" />
@@ -1146,8 +1146,8 @@
     </div>
 
     <div class="reverify-banner" id="reverifyBanner">
-      <span>Your wallet verification has aged out. Reconnect to confirm you still hold the token and keep full access.</span>
-      <button class="btn ghost" id="reverifyBtn">Reconnect wallet</button>
+      <span>Choose your holder wallet to refresh access. The token check happens during the wallet connection.</span>
+      <button class="btn ghost" id="reverifyBtn">Connect wallet</button>
     </div>
 
     <div class="email-updates-panel" id="emailUpdatesPanel">
@@ -2263,31 +2263,24 @@ async function handleSession(session) {
 
   currentHolder = mergeLinkedHolderRows(holderRows);
 
-  const needsVerify = !currentHolder || isStale(currentHolder.last_verified_at);
-
-  if (needsVerify) {
+  if (!currentHolder) {
     els.gate.style.display = 'block';
     els.dashboard.classList.remove('show');
-    isReverifyMode = true;   // signed in already → wallet check should link directly, no email step
+    isReverifyMode = true;   // signed in already -> wallet check should link directly, no email step
     setWalletStepCopy(true);
     showStep('stepWallet');
-    if (!currentHolder) {
-      setStatus(els.walletStatus, 'err', 'This email is signed in, but no holder wallet is linked to it yet. Connect the holder wallet once to link it.');
-    } else {
-      setStatus(els.walletStatus, '', 'Please reconnect the holder wallet once to refresh access.');
-    }
+    setStatus(els.walletStatus, 'err', 'This email is signed in, but no holder wallet is linked to it yet. Choose the holder wallet below to link it.');
   } else {
-    enterDashboard();
+    isReverifyMode = false;
+    await enterDashboard();
   }
 }
 
 function setWalletStepCopy(reverify) {
-  document.getElementById('walletStepTitle').textContent = reverify
-    ? 'Reconnect your wallet'
-    : 'Step 1 — Verify your token';
+  document.getElementById('walletStepTitle').textContent = 'Connect holder wallet';
   document.getElementById('walletStepNote').textContent = reverify
-    ? "Just confirming you still hold the token — you're already signed in, so this takes you straight back to the hub."
-    : 'Connect the wallet that holds your Àpótí Ọlọ́wẹ̀ token. If this is your first time here, you can add email access after verification.';
+    ? "You're signed in. Choose the wallet that holds your Apoti Olowe token. Connecting also checks token ownership and opens the hub when access is confirmed."
+    : 'Choose the wallet that holds your Àpótí Ọlọ́wẹ̀ token. Connecting also checks token ownership and opens the hub when access is confirmed.';
 }
 
 function isStale(ts) {
@@ -2383,12 +2376,12 @@ els.backToWalletBtn.addEventListener('click', () => {
   showStep('stepWallet');
 });
 
-// ── Step 1: magic link ──
+// ── Magic link ──
 els.sendLinkBtn.addEventListener('click', async () => {
   const email = els.emailInput.value.trim();
   if (!email) { setStatus(els.emailStatus, 'err', 'Enter your email first.'); return; }
   if (!isEmailLoginFlow && !pendingClaimToken) {
-    setStatus(els.emailStatus, 'err', 'Wallet verification is missing — please reconnect your wallet first.');
+    setStatus(els.emailStatus, 'err', 'Connect the holder wallet first. The token check happens during that wallet connection.');
     return;
   }
   els.sendLinkBtn.disabled = true;
@@ -2417,7 +2410,7 @@ els.sendLinkBtn.addEventListener('click', async () => {
   }
 });
 
-// ── Step 2: wallet connect + verify ──
+// ── Wallet connect + token check ──
 els.connectEth.addEventListener('click', connectEth);
 els.connectTez.addEventListener('click', () => els.tezosWalletModal.classList.add('show'));
 els.dismissTezWallet.addEventListener('click', () => els.tezosWalletModal.classList.remove('show'));
@@ -2685,7 +2678,7 @@ els.walletEmailClose.addEventListener('click', () => {
 els.walletEmailBtn.addEventListener('click', async () => {
   const email = els.walletEmailInput.value.trim();
   if (!email) { setStatus(els.walletEmailStatus, 'err', 'Enter your email first.'); return; }
-  if (!pendingClaimToken) { setStatus(els.walletEmailStatus, 'err', 'Reconnect your wallet before saving email access.'); return; }
+  if (!pendingClaimToken) { setStatus(els.walletEmailStatus, 'err', 'Connect the holder wallet before saving email access.'); return; }
   els.walletEmailBtn.disabled = true;
   els.walletEmailBtn.textContent = 'Sending…';
   try {
@@ -2760,7 +2753,7 @@ async function enterDashboard() {
   els.walletPill.classList.add('show');
   els.signoutBtn.classList.add('show');
   els.holderGreeting.textContent = currentHolder.display_name || shortAddr(currentHolder.wallet_address);
-  els.reverifyBanner.classList.toggle('show', isStale(currentHolder.last_verified_at));
+  els.reverifyBanner.classList.remove('show');
   renderEmailUpdatesPreference();
 
   renderMerchEntitlement();
