@@ -2252,6 +2252,14 @@ async function handleSession(session) {
   } catch (_) {
     holderRows = [];
   }
+  if (!holderRows.length || holderRows.every(row => !row.last_verified_at && !row.lastVerifiedAt)) {
+    const { data: directRows } = await sb
+      .from('holders')
+      .select('*')
+      .eq('auth_user_id', currentUser.id)
+      .order('last_verified_at', { ascending: false });
+    if (Array.isArray(directRows) && directRows.length) holderRows = directRows;
+  }
 
   currentHolder = mergeLinkedHolderRows(holderRows);
 
@@ -2278,6 +2286,7 @@ function setWalletStepCopy(reverify) {
 }
 
 function isStale(ts) {
+  ts = ts || currentHolder?.lastVerifiedAt;
   if (!ts) return true;
   const days = (Date.now() - new Date(ts).getTime()) / 86400000;
   return days > CONFIG.reverifyDays;
