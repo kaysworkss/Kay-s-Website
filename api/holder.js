@@ -694,7 +694,7 @@ async function getHolderAccessRows(req, supabase) {
     const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
     if (userError || !userData || !userData.user) return [];
 
-    const selectFields = 'id,auth_user_id,wallet_address,chain,display_name,tier,token_balance';
+    const selectFields = 'id,auth_user_id,wallet_address,chain,display_name,tier,token_balance,last_verified_at,email_updates_opt_in';
     const { data: authRows, error: authError } = await supabase
       .from('holders')
       .select(selectFields)
