@@ -2330,7 +2330,13 @@ async function restoreWalletAccessSnapshot() {
     if (!response.ok) throw new Error(result.error || 'Saved wallet access expired.');
     pendingClaimToken = saved.claimToken;
     currentUser = null;
-    currentHolder = mergeLinkedHolderRows(result.linked_wallets || result.wallets || (result.holder ? [result.holder] : [])) || saved.holder;
+    const apiHolder = mergeLinkedHolderRows(result.linked_wallets || result.wallets || (result.holder ? [result.holder] : []));
+    currentHolder = {
+      ...(saved.holder || {}),
+      ...(apiHolder || {}),
+      display_name: holderDisplayName(apiHolder) || holderDisplayName(saved.holder) || null,
+      linked_wallets: apiHolder?.linked_wallets?.length ? apiHolder.linked_wallets : (saved.holder?.linked_wallets || []),
+    };
     await enterDashboard();
     return true;
   } catch (_) {
@@ -2852,6 +2858,7 @@ const HOLDER_GATE_TEZOS_CONTRACT = 'KT1MNxJYowrxgC1FLuN45TyPjzyFEoeHBJa8';
 // or staggered deployments of the page and server endpoint.
 const PARTICIPANT_COLLECTION_WALLET_LINKS = [
   { display_name:'Spitfingers', chain:'ethereum', wallet_address:'0x958b84f8a709fe789b1dfaeb7f76640d5d4970a9' },
+  { display_name:'Batsoupyum', chain:'ethereum', wallet_address:'0xcc6c1d21e8474b3578e69eb036c712ab08ffdfbb' },
 ];
 
 function normalizeGateBalances(rawBalances) {
