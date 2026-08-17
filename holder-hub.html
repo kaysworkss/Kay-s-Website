@@ -2271,6 +2271,11 @@ async function handleSession(session) {
     isReverifyMode = true;   // signed in already → wallet check should link directly, no email step
     setWalletStepCopy(true);
     showStep('stepWallet');
+    if (!currentHolder) {
+      setStatus(els.walletStatus, 'err', 'This email is signed in, but no holder wallet is linked to it yet. Connect the holder wallet once to link it.');
+    } else {
+      setStatus(els.walletStatus, '', 'Please reconnect the holder wallet once to refresh access.');
+    }
   } else {
     enterDashboard();
   }
@@ -2354,10 +2359,12 @@ async function hydrateCurrentHolderProfile() {
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || 'Could not load holder profile.');
     const merged = mergeLinkedHolderRows(result.linked_wallets || result.wallets || []);
+    const verifiedAt = merged?.last_verified_at || result.holder?.last_verified_at || currentHolder.last_verified_at || currentHolder.lastVerifiedAt || null;
     currentHolder = {
       ...currentHolder,
       ...(result.holder || {}),
       ...(merged || {}),
+      last_verified_at: verifiedAt,
       linked_wallets: result.linked_wallets || result.wallets || currentHolder.linked_wallets || [],
     };
   } catch (err) {
@@ -2569,10 +2576,22 @@ async function connectBeacon() {
 
 async function connectTemple() {
   // Same pattern as claim-token.html's direct Temple connector.
-  if (!window.tezos && !window.temple) return connectBeacon();
-  const temple = window.temple || window.tezos;
-  const permission = await temple.requestPermissions?.();
-  const address = permission?.address || permission?.[0]?.address;
+  const temple = window.templeWallet || window.temple || window.tezos;
+  if (!temple) return connectBeacon();
+  let permission;
+  if (typeof temple.requestPermissions === 'function') {
+    permission = await temple.requestPermissions({ network: { type: 'mainnet' } });
+  }
+  let address =
+    permission?.address ||
+    permission?.[0]?.address ||
+    permission?.pkh ||
+    permission?.publicKeyHash;
+  if (!address && typeof temple.getPKH === 'function') address = await temple.getPKH();
+  if (!address && typeof temple.getActiveAccount === 'function') {
+    const account = await temple.getActiveAccount();
+    address = account?.address || account?.pkh || account?.publicKeyHash;
+  }
   if (!address) throw new Error('Temple connected but returned no address.');
   return address;
 }
@@ -2603,7 +2622,22 @@ async function verifyAndLink(chain, address) {
 
   if (isReverifyMode && session) {
     setStatus(els.walletStatus, 'ok', 'Verified — welcome back.');
-    await handleSession(session);
+    currentUser = session.user;
+    currentHolder = {
+      id: result.holderId || result.id || null,
+      wallet_address: address,
+      chain,
+      token_balance: result.balance || 1,
+      tier: result.tier || result.tokenTier || result.token_tier || null,
+      token_id: result.tokenId || result.token_id || result.gateTokenId || result.gate_token_id || result.holdingTokenId || result.holding_token_id || null,
+      balancesByTokenId: result.balancesByTokenId || result.balances_by_token_id || result.tokenBalances || null,
+      display_name: result.displayName || result.display_name || null,
+      auth_user_id: session.user.id,
+      email_updates_opt_in: result.email_updates_opt_in === true || result.emailUpdatesOptIn === true,
+      linked_wallets: result.linked_wallets || result.linkedWallets || result.wallets || [],
+      last_verified_at: new Date().toISOString(),
+    };
+    await enterDashboard();
     return;
   }
 
@@ -2732,20 +2766,8 @@ async function enterDashboard() {
   renderMerchEntitlement();
   loadParticipants();
   loadMessages();
-  document.getElementById('ownedAssetSummary').textContent = 'Confirming the collection assets held by this wallet…';
-  // Defer ownership highlight so ethers.js activity doesn't trigger MetaMask's
-  // eager "want to connect?" popup the instant the dashboard renders. The scan
-  // uses a read-only RPC (JsonRpcProvider, not BrowserProvider), but some
-  // MetaMask versions hook into any ethers constructor globally when
-  // window.ethereum exists. A short delay + requestIdleCallback lets the page
-  // settle first, and the user sees the dashboard immediately regardless.
-  setTimeout(() => {
-    if (typeof requestIdleCallback === 'function') {
-      requestIdleCallback(() => highlightOwnedPieces());
-    } else {
-      highlightOwnedPieces();
-    }
-  }, 1500);
+  document.getElementById('ownedAssetSummary').textContent = 'Collection ownership will update after you choose a wallet action.';
+  renderOwnedWorks();
 }
 
 // IDs 1 and 2 define the participant's Wood/Bronze core. ID 3 is read from
