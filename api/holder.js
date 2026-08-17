@@ -153,6 +153,17 @@ function holderRowKey(row) {
   return String(row?.chain || '') + ':' + String(row?.wallet_address || row?.walletAddress || '').toLowerCase();
 }
 
+async function hasHolderForAuthUser(supabase, authUserId) {
+  if (!authUserId) return false;
+  const { data, error } = await supabase
+    .from('holders')
+    .select('id')
+    .eq('auth_user_id', authUserId)
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) && data.length > 0;
+}
+
 async function checkHolderRowBalances(row) {
   const chain = String(row?.chain || '').toLowerCase();
   const address = row?.wallet_address || row?.walletAddress || '';
@@ -599,12 +610,12 @@ async function handleSendAuthEmail(req, res, supabase) {
 
   if (!claimToken) {
     const userId = linkData.user && linkData.user.id;
-    const { data: linkedHolder, error: holderError } = await supabase
-      .from('holders')
-      .select('auth_user_id')
-      .eq('auth_user_id', userId || '00000000-0000-0000-0000-000000000000')
-      .maybeSingle();
-    if (holderError) return res.status(500).json({ error: holderError.message });
+    let linkedHolder = false;
+    try {
+      linkedHolder = await hasHolderForAuthUser(supabase, userId);
+    } catch (holderError) {
+      return res.status(500).json({ error: holderError.message });
+    }
   // Keep the response deliberately generic so this endpoint cannot be used
   // to discover which email addresses belong to collectors. If an older
   // account was accidentally linked to an anonymous user, reconnecting the
@@ -627,8 +638,7 @@ async function handleContent(req, res, supabase) {
   if (accessToken) {
     const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
     if (!userError && userData && userData.user) {
-      const { data: holder } = await supabase.from('holders').select('id').eq('auth_user_id', userData.user.id).maybeSingle();
-      authorised = Boolean(holder);
+      authorised = await hasHolderForAuthUser(supabase, userData.user.id);
     }
   } else if (walletClaim) {
     const { data: pending } = await supabase.from('pending_verifications')
@@ -647,8 +657,7 @@ async function isHolderAuthorised(req, supabase) {
   if (accessToken) {
     const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
     if (!userError && userData && userData.user) {
-      const { data: holder } = await supabase.from('holders').select('id').eq('auth_user_id', userData.user.id).maybeSingle();
-      return Boolean(holder);
+      return hasHolderForAuthUser(supabase, userData.user.id);
     }
   }
   if (walletClaim) {
