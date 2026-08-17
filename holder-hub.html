@@ -2297,6 +2297,27 @@ function showStep(id) {
   document.getElementById(id).classList.add('show');
 }
 
+function friendlyErrorMessage(err, fallback) {
+  const raw = String(err?.message || err?.description || err || '').trim();
+  if (/unexpected end of json input/i.test(raw)) {
+    return 'The wallet returned an empty response. Please close the wallet popup and try connecting again.';
+  }
+  if (/user rejected|user denied|request rejected|rejected by user/i.test(raw)) {
+    return 'Wallet connection was cancelled.';
+  }
+  return raw || fallback;
+}
+
+async function readJsonResponse(response) {
+  const text = await response.text().catch(() => '');
+  if (!text.trim()) return {};
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    return { error: text.slice(0, 240) };
+  }
+}
+
 function holderDisplayName(row) {
   return String(row?.display_name || row?.displayName || row?.name || row?.full_name || row?.fullName || '').trim();
 }
@@ -2410,9 +2431,10 @@ async function connectEth() {
     const provider = new ethers.BrowserProvider(window.ethereum);
     const accounts = await provider.send('eth_requestAccounts', []);
     const address = accounts[0];
+    if (!address) throw new Error('Wallet connected but returned no Ethereum address.');
     await verifyAndLink('ethereum', address);
   } catch (err) {
-    setStatus(els.walletStatus, 'err', err.message || 'Could not connect Ethereum wallet.');
+    setStatus(els.walletStatus, 'err', friendlyErrorMessage(err, 'Could not connect Ethereum wallet.'));
   }
 }
 
@@ -2423,7 +2445,7 @@ async function connectTezosWith(connector) {
     const address = await connector();
     await verifyAndLink('tezos', address);
   } catch (err) {
-    const msg = err?.message || err?.description || String(err);
+    const msg = friendlyErrorMessage(err, 'Could not connect Tezos wallet.');
     console.error('Tezos connect error:', err);
     setStatus(els.walletStatus, 'err', 'Tezos: ' + msg);
   }
@@ -2567,7 +2589,7 @@ async function verifyAndLink(chain, address) {
     headers,
     body: JSON.stringify({ chain, address })
   });
-  const result = await res.json().catch(() => ({}));
+  const result = await readJsonResponse(res);
 
   if (!res.ok) {
     if (res.status === 403) {
@@ -2642,7 +2664,7 @@ els.walletEmailBtn.addEventListener('click', async () => {
     if (!response.ok) throw new Error(result.error || 'Could not send the email.');
     setStatus(els.walletEmailStatus, 'ok', 'Email sent. Your Hub access is already open—you can confirm the link whenever convenient.');
   } catch (err) {
-    setStatus(els.walletEmailStatus, 'err', err.message);
+    setStatus(els.walletEmailStatus, 'err', friendlyErrorMessage(err, 'Could not send the email.'));
   } finally {
     els.walletEmailBtn.disabled = false;
     els.walletEmailBtn.textContent = 'Save email access';
