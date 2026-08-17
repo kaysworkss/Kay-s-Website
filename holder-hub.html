@@ -2107,6 +2107,7 @@ let currentHolder = null;
 let pendingClaimToken = null;   // set once the wallet check succeeds pre-login
 let isReverifyMode = false;     // true when an already-signed-in holder is reconnecting
 let isEmailLoginFlow = false;   // true when a returning holder chose "sign in with email" directly
+const WALLET_ACCESS_STORAGE_KEY = 'apotiHolderWalletAccess';
 
 const els = {
   stepEmail: document.getElementById('stepEmail'),
@@ -2194,6 +2195,10 @@ function shortAddr(a) { return a ? a.slice(0, 6) + '…' + a.slice(-4) : ''; }
   els.walletStatus.classList.remove('show');
 
   const { data: { session } } = await sb.auth.getSession();
+
+  if (!session && await restoreWalletAccessSnapshot()) {
+    return;
+  }
 
   await handleSession(session);
 
@@ -2287,6 +2292,55 @@ async function handleSession(session) {
   }
 }
 
+function saveWalletAccessSnapshot(holder, claimToken) {
+  if (!claimToken || !holder) return;
+  try {
+    localStorage.setItem(WALLET_ACCESS_STORAGE_KEY, JSON.stringify({
+      claimToken,
+      holder,
+      savedAt: Date.now(),
+    }));
+  } catch (_) {}
+}
+
+function clearWalletAccessSnapshot() {
+  try { localStorage.removeItem(WALLET_ACCESS_STORAGE_KEY); } catch (_) {}
+}
+
+function readWalletAccessSnapshot() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(WALLET_ACCESS_STORAGE_KEY) || 'null');
+    if (!parsed || !parsed.claimToken) return null;
+    return parsed;
+  } catch (_) {
+    clearWalletAccessSnapshot();
+    return null;
+  }
+}
+
+async function restoreWalletAccessSnapshot() {
+  const saved = readWalletAccessSnapshot();
+  if (!saved) return false;
+  try {
+    const response = await fetch(CONFIG.profileEndpoint, {
+      headers: { 'x-holder-claim': saved.claimToken },
+      cache: 'no-store',
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Saved wallet access expired.');
+    pendingClaimToken = saved.claimToken;
+    currentUser = null;
+    currentHolder = mergeLinkedHolderRows(result.linked_wallets || result.wallets || (result.holder ? [result.holder] : [])) || saved.holder;
+    await enterDashboard();
+    return true;
+  } catch (_) {
+    clearWalletAccessSnapshot();
+    pendingClaimToken = null;
+    currentHolder = null;
+    return false;
+  }
+}
+
 function setWalletStepCopy(reverify) {
   document.getElementById('walletStepTitle').textContent = 'Connect holder wallet';
   document.getElementById('walletStepNote').textContent = reverify
@@ -2333,14 +2387,16 @@ function holderDisplayName(row) {
 
 function mergeLinkedHolderRows(rows) {
   if (!Array.isArray(rows) || !rows.length) return null;
-  const newest = rows[0];
+  const newest = rows.find(row => row.wallet_address || row.walletAddress) || rows[0];
   const named = rows.find(row => holderDisplayName(row)) || newest;
+  const verified = rows.find(row => row.last_verified_at || row.lastVerifiedAt) || newest;
   return {
     ...newest,
     display_name: holderDisplayName(named) || holderDisplayName(newest) || null,
     tier: newest?.tier || named?.tier || null,
     token_id: newest?.token_id || named?.token_id || null,
     balancesByTokenId: newest?.balancesByTokenId || newest?.balances_by_token_id || named?.balancesByTokenId || named?.balances_by_token_id || null,
+    last_verified_at: newest?.last_verified_at || newest?.lastVerifiedAt || verified?.last_verified_at || verified?.lastVerifiedAt || null,
     linked_wallets: rows,
   };
 }
@@ -2678,6 +2734,7 @@ async function verifyAndLink(chain, address) {
     linked_wallets: result.linked_wallets || result.linkedWallets || result.wallets || [],
     last_verified_at: new Date().toISOString(),
   };
+  saveWalletAccessSnapshot(currentHolder, pendingClaimToken);
   await enterDashboard();
   const hasSavedEmailAccess = result.emailLinked === true || Boolean(currentHolder.auth_user_id);
   if (!hasSavedEmailAccess && pendingClaimToken) {
@@ -3024,6 +3081,8 @@ async function loadFuturePlans() {
 }
 
 els.signoutBtn.addEventListener('click', async () => {
+  clearWalletAccessSnapshot();
+  pendingClaimToken = null;
   await sb.auth.signOut();
   window.location.reload();
 });
