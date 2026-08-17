@@ -2182,19 +2182,7 @@ function shortAddr(a) { return a ? a.slice(0, 6) + '…' + a.slice(-4) : ''; }
   els.showEmailLoginBtn.disabled = false;
   els.walletStatus.classList.remove('show');
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const claimTokenFromUrl = urlParams.get('vt');
-
   const { data: { session } } = await sb.auth.getSession();
-
-  if (session && claimTokenFromUrl) {
-    // Returning from the magic-link email with a wallet already verified —
-    // finalize the link, then clean the token out of the URL.
-    await claimPendingVerification(session, claimTokenFromUrl);
-    urlParams.delete('vt');
-    const cleanUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
-    window.history.replaceState({}, '', cleanUrl);
-  }
 
   await handleSession(session);
 
@@ -2202,6 +2190,18 @@ function shortAddr(a) { return a ? a.slice(0, 6) + '…' + a.slice(-4) : ''; }
     await handleSession(session);
   });
 })();
+
+function claimTokenFromCurrentUrl() {
+  return new URLSearchParams(window.location.search).get('vt');
+}
+
+function removeClaimTokenFromUrl() {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (!urlParams.has('vt')) return;
+  urlParams.delete('vt');
+  const cleanUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '') + window.location.hash;
+  window.history.replaceState({}, '', cleanUrl);
+}
 
 async function claimPendingVerification(session, token) {
   try {
@@ -2213,8 +2213,12 @@ async function claimPendingVerification(session, token) {
     if (!res.ok) {
       const result = await res.json().catch(() => ({}));
       setStatus(els.walletStatus, 'err', result.error || 'Could not finish linking your wallet — please reconnect.');
+      return false;
     }
-  } catch (_) { /* handled by the fresh holder-row check right after */ }
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 async function handleSession(session) {
@@ -2229,11 +2233,25 @@ async function handleSession(session) {
   }
   currentUser = session.user;
 
-  const { data: holderRows } = await sb
-    .from('holders')
-    .select('*')
-    .eq('auth_user_id', currentUser.id)
-    .order('last_verified_at', { ascending: false });
+  const claimToken = claimTokenFromCurrentUrl();
+  if (claimToken) {
+    // Supabase may restore a magic-link session after the first getSession()
+    // call. Finalize the pending wallet claim whenever a valid session appears.
+    const claimed = await claimPendingVerification(session, claimToken);
+    if (claimed) removeClaimTokenFromUrl();
+  }
+
+  let holderRows = [];
+  try {
+    const response = await fetch(CONFIG.profileEndpoint, {
+      headers: { Authorization: 'Bearer ' + session.access_token },
+      cache: 'no-store',
+    });
+    const result = await response.json().catch(() => ({}));
+    if (response.ok) holderRows = result.linked_wallets || result.wallets || (result.holder ? [result.holder] : []);
+  } catch (_) {
+    holderRows = [];
+  }
 
   currentHolder = mergeLinkedHolderRows(holderRows);
 
