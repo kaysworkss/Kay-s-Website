@@ -30,7 +30,7 @@
   html { scroll-behavior: smooth; }
   body.auth-booting #gate,
   body.auth-booting #dashboard { display:none !important; }
-  body.auth-booting #authBoot { display:block; }
+  body.auth-booting #authBoot { display:none !important; }
   #authBoot { display:none; max-width:640px; margin:4rem auto; text-align:center; }
   #authBoot .panel { text-align:center; }
   body {
@@ -546,9 +546,10 @@
   .participant-owned-card h4 { padding:0.9rem 1rem; font-size:1.2rem; }
   @media (max-width:620px) { .participant-works-grid { grid-template-columns:1fr; } .participant-works-panel { padding:1.5rem 1rem; } }
   .participant-you {
+    display:inline-flex; align-items:center; justify-content:center;
     margin-left: 0.55rem; padding: 0.18rem 0.5rem; border-radius: 999px;
     border: 1px solid rgba(201,153,58,0.5); color: var(--gold);
-    font-family: 'Cinzel',serif; font-size: 0.5rem; letter-spacing: 0.12em;
+    font-family: 'Cinzel',serif; font-size: 0.5rem; line-height:1; letter-spacing: 0.12em;
     text-transform: uppercase; vertical-align: middle;
   }
   /* Equal visual weight: identical lightness/chroma, hue alone distinguishes tiers. */
@@ -578,7 +579,8 @@
     .participant-token { width:54px; margin-bottom:.38rem; }
     .participant-token::before { inset:6px; }
     .participant-initial { font-size:.92rem; }
-    .participant-name { font-size:.78rem; line-height:1; }
+    .participant-name { display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:.22rem; font-size:.78rem; line-height:1; }
+    .participant-you { margin:0; padding:.16rem .42rem; max-width:100%; font-size:.42rem; line-height:1; letter-spacing:.1em; }
     .participant-badges { min-height:.8rem; margin-top:.18rem; font-size:.43rem; line-height:1.25; }
   }
   @media (max-width:390px) {
@@ -586,6 +588,7 @@
     .participant-node { width:78px; offset-path:ellipse(34% 30% at 50% 50%); }
     .participant-token { width:50px; }
     .participant-name { font-size:.72rem; }
+    .participant-you { font-size:.38rem; padding:.14rem .34rem; }
   }
 
   .chapter-card {
@@ -983,7 +986,7 @@
   .sculpture-number, .viewer-mode-btn, .reserve-toggle, .reserve-submit,
   .reserve-form label, .auction-notes strong, .sculpture-story strong,
   .msg-reply-label { font-size:0.72rem; }
-  .badge, .owned-ribbon, .sold-sticker, .participant-you { font-size:0.68rem; }
+  .badge, .owned-ribbon, .sold-sticker { font-size:0.68rem; }
   .btn { font-size:0.72rem; min-height:44px; }
   .tab-btn, .nav-back, .signout-btn, .wallet-option, .viewer-mode-btn,
   .reserve-toggle, .reserve-submit { min-height:44px; }
@@ -1103,7 +1106,48 @@
   }
 </style>
 </head>
-<body class="auth-booting">
+<body>
+<script>
+  (function () {
+    function hasStoredSupabaseSession() {
+      try {
+        for (var i = 0; i < localStorage.length; i += 1) {
+          var key = localStorage.key(i) || '';
+          if (!/^sb-.+-auth-token$/.test(key)) continue;
+          var value = localStorage.getItem(key);
+          if (value && value !== 'null') return true;
+        }
+      } catch (_) {}
+      return false;
+    }
+    function hasStoredWalletAccess() {
+      try {
+        var saved = JSON.parse(localStorage.getItem('apotiHolderWalletAccess') || 'null');
+        return Boolean(saved && saved.claimToken);
+      } catch (_) {
+        return false;
+      }
+    }
+    var urlState = window.location.search + window.location.hash;
+    var isReturningFromEmail = /(?:[?#&](?:access_token|refresh_token|code|type)=)/.test(urlState);
+    var shouldRestore = isReturningFromEmail || hasStoredSupabaseSession() || hasStoredWalletAccess();
+    window.__holderHubShouldRestore = shouldRestore;
+    if (!shouldRestore) return;
+    document.body.classList.add('auth-booting');
+    window.__holderHubBootFallback = setTimeout(function () {
+      document.body.classList.remove('auth-booting');
+      var status = document.getElementById('walletStatus');
+      if (status) {
+        status.className = 'status show err';
+        status.textContent = 'Could not restore saved access. Choose a holder wallet or sign in with email.';
+      }
+      ['connectEth', 'connectTez', 'showEmailLoginBtn'].forEach(function (id) {
+        var button = document.getElementById(id);
+        if (button) button.disabled = false;
+      });
+    }, 5000);
+  })();
+</script>
 
 <nav>
   <a class="nav-logo" href="/holder-hub" aria-label="Holder Hub home">KAY'S WORKS</a>
@@ -2183,12 +2227,20 @@ function cleanStatusMessage(value) {
 }
 function shortAddr(a) { return a ? a.slice(0, 6) + '…' + a.slice(-4) : ''; }
 
+function finishAuthBoot() {
+  if (window.__holderHubBootFallback) {
+    clearTimeout(window.__holderHubBootFallback);
+    window.__holderHubBootFallback = null;
+  }
+  document.body.classList.remove('auth-booting');
+}
+
 // ── Boot ──
 (async function boot() {
+  try {
   els.connectEth.disabled = true;
   els.connectTez.disabled = true;
   els.showEmailLoginBtn.disabled = true;
-  setStatus(els.walletStatus, '', 'Loading…');
 
   let cfg;
   try {
@@ -2206,7 +2258,7 @@ function shortAddr(a) { return a ? a.slice(0, 6) + '…' + a.slice(-4) : ''; }
     if (!res.ok) throw new Error(cfg.error || 'Could not load configuration.');
   } catch (err) {
     setStatus(els.walletStatus, 'err', 'This page isn\'t configured yet: ' + err.message);
-    document.body.classList.remove('auth-booting');
+    finishAuthBoot();
     return; // sb never gets created — nothing else can safely run
   }
 
@@ -2228,8 +2280,21 @@ function shortAddr(a) { return a ? a.slice(0, 6) + '…' + a.slice(-4) : ''; }
   await handleSession(session);
 
   sb.auth.onAuthStateChange(async (_event, session) => {
-    await handleSession(session);
+    try {
+      await handleSession(session);
+    } catch (err) {
+      console.error('Holder Hub auth state failed:', err);
+      finishAuthBoot();
+    }
   });
+  } catch (err) {
+    console.error('Holder Hub boot failed:', err);
+    els.connectEth.disabled = false;
+    els.connectTez.disabled = false;
+    els.showEmailLoginBtn.disabled = false;
+    setStatus(els.walletStatus, 'err', 'Could not restore saved access. Choose a holder wallet or sign in with email.');
+    finishAuthBoot();
+  }
 })();
 
 function claimTokenFromCurrentUrl() {
@@ -2270,7 +2335,7 @@ async function handleSession(session) {
     isReverifyMode = false;
     setWalletStepCopy(false);
     showStep('stepWallet');
-    document.body.classList.remove('auth-booting');
+    finishAuthBoot();
     return;
   }
   currentUser = session.user;
@@ -2312,7 +2377,7 @@ async function handleSession(session) {
     setWalletStepCopy(true);
     showStep('stepWallet');
     setStatus(els.walletStatus, 'err', 'This email is signed in, but no holder wallet is linked to it yet. Choose the holder wallet below to link it.');
-    document.body.classList.remove('auth-booting');
+    finishAuthBoot();
   } else {
     isReverifyMode = false;
     await enterDashboard();
@@ -2875,7 +2940,7 @@ async function enterDashboard() {
     try { return localStorage.getItem(ACTIVE_TAB_STORAGE_KEY); } catch (_) { return null; }
   })();
   activateHubTab(savedTab || 'current', { save:false, scroll:false });
-  document.body.classList.remove('auth-booting');
+  finishAuthBoot();
 }
 
 // IDs 1 and 2 define the participant's Wood/Bronze core. ID 3 is read from
@@ -4070,10 +4135,18 @@ async function loadParticipants() {
     });
   });
 
-  const activeAddress = String(currentHolder?.wallet_address || '').toLowerCase();
+  const activeAddresses = new Set(
+    [
+      currentHolder,
+      ...((currentHolder?.linked_wallets && currentHolder.linked_wallets.length) ? currentHolder.linked_wallets : [])
+    ]
+      .map(row => row?.wallet_address || row?.walletAddress)
+      .filter(Boolean)
+      .map(address => String(address).toLowerCase())
+  );
   groups.forEach(group => {
-    group.isCurrent = !!activeAddress && group.wallets.some(wallet =>
-      String(wallet.address || '').toLowerCase() === activeAddress
+    group.isCurrent = activeAddresses.size > 0 && group.wallets.some(wallet =>
+      activeAddresses.has(String(wallet.address || '').toLowerCase())
     );
   });
   // Stable sort: move only the connected participant; preserve everyone else's order.
