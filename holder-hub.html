@@ -30,9 +30,21 @@
   html { scroll-behavior: smooth; }
   body.auth-booting #gate,
   body.auth-booting #dashboard { display:none !important; }
-  body.auth-booting #authBoot { display:none !important; }
+  body.auth-booting #authBoot { display:grid; place-items:center; min-height:46vh; }
   #authBoot { display:none; max-width:640px; margin:4rem auto; text-align:center; }
-  #authBoot .panel { text-align:center; }
+  #authBoot .panel { display:grid; place-items:center; text-align:center; border:0; background:transparent; box-shadow:none; }
+  .holder-refresh-loader,
+  .participant-mini-loader {
+    width:54px; aspect-ratio:1; border-radius:50%;
+    border:1px solid rgba(201,153,58,.42);
+    background:
+      radial-gradient(circle at 50% 50%, rgba(237,203,126,.95) 0 12%, transparent 13%),
+      conic-gradient(from 0deg, transparent 0 18%, rgba(201,153,58,.95) 19% 28%, transparent 29% 48%, rgba(240,197,109,.72) 49% 58%, transparent 59% 100%);
+    box-shadow:0 0 24px rgba(201,153,58,.22), inset 0 0 18px rgba(201,153,58,.12);
+    animation:holderLoaderSpin 1.05s linear infinite;
+  }
+  .participant-mini-loader { width:28px; flex:0 0 auto; }
+  @keyframes holderLoaderSpin { to { transform:rotate(360deg); } }
   body {
     min-height: 100vh;
     font-family: 'Crimson Pro', serif;
@@ -490,9 +502,10 @@
     background:radial-gradient(circle at 50% 50%,rgba(201,153,58,0.10),transparent 48%),rgba(30,20,16,0.2); overflow:visible;
   }
   .participant-circle::after { content:''; position:absolute; inset:12%; border:1px solid rgba(201,153,58,.12); border-radius:50%; pointer-events:none; }
-  .participant-node { position:absolute; width:150px; min-width:0; text-align:center; offset-path:ellipse(43% 39% at 50% 50%); offset-distance:var(--orbit-start); offset-rotate:0deg; animation:participantOrbit 72s linear infinite; z-index:1; }
-  .participant-circle:has(.participant-token:hover) .participant-node,.participant-circle:focus-within .participant-node { animation-play-state:paused; }
-  @keyframes participantOrbit { from{offset-distance:var(--orbit-start)} to{offset-distance:calc(var(--orbit-start) + 100%)} }
+  .participant-node {
+    position:absolute; left:var(--orbit-x,50%); top:var(--orbit-y,50%);
+    width:150px; min-width:0; text-align:center; transform:translate(-50%,-50%); z-index:1;
+  }
   .participant-token {
     position:relative; display:grid; place-items:center; width:86px; aspect-ratio:1; margin:0 auto 0.8rem;
     border:1px solid rgba(255,255,255,0.18); border-radius:50%; color:#f5e6c8;
@@ -525,6 +538,19 @@
   .participant-legend { display:flex; flex-wrap:wrap; justify-content:center; gap:0.7rem 1.25rem; margin:0 0 1.3rem; color:var(--text-muted); font-size:0.76rem; }
   .participant-legend span { display:inline-flex; align-items:center; gap:0.42rem; }
   .participant-hint { margin:-.55rem 0 1.2rem; text-align:center; color:var(--gold); font-family:'Cinzel',serif; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; }
+  .participant-tools { display:flex; justify-content:center; align-items:center; gap:.75rem; margin:0 0 1.15rem; }
+  .participant-refresh-btn {
+    display:inline-flex; align-items:center; justify-content:center; min-height:38px; padding:.55rem .9rem;
+    border:1px solid rgba(201,153,58,.5); border-radius:5px; background:rgba(70,42,28,.34);
+    color:var(--gold); cursor:pointer; font-family:'Cinzel',serif; font-size:.62rem; letter-spacing:.13em; text-transform:uppercase;
+  }
+  .participant-refresh-btn:disabled { opacity:.58; cursor:wait; }
+  .participant-loading {
+    min-height:420px; display:flex; align-items:center; justify-content:center; gap:.85rem;
+    border:1px solid var(--line); border-radius:18px; color:var(--sand);
+    background:radial-gradient(circle at 50% 50%,rgba(201,153,58,0.10),transparent 48%),rgba(30,20,16,0.2);
+    font-family:'Cinzel',serif; font-size:.72rem; letter-spacing:.12em; text-transform:uppercase;
+  }
   .legend-dot { width:11px; height:11px; border-radius:50%; background:#76502f; border:1px solid rgba(255,255,255,0.2); }
   .legend-dot.bronze { background:linear-gradient(145deg,#4a3010,#a07838 48%,#5a3a10); border-color:rgba(184,144,74,0.68); }
   .legend-dot.work { background:transparent; border:2px solid #d06836; }
@@ -560,22 +586,15 @@
   @media (prefers-reduced-motion:reduce) { .participant-node { animation:none; } }
   @media (min-width:761px) {
     .participant-circle {
-      display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
-      gap:1.35rem 1.8rem; height:auto; min-height:420px; padding:2rem;
-      border-radius:18px; overflow:visible;
+      height:clamp(470px,44vw,610px); min-height:420px; border-radius:50%; overflow:visible;
     }
-    .participant-circle::after { inset:8%; border-radius:18px; }
-    .participant-node {
-      position:relative; width:150px; offset-path:none; offset-distance:0;
-      animation:none; transform:none;
-    }
+    .participant-circle::after { inset:12%; border-radius:50%; }
   }
   @media (max-width:760px) {
     .participant-legend { gap:.55rem .85rem; margin-bottom:1.1rem; font-size:.68rem; }
     .participant-circle { height:clamp(420px,122vw,500px); border-radius:50%; overflow:hidden; }
     .participant-circle::after { display:block; inset:18% 19%; border-radius:50%; }
-    .participant-node { width:86px; offset-path:ellipse(34% 31% at 50% 50%); animation-duration:58s; }
-    .participant-circle:focus-within .participant-node { animation-play-state:running; }
+    .participant-node { width:86px; }
     .participant-token { width:54px; margin-bottom:.38rem; }
     .participant-token::before { inset:6px; }
     .participant-initial { font-size:.92rem; }
@@ -585,7 +604,7 @@
   }
   @media (max-width:390px) {
     .participant-circle { height:410px; }
-    .participant-node { width:78px; offset-path:ellipse(34% 30% at 50% 50%); }
+    .participant-node { width:78px; }
     .participant-token { width:50px; }
     .participant-name { font-size:.72rem; }
     .participant-you { font-size:.38rem; padding:.14rem .34rem; }
@@ -1160,9 +1179,8 @@
 
 <div class="page">
   <section id="authBoot">
-    <div class="panel">
-      <div class="panel-title">Opening Holder Hub</div>
-      <p class="step-note" style="margin:0">Restoring your saved access...</p>
+    <div class="panel" aria-label="Opening Holder Hub">
+      <div class="holder-refresh-loader" aria-hidden="true"></div>
     </div>
   </section>
 
@@ -2092,6 +2110,9 @@
         <span><i class="legend-dot gold" aria-hidden="true"></i>Gold token</span>
       </div>
       <p class="participant-hint">Tap or click a patron token to view their collected works</p>
+      <div class="participant-tools">
+        <button class="participant-refresh-btn" type="button" id="refreshParticipantsBtn">Refresh patron circle</button>
+      </div>
       <div id="participantsList"></div>
     </div>
 
@@ -3578,6 +3599,7 @@ async function walletOwnsCollectionWork(wallet) {
 
 const participantWorksCache = new Map();
 let participantGroups = [];
+let participantLoadSeq = 0;
 
 async function discoverTezosWorks(address) {
   const url =
@@ -4035,8 +4057,32 @@ async function highlightOwnedPieces() {
 
 // ── Data loading (only what's genuinely dynamic: participants + messages) ──
 
-async function loadParticipants() {
+function setParticipantsFetching(isFetching) {
+  const button = document.getElementById('refreshParticipantsBtn');
+  if (button) {
+    button.disabled = isFetching;
+    button.textContent = isFetching ? 'Refreshing patron circle' : 'Refresh patron circle';
+  }
+}
+
+function renderParticipantsLoading(message = 'Fetching patron circle') {
   const el = document.getElementById('participantsList');
+  if (!el) return;
+  el.innerHTML = `<div class="participant-loading"><span class="participant-mini-loader" aria-hidden="true"></span><span>${escapeMessageHtml(message)}</span></div>`;
+}
+
+function renderParticipantsNotice(message) {
+  const el = document.getElementById('participantsList');
+  if (!el) return;
+  el.innerHTML = `<div class="participant-loading">${escapeMessageHtml(message)}</div>`;
+}
+
+async function loadParticipants() {
+  const requestId = ++participantLoadSeq;
+  const el = document.getElementById('participantsList');
+  if (!el) return;
+  setParticipantsFetching(true);
+  renderParticipantsLoading();
   let data = [];
   let error = null;
   try {
@@ -4044,21 +4090,35 @@ async function loadParticipants() {
     const { data: { session } } = await sb.auth.getSession();
     if (session) headers.Authorization = 'Bearer ' + session.access_token;
     else if (pendingClaimToken) headers['x-holder-claim'] = pendingClaimToken;
-    const response = await fetch('/api/holder?action=participants', { headers });
+    const response = await walletTimeout(fetch('/api/holder?action=participants', { headers }), 9000, 'Participant request timed out.');
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || 'Could not load participants.');
     data = Array.isArray(result.participants) ? result.participants : [];
   } catch (apiErr) {
     console.warn('Participant API lookup failed, retrying holder_public:', apiErr);
-    const direct = await sb.from('holder_public').select('*').order('created_at', { ascending: true });
-    data = direct.data;
-    error = direct.error;
+    try {
+      const direct = await walletTimeout(
+        sb.from('holder_public').select('*').order('created_at', { ascending: true }),
+        9000,
+        'Participant fallback timed out.'
+      );
+      data = direct.data;
+      error = direct.error;
+    } catch (fallbackErr) {
+      console.warn('Participant fallback lookup failed:', fallbackErr);
+      error = fallbackErr;
+    }
   }
+  if (requestId !== participantLoadSeq) return;
   const fallbackRows = currentHolder
     ? (currentHolder.linked_wallets && currentHolder.linked_wallets.length ? currentHolder.linked_wallets : [currentHolder])
     : [];
   if (error || !data?.length) {
-    if (!fallbackRows.length) { el.innerHTML = '<p class="empty-state">No patrons to show yet.</p>'; return; }
+    if (!fallbackRows.length) {
+      renderParticipantsNotice(error ? 'The patron circle could not load. Try refreshing it.' : 'No patrons to show yet.');
+      setParticipantsFetching(false);
+      return;
+    }
     data = fallbackRows.map(row => ({
       display_name: holderDisplayName(row) || currentHolder.display_name || null,
       tier: row.tier || currentHolder.tier || null,
@@ -4090,10 +4150,14 @@ async function loadParticipants() {
   data = await Promise.all(data.map(async holder => {
     const enriched = { ...holder };
     try {
-      const gateBalances = await fetchWalletGateBalances({
-        wallet_address: holder.wallet_address || holder.walletAddress,
-        chain: String(holder.chain || '').toLowerCase(),
-      });
+      const gateBalances = await walletTimeout(
+        fetchWalletGateBalances({
+          wallet_address: holder.wallet_address || holder.walletAddress,
+          chain: String(holder.chain || '').toLowerCase(),
+        }),
+        5500,
+        'Participant token lookup timed out.'
+      );
       enriched.balancesByTokenId = gateBalances;
       enriched.has_gold_token = Number(gateBalances['3'] || 0) > 0;
       if (Number(gateBalances['2'] || 0) > 0) enriched.tier = 'bronze';
@@ -4102,12 +4166,17 @@ async function loadParticipants() {
       console.warn('Participant entry-token lookup failed:', holder.chain, err);
     }
     try {
-      enriched.owns_work = await walletOwnsCollectionWork(holder);
+      enriched.owns_work = await walletTimeout(
+        walletOwnsCollectionWork(holder),
+        5500,
+        'Participant artwork lookup timed out.'
+      );
     } catch (err) {
       console.warn('Participant artwork lookup failed:', holder.chain, err);
     }
     return enriched;
   }));
+  if (requestId !== participantLoadSeq) return;
 
   // Group linked ETH/Tezos wallets by holder account first, then by display
   // name. This ensures artwork held in a second wallet contributes its halo to
@@ -4158,8 +4227,10 @@ async function loadParticipants() {
     const tokenClass = `tier-${g.tier || 'none'}${g.ownsWork ? ' has-work' : ''}${g.hasGoldToken ? ' has-gold' : ''}${g.isCurrent ? ' is-current' : ''}`;
     const badges = [g.tier ? `${g.tier} token` : 'holder', g.ownsWork ? 'work owner' : '', g.hasGoldToken ? 'gold' : ''].filter(Boolean).join(' · ');
     const label = `${name}, ${badges}${g.isCurrent ? ', you' : ''}`;
-    const orbitStart = (index / Math.max(groups.length, 1) * 100).toFixed(3) + '%';
-    return `<div class="participant-node" style="--orbit-start:${orbitStart}">
+    const angle = (index / Math.max(groups.length, 1)) * Math.PI * 2 - Math.PI / 2;
+    const orbitX = (50 + Math.cos(angle) * 36).toFixed(3) + '%';
+    const orbitY = (50 + Math.sin(angle) * 33).toFixed(3) + '%';
+    return `<div class="participant-node" style="--orbit-x:${orbitX};--orbit-y:${orbitY}">
       <button class="participant-token ${tokenClass}" type="button" data-participant-index="${index}" aria-label="View works owned by ${escapeMessageHtml(label)}">
         <span class="participant-initial" aria-hidden="true">${escapeMessageHtml(name.trim().charAt(0).toUpperCase() || 'H')}</span>
       </button>
@@ -4170,7 +4241,13 @@ async function loadParticipants() {
   el.querySelectorAll('[data-participant-index]').forEach(button => {
     button.addEventListener('click', () => openParticipantWorks(Number(button.dataset.participantIndex)));
   });
+  setParticipantsFetching(false);
 }
+
+document.getElementById('refreshParticipantsBtn')?.addEventListener('click', () => {
+  participantWorksCache.clear();
+  loadParticipants();
+});
 
 document.getElementById('participantWorksClose')?.addEventListener('click',closeParticipantWorks);
 document.getElementById('participantWorksModal')?.addEventListener('click',event => {
