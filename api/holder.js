@@ -466,7 +466,7 @@ async function handleVerify(req, res, supabase) {
     }, { onConflict: 'wallet_address,chain' });
     if (upsertErr) return res.status(500).json({ error: 'Could not save holder record: ' + upsertErr.message });
 
-    const postLinkWallets = await getHolderAccessRows(req, supabase);
+    const postLinkWallets = await findLinkedHolderRows(supabase, chain, normalizedAddress, holderTokens.balancesByTokenId);
     const namedPostLinkWallet = postLinkWallets.find(row => holderDisplayName(row)) || null;
     const postLinkDisplayName = holderDisplayName(namedPostLinkWallet) || displayName;
     const postLinkEmailUpdatesOptIn = postLinkWallets.some(row => row.email_updates_opt_in === true) || emailUpdatesOptIn;
@@ -734,7 +734,15 @@ async function getHolderAccessRows(req, supabase) {
       .eq('consumed', false)
       .maybeSingle();
     if (error) throw error;
-    if (pending && new Date(pending.expires_at) > new Date()) return [pending];
+    if (pending && new Date(pending.expires_at) > new Date()) {
+      const linkedRows = await findLinkedHolderRows(
+        supabase,
+        pending.chain,
+        pending.wallet_address,
+        null
+      );
+      return linkedRows.length ? linkedRows : [pending];
+    }
   }
 
   return [];
