@@ -2143,7 +2143,18 @@ const els = {
 
 function setStatus(el, cls, msg) {
   el.className = 'status show' + (cls ? ' ' + cls : '');
-  el.textContent = msg;
+  el.textContent = cleanStatusMessage(msg);
+}
+
+function cleanStatusMessage(value) {
+  const text = String(value || '').trim();
+  if (/unexpected end of json input/i.test(text)) {
+    return 'The wallet did not finish the connection response. Close the wallet popup, unlock the wallet, and try Ethereum Wallet again.';
+  }
+  if (/failed to fetch|networkerror|load failed/i.test(text)) {
+    return 'The connection request could not reach the server. Check the page is live, then try again.';
+  }
+  return text;
 }
 function shortAddr(a) { return a ? a.slice(0, 6) + '…' + a.slice(-4) : ''; }
 
@@ -2425,21 +2436,27 @@ els.reverifyBtn.addEventListener('click', () => {
 });
 
 async function connectEth() {
+  els.connectEth.disabled = true;
+  els.connectTez.disabled = true;
   try {
     if (!window.ethereum) throw new Error('No Ethereum wallet found in this browser.');
     setStatus(els.walletStatus, '', 'Connecting…');
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const accounts = await provider.send('eth_requestAccounts', []);
-    const address = accounts[0];
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const address = Array.isArray(accounts) ? accounts[0] : accounts;
     if (!address) throw new Error('Wallet connected but returned no Ethereum address.');
     await verifyAndLink('ethereum', address);
   } catch (err) {
     setStatus(els.walletStatus, 'err', friendlyErrorMessage(err, 'Could not connect Ethereum wallet.'));
+  } finally {
+    els.connectEth.disabled = false;
+    els.connectTez.disabled = false;
   }
 }
 
 async function connectTezosWith(connector) {
   els.tezosWalletModal.classList.remove('show');
+  els.connectEth.disabled = true;
+  els.connectTez.disabled = true;
   try {
     setStatus(els.walletStatus, '', 'Connecting Tezos wallet…');
     const address = await connector();
@@ -2448,6 +2465,9 @@ async function connectTezosWith(connector) {
     const msg = friendlyErrorMessage(err, 'Could not connect Tezos wallet.');
     console.error('Tezos connect error:', err);
     setStatus(els.walletStatus, 'err', 'Tezos: ' + msg);
+  } finally {
+    els.connectEth.disabled = false;
+    els.connectTez.disabled = false;
   }
 }
 
