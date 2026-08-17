@@ -28,6 +28,11 @@
   }
 
   html { scroll-behavior: smooth; }
+  body.auth-booting #gate,
+  body.auth-booting #dashboard { display:none !important; }
+  body.auth-booting #authBoot { display:block; }
+  #authBoot { display:none; max-width:640px; margin:4rem auto; text-align:center; }
+  #authBoot .panel { text-align:center; }
   body {
     min-height: 100vh;
     font-family: 'Crimson Pro', serif;
@@ -552,6 +557,18 @@
   .name.tier-wood { color:oklch(76% 0.105 25); }
   .name.tier-none { color:oklch(76% 0.105 60); }
   @media (prefers-reduced-motion:reduce) { .participant-node { animation:none; } }
+  @media (min-width:761px) {
+    .participant-circle {
+      display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
+      gap:1.35rem 1.8rem; height:auto; min-height:420px; padding:2rem;
+      border-radius:18px; overflow:visible;
+    }
+    .participant-circle::after { inset:8%; border-radius:18px; }
+    .participant-node {
+      position:relative; width:150px; offset-path:none; offset-distance:0;
+      animation:none; transform:none;
+    }
+  }
   @media (max-width:760px) {
     .participant-legend { gap:.55rem .85rem; margin-bottom:1.1rem; font-size:.68rem; }
     .participant-circle { height:clamp(420px,122vw,500px); border-radius:50%; overflow:hidden; }
@@ -1086,7 +1103,7 @@
   }
 </style>
 </head>
-<body>
+<body class="auth-booting">
 
 <nav>
   <a class="nav-logo" href="/holder-hub" aria-label="Holder Hub home">KAY'S WORKS</a>
@@ -1098,6 +1115,12 @@
 </nav>
 
 <div class="page">
+  <section id="authBoot">
+    <div class="panel">
+      <div class="panel-title">Opening Holder Hub</div>
+      <p class="step-note" style="margin:0">Restoring your saved access...</p>
+    </div>
+  </section>
 
   <!-- ══════════ GATE: sign in + verify wallet ══════════ -->
   <section id="gate">
@@ -2108,6 +2131,7 @@ let pendingClaimToken = null;   // set once the wallet check succeeds pre-login
 let isReverifyMode = false;     // true when an already-signed-in holder is reconnecting
 let isEmailLoginFlow = false;   // true when a returning holder chose "sign in with email" directly
 const WALLET_ACCESS_STORAGE_KEY = 'apotiHolderWalletAccess';
+const ACTIVE_TAB_STORAGE_KEY = 'apotiHolderHubActiveTab';
 
 const els = {
   stepEmail: document.getElementById('stepEmail'),
@@ -2182,6 +2206,7 @@ function shortAddr(a) { return a ? a.slice(0, 6) + '…' + a.slice(-4) : ''; }
     if (!res.ok) throw new Error(cfg.error || 'Could not load configuration.');
   } catch (err) {
     setStatus(els.walletStatus, 'err', 'This page isn\'t configured yet: ' + err.message);
+    document.body.classList.remove('auth-booting');
     return; // sb never gets created — nothing else can safely run
   }
 
@@ -2245,6 +2270,7 @@ async function handleSession(session) {
     isReverifyMode = false;
     setWalletStepCopy(false);
     showStep('stepWallet');
+    document.body.classList.remove('auth-booting');
     return;
   }
   currentUser = session.user;
@@ -2286,6 +2312,7 @@ async function handleSession(session) {
     setWalletStepCopy(true);
     showStep('stepWallet');
     setStatus(els.walletStatus, 'err', 'This email is signed in, but no holder wallet is linked to it yet. Choose the holder wallet below to link it.');
+    document.body.classList.remove('auth-booting');
   } else {
     isReverifyMode = false;
     await enterDashboard();
@@ -2844,6 +2871,11 @@ async function enterDashboard() {
   loadMessages();
   document.getElementById('ownedAssetSummary').textContent = 'Collection ownership will update after you choose a wallet action.';
   renderOwnedWorks();
+  const savedTab = (() => {
+    try { return localStorage.getItem(ACTIVE_TAB_STORAGE_KEY); } catch (_) { return null; }
+  })();
+  activateHubTab(savedTab || 'current', { save:false, scroll:false });
+  document.body.classList.remove('auth-booting');
 }
 
 // IDs 1 and 2 define the participant's Wood/Bronze core. ID 3 is read from
@@ -3130,17 +3162,31 @@ document.addEventListener('keydown', event => {
 
 document.querySelectorAll('.tabs .tab-btn[data-tab]').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.tabs .tab-btn[data-tab]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.panel-view').forEach(v => v.classList.remove('show'));
-    document.getElementById('view-' + btn.dataset.tab).classList.add('show');
-    els.dashboard.classList.toggle('first-tab-active', btn.dataset.tab === 'current');
-    if (hubTabCurrent) hubTabCurrent.textContent = btn.textContent.trim();
-    hubTabs?.classList.remove('open');
-    hubTabToggle?.setAttribute('aria-expanded', 'false');
-    btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    activateHubTab(btn.dataset.tab);
   });
 });
+
+function activateHubTab(tabName, options = {}) {
+  const btn = document.querySelector(`.tabs .tab-btn[data-tab="${tabName}"]`) ||
+    document.querySelector('.tabs .tab-btn[data-tab="current"]');
+  if (!btn) return;
+  const view = document.getElementById('view-' + btn.dataset.tab);
+  if (!view) return;
+  document.querySelectorAll('.tabs .tab-btn[data-tab]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.panel-view').forEach(v => v.classList.remove('show'));
+  view.classList.add('show');
+  els.dashboard.classList.toggle('first-tab-active', btn.dataset.tab === 'current');
+  if (hubTabCurrent) hubTabCurrent.textContent = btn.textContent.trim();
+  hubTabs?.classList.remove('open');
+  hubTabToggle?.setAttribute('aria-expanded', 'false');
+  if (options.save !== false) {
+    try { localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, btn.dataset.tab); } catch (_) {}
+  }
+  if (options.scroll !== false) {
+    btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
+}
 
 document.querySelectorAll('[data-jump-tab]').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -3554,6 +3600,12 @@ async function discoverEthWorks(address) {
 async function discoverParticipantWorks(group) {
   const cacheKey = group.wallets.map(wallet => `${wallet.chain}:${String(wallet.address).toLowerCase()}`).sort().join('|');
   if (participantWorksCache.has(cacheKey)) return participantWorksCache.get(cacheKey);
+  const knownNames = Array.isArray(group.workNames) ? group.workNames.filter(Boolean) : [];
+  if (knownNames.length) {
+    const names = [...new Set(knownNames)];
+    participantWorksCache.set(cacheKey,names);
+    return names;
+  }
   const results = await Promise.allSettled(group.wallets.map(wallet => {
     const chain = String(wallet.chain || '').toLowerCase();
     if (chain === 'tezos') return discoverTezosWorks(wallet.address);
@@ -4003,7 +4055,7 @@ async function loadParticipants() {
     const key = accountKey || nameKey || null;
     let group = key ? byHolder.get(key) : null;
     if (!group) {
-      group = { display_name: h.display_name, tier: h.tier, auth_user_id: h.auth_user_id, wallets: [], ownsWork: false, hasGoldToken: false };
+      group = { display_name: h.display_name, tier: h.tier, auth_user_id: h.auth_user_id, wallets: [], ownsWork: false, hasGoldToken: false, workNames: [] };
       if (key) byHolder.set(key, group);
       groups.push(group);
     }
@@ -4012,6 +4064,10 @@ async function loadParticipants() {
     if (!group.tier) group.tier = h.tier;
     group.ownsWork = group.ownsWork || h.owns_work === true || h.ownsWork === true;
     group.hasGoldToken = group.hasGoldToken || h.has_gold_token === true || h.hasGoldToken === true || String(h.tier || '').toLowerCase() === 'gold' || Number(h?.balancesByTokenId?.['3'] || 0) > 0;
+    const rowWorkNames = Array.isArray(h.work_names) ? h.work_names : Array.isArray(h.workNames) ? h.workNames : [];
+    rowWorkNames.filter(Boolean).forEach(name => {
+      if (!group.workNames.some(existing => namesMatch(existing, name))) group.workNames.push(name);
+    });
   });
 
   const activeAddress = String(currentHolder?.wallet_address || '').toLowerCase();
