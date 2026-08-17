@@ -723,6 +723,10 @@ async function getHolderAccessRows(req, supabase) {
       if (!key || seen.has(key)) return false;
       seen.add(key);
       return true;
+    }).sort((a, b) => {
+      const named = Number(Boolean(holderDisplayName(b))) - Number(Boolean(holderDisplayName(a)));
+      if (named) return named;
+      return Date.parse(b.last_verified_at || 0) - Date.parse(a.last_verified_at || 0);
     });
   }
 
