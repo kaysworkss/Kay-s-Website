@@ -505,6 +505,7 @@
   .participant-node {
     position:absolute; left:var(--orbit-x,50%); top:var(--orbit-y,50%);
     width:150px; min-width:0; text-align:center; transform:translate(-50%,-50%); z-index:1;
+    will-change:left,top;
   }
   .participant-token {
     position:relative; display:grid; place-items:center; width:86px; aspect-ratio:1; margin:0 auto 0.8rem;
@@ -583,7 +584,7 @@
   .name.tier-bronze { color:oklch(76% 0.105 48); }
   .name.tier-wood { color:oklch(76% 0.105 25); }
   .name.tier-none { color:oklch(76% 0.105 60); }
-  @media (prefers-reduced-motion:reduce) { .participant-node { animation:none; } }
+  @media (prefers-reduced-motion:reduce) { .participant-node { will-change:auto; } }
   @media (min-width:761px) {
     .participant-circle {
       height:clamp(470px,44vw,610px); min-height:420px; border-radius:50%; overflow:visible;
@@ -4227,10 +4228,7 @@ async function loadParticipants() {
     const tokenClass = `tier-${g.tier || 'none'}${g.ownsWork ? ' has-work' : ''}${g.hasGoldToken ? ' has-gold' : ''}${g.isCurrent ? ' is-current' : ''}`;
     const badges = [g.tier ? `${g.tier} token` : 'holder', g.ownsWork ? 'work owner' : '', g.hasGoldToken ? 'gold' : ''].filter(Boolean).join(' · ');
     const label = `${name}, ${badges}${g.isCurrent ? ', you' : ''}`;
-    const angle = (index / Math.max(groups.length, 1)) * Math.PI * 2 - Math.PI / 2;
-    const orbitX = (50 + Math.cos(angle) * 36).toFixed(3) + '%';
-    const orbitY = (50 + Math.sin(angle) * 33).toFixed(3) + '%';
-    return `<div class="participant-node" style="--orbit-x:${orbitX};--orbit-y:${orbitY}">
+    return `<div class="participant-node" data-orbit-index="${index}">
       <button class="participant-token ${tokenClass}" type="button" data-participant-index="${index}" aria-label="View works owned by ${escapeMessageHtml(label)}">
         <span class="participant-initial" aria-hidden="true">${escapeMessageHtml(name.trim().charAt(0).toUpperCase() || 'H')}</span>
       </button>
@@ -4241,7 +4239,84 @@ async function loadParticipants() {
   el.querySelectorAll('[data-participant-index]').forEach(button => {
     button.addEventListener('click', () => openParticipantWorks(Number(button.dataset.participantIndex)));
   });
+  startParticipantOrbit(el.querySelector('.participant-circle'));
   setParticipantsFetching(false);
+}
+
+let participantOrbitFrame = 0;
+let participantOrbitResizeObserver = null;
+
+function startParticipantOrbit(circle) {
+  cancelAnimationFrame(participantOrbitFrame);
+  participantOrbitResizeObserver?.disconnect();
+  if (!circle) return;
+
+  const nodes = Array.from(circle.querySelectorAll('.participant-node'));
+  if (!nodes.length) return;
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let path = [];
+  const startedAt = performance.now();
+
+  // Sample the responsive ellipse and distribute patrons by arc length.
+  // Equal angles visibly bunch up at the narrow left and right ends.
+  function rebuildPath() {
+    const width = circle.clientWidth;
+    const height = circle.clientHeight;
+    const mobile = width <= 760;
+    const nodeClearanceX = mobile ? 48 : 82;
+    const nodeClearanceY = mobile ? 56 : 78;
+    const radiusX = Math.max(1, width / 2 - nodeClearanceX);
+    const radiusY = Math.max(1, height / 2 - nodeClearanceY);
+    const samples = 720;
+    const raw = [];
+    let total = 0;
+
+    for (let i = 0; i <= samples; i += 1) {
+      const angle = -Math.PI / 2 + (i / samples) * Math.PI * 2;
+      const point = { x: width / 2 + Math.cos(angle) * radiusX, y: height / 2 + Math.sin(angle) * radiusY, distance: total };
+      if (raw.length) total += Math.hypot(point.x - raw[raw.length - 1].x, point.y - raw[raw.length - 1].y);
+      point.distance = total;
+      raw.push(point);
+    }
+    path = raw.map(point => ({ ...point, progress: total ? point.distance / total : 0 }));
+  }
+
+  function pointAt(progress) {
+    const wrapped = ((progress % 1) + 1) % 1;
+    let low = 0;
+    let high = path.length - 1;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      if (path[mid].progress < wrapped) low = mid + 1;
+      else high = mid;
+    }
+    const next = path[low];
+    const prev = path[Math.max(0, low - 1)];
+    const span = next.progress - prev.progress;
+    const mix = span > 0 ? (wrapped - prev.progress) / span : 0;
+    return { x: prev.x + (next.x - prev.x) * mix, y: prev.y + (next.y - prev.y) * mix };
+  }
+
+  function draw(now) {
+    if (!circle.isConnected) return;
+    // One calm revolution every 90 seconds; reduced-motion remains still.
+    const travel = reduceMotion ? 0 : (now - startedAt) / 90000;
+    nodes.forEach((node, index) => {
+      const point = pointAt(index / nodes.length + travel);
+      node.style.left = `${point.x}px`;
+      node.style.top = `${point.y}px`;
+    });
+    if (!reduceMotion) participantOrbitFrame = requestAnimationFrame(draw);
+  }
+
+  rebuildPath();
+  draw(startedAt);
+  participantOrbitResizeObserver = new ResizeObserver(() => {
+    rebuildPath();
+    if (reduceMotion) draw(startedAt);
+  });
+  participantOrbitResizeObserver.observe(circle);
 }
 
 document.getElementById('refreshParticipantsBtn')?.addEventListener('click', () => {
