@@ -761,6 +761,7 @@ body.dark .cart-toast { background:#2a1c14; }
   font-size:2rem; font-weight:300; color:var(--text); margin-bottom:0.6rem;
 }
 .error-state-sub { font-size:1rem; color:var(--text-muted); margin-bottom:2rem; }
+.error-state-actions { display:flex; gap:0.8rem; flex-wrap:wrap; justify-content:center; }
 .back-btn {
   font-family:'Cinzel',serif; font-size:0.58rem;
   letter-spacing:0.2em; text-transform:uppercase;
@@ -1063,9 +1064,12 @@ body.dark .cart-note-toggle { color: var(--sand); }
   <div id="printContent" style="display:none"></div>
   <div id="errorState" style="display:none" class="error-state">
     <div class="error-state-icon">⊘</div>
-    <h2 class="error-state-title">Print not found</h2>
-    <p class="error-state-sub">This piece may have sold out or been removed.</p>
-    <a href="/shop" class="back-btn">Back to the shop</a>
+    <h2 class="error-state-title" id="errorStateTitle">Unable to load print</h2>
+    <p class="error-state-sub" id="errorStateSub">There may be a temporary connection problem. Please refresh and try again.</p>
+    <div class="error-state-actions">
+      <button type="button" class="back-btn" id="refreshPrintBtn">Refresh page</button>
+      <a href="/shop" class="back-btn">Back to the shop</a>
+    </div>
   </div>
 </div>
 
@@ -2605,10 +2609,14 @@ function renderRelated(prints) {
 
 /* ─── Load product ─── */
 async function load() {
-  if (!slug) { showError(); return; }
+  if (!slug) { showError('not-found'); return; }
   try {
     const res = await fetch(`/api/shop/products?slug=${encodeURIComponent(slug)}`);
-    if (!res.ok) { showError(); return; }
+    if (!res.ok) {
+      console.error('[print-detail] Product request failed:', res.status, res.statusText);
+      showError(res.status === 404 ? 'not-found' : 'temporary');
+      return;
+    }
     const product = await res.json();
     renderProduct(product);
     // Apply local currency — use requestAnimationFrame to ensure DOM is painted first
@@ -2636,11 +2644,21 @@ async function load() {
         .catch(e => console.error('[related] all-products fetch failed:', e.message));
     }
   } catch(e) {
-    showError();
+    console.error('[print-detail] Unable to load product:', e);
+    showError('temporary');
   }
 }
 
-function showError() {
+function showError(kind = 'temporary') {
+  const notFound = kind === 'not-found';
+  const title = document.getElementById('errorStateTitle');
+  const sub = document.getElementById('errorStateSub');
+  const refresh = document.getElementById('refreshPrintBtn');
+  if (title) title.textContent = notFound ? 'Print not found' : 'Unable to load print';
+  if (sub) sub.textContent = notFound
+    ? 'This piece may have sold out or been removed.'
+    : 'There may be a temporary connection problem. Please refresh and try again.';
+  if (refresh) refresh.style.display = notFound ? 'none' : '';
   document.getElementById('loadingSkeleton').style.display = 'none';
   document.getElementById('errorState').style.display = '';
 }
@@ -2704,6 +2722,7 @@ document.getElementById('printContent').addEventListener('click', e => {
 });
 
 initCartLinks();
+document.getElementById('refreshPrintBtn')?.addEventListener('click', () => location.reload());
 load();
 
 // Fetch full product catalogue for cart recommendations
