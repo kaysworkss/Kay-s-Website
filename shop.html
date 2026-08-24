@@ -3180,7 +3180,7 @@ body.dark { --text-muted: #b3a392; }
     <span class="marquee-item">Fine Art Prints</span>
     <span class="marquee-item">Hand-Signed Editions</span>
     <span class="marquee-item">Ships Worldwide</span>
- <span class="marquee-item marquee-promo" onclick="navigator.clipboard?.writeText('OPEN10');this.querySelector('strong').textContent='COPIED ';setTimeout(()=>this.querySelector('strong').textContent='OPEN10',2000)" title="Click to copy code">Use code <strong>OPEN10</strong> for 10% off</span>
+    <span class="marquee-item marquee-promo announcement-marquee">Complimentary shipping credit of up to $100 on orders of $500 or more.</span>
     <span class="marquee-item">Merch & Goods</span>
     <span class="marquee-item">Handcrafted Notebooks</span>
  <span class="marquee-item">Gicle on Cotton Rag</span>
@@ -3189,7 +3189,7 @@ body.dark { --text-muted: #b3a392; }
     <span class="marquee-item">Fine Art Prints</span>
     <span class="marquee-item">Hand-Signed Editions</span>
     <span class="marquee-item">Ships Worldwide</span>
- <span class="marquee-item marquee-promo" onclick="navigator.clipboard?.writeText('OPEN10');this.querySelector('strong').textContent='COPIED ';setTimeout(()=>this.querySelector('strong').textContent='OPEN10',2000)" title="Click to copy code">Use code <strong>OPEN10</strong> for 10% off</span>
+    <span class="marquee-item marquee-promo announcement-marquee">Complimentary shipping credit of up to $100 on orders of $500 or more.</span>
     <span class="marquee-item">Merch & Goods</span>
     <span class="marquee-item">Handcrafted Notebooks</span>
  <span class="marquee-item">Gicle on Cotton Rag</span>
@@ -3240,7 +3240,7 @@ body.dark { --text-muted: #b3a392; }
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
-#open10Code {
+#announcementText {
   display: inline-block;
   border: 1.5px solid rgba(255,255,255,0.5);
   border-radius: 4px;
@@ -3250,16 +3250,27 @@ body.dark { --text-muted: #b3a392; }
   font-weight: 700;
   transition: background 0.2s, border-color 0.2s;
 }
-#open10Code:hover { background: rgba(255,255,255,0.15); border-color: #fff; }
+#announcementText { position: relative; z-index: 1; }
 </style>
 <div id="launchBanner">
- <span style="opacity:0.7;margin-right:0.5rem"></span>
-  USE CODE&nbsp;
- <span id="open10Code" onclick="navigator.clipboard?.writeText('OPEN10');this.textContent='COPIED ';setTimeout(()=>this.textContent='OPEN10',2000)" title="Click to copy">OPEN10</span>
-  &nbsp;FOR <strong style="font-weight:700">10% OFF</strong> YOUR FIRST ORDER
- <span style="opacity:0.7;margin-left:0.5rem"></span>
+ <span id="announcementText">Complimentary shipping credit of up to $100 on orders of $500 or more.</span>
  <button onclick="document.getElementById('launchBanner').style.display='none'" style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,0.55);font-size:1rem;cursor:pointer;line-height:1" aria-label="Dismiss"></button>
 </div>
+<script>
+function renderShopAnnouncement() {
+  const banner = document.getElementById('launchBanner');
+  const text = document.getElementById('announcementText');
+  if (!banner || !text) return;
+  const message = String(SHOP_CONFIG.announcement || '').trim();
+  const enabled = message && message !== '__OFF__';
+  banner.style.display = enabled ? '' : 'none';
+  if (enabled) text.textContent = message;
+  document.querySelectorAll('.announcement-marquee').forEach(el => {
+    el.style.display = enabled ? '' : 'none';
+    if (enabled) el.textContent = message;
+  });
+}
+</script>
 
 <div id="shopDiscoveryExtras">
 
@@ -4802,9 +4813,11 @@ function renderFeaturedSection() {
     const choices = availablePrintChoices(p);
     if (choices.length > 1) {
       const prices = choices.map(c => productPrice(p, c.key, 'ngn')).filter(Boolean);
-      sizesEl.textContent = prices.length ? `From ${fmt(Math.min(...prices))}` : `${choices.length} options`;
+      const lowest = prices.length ? Math.min(...prices) : 0;
+      sizesEl.textContent = lowest ? `From ${_showLocalCurrency && _visitorRate ? fmtLocal(lowest) : fmt(lowest)}` : `${choices.length} options`;
     } else if (choices.length === 1) {
-      sizesEl.textContent = fmt(productPrice(p, choices[0].key, 'ngn'));
+      const price = productPrice(p, choices[0].key, 'ngn');
+      sizesEl.textContent = _showLocalCurrency && _visitorRate ? fmtLocal(price) : fmt(price);
     } else {
       sizesEl.textContent = '';
     }
@@ -10447,6 +10460,7 @@ async function loadShopData() {
       if (cfg.eth_address)          SHOP_CONFIG.ethAddress          = cfg.eth_address;
       if (cfg.tezos_address)        SHOP_CONFIG.tezosAddress        = cfg.tezos_address;
       if (cfg.featured_product_id)  SHOP_CONFIG.featured_product_id = cfg.featured_product_id;
+      if (typeof cfg.announcement === 'string' && cfg.announcement.trim()) SHOP_CONFIG.announcement = cfg.announcement.trim();
     } else {
       // Wallet/config data can retry independently; it must never invalidate products.
       console.warn('Shop configuration unavailable:', configResult.reason?.message || configResult.reason);
@@ -10462,6 +10476,7 @@ async function loadShopData() {
     // Storefront failures never inject demo/sample products. An empty successful
     // response renders the genuine empty-shop state; a failed first load renders retry.
     renderProducts();
+    renderShopAnnouncement();
     // A checkout handed off from a product page opens immediately from the
     // shared cart. Refresh it once authoritative product/config data arrives so
     // live prices, edition stock and shipping metadata replace cached values.
@@ -10564,8 +10579,8 @@ loadShopData()
       _showLocalCurrency = true;
       _activeCurrency = saved;
       // Update selector button
-      const curr = typeof getLocaleCountries === 'function'
-        ? getLocaleCountries().find(c => c.code === saved)
+      const curr = typeof preferredCurrencyLocale === 'function'
+        ? preferredCurrencyLocale(saved)
         : null;
       const flagHtml = curr?.flag?.length === 2
         ? `<img src="https://flagcdn.com/16x12/${curr.flag}.png" width="16" height="12" style="border-radius:2px;vertical-align:middle" alt=""/>`

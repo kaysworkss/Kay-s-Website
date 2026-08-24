@@ -205,6 +205,16 @@ function getLocaleCountries() {
 }
 const ALL_LOCALE_COUNTRIES = {find: fn => getLocaleCountries().find(fn)}; // compat shim
 
+// A currency can belong to several countries (for example USD). Currency-level
+// controls should use the canonical flag instead of whichever country happens
+// to appear first in the locale list.
+function preferredCurrencyLocale(code) {
+  const preferredCountry = { USD: 'United States', EUR: 'European Union' }[code];
+  return getLocaleCountries().find(c => c.code === code && (!preferredCountry || c.country === preferredCountry))
+    || getLocaleCountries().find(c => c.code === code)
+    || getLocaleCountries()[0];
+}
+
 let _localeFilter = '';
 
 function buildCurrencyDropdown(detectedCode) {
@@ -313,7 +323,7 @@ function setCurrency(code) {
     if (el) el.style.display = 'none';
   });
 
-  const curr = getLocaleCountries().find(c => c.code === code) || getLocaleCountries()[0];
+  const curr = preferredCurrencyLocale(code);
 
   if (code === 'NGN') {
     _showLocalCurrency = false;
@@ -392,6 +402,9 @@ function refreshAllPrices() {
       if (localEl) localEl.style.display = 'none';
     }
   });
+  // The featured spotlight sits outside the product-card loop, so refresh it
+  // explicitly whenever the visitor changes currency.
+  if (typeof renderFeaturedSection === 'function') renderFeaturedSection();
 }
 
 document.addEventListener('click', e => {
@@ -406,6 +419,7 @@ let SHOP_CONFIG = {
   ethAddress:         '',
   tezosAddress:       '',
   featured_product_id: '', // set in admin — ID of the featured print this month
+  announcement: 'Complimentary shipping credit of up to $100 on orders of $500 or more.',
   discount_codes:     [],  // managed in admin → Discounts tab
   products: [
     // One print product is one artwork. The print formats and sizes live inside variants.
