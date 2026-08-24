@@ -3783,6 +3783,7 @@ function renderShopAnnouncement() {
               </div>
               <div style="text-align:right">
                 <div id="deliveryFeeDisplay" style="font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:var(--text)"></div>
+                <div id="deliveryCreditDisplay" style="display:none;font-size:0.72rem;color:#6b7c5c;margin-top:0.2rem"></div>
                 <div id="deliveryFeeNote" style="font-size:0.7rem;color:var(--text-muted);font-style:italic"></div>
               </div>
             </div>
@@ -6502,7 +6503,7 @@ const WEIGHT_TIERS = {
 
 const HIGH_CART_USD = 60;
 const COMPLIMENTARY_SHIPPING_USD = 500;
-const COMPLIMENTARY_SHIPPING_CREDIT_USD = 100;
+const COMPLIMENTARY_SHIPPING_CREDIT_USD = 70;
 const SHIPPING_DIM_DIVISOR = 5000;
 const SHIPPING_BUFFER = 1.2;
 // Per-package packing allowance added before the safety buffer. This covers
@@ -6931,6 +6932,21 @@ function applyComplimentaryShippingCreditNgn(ngn) {
 function intlRate(zone, isLarge, carrier = selectedIntlCarrier(zone)) {
   return applyComplimentaryShippingCreditUsd(rateForBillableWeight(zone, carrier) + packingFeeUsd());
 }
+function grossDeliveryFeeUsd(carrier = selectedIntlCarrier(_deliveryZone)) {
+  if (!_deliveryZone) return 0;
+  let r = DELIVERY_RATES[_deliveryZone];
+  if (!r) return 0;
+  if (!isInternationalZone(_deliveryZone)) r = selectedDomesticRate(r);
+  const isLarge = cartHasLargePrint();
+  if (r.small !== undefined) return +(domesticDeliveryNgn(r, isLarge) / SHOP_RATE).toFixed(2);
+  return +(rateForBillableWeight(_deliveryZone, carrier) + packingFeeUsd()).toFixed(2);
+}
+function grossDeliveryFeeNgn(carrier = selectedIntlCarrier(_deliveryZone)) {
+  return Math.round(grossDeliveryFeeUsd(carrier) * SHOP_RATE);
+}
+function appliedShippingCreditUsd(carrier = selectedIntlCarrier(_deliveryZone)) {
+  return Math.min(grossDeliveryFeeUsd(carrier), complimentaryShippingCreditUsd());
+}
 function deliveryFeeNgn() {
   if (!_deliveryZone) return 0;
   let r = DELIVERY_RATES[_deliveryZone];
@@ -6959,16 +6975,16 @@ function deliveryFeeDisplay(carrier = selectedIntlCarrier(_deliveryZone)) {
   if (!isInternationalZone(_deliveryZone)) r = selectedDomesticRate(r);
   const isLarge = cartHasLargePrint();
   if (r.small !== undefined) {
-    const ngn = applyComplimentaryShippingCreditNgn(domesticDeliveryNgn(r, isLarge));
+    const ngn = domesticDeliveryNgn(r, isLarge);
     return ngn > 0 ? fmt(ngn) : 'Complimentary';
   }
-  const usd = intlRate(_deliveryZone, isLarge, carrier);
+  const usd = grossDeliveryFeeUsd(carrier);
   if (usd <= 0) return 'Complimentary';
   return '$' + usd.toFixed(0) + ' USD (~' + fmt(Math.round(usd * SHOP_RATE)) + ')';
 }
 function carrierLabel(carrier) { return carrier === 'dhl' ? 'DHL Express' : 'UPS'; }
 function deliveryFeeForCarrier(carrier) {
-  const usd = intlRate(_deliveryZone, cartHasLargePrint(), carrier);
+  const usd = grossDeliveryFeeUsd(carrier);
   return usd > 0 ? '$' + usd.toFixed(0) + ' USD' : 'Complimentary';
 }
 
@@ -7006,6 +7022,12 @@ function updateDeliveryEstimate() {
   const domesticInfo = isIntl ? info : selectedDomesticRate(info);
   document.getElementById('deliveryZoneLabel').textContent = (zone === 'ROW' && countryName) ? countryName : domesticInfo.label;
   document.getElementById('deliveryFeeDisplay').innerHTML = deliveryFeeDisplay();
+  const creditEl = document.getElementById('deliveryCreditDisplay');
+  const creditUsd = appliedShippingCreditUsd();
+  if (creditEl) {
+    creditEl.style.display = creditUsd > 0 ? '' : 'none';
+    creditEl.textContent = creditUsd > 0 ? `Shipping credit applied at summary: -$${creditUsd.toFixed(0)} USD` : '';
+  }
   const profile = cartShippingProfile();
   // Customer-facing note: describe the packaging reassuringly, without exposing
   // billable weight or piece counts (internal shipping mechanics).
@@ -7636,6 +7658,14 @@ function buildOrderSummary() {
        </div>`
     : `<div class="order-line"><span>Delivery</span><span style="color:var(--text-muted)">Select country to calculate</span></div>`;
 
+  const shippingCreditUsd = appliedShippingCreditUsd();
+  const shippingCreditLine = _deliveryZone && shippingCreditUsd > 0
+    ? `<div class="order-line" style="color:#6b7c5c">
+        <span>Complimentary shipping credit</span>
+        <span>&minus; ${fmt(Math.round(shippingCreditUsd * SHOP_RATE))} / $${shippingCreditUsd.toFixed(0)}</span>
+       </div>`
+    : '';
+
   const subtotalLine = `<div class="order-line"><span>Subtotal</span><span>${fmt(cartNgnTotal())}</span></div>`;
 
   const holderBenefit = holderMerchBenefit('ngn');
@@ -7667,6 +7697,7 @@ function buildOrderSummary() {
   const totalsHtml = `
     ${subtotalLine}
     ${deliveryLine}
+    ${shippingCreditLine}
     ${holderLine}
     ${discountLine}
     ${tipLine}
