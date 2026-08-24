@@ -998,7 +998,7 @@ function getNgnPerUsdSync() { return _cachedRate || 1400; }
 const NGN_PER_USD_DEFAULT = 1400;
 const SERVER_HIGH_CART_USD = 60;
 const SERVER_COMPLIMENTARY_SHIPPING_USD = 500;
-const SERVER_COMPLIMENTARY_SHIPPING_CREDIT_USD = 100;
+const SERVER_COMPLIMENTARY_SHIPPING_CREDIT_USD = 70;
 const SERVER_SHIPPING_DIM_DIVISOR = 5000;
 const SERVER_SHIPPING_BUFFER = 1.2;
 // Per-package packing allowance added before the safety buffer. This covers
