@@ -3241,16 +3241,19 @@ body.dark { --text-muted: #b3a392; }
   100% { transform: translateX(100%); }
 }
 #announcementText {
+  position: relative;
+  z-index: 1;
+}
+.announcement-highlight {
   display: inline-block;
   border: 1.5px solid rgba(255,255,255,0.5);
   border-radius: 4px;
   padding: 0.1em 0.55em;
-  cursor: pointer;
   letter-spacing: 0.14em;
   font-weight: 700;
   transition: background 0.2s, border-color 0.2s;
 }
-#announcementText { position: relative; z-index: 1; }
+.announcement-highlight:hover { background: rgba(255,255,255,0.12); border-color: #fff; }
 </style>
 <div id="launchBanner">
  <span id="announcementText">Complimentary shipping credit of up to $100 on orders of $500 or more.</span>
@@ -3264,10 +3267,31 @@ function renderShopAnnouncement() {
   const message = String(SHOP_CONFIG.announcement || '').trim();
   const enabled = message && message !== '__OFF__';
   banner.style.display = enabled ? '' : 'none';
-  if (enabled) text.textContent = message;
+  let markedMessage = message;
+  // Admins choose the boxed phrase with [[double brackets]]. For existing
+  // messages without markers, highlight the first monetary amount gracefully.
+  if (enabled && !/\[\[[\s\S]+?\]\]/.test(markedMessage)) {
+    markedMessage = markedMessage.replace(/(?:US\$|\$|₦|£|€)\s?[\d,.]+(?:\s*(?:USD|NGN))?/i, match => `[[${match}]]`);
+  }
+  if (enabled) {
+    text.replaceChildren();
+    const markerPattern = /\[\[([\s\S]+?)\]\]/g;
+    let cursor = 0;
+    let match;
+    while ((match = markerPattern.exec(markedMessage))) {
+      if (match.index > cursor) text.append(document.createTextNode(markedMessage.slice(cursor, match.index)));
+      const highlight = document.createElement('span');
+      highlight.className = 'announcement-highlight';
+      highlight.textContent = match[1];
+      text.append(highlight);
+      cursor = match.index + match[0].length;
+    }
+    if (cursor < markedMessage.length) text.append(document.createTextNode(markedMessage.slice(cursor)));
+  }
+  const plainMessage = message.replace(/\[\[([\s\S]+?)\]\]/g, '$1');
   document.querySelectorAll('.announcement-marquee').forEach(el => {
     el.style.display = enabled ? '' : 'none';
-    if (enabled) el.textContent = message;
+    if (enabled) el.textContent = plainMessage;
   });
 }
 </script>
