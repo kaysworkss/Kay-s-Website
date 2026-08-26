@@ -511,12 +511,27 @@
   }
   .marketplace-offers .btn.ethereum:hover,
   .marketplace-offers .btn.tezos:hover { filter:brightness(1.1); }
-  .chain-burn-note {
-    max-width:760px; margin:0 auto 1.4rem; padding:0.9rem 1rem; text-align:center;
-    border:1px solid rgba(223,184,92,0.34); border-radius:6px;
-    background:rgba(201,153,58,0.07); color:var(--text-muted); line-height:1.55;
+  .holder-offer-trigger { width:100%; }
+  .holder-chain-modal {
+    position:fixed; inset:0; z-index:130; display:none; align-items:center; justify-content:center;
+    padding:1rem; background:rgba(12,8,6,0.78); backdrop-filter:blur(9px);
   }
-  .chain-burn-note strong { color:var(--gold); }
+  .holder-chain-modal.show { display:flex; }
+  .holder-chain-modal-box {
+    position:relative; width:min(520px,100%); padding:1.5rem; border:1px solid rgba(223,184,92,0.46);
+    border-radius:8px; background:#2b1b14; box-shadow:0 28px 90px rgba(0,0,0,0.55); text-align:center;
+  }
+  .holder-chain-modal-close {
+    position:absolute; top:0.65rem; right:0.7rem; width:36px; height:36px; border-radius:50%;
+    border:1px solid var(--line); background:rgba(0,0,0,0.18); color:var(--sand); cursor:pointer;
+  }
+  .holder-chain-modal-box h3 { margin:0.35rem 2rem 0.4rem; font-size:clamp(1.65rem,4vw,2.15rem); }
+  .holder-chain-modal-intro { color:var(--text-muted); margin-bottom:1rem; }
+  .holder-chain-modal-note {
+    margin:1rem 0 0; padding:0.8rem; border:1px solid rgba(223,184,92,0.3); border-radius:5px;
+    background:rgba(201,153,58,0.07); color:var(--text-muted); font-size:0.88rem; line-height:1.5;
+  }
+  .holder-chain-modal-note strong { color:var(--gold); }
   @media (max-width:520px) { .marketplace-offers { grid-template-columns:1fr; } }
 
   .participant-circle {
@@ -1701,7 +1716,6 @@
         <h2>All Artworks</h2>
         <p>Explore the story in sequence, from recent releases to the works that opened the series.</p>
       </header>
-      <p class="chain-burn-note"><strong>One work, two chain options.</strong> If an offer is accepted on Ethereum or Tezos, its duplicate on the other chain will be burned.</p>
       <div class="tabs" id="available-artworks" style="border-bottom:none;margin-bottom:1.2rem;padding-bottom:0;">
         <button class="tab-btn active" data-artstatus="all">All</button>
         <button class="tab-btn" data-artstatus="available">Available</button>
@@ -4662,9 +4676,11 @@ document.addEventListener('keydown', event => {
     const actions = document.createElement('div');
     actions.className = 'marketplace-offers';
     actions.setAttribute('aria-label', 'Marketplace offer options for ' + title);
-    actions.innerHTML =
-      '<a class="btn ethereum" href="https://opensea.io/item/ethereum/' + ethContract + '/' + ids.eth + '" target="_blank" rel="noopener noreferrer">Make an offer on ETH</a>' +
-      '<a class="btn tezos" href="https://objkt.com/tokens/' + tezContract + '/' + ids.tez + '" target="_blank" rel="noopener noreferrer">Make an offer on Tezos</a>';
+    actions.style.gridTemplateColumns = '1fr';
+    actions.innerHTML = '<button class="btn holder-offer-trigger" type="button" ' +
+      'data-offer-title="' + title + '" ' +
+      'data-eth-href="https://opensea.io/item/ethereum/' + ethContract + '/' + ids.eth + '" ' +
+      'data-tezos-href="https://objkt.com/tokens/' + tezContract + '/' + ids.tez + '">Make an Offer</button>';
     return actions;
   }
 
@@ -4713,6 +4729,48 @@ document.addEventListener('keydown', event => {
     actions.innerHTML = '<a class="btn" href="https://www.kaysworks.com/auction" target="_blank" rel="noopener noreferrer">View Auction</a>';
     chapterThree.querySelector('.card-body')?.appendChild(actions);
   }
+
+  const modal = document.createElement('div');
+  modal.className = 'holder-chain-modal';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-labelledby', 'holderChainModalTitle');
+  modal.innerHTML = '<div class="holder-chain-modal-box">' +
+    '<button class="holder-chain-modal-close" type="button" aria-label="Close offer options">&times;</button>' +
+    '<span class="eyebrow">Choose your chain</span>' +
+    '<h3 id="holderChainModalTitle">Make an offer</h3>' +
+    '<p class="holder-chain-modal-intro">Select the chain you would like to use.</p>' +
+    '<div class="marketplace-offers">' +
+      '<a class="btn ethereum" data-holder-chain="eth" target="_blank" rel="noopener noreferrer">Make an offer on ETH</a>' +
+      '<a class="btn tezos" data-holder-chain="tezos" target="_blank" rel="noopener noreferrer">Make an offer on Tezos</a>' +
+    '</div>' +
+    '<p class="holder-chain-modal-note"><strong>One work, two chain options.</strong> If an offer is accepted on either chain, the duplicate on the other chain will be burned.</p>' +
+  '</div>';
+  document.body.appendChild(modal);
+  const closeButton = modal.querySelector('.holder-chain-modal-close');
+  const modalTitle = modal.querySelector('#holderChainModalTitle');
+  const ethLink = modal.querySelector('[data-holder-chain="eth"]');
+  const tezosLink = modal.querySelector('[data-holder-chain="tezos"]');
+  let lastTrigger = null;
+  document.querySelectorAll('.holder-offer-trigger').forEach(trigger => {
+    trigger.addEventListener('click', () => {
+      lastTrigger = trigger;
+      modalTitle.textContent = 'Make an offer for ' + trigger.dataset.offerTitle;
+      ethLink.href = trigger.dataset.ethHref;
+      tezosLink.href = trigger.dataset.tezosHref;
+      modal.classList.add('show');
+      document.body.style.overflow = 'hidden';
+      closeButton.focus();
+    });
+  });
+  function closeModal() {
+    modal.classList.remove('show');
+    document.body.style.overflow = '';
+    lastTrigger?.focus();
+  }
+  closeButton.addEventListener('click', closeModal);
+  modal.addEventListener('click', event => { if (event.target === modal) closeModal(); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && modal.classList.contains('show')) closeModal(); });
 }());
 </script>
 </body>

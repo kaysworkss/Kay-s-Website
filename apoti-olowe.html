@@ -1861,21 +1861,36 @@
   .ao-offer-btn {
     display: inline-flex; align-items: center; justify-content: center; min-height: 42px;
     padding: 0.65rem 0.7rem; border: 1px solid rgba(200,146,42,0.55); border-radius: 5px;
-    background: linear-gradient(135deg,#7768d8 0%,#5b4fbd 55%,#473b9c 100%);
+    background: linear-gradient(135deg,#c8922a 0%,#a97430 42%,#7a5020 68%,#d4a84b 100%);
     color: #fdf0d0; font-family: 'Cinzel', serif; font-size: 0.56rem; line-height: 1.35;
     letter-spacing: 0.1em; text-align: center; text-transform: uppercase;
     transition: transform 0.2s, filter 0.2s, border-color 0.2s, background 0.2s;
   }
   .ao-offer-btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
   .ao-offer-btn.auction { background:linear-gradient(135deg,#c8922a 0%,#a97430 42%,#7a5020 68%,#d4a84b 100%); }
+  .ao-chain-modal .ao-offer-btn.ethereum { background:linear-gradient(135deg,#7768d8 0%,#5b4fbd 55%,#473b9c 100%); border-color:rgba(151,140,235,0.76); }
   .ao-offer-btn.tezos { background:linear-gradient(135deg,#2c9edb 0%,#1679be 55%,#0f5e9c 100%); color:#f4fbff; border-color:rgba(97,194,244,0.72); }
   .ao-offer-btn.tezos:hover { border-color:#8bd7ff; background:linear-gradient(135deg,#35abe8 0%,#1b86cd 55%,#1269aa 100%); }
-  .ao-chain-note {
-    max-width:760px; margin:0 auto 2rem; padding:0.9rem 1rem; text-align:center;
-    border:1px solid rgba(201,153,58,0.34); border-radius:6px;
-    background:rgba(201,153,58,0.07); color:var(--text-muted); font-size:0.92rem; line-height:1.55;
+  .ao-offer-trigger { width:100%; }
+  .ao-chain-modal {
+    position:fixed; inset:0; z-index:120; display:none; align-items:center; justify-content:center;
+    padding:1rem; background:rgba(12,8,5,0.78); backdrop-filter:blur(9px);
   }
-  .ao-chain-note strong { color:var(--gold); }
+  .ao-chain-modal.show { display:flex; }
+  .ao-chain-modal-box {
+    position:relative; width:min(520px,100%); padding:1.5rem; border:1px solid rgba(201,153,58,0.48);
+    border-radius:8px; background:#2b1b14; box-shadow:0 28px 90px rgba(0,0,0,0.52); text-align:center;
+  }
+  .ao-chain-modal-close {
+    position:absolute; top:0.65rem; right:0.7rem; width:36px; height:36px; border-radius:50%;
+    border:1px solid var(--divider); background:rgba(0,0,0,0.18); color:var(--text-soft); cursor:pointer;
+  }
+  .ao-chain-modal-box h3 { margin:0.35rem 2rem 0.4rem; font-size:clamp(1.65rem,4vw,2.15rem); }
+  .ao-chain-modal-intro { color:var(--text-muted); margin-bottom:1rem; }
+  .ao-chain-modal-note {
+    margin:1rem 0 0; padding:0.8rem; border:1px solid rgba(201,153,58,0.3); border-radius:5px;
+    background:rgba(201,153,58,0.07); color:var(--text-muted); font-size:0.88rem; line-height:1.5;
+  }
   .ao-collection-cta { margin-top: 1.8rem; text-align: center; }
   .ao-collection-cta a {
     display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.8rem 1.6rem;
@@ -2881,8 +2896,6 @@ imgGrey.src = SRC_GREY;
       <button class="ao-collection-filter" type="button" data-collection-filter="available" aria-pressed="false">Available</button>
       <button class="ao-collection-filter" type="button" data-collection-filter="sold" aria-pressed="false">Sold</button>
     </div>
-    <p class="ao-chain-note"><strong>One work, two chain options.</strong> If an offer is accepted on Ethereum or Tezos, its duplicate on the other chain will be burned.</p>
-
     <div class="ao-collection-grid">
 
       <div class="ao-collection-group">Chapter 3 &mdash; Lábẹ́ Igi Òroǹbó</div>
@@ -4612,15 +4625,62 @@ lbPanel.addEventListener('touchend', function(e) {
 })();
 </script>
 <script>
-(function clarifyOfferChains() {
-  document.querySelectorAll('.ao-offer-btn').forEach(function(link) {
-    if (link.classList.contains('tezos')) {
-      link.textContent = 'Make an offer on Tezos';
-    } else if (link.href.indexOf('opensea.io') !== -1) {
-      link.textContent = 'Make an offer on ETH';
-      link.classList.add('ethereum');
-    }
+(function buildChainOfferModal() {
+  var modal = document.createElement('div');
+  modal.className = 'ao-chain-modal';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-labelledby', 'aoChainModalTitle');
+  modal.innerHTML = '<div class="ao-chain-modal-box">' +
+    '<button class="ao-chain-modal-close" type="button" aria-label="Close offer options">&times;</button>' +
+    '<p class="ao-section-label">Choose your chain</p>' +
+    '<h3 id="aoChainModalTitle">Make an offer</h3>' +
+    '<p class="ao-chain-modal-intro">Select the chain you would like to use.</p>' +
+    '<div class="ao-offer-actions">' +
+      '<a class="ao-offer-btn ethereum" data-chain-link="eth" target="_blank" rel="noopener noreferrer">Make an offer on ETH</a>' +
+      '<a class="ao-offer-btn tezos" data-chain-link="tezos" target="_blank" rel="noopener noreferrer">Make an offer on Tezos</a>' +
+    '</div>' +
+    '<p class="ao-chain-modal-note"><strong>One work, two chain options.</strong> If an offer is accepted on either chain, the duplicate on the other chain will be burned.</p>' +
+  '</div>';
+  document.body.appendChild(modal);
+
+  var closeButton = modal.querySelector('.ao-chain-modal-close');
+  var title = modal.querySelector('#aoChainModalTitle');
+  var ethLink = modal.querySelector('[data-chain-link="eth"]');
+  var tezLink = modal.querySelector('[data-chain-link="tezos"]');
+  var lastTrigger = null;
+
+  document.querySelectorAll('.ao-offer-actions').forEach(function(actions) {
+    if (actions.closest('.ao-chain-modal')) return;
+    var openSea = actions.querySelector('a[href*="opensea.io"]');
+    var objkt = actions.querySelector('a[href*="objkt.com"]');
+    if (!openSea || !objkt) return;
+    var cardTitle = actions.closest('.ao-collection-card')?.querySelector('.ao-collection-title')?.textContent.trim() || 'this work';
+    var trigger = document.createElement('button');
+    trigger.className = 'ao-offer-btn ao-offer-trigger';
+    trigger.type = 'button';
+    trigger.textContent = 'Make an Offer';
+    trigger.addEventListener('click', function() {
+      lastTrigger = trigger;
+      title.textContent = 'Make an offer for ' + cardTitle;
+      ethLink.href = openSea.href;
+      tezLink.href = objkt.href;
+      modal.classList.add('show');
+      document.body.style.overflow = 'hidden';
+      closeButton.focus();
+    });
+    actions.style.gridTemplateColumns = '1fr';
+    actions.replaceChildren(trigger);
   });
+
+  function closeModal() {
+    modal.classList.remove('show');
+    document.body.style.overflow = '';
+    if (lastTrigger) lastTrigger.focus();
+  }
+  closeButton.addEventListener('click', closeModal);
+  modal.addEventListener('click', function(event) { if (event.target === modal) closeModal(); });
+  document.addEventListener('keydown', function(event) { if (event.key === 'Escape' && modal.classList.contains('show')) closeModal(); });
 }());
 </script>
 </body>
