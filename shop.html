@@ -3180,7 +3180,7 @@ body.dark { --text-muted: #b3a392; }
     <span class="marquee-item">Fine Art Prints</span>
     <span class="marquee-item">Hand-Signed Editions</span>
     <span class="marquee-item">Ships Worldwide</span>
-    <span class="marquee-item marquee-promo announcement-marquee">Complimentary shipping credit of up to $100 on orders of $500 or more.</span>
+    <span class="marquee-item marquee-promo announcement-marquee" style="display:none"></span>
     <span class="marquee-item">Merch & Goods</span>
     <span class="marquee-item">Handcrafted Notebooks</span>
  <span class="marquee-item">Gicle on Cotton Rag</span>
@@ -3189,7 +3189,7 @@ body.dark { --text-muted: #b3a392; }
     <span class="marquee-item">Fine Art Prints</span>
     <span class="marquee-item">Hand-Signed Editions</span>
     <span class="marquee-item">Ships Worldwide</span>
-    <span class="marquee-item marquee-promo announcement-marquee">Complimentary shipping credit of up to $100 on orders of $500 or more.</span>
+    <span class="marquee-item marquee-promo announcement-marquee" style="display:none"></span>
     <span class="marquee-item">Merch & Goods</span>
     <span class="marquee-item">Handcrafted Notebooks</span>
  <span class="marquee-item">Gicle on Cotton Rag</span>
@@ -3255,8 +3255,8 @@ body.dark { --text-muted: #b3a392; }
 }
 .announcement-highlight:hover { background: rgba(255,255,255,0.12); border-color: #fff; }
 </style>
-<div id="launchBanner">
- <span id="announcementText">Complimentary shipping credit of up to $100 on orders of $500 or more.</span>
+<div id="launchBanner" style="display:none">
+ <span id="announcementText"></span>
  <button onclick="document.getElementById('launchBanner').style.display='none'" style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,0.55);font-size:1rem;cursor:pointer;line-height:1" aria-label="Dismiss"></button>
 </div>
 <script>
@@ -3267,12 +3267,9 @@ function renderShopAnnouncement() {
   const message = String(SHOP_CONFIG.announcement || '').trim();
   const enabled = message && message !== '__OFF__';
   banner.style.display = enabled ? '' : 'none';
-  let markedMessage = message;
-  // Admins choose the boxed phrase with [[double brackets]]. For existing
-  // messages without markers, highlight the first monetary amount gracefully.
-  if (enabled && !/\[\[[\s\S]+?\]\]/.test(markedMessage)) {
-    markedMessage = markedMessage.replace(/(?:US\$|\$|₦|£|€)\s?[\d,.]+(?:\s*(?:USD|NGN))?/i, match => `[[${match}]]`);
-  }
+  // The admin message is authoritative. Only explicitly marked [[words]]
+  // receive a box; ordinary text is rendered without inferred styling.
+  const markedMessage = message;
   if (enabled) {
     text.replaceChildren();
     const markerPattern = /\[\[([\s\S]+?)\]\]/g;
@@ -10515,7 +10512,7 @@ async function loadShopData() {
       if (cfg.eth_address)          SHOP_CONFIG.ethAddress          = cfg.eth_address;
       if (cfg.tezos_address)        SHOP_CONFIG.tezosAddress        = cfg.tezos_address;
       if (cfg.featured_product_id)  SHOP_CONFIG.featured_product_id = cfg.featured_product_id;
-      if (typeof cfg.announcement === 'string' && cfg.announcement.trim()) SHOP_CONFIG.announcement = cfg.announcement.trim();
+      if (typeof cfg.announcement === 'string') SHOP_CONFIG.announcement = cfg.announcement.trim();
     } else {
       // Wallet/config data can retry independently; it must never invalidate products.
       console.warn('Shop configuration unavailable:', configResult.reason?.message || configResult.reason);
