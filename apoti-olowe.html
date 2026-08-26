@@ -1794,6 +1794,22 @@
   .ao-collection-grid {
     display: block;
   }
+  .ao-collection-filters {
+    display:flex; justify-content:center; gap:0; margin:0 auto 2rem;
+    border-top:1px solid var(--divider); border-bottom:1px solid var(--divider);
+  }
+  .ao-collection-filter {
+    position:relative; border:0; background:transparent; color:var(--text-muted); cursor:pointer;
+    padding:0.9rem 1.15rem; font-family:'Cinzel',serif; font-size:0.58rem;
+    letter-spacing:0.13em; text-transform:uppercase;
+  }
+  .ao-collection-filter::after {
+    content:''; position:absolute; left:0.9rem; right:0.9rem; bottom:-1px; height:2px;
+    background:var(--gold); transform:scaleX(0); transition:transform 0.18s ease;
+  }
+  .ao-collection-filter:hover,
+  .ao-collection-filter.active { color:var(--text-soft); }
+  .ao-collection-filter.active::after { transform:scaleX(1); }
   .ao-collection-section { width: 100%; }
   .ao-collection-section + .ao-collection-section { margin-top: 2.7rem; }
   .ao-collection-section-grid {
@@ -1845,14 +1861,21 @@
   .ao-offer-btn {
     display: inline-flex; align-items: center; justify-content: center; min-height: 42px;
     padding: 0.65rem 0.7rem; border: 1px solid rgba(200,146,42,0.55); border-radius: 5px;
-    background: linear-gradient(135deg,#c8922a 0%,#a97430 42%,#7a5020 68%,#d4a84b 100%);
+    background: linear-gradient(135deg,#7768d8 0%,#5b4fbd 55%,#473b9c 100%);
     color: #fdf0d0; font-family: 'Cinzel', serif; font-size: 0.56rem; line-height: 1.35;
     letter-spacing: 0.1em; text-align: center; text-transform: uppercase;
     transition: transform 0.2s, filter 0.2s, border-color 0.2s, background 0.2s;
   }
   .ao-offer-btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
-  .ao-offer-btn.tezos { background: rgba(232,213,176,0.06); color: var(--text-soft); border-color: rgba(201,153,58,0.42); }
-  .ao-offer-btn.tezos:hover { border-color: var(--gold); background: rgba(201,153,58,0.13); }
+  .ao-offer-btn.auction { background:linear-gradient(135deg,#c8922a 0%,#a97430 42%,#7a5020 68%,#d4a84b 100%); }
+  .ao-offer-btn.tezos { background:linear-gradient(135deg,#2c9edb 0%,#1679be 55%,#0f5e9c 100%); color:#f4fbff; border-color:rgba(97,194,244,0.72); }
+  .ao-offer-btn.tezos:hover { border-color:#8bd7ff; background:linear-gradient(135deg,#35abe8 0%,#1b86cd 55%,#1269aa 100%); }
+  .ao-chain-note {
+    max-width:760px; margin:0 auto 2rem; padding:0.9rem 1rem; text-align:center;
+    border:1px solid rgba(201,153,58,0.34); border-radius:6px;
+    background:rgba(201,153,58,0.07); color:var(--text-muted); font-size:0.92rem; line-height:1.55;
+  }
+  .ao-chain-note strong { color:var(--gold); }
   .ao-collection-cta { margin-top: 1.8rem; text-align: center; }
   .ao-collection-cta a {
     display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.8rem 1.6rem;
@@ -2853,6 +2876,13 @@ imgGrey.src = SRC_GREY;
   <section class="ao-section reveal" id="collection">
     <p class="ao-section-label">The Collection</p>
 
+    <div class="ao-collection-filters" role="group" aria-label="Filter the collection by availability">
+      <button class="ao-collection-filter active" type="button" data-collection-filter="all" aria-pressed="true">All</button>
+      <button class="ao-collection-filter" type="button" data-collection-filter="available" aria-pressed="false">Available</button>
+      <button class="ao-collection-filter" type="button" data-collection-filter="sold" aria-pressed="false">Sold</button>
+    </div>
+    <p class="ao-chain-note"><strong>One work, two chain options.</strong> If an offer is accepted on Ethereum or Tezos, its duplicate on the other chain will be burned.</p>
+
     <div class="ao-collection-grid">
 
       <div class="ao-collection-group">Chapter 3 &mdash; Lábẹ́ Igi Òroǹbó</div>
@@ -2865,7 +2895,7 @@ imgGrey.src = SRC_GREY;
           <div class="ao-collection-title">Lábẹ́ Igi Òroǹbó</div>
           <div class="ao-collection-desc">Chapter 3&rsquo;s central painting &mdash; Ayo and Morenike share a quiet morning beneath the orange tree.</div>
           <div class="ao-offer-actions" aria-label="Auction link for Lábẹ́ Igi Òroǹbó" style="grid-template-columns:1fr;">
-            <a class="ao-offer-btn" href="/auction">View Auction</a>
+            <a class="ao-offer-btn auction" href="/auction">View Auction</a>
           </div>
         </div>
       </div>
@@ -3645,7 +3675,7 @@ lbBg.addEventListener('click',    closeLight);
 
   function layoutCollectionMasonry() {
     collection.querySelectorAll('.ao-collection-section-grid').forEach(function(grid) {
-      var items = Array.prototype.slice.call(grid.children);
+      var items = Array.prototype.slice.call(grid.children).filter(function(item) { return !item.hidden; });
       items.forEach(function(item) { item.style.gridRowEnd = ''; });
       if (window.matchMedia('(max-width: 520px)').matches) return;
 
@@ -3658,6 +3688,29 @@ lbBg.addEventListener('click',    closeLight);
       });
     });
   }
+
+  var filterButtons = document.querySelectorAll('[data-collection-filter]');
+  var collectionCards = collection.querySelectorAll('.ao-collection-card');
+  collectionCards.forEach(function(card) {
+    card.dataset.collectionStatus = card.querySelector('.ao-collection-sold-dot') ? 'sold' : 'available';
+  });
+  filterButtons.forEach(function(button) {
+    button.addEventListener('click', function() {
+      var filter = button.dataset.collectionFilter;
+      filterButtons.forEach(function(other) {
+        var selected = other === button;
+        other.classList.toggle('active', selected);
+        other.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      });
+      collectionCards.forEach(function(card) {
+        card.hidden = filter !== 'all' && card.dataset.collectionStatus !== filter;
+      });
+      collection.querySelectorAll('.ao-collection-section').forEach(function(section) {
+        section.hidden = !section.querySelector('.ao-collection-card:not([hidden])');
+      });
+      requestAnimationFrame(layoutCollectionMasonry);
+    });
+  });
 
   collection.querySelectorAll('img').forEach(function(img) {
     if (!img.complete) img.addEventListener('load', layoutCollectionMasonry, { once: true });
@@ -4557,6 +4610,18 @@ lbPanel.addEventListener('touchend', function(e) {
   async function load(){try{const r=await fetch(PARTICIPANT_API,{cache:'no-store'}),j=await r.json();if(!r.ok)throw Error(j.error||'Unavailable');const rows=Array.isArray(j.participants)?[...j.participants]:[];PARTICIPANT_WALLET_LINKS.forEach(linked=>{const address=linked.wallet_address.toLowerCase();if(!rows.some(row=>String(row.wallet_address||'').toLowerCase()===address))rows.push({...linked,participant_key:'name:'+norm(linked.display_name),tier:null,has_gold_token:false,owns_work:false,work_names:[]});});const map=new Map();rows.forEach(row=>{const displayName=String(row.display_name||'').trim(),key=displayName?'name:'+norm(displayName):(row.participant_key||'wallet:'+String(row.chain||'')+':'+String(row.wallet_address||'').toLowerCase());if(!map.has(key))map.set(key,{display_name:row.display_name,tier:row.tier,wallets:[],ownsWork:false,hasGoldToken:false,workNames:[]});const g=map.get(key);if(!g.display_name&&row.display_name)g.display_name=row.display_name;if(!g.tier&&row.tier)g.tier=row.tier;g.hasGoldToken=g.hasGoldToken||row.has_gold_token===true;g.ownsWork=g.ownsWork||row.owns_work===true;g.workNames.push(...(Array.isArray(row.work_names)?row.work_names:[]));if(row.wallet_address){const wallet={address:row.wallet_address,chain:row.chain},walletKey=String(wallet.chain||'').toLowerCase()+':'+String(wallet.address).toLowerCase();if(!g.wallets.some(w=>String(w.chain||'').toLowerCase()+':'+String(w.address).toLowerCase()===walletKey))g.wallets.push(wallet);}});groups=[...map.values()];groups.forEach(g=>g.workNames=[...new Set(g.workNames)]);await Promise.all(groups.map(async g=>{const scans=await Promise.allSettled(g.wallets.map(w=>walletWorks(w,false)));g.ownsWork=g.ownsWork||scans.some(x=>x.status==='fulfilled'&&x.value.owns);}));list.innerHTML='<div class="ao-participant-circle">'+groups.map((g,i)=>{const name=g.display_name||'Anonymous Holder',badges=[g.tier?g.tier+' token':'holder',g.ownsWork?'work owner':'',g.hasGoldToken?'gold':''].filter(Boolean).join(' · '),cls='tier-'+(g.tier||'none')+(g.ownsWork?' has-work':'')+(g.hasGoldToken?' has-gold':''),start=(i/Math.max(groups.length,1)*100).toFixed(3)+'%';return'<div class="ao-participant-node" style="--orbit-start:'+start+'"><button class="ao-participant-token '+cls+'" type="button" data-ao-participant="'+i+'" aria-label="View works owned by '+esc(name)+'"><span class="ao-participant-initial">'+esc(name.trim().charAt(0).toUpperCase()||'H')+'</span></button><div class="ao-participant-name">'+esc(name)+'</div><div class="ao-participant-badges">'+esc(badges)+'</div></div>';}).join('')+'</div>';list.querySelectorAll('[data-ao-participant]').forEach(b=>b.addEventListener('click',()=>openGroup(Number(b.dataset.aoParticipant))));}catch(e){list.innerHTML='<p class="ao-participant-status">The participant circle is temporarily unavailable.</p>';console.warn('Public participants:',e);}}
   load();
 })();
+</script>
+<script>
+(function clarifyOfferChains() {
+  document.querySelectorAll('.ao-offer-btn').forEach(function(link) {
+    if (link.classList.contains('tezos')) {
+      link.textContent = 'Make an offer on Tezos';
+    } else if (link.href.indexOf('opensea.io') !== -1) {
+      link.textContent = 'Make an offer on ETH';
+      link.classList.add('ethereum');
+    }
+  });
+}());
 </script>
 </body>
 </html>
