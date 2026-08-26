@@ -496,6 +496,12 @@
   .auction-cta { margin-top: 1.1rem; border-top: 1px solid var(--line); padding-top: 1.1rem; }
   .auction-cta .btn { width: auto; padding: 0.7rem 1.3rem; display: inline-flex; }
   .auction-cta .reserve-note { margin-top: 0.7rem; }
+  .marketplace-offers {
+    display:grid; grid-template-columns:1fr 1fr; gap:0.65rem;
+    margin-top:1.1rem; border-top:1px solid var(--line); padding-top:1.1rem;
+  }
+  .marketplace-offers .btn { width:100%; min-width:0; padding:0.72rem 0.75rem; }
+  @media (max-width:520px) { .marketplace-offers { grid-template-columns:1fr; } }
 
   .participant-circle {
     position:relative; height:clamp(470px,44vw,610px); border:1px solid var(--line); border-radius:50%;
@@ -4617,6 +4623,80 @@ document.addEventListener('keydown', event => {
   if (event.key === 'ArrowLeft') stepArtLightbox(-1);
   if (event.key === 'ArrowRight') stepArtLightbox(1);
 });
+</script>
+<script>
+// Direct, chain-specific marketplace offers for every available cross-chain work.
+(function wireMarketplaceOffers() {
+  const offers = {
+    'Ìjòkòó I':  { eth: 7,  tez: 1 },
+    'Ìjòkòó II': { eth: 6,  tez: 2 },
+    'Ìjòkòó III':{ eth: 5,  tez: 3 },
+    'Ìjòkòó V':  { eth: 3,  tez: 4 },
+    'Ìjòkòó VI': { eth: 2,  tez: 5 },
+    'Ìpàdé I':   { eth: 8,  tez: 6 },
+    'Ọ̀pá Orísun': { eth: 9,  tez: 7 },
+    'Ọ̀pá Ìrántí': { eth: 10, tez: 8 },
+    'Ọ̀pá Ẹkùn':   { eth: 11, tez: 9 }
+  };
+  const ethContract = '0xd7066137225cb0e1eb3220a2b814ff228e2c0249';
+  const tezContract = 'KT1RF7ck9WMY6oXQnaZbTyJhwuLx7cPyvbEz';
+
+  function offerActions(title, ids) {
+    const actions = document.createElement('div');
+    actions.className = 'marketplace-offers';
+    actions.setAttribute('aria-label', 'Marketplace offer options for ' + title);
+    actions.innerHTML =
+      '<a class="btn" href="https://opensea.io/item/ethereum/' + ethContract + '/' + ids.eth + '" target="_blank" rel="noopener noreferrer">Offer on OpenSea</a>' +
+      '<a class="btn ghost" href="https://objkt.com/tokens/' + tezContract + '/' + ids.tez + '" target="_blank" rel="noopener noreferrer">Offer on Objkt</a>';
+    return actions;
+  }
+
+  document.querySelectorAll('#artworksList .card').forEach(card => {
+    const title = card.querySelector('.card-title')?.textContent.trim();
+    const ids = offers[title];
+    if (!ids) return;
+    card.querySelector('.reserve-block')?.remove();
+    card.querySelector('.auction-cta')?.remove();
+    const badge = card.querySelector('.badge');
+    if (badge) {
+      badge.className = 'badge available';
+      badge.textContent = 'available for offer';
+    }
+    const tokenCopy = card.querySelector('.token-contents p');
+    if (tokenCopy) tokenCopy.textContent = 'Interactive GLB model, close-up image set, and rendered turntable video, packaged together as one multi-metadata token. Choose Ethereum or Tezos below to place an on-chain offer for the corresponding token.';
+    card.querySelector('.card-body')?.appendChild(offerActions(title, ids));
+  });
+
+  document.querySelectorAll('.sculpture-block').forEach(block => {
+    const title = block.querySelector('h3')?.textContent.trim();
+    const ids = offers[title];
+    if (!ids) return;
+    block.querySelector('.auction-cta')?.remove();
+    const badge = block.querySelector('.badge');
+    if (badge) {
+      badge.className = 'badge available';
+      badge.textContent = 'available for offer';
+    }
+    block.querySelector('.sculpture-info')?.appendChild(offerActions(title, ids));
+  });
+
+  const chapterThree = Array.from(document.querySelectorAll('#artworksList .card')).find(card =>
+    card.querySelector('.card-title')?.textContent.trim() === 'Lábẹ́ Igi Òroǹbó'
+  );
+  if (chapterThree) {
+    chapterThree.querySelector('.auction-cta')?.remove();
+    const badge = chapterThree.querySelector('.badge');
+    if (badge) {
+      badge.className = 'badge auction';
+      badge.textContent = 'in auction';
+    }
+    const actions = document.createElement('div');
+    actions.className = 'marketplace-offers';
+    actions.style.gridTemplateColumns = '1fr';
+    actions.innerHTML = '<a class="btn" href="https://www.kaysworks.com/auction" target="_blank" rel="noopener noreferrer">View Auction</a>';
+    chapterThree.querySelector('.card-body')?.appendChild(actions);
+  }
+}());
 </script>
 </body>
 </html>
