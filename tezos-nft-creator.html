@@ -1,0 +1,2393 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NFT Launchpad &middot; Tezos</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@500;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+ --bg:#0a0a0f;--s1:#111118;--s2:#1a1a24;
+ --bdr:#2e2e3e;--acc:#00e5a0;--acc2:#5b8dff;--warn:#ffb347;--err:#ff5c5c;
+ --tx:#dde0f0;--muted:#6b6b88;--r:9px;
+}
+body{background:var(--bg);color:var(--tx);font-family:'Syne',sans-serif;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;
+ background-image:linear-gradient(rgba(0,229,160,.025) 1px,transparent 1px),
+ linear-gradient(90deg,rgba(0,229,160,.025) 1px,transparent 1px);
+ background-size:44px 44px;pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:0 32px 80px}
+
+header{display:flex;align-items:center;justify-content:space-between;
+ padding:26px 0 32px;border-bottom:1px solid var(--bdr);margin-bottom:36px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-dot{width:26px;height:26px;border-radius:50%;background:var(--acc);
+ box-shadow:0 0 18px rgba(0,229,160,.4)}
+.logo-text{font-size:1rem;font-weight:800}
+.logo-text em{color:var(--acc);font-style:normal}
+.hdr-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+select.net{background:var(--s2);border:1px solid var(--bdr);color:var(--tx);
+ border-radius:999px;padding:7px 14px;font-family:'Syne',sans-serif;
+ font-size:.76rem;font-weight:600;outline:none;cursor:pointer}
+
+.addr-pill{font-family:'IBM Plex Mono',monospace;font-size:.7rem;color:var(--acc2);
+ padding:6px 14px;background:var(--s2);border:1px solid var(--bdr);
+ border-radius:999px;display:none}
+.addr-pill.show{display:inline}
+
+.btn{display:inline-flex;align-items:center;gap:7px;font-family:'Syne',sans-serif;
+ font-weight:700;font-size:.8rem;border:none;border-radius:var(--r);
+ padding:10px 20px;cursor:pointer;transition:all .16s;white-space:nowrap}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+.btn-acc{background:var(--acc);color:#000}
+.btn-acc:hover:not(:disabled){filter:brightness(1.08)}
+.btn-sec{background:var(--s2);color:var(--tx);border:1px solid var(--bdr)}
+.btn-sec:hover:not(:disabled){border-color:var(--acc);color:var(--acc)}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--bdr);
+ padding:8px 14px;font-size:.74rem}
+.btn-sm{padding:7px 13px;font-size:.74rem}
+
+.tag{font-family:'IBM Plex Mono',monospace;font-size:.65rem;color:var(--acc);
+ letter-spacing:2px;text-transform:uppercase;margin-bottom:5px}
+.title{font-size:1.35rem;font-weight:800;margin-bottom:18px}
+
+.card{background:var(--s1);border:1px solid var(--bdr);border-radius:var(--r);
+ padding:22px;margin-bottom:16px}
+.card-title{font-weight:700;font-size:.9rem;margin-bottom:14px;
+ display:flex;align-items:center;gap:8px}
+.badge{font-family:'IBM Plex Mono',monospace;font-size:.62rem;padding:3px 8px;
+ border-radius:4px;border:1px solid}
+.badge-g{border-color:var(--acc);color:var(--acc);background:rgba(0,229,160,.07)}
+
+.field{margin-bottom:13px}
+.field label{display:block;font-size:.7rem;font-weight:700;color:var(--muted);
+ margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px}
+.field input,.field textarea{width:100%;background:var(--s2);border:1px solid var(--bdr);
+ border-radius:6px;color:var(--tx);font-family:'IBM Plex Mono',monospace;
+ font-size:.8rem;padding:10px 12px;outline:none;transition:border-color .14s;resize:vertical}
+.field input:focus,.field textarea:focus{border-color:var(--acc2)}
+.field .hint{font-size:.68rem;color:var(--muted);margin-top:4px;font-family:'IBM Plex Mono',monospace}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:520px){.row2{grid-template-columns:1fr}}
+@media(max-width:760px){.wrap{padding:0 16px 56px}}
+
+.uri-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.uri-row{display:flex;gap:6px}
+.uri-row input{flex:1}
+.uri-del{background:transparent;border:1px solid var(--bdr);color:var(--muted);
+ border-radius:6px;padding:0 10px;cursor:pointer;flex-shrink:0}
+.uri-del:hover{border-color:var(--err);color:var(--err)}
+
+.steps{display:flex;margin-bottom:28px}
+.step{flex:1;text-align:center;position:relative}
+.step::after{content:'';position:absolute;top:13px;left:50%;width:100%;height:1px;background:var(--bdr)}
+.step:last-child::after{display:none}
+.step-num{width:26px;height:26px;border-radius:50%;background:var(--s2);
+ border:1px solid var(--bdr);display:inline-flex;align-items:center;justify-content:center;
+ font-size:.7rem;font-family:'IBM Plex Mono',monospace;position:relative;z-index:1;margin-bottom:4px}
+.step.done .step-num{background:var(--acc);border-color:var(--acc);color:#000}
+.step.active .step-num{border-color:var(--acc2);color:var(--acc2)}
+.step-lbl{font-size:.62rem;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
+
+#deployed-banner{display:none;background:rgba(0,229,160,.05);border:1px solid var(--acc);
+ border-radius:var(--r);padding:16px 22px;margin-bottom:24px}
+#deployed-banner.show{display:block}
+.banner-lbl{font-size:.65rem;color:var(--acc);letter-spacing:1.5px;margin-bottom:5px;
+ font-family:'IBM Plex Mono',monospace;text-transform:uppercase}
+.banner-addr{font-family:'IBM Plex Mono',monospace;font-size:.82rem;word-break:break-all}
+.banner-acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+.tabs{display:flex;gap:2px;background:var(--s1);border:1px solid var(--bdr);
+ border-radius:var(--r);padding:4px;margin-bottom:20px}
+.tab{flex:1;font-family:'Syne',sans-serif;font-weight:700;font-size:.75rem;
+ padding:8px 6px;border:none;border-radius:7px;background:transparent;
+ color:var(--muted);cursor:pointer;text-align:center}
+.tab.active{background:var(--s2);color:var(--tx);border:1px solid var(--bdr)}
+.panel{display:none}.panel.active{display:block}
+
+.view-result{background:var(--s2);border:1px solid var(--bdr);border-radius:var(--r);
+ padding:14px;margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:.74rem;display:none}
+
+.log{font-family:'IBM Plex Mono',monospace;font-size:.7rem;background:var(--s2);
+ border:1px solid var(--bdr);border-radius:var(--r);padding:12px 14px;
+ max-height:190px;overflow-y:auto;line-height:1.8;color:var(--muted)}
+.lok{color:var(--acc)}.linfo{color:var(--acc2)}.lerr{color:var(--err)}.lwarn{color:var(--warn)}
+
+.spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(0,0,0,.25);
+ border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+#status-bar{padding:13px 18px;border-radius:var(--r);margin-bottom:20px;
+ font-family:'IBM Plex Mono',monospace;font-size:.75rem;border:1px solid;
+ display:flex;align-items:center;gap:10px}
+#status-bar.loading{border-color:var(--bdr);color:var(--muted);background:var(--s1)}
+#status-bar.ok{border-color:var(--acc);color:var(--acc);background:rgba(0,229,160,.06)}
+#status-bar.err{border-color:var(--err);color:var(--err);background:rgba(255,92,92,.06)}
+.sb-spin{width:14px;height:14px;border:2px solid rgba(0,229,160,.3);
+ border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+
+
+.token-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+.token-tools .field{flex:1;min-width:160px;margin:0}
+.token-grid{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.token-card{width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;min-width:0}
+.token-card.active{border-color:var(--acc);box-shadow:0 0 0 1px rgba(0,229,160,.18)}
+.token-media{aspect-ratio:1/1;background:#07070b;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:.68rem;text-align:center;padding:12px}
+.token-media img,.token-media video{width:100%;height:100%;object-fit:cover;display:block}
+.token-body{padding:12px}
+.token-name{font-size:.9rem;font-weight:800;margin-bottom:5px;overflow-wrap:anywhere}
+.token-meta{font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
+.token-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.uri-choice{border-top:1px solid var(--bdr);padding-top:8px;margin-top:8px}
+.uri-choice-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--muted)}
+.uri-choice-row strong{color:var(--tx)}
+
+.token-version-grid{display:flex;gap:8px;margin-top:10px;overflow-x:auto;padding-bottom:6px;justify-content:center}
+.token-version{background:rgba(0,0,0,.16);border:1px solid var(--bdr);border-radius:6px;overflow:hidden;min-width:68px;max-width:76px;flex:0 0 70px;cursor:pointer;position:relative}
+.token-version.active{border-color:var(--acc);box-shadow:0 0 0 1px rgba(0,229,160,.22)}
+.token-version .token-media{aspect-ratio:1/1;border-bottom:1px solid var(--bdr);padding:0;font-size:.6rem}
+.token-version-body{padding:4px}
+@media(max-width:620px){.token-hero-media{min-height:220px}.token-version-grid{justify-content:flex-start}}
+.token-version-title{position:absolute;top:3px;left:3px;background:rgba(10,10,15,.72);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:1px 5px;font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--tx)}
+.token-version-uri{display:none}
+
+.token-hero{background:#050508;border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;margin-top:10px}
+.token-hero-media{min-height:420px;display:flex;align-items:center;justify-content:center;background:#030306}
+.token-hero-media img,.token-hero-media video{max-width:100%;max-height:68vh;object-fit:contain;display:block}
+.token-hero-info{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:12px;border-top:1px solid var(--bdr)}
+.token-hero-title{font-size:.95rem;font-weight:800;margin-bottom:4px;overflow-wrap:anywhere}
+.token-hero-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.nft-details{border-top:1px solid var(--bdr);padding:12px;background:rgba(0,0,0,.12)}
+.nft-details-title{font-weight:800;font-size:.86rem;margin-bottom:8px}
+.nft-details-row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-family:'IBM Plex Mono',monospace;font-size:.68rem;border-top:1px solid rgba(255,255,255,.04)}
+.nft-details-row span:first-child{color:var(--muted)}
+.nft-details-row span:last-child{color:var(--tx);text-align:right;overflow-wrap:anywhere}
+.fullscreen-viewer{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:300;display:none;align-items:center;justify-content:center;padding:26px}
+.fullscreen-viewer.open{display:flex}
+.fullscreen-viewer img,.fullscreen-viewer video{max-width:96vw;max-height:92vh;object-fit:contain}
+.fullscreen-close{position:fixed;top:18px;right:18px}
+.fullscreen-nav{position:fixed;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;padding:0;justify-content:center}
+.fullscreen-prev{left:18px}.fullscreen-next{right:18px}
+.fullscreen-caption{position:fixed;left:24px;right:24px;bottom:18px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--muted);overflow-wrap:anywhere}
+#fullscreen-media{max-width:96vw;max-height:92vh;overflow:auto;display:flex;align-items:center;justify-content:center}
+.fullscreen-tools{position:fixed;top:18px;left:18px;display:flex;gap:6px;align-items:center;z-index:302}
+.fullscreen-zoom-label{font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--muted);min-width:42px;text-align:center}
+.fullscreen-viewer img.zoomable{transition:transform .12s ease;cursor:zoom-in;max-width:96vw;max-height:92vh;transform-origin:center center}
+.token-empty{font-family:'IBM Plex Mono',monospace;color:var(--muted);font-size:.72rem;border:1px dashed var(--bdr);border-radius:var(--r);padding:14px;margin-top:10px}
+/* wallet chooser modal */
+#wallet-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;
+ display:none;align-items:center;justify-content:center}
+#wallet-modal.open{display:flex}
+.wm-box{background:var(--s1);border:1px solid var(--bdr);border-radius:12px;
+ padding:28px;width:340px;max-width:90vw}
+.wm-title{font-weight:800;font-size:1rem;margin-bottom:6px}
+.wm-sub{font-size:.74rem;color:var(--muted);margin-bottom:20px;font-family:'IBM Plex Mono',monospace}
+.wm-btn{display:flex;align-items:center;gap:12px;width:100%;padding:13px 16px;
+ background:var(--s2);border:1px solid var(--bdr);border-radius:var(--r);
+ color:var(--tx);font-family:'Syne',sans-serif;font-weight:700;font-size:.85rem;
+ cursor:pointer;transition:all .15s;margin-bottom:10px;text-align:left}
+.wm-btn:hover{border-color:var(--acc);color:var(--acc)}
+.wm-btn:last-child{margin-bottom:0}
+.wm-btn .wm-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;
+ justify-content:center;font-size:18px;flex-shrink:0}
+.wm-btn .wm-desc{font-size:.68rem;color:var(--muted);font-weight:400;margin-top:2px;font-family:'IBM Plex Mono',monospace}
+.wm-cancel{width:100%;margin-top:12px;background:transparent;border:none;
+ color:var(--muted);font-family:'Syne',sans-serif;font-size:.78rem;cursor:pointer;
+ padding:8px}
+.wm-cancel:hover{color:var(--tx)}
+.wm-badge{font-size:.6rem;padding:2px 7px;border-radius:999px;
+ background:rgba(0,229,160,.15);color:var(--acc);border:1px solid rgba(0,229,160,.3);
+ margin-left:auto;font-family:'IBM Plex Mono',monospace;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<!-- Wallet chooser modal -->
+<div id="wallet-modal">
+ <div class="wm-box">
+ <div class="wm-title">Connect Wallet</div>
+ <div class="wm-sub">Choose your Tezos wallet</div>
+
+ <button class="wm-btn" id="wm-temple">
+ <div class="wm-icon" style="background:#5E35B1">TZ</div>
+ <div>
+ <div style="display:flex;align-items:center;gap:8px">Temple <span class="wm-badge">Instant</span></div>
+ <div class="wm-desc">Browser extension - fastest connection</div>
+ </div>
+ </button>
+
+ <button class="wm-btn" id="wm-beacon">
+ <div class="wm-icon" style="background:#1a1a24;border:1px solid var(--bdr)">BC</div>
+ <div>
+ <div>Beacon (any wallet)</div>
+ <div class="wm-desc">Temple, Kukai, Naan, AirGap, mobile wallets</div>
+ </div>
+ </button>
+
+ <button class="wm-cancel" id="wm-cancel">Cancel</button>
+ </div>
+</div>
+
+<div class="wrap">
+
+<div id="status-bar" class="loading">
+ <div class="sb-spin"></div>
+ <span id="status-txt">Loading taquito-bundle-ipfs.js...</span>
+</div>
+
+<header>
+ <div class="logo">
+ <div class="logo-dot"></div>
+ <div class="logo-text">NFT <em>Launchpad</em> &middot; Tezos</div>
+ </div>
+ <div class="hdr-right">
+ <a class="btn btn-sec btn-sm" href="./tezos-contract-studio.html" style="text-decoration:none">Auction Studio</a>
+ <select class="net" id="net-sel">
+ <option value="mainnet">Mainnet</option>
+ <option value="ghostnet">Ghostnet (testnet)</option>
+ </select>
+ <span class="addr-pill" id="addr-pill"></span>
+ <button class="btn btn-acc" id="btn-connect" disabled>Connect Wallet</button>
+ <button class="btn btn-ghost btn-sm" id="btn-disconnect" style="display:none">Disconnect</button>
+ </div>
+</header>
+
+<div class="tag">Getting started</div>
+<div class="title">Deploy Your Contract</div>
+<div class="steps">
+ <div class="step active" id="s1"><div class="step-num">1</div><div class="step-lbl">Connect</div></div>
+ <div class="step" id="s2"><div class="step-num">2</div><div class="step-lbl">Configure</div></div>
+ <div class="step" id="s3"><div class="step-num">3</div><div class="step-lbl">Deploy</div></div>
+</div>
+
+<div class="card">
+ <div class="card-title">Deploy or Load Contract</div>
+ <div class="field">
+ <label>Admin Address (defaults to your wallet)</label>
+ <input id="admin-addr" placeholder="tz1..." />
+ </div>
+ <div class="field">
+ <label>Collection Name</label>
+ <input id="collection-name" placeholder="Kayode Collection" />
+ </div>
+ <div class="field">
+ <label>Collection Symbol</label>
+ <input id="collection-symbol" placeholder="KAY" />
+ </div>
+ <div class="field">
+ <label>Collection Metadata URI</label>
+ <input id="collection-metadata-uri" placeholder="ipfs://Qm..." />
+ </div>
+ <div class="row2">
+ <div class="field"><label>Default Royalty Recipient</label><input id="royalty-recipient" placeholder="tz1... (blank = admin)" /></div>
+ <div class="field"><label>Default Royalty BPS</label><input id="royalty-bps" type="number" min="0" max="10000" placeholder="1000 = 10%" /></div>
+ </div><div class="field">
+ <label>Michelson JSON - SmartPy IDE -> Show Michelson -> copy full JSON</label>
+ <textarea id="code-input" rows="5"
+ placeholder='Paste the code array: [{"prim":"parameter",...}, ...]'></textarea>
+ <div class="hint">You can also paste the full SmartPy JSON here; the launchpad will use its "code" field.</div>
+ </div>
+ <div class="field">
+ <label>Storage JSON - SmartPy IDE -> Show Michelson -> storage</label>
+ <textarea id="storage-input" rows="5"
+ placeholder='Paste the storage object: {"prim":"Pair",...}'></textarea>
+ <div class="hint">You can also paste the full SmartPy JSON here; the launchpad will use its "storage" field.</div>
+ </div>
+ <div class="field">
+ <label>Storage Address Replacement</label>
+ <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+ <label style="display:flex;align-items:center;gap:8px;margin:0;text-transform:none;letter-spacing:0;color:var(--tx)">
+ <input id="replace-storage-address" type="checkbox" checked style="width:auto" />
+ Replace Tezos address literals in storage with admin address
+ </label>
+ </div>
+ <div class="hint">Admin Address defaults to your connected wallet. Use this when SmartPy storage still contains a sample/default wallet address.</div>
+ <div class="hint">In SmartPy: Run -> "Deploy Michelson Contract" -> copy JSON -> paste above.</div>
+ </div>
+ <button class="btn btn-acc" id="btn-deploy" disabled>Deploy Contract -> Sign in Wallet</button>
+</div>
+
+<div class="card">
+ <div class="card-title">Load Existing Contract</div>
+ <div style="display:flex;gap:8px">
+ <input id="existing-addr" placeholder="KT1..."
+ style="flex:1;background:var(--s2);border:1px solid var(--bdr);border-radius:6px;
+ color:var(--tx);font-family:'IBM Plex Mono',monospace;font-size:.8rem;
+ padding:10px 12px;outline:none" />
+ <button class="btn btn-sec" id="btn-load-existing">Load</button>
+ </div>
+</div>
+
+<div id="deployed-banner">
+ <div class="banner-lbl">Contract Active</div>
+ <div class="banner-addr" id="ct-addr-display"></div>
+ <div class="banner-acts">
+ <a id="tzkt-link" href="#" target="_blank" class="btn btn-sec btn-sm">View on TzKT </a>
+ <a id="collector-link" href="tezos_nft_collector_pin.html" target="_blank" class="btn btn-sec btn-sm" style="display:none">Collector Page</a>
+ <button class="btn btn-ghost btn-sm" id="btn-copy-ct">Copy Address</button>
+ </div>
+</div>
+
+<div id="manage-section" style="display:none">
+ <div class="tag" style="margin-top:36px">Contract Management</div>
+ <div class="title" style="margin-bottom:20px">Manage Your NFTs</div>
+
+ <div class="tabs">
+ <button class="tab active" data-panel="p-mint">Mint</button>
+ <button class="tab" data-panel="p-uri">URIs</button>
+ <button class="tab" data-panel="p-preview">Preview</button>
+ <button class="tab" data-panel="p-transfer">Transfer</button>
+ <button class="tab" data-panel="p-operators">Operators</button>
+ <button class="tab" data-panel="p-admin">Admin</button>
+ </div>
+
+ <div class="panel active" id="p-mint">
+ <div class="card">
+ <div class="card-title">Pinata Metadata Builder <span class="badge badge-g">IPFS</span></div>
+ <div class="field"><label>Pinata JWT</label>
+ <textarea id="pinata-jwt" rows="2" placeholder="Paste Pinata JWT here. It is only used in this browser session."></textarea></div>
+ <div class="row2">
+ <div class="field"><label>Legacy API Key</label><input id="pinata-api-key" placeholder="Optional if using JWT" /></div>
+ <div class="field"><label>Legacy API Secret</label><input id="pinata-api-secret" type="password" placeholder="Optional if using JWT" /></div>
+ </div>
+ <div class="field"><label>Image File</label><input id="pinata-image-file" type="file" accept="image/*,video/*,audio/*,.glb,.gltf,.pdf" /></div>
+ <div class="row2">
+ <div class="field"><label>NFT Name</label><input id="meta-name" placeholder="Artwork title" /></div>
+ <div class="field"><label>Creator Address</label><input id="meta-creator" placeholder="tz1... (blank = your wallet)" /></div>
+ </div>
+ <div class="row2">
+ <div class="field"><label>Mint Recipient</label><input id="pinata-mint-to" placeholder="tz1... (blank = your wallet)" /></div>
+ <div class="field"><label>Existing Token ID</label><input id="pinata-append-tid" type="number" min="0" placeholder="0" /></div>
+ </div>
+ <div class="field"><label>Description</label><textarea id="meta-desc" rows="3" placeholder="Description shown by wallets and marketplaces"></textarea></div>
+ <div class="row2">
+ <div class="field"><label>Attribute Trait</label><input id="meta-attr-trait" placeholder="Medium" /></div>
+ <div class="field"><label>Attribute Value</label><input id="meta-attr-value" placeholder="Digital painting" /></div>
+ </div>
+ <div class="view-result" id="pinata-result"></div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap">
+ <button class="btn btn-sec" id="btn-pinata-build" type="button">Upload + Create Metadata URI</button>
+ <button class="btn btn-acc" id="btn-pinata-mint" type="button">Upload + Mint</button>
+ <button class="btn btn-sec" id="btn-pinata-append" type="button">Upload + Append to Token</button>
+ </div>
+ <div class="hint">Uploads are public IPFS pins. The launcher mints or appends the metadata JSON URI, not the raw image URI.</div>
+ </div>
+ <div class="card">
+ <div class="card-title">Mint New Token <span class="badge badge-g">Admin only</span></div>
+ <div class="field"><label>Recipient Address</label>
+ <input id="mint-to" placeholder="tz1... (blank = your address)" /></div>
+ <div class="field"><label>Initial Metadata URIs</label>
+ <div class="uri-list" id="mint-uri-list">
+ <div class="uri-row"><input placeholder="ipfs://Qm..." class="m-uri" /></div>
+ </div>
+ <button class="btn btn-ghost btn-sm" id="btn-add-uri">+ Add URI</button>
+ <div class="hint">Min 1 token metadata JSON URI. Use ipfs://... for best objkt indexing.</div>
+ </div>
+ <button class="btn btn-acc" id="btn-mint">Mint Token -> Sign in Wallet</button>
+ </div>
+ </div>
+
+ <div class="panel" id="p-uri">
+ <div class="card">
+ <div class="card-title">Append URI <span class="badge badge-g">Admin only</span></div>
+ <div class="row2">
+ <div class="field"><label>Token ID</label><input id="ap-tid" type="number" min="0" placeholder="0" /></div>
+ <div class="field"><label>New URI</label><input id="ap-uri" placeholder="ipfs://Qm..." /></div>
+ </div>
+ <button class="btn btn-acc" id="btn-append">Append URI -> Sign in Wallet</button>
+ </div>
+ <div class="card">
+ <div class="card-title">Pin / Unpin URI</div>
+ <div class="row2">
+ <div class="field"><label>Token ID</label><input id="pin-tid" type="number" min="0" placeholder="0" /></div>
+ <div class="field"><label>URI Index (0-based)</label><input id="pin-idx" type="number" min="0" placeholder="0" /></div>
+ </div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap">
+ <button class="btn btn-acc" id="btn-pin">Pin -> Sign in Wallet</button>
+ <button class="btn btn-sec" id="btn-unpin">Unpin (use latest) -> Sign</button>
+ </div>
+ <div style="display:flex;gap:8px;margin-top:14px;align-items:flex-end">
+ <div class="field" style="flex:1;margin:0"><label>Query Token Metadata</label>
+ <input id="view-tid" type="number" min="0" placeholder="Token ID" /></div>
+ <button class="btn btn-sec btn-sm" id="btn-view">Query</button>
+ </div>
+ <div class="view-result" id="uri-result"></div>
+ </div>
+ </div>
+ <div class="panel" id="p-preview">
+ <div class="card">
+ <div class="card-title">Contract Token Preview <span class="badge badge-g">Images</span></div>
+ <div class="token-tools">
+ <div class="field"><label>Start Token ID</label><input id="preview-start" type="number" min="0" value="0" /></div>
+ <div class="field"><label>How Many</label><input id="preview-count" type="number" min="1" max="100" value="24" /></div>
+ <button class="btn btn-sec" id="btn-preview-load" type="button">Load Tokens</button>
+ </div>
+ <div class="hint">Loads every metadata option separately, including each image, so you can review every token choice.</div>
+ <div id="preview-grid" class="token-grid"><div class="token-empty">Load a contract, then preview token images here.</div></div>
+ </div>
+ </div>
+
+ <div class="panel" id="p-transfer">
+ <div class="card">
+ <div class="card-title">Transfer Token</div>
+ <div class="field"><label>From Address</label><input id="xfer-from" placeholder="tz1..." /></div>
+ <div class="row2">
+ <div class="field"><label>Token ID</label><input id="xfer-tid" type="number" min="0" placeholder="0" /></div>
+ <div class="field"><label>To Address</label><input id="xfer-to" placeholder="tz1..." /></div>
+ </div>
+ <button class="btn btn-acc" id="btn-transfer">Transfer -> Sign in Wallet</button>
+ </div>
+ </div>
+
+ <div class="panel" id="p-operators">
+ <div class="card">
+ <div class="card-title">Operator Management</div>
+ <div class="field"><label>Owner Address</label><input id="op-owner" placeholder="tz1..." /></div>
+ <div class="row2">
+ <div class="field"><label>Operator Address</label><input id="op-operator" placeholder="tz1..." /></div>
+ <div class="field"><label>Token ID</label><input id="op-tid" type="number" min="0" placeholder="0" /></div>
+ </div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap">
+ <button class="btn btn-acc" id="btn-add-op">Add Operator -> Sign</button>
+ <button class="btn btn-sec" id="btn-rem-op">Remove Operator -> Sign</button>
+ </div>
+ </div>
+ <div class="card">
+ <div class="card-title">Check Balance</div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+ <div class="field" style="flex:1;margin:0"><label>Owner</label><input id="bal-owner" placeholder="tz1..." /></div>
+ <div class="field" style="width:100px;margin:0"><label>Token ID</label><input id="bal-tid" type="number" min="0" placeholder="0" /></div>
+ <button class="btn btn-sec btn-sm" id="btn-check-bal">Check</button>
+ </div>
+ <div id="bal-result" style="font-family:'IBM Plex Mono',monospace;font-size:.74rem;color:var(--muted);margin-top:8px"></div>
+ </div>
+ </div>
+
+ <div class="panel" id="p-admin">
+ <div class="card">
+ <div class="card-title">Admin Controls <span class="badge badge-g">Admin only</span></div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+ <button class="btn btn-sec" id="btn-pause">Pause Contract -> Sign</button>
+ <button class="btn btn-acc" id="btn-unpause">Unpause -> Sign</button>
+ </div>
+ <div class="field">
+ <label>Collection Name</label>
+ <input id="update-collection-name" placeholder="New collection name" />
+ </div>
+ <div class="row2">
+ <div class="field"><label>Collection Symbol</label><input id="update-collection-symbol" placeholder="Symbol" /></div>
+ <div class="field"><label>Collection Metadata URI</label><input id="update-collection-uri" placeholder="ipfs://Qm..." /></div>
+ </div>
+ <button class="btn btn-sec btn-sm" id="btn-update-collection">Update Collection Metadata</button>
+ <div class="row2" style="margin-top:16px">
+ <div class="field"><label>Default Royalty Recipient</label><input id="default-royalty-recipient" placeholder="tz1..." /></div>
+ <div class="field"><label>Default Royalty BPS</label><input id="default-royalty-bps" type="number" min="0" max="10000" placeholder="500 = 5%" /></div>
+ </div>
+ <button class="btn btn-sec btn-sm" id="btn-set-default-royalty">Set Default Royalty</button>
+ <div class="row2" style="margin-top:16px">
+ <div class="field"><label>Token ID</label><input id="token-royalty-id" type="number" min="0" placeholder="0" /></div>
+ <div class="field"><label>Token Royalty Recipient</label><input id="token-royalty-recipient" placeholder="tz1..." /></div>
+ </div>
+ <div class="field"><label>Token Royalty BPS</label><input id="token-royalty-bps" type="number" min="0" max="10000" placeholder="750 = 7.5%" /></div>
+ <button class="btn btn-sec btn-sm" id="btn-set-token-royalty">Set Token Royalty</button><div class="field">
+ <label>Transfer Admin Role To</label>
+ <div style="display:flex;gap:8px">
+ <input id="new-admin" placeholder="tz1..." style="flex:1" />
+ <button class="btn btn-sec btn-sm" id="btn-set-admin">Transfer -> Sign</button>
+ </div>
+ <div class="hint">Warning: permanent - you lose admin access immediately.</div>
+ </div>
+ </div>
+ </div>
+</div>
+
+<div style="margin-top:28px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+ <div class="tag" style="margin:0">Activity Log</div>
+ <button class="btn btn-ghost btn-sm" id="btn-clr-log">Clear</button>
+</div>
+<div class="log" id="log"><span class="linfo">Initialising...</span></div>
+</div>
+
+<script>
+(function() {
+ window.global = window.global || window;
+ window.beaconSdkDebugEnabled = true;
+ if (window.Buffer) return;
+ function bytesToBinary(bytes) {
+ var s = '';
+ for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+ return s;
+ }
+ class BrowserBuffer extends Uint8Array {
+ static from(value, enc) {
+ if (typeof value === 'string') {
+ if (enc === 'hex') {
+ var out = new BrowserBuffer(value.length / 2);
+ for (var i = 0; i < out.length; i++) out[i] = parseInt(value.substr(i * 2, 2), 16);
+ return out;
+ }
+ if (enc === 'base64') {
+ var bin = atob(value);
+ var b64 = new BrowserBuffer(bin.length);
+ for (var j = 0; j < bin.length; j++) b64[j] = bin.charCodeAt(j);
+ return b64;
+ }
+ return new BrowserBuffer(new TextEncoder().encode(value));
+ }
+ return new BrowserBuffer(value || []);
+ }
+ static alloc(size) { return new BrowserBuffer(size); }
+ static isBuffer(value) { return value instanceof Uint8Array; }
+ toString(enc) {
+ if (enc === 'hex') {
+ return Array.from(this).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+ }
+ if (enc === 'base64') return btoa(bytesToBinary(this));
+ return new TextDecoder().decode(this);
+ }
+ }
+ window.Buffer = BrowserBuffer;
+})();
+globalThis.Buffer = window.Buffer;
+var Buffer = window.Buffer;
+</script>
+
+<!-- Bundle loads synchronously before the script below -->
+<script src="taquito-bundle-ipfs.js"
+ onerror="
+ document.getElementById('status-bar').className='err';
+ document.getElementById('status-txt').textContent='x taquito-bundle-ipfs.js not found - place both files in the same folder and open via Live Server.';
+ ">
+</script>
+<script>
+window.addEventListener('load', function() {
+ var statusBar = document.getElementById('status-bar');
+ var statusTxt = document.getElementById('status-txt');
+ var logEl = document.getElementById('log');
+ // Section
+ var _b = window.TaquitoBundle;
+ if (_b && _b.default) _b = _b.default;
+ var TezosToolkit = _b && _b.TezosToolkit;
+ var BeaconWallet = _b && _b.BeaconWallet;
+
+ if (!TezosToolkit || !BeaconWallet) {
+ statusBar.className = 'err';
+ statusTxt.textContent = 'x Bundle missing or corrupt. Re-download taquito-bundle-ipfs.js.';
+ logEl.innerHTML = '<span class="lerr">Bundle error.</span>';
+ return;
+ }
+
+ statusBar.className = 'ok';
+ statusTxt.textContent = 'OK Libraries ready (Taquito v24.2.0). Connect your wallet.';
+ logEl.innerHTML = '<span class="lok">Ready.</span>';
+ // Section
+ var RPCS = {
+ ghostnet:[
+ 'https://rpc.ghostnet.teztnets.com',
+ 'https://ghostnet.smartpy.io',
+ 'https://ghostnet.tezos.ecadinfra.com'
+ ],
+ mainnet:[
+ 'https://rpc.tzkt.io/mainnet',
+ 'https://rpc.tzbeta.net',
+ 'https://tezos-mainnet.octez.io',
+ 'https://mainnet.api.tez.ie',
+ 'https://mainnet.smartpy.io',
+ 'https://mainnet.tezos.marigold.dev'
+ ]
+ };
+ var RPC = { ghostnet:RPCS.ghostnet[0], mainnet:RPCS.mainnet[0] };
+ var TZKT = { ghostnet:'https://ghostnet.tzkt.io', mainnet:'https://tzkt.io' };
+ var network = 'mainnet';
+ var Tezos, beaconWallet, userAddr, ct, ctAddr, lastSubmittedOpHash = '';
+
+ function beaconOptions(net) {
+ return {
+ name: 'NFT Launchpad',
+ network: { type: net },
+ preferredNetwork: net
+ };
+ }
+
+ function makeBeaconWallet(net) {
+ if (beaconWallet && beaconWallet.client && beaconWallet.client.destroy) {
+ beaconWallet.client.destroy().catch(function(){});
+ }
+ window.beaconCreatedClientInstance = false;
+ beaconWallet = new BeaconWallet(beaconOptions(net));
+ Tezos.setWalletProvider(beaconWallet);
+ return beaconWallet;
+ }
+
+ function withTimeout(promise, ms, msg) {
+ return Promise.race([
+ promise,
+ new Promise(function(_, reject) {
+ setTimeout(function() { reject(new Error(msg)); }, ms);
+ })
+ ]);
+ }
+
+ function compactKeys(obj) {
+ if (!obj) return 'none';
+ try {
+ var keys = [];
+ var cur = obj;
+ while (cur && cur !== Object.prototype && keys.length < 40) {
+ Object.getOwnPropertyNames(cur).forEach(function(k) {
+ if (keys.indexOf(k) < 0 && k !== 'constructor') keys.push(k);
+ });
+ cur = Object.getPrototypeOf(cur);
+ }
+ return keys.slice(0, 24).join(', ') || typeof obj;
+ } catch(e) {
+ return typeof obj;
+ }
+ }
+
+ function errorText(e) {
+ if (!e) return 'Unknown error';
+ if (typeof e === 'string') return e;
+ if (e.message || e.description || e.title) return e.message || e.description || e.title;
+ try { return JSON.stringify(e); }
+ catch(_) { return String(e); }
+ }
+
+ function isPostSubmitResultError(e) {
+ return /Invalid operation hash "\[object Object\]"|Cannot read properties of (undefined|null)|reading ['"](opHash|hash|confirmation|contract|kind)['"]|\[object Object\]/i.test(errorText(e));
+ }
+
+ function randomId() {
+ return 'temple-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+ }
+
+ function templeDappNetwork() {
+ return network === 'mainnet' ? 'mainnet' : { name: network, rpc: RPC[network] };
+ }
+
+ function templePageRequest(payload, timeoutMs) {
+ timeoutMs = timeoutMs || 60000;
+ return new Promise(function(resolve, reject) {
+ var reqId = randomId();
+ var timer;
+ function done(fn, value) {
+ clearTimeout(timer);
+ window.removeEventListener('message', onMessage);
+ fn(value);
+ }
+ function onMessage(evt) {
+ var data = evt.data;
+ if (evt.source !== window || !data || data.reqId !== reqId) return;
+ if (data.type === 'TEMPLE_PAGE_RESPONSE') {
+ done(resolve, data.payload);
+ } else if (data.type === 'TEMPLE_PAGE_ERROR_RESPONSE') {
+ done(reject, new Error(Array.isArray(data.payload) ? data.payload.join(': ') : String(data.payload || 'Temple rejected the request')));
+ }
+ }
+ window.addEventListener('message', onMessage);
+ window.postMessage({ type:'TEMPLE_PAGE_REQUEST', payload:makeCloneable(payload), reqId:reqId }, '*');
+ timer = setTimeout(function() {
+ done(reject, new Error('Temple did not answer the direct dApp request. Unlock Temple and allow this localhost site.'));
+ }, timeoutMs);
+ });
+ }
+
+ function makeCloneable(value) {
+ var seen = [];
+ return JSON.parse(JSON.stringify(value, function(key, val) {
+ if (typeof val === 'function' || typeof val === 'undefined') return undefined;
+ if (typeof val === 'bigint') return val.toString();
+ if (val && typeof val === 'object') {
+ if (seen.indexOf(val) >= 0) return undefined;
+ seen.push(val);
+ }
+ return val;
+ }));
+ }
+
+ function templeDirectAvailable(timeoutMs) {
+ timeoutMs = timeoutMs || 800;
+ return new Promise(function(resolve) {
+ var timer;
+ function finish(ok) {
+ clearTimeout(timer);
+ window.removeEventListener('message', onMessage);
+ resolve(ok);
+ }
+ function onMessage(evt) {
+ var data = evt.data;
+ if (evt.source === window && data && data.type === 'TEMPLE_PAGE_RESPONSE' && data.payload === 'PONG') finish(true);
+ }
+ window.addEventListener('message', onMessage);
+ window.postMessage({ type:'TEMPLE_PAGE_REQUEST', payload:'PING' }, '*');
+ timer = setTimeout(function() { finish(false); }, timeoutMs);
+ });
+ }
+
+ async function requestTempleDirectPermission() {
+ return templePageRequest({
+ type: 'PERMISSION_REQUEST',
+ network: templeDappNetwork(),
+ appMeta: { name: 'NFT Launchpad' },
+ force: true
+ }, 90000);
+ }
+
+ function templeDirectProvider(permission) {
+ async function resolveWalletParams(params) {
+ return typeof params === 'function' ? params() : params;
+ }
+ async function resolveOperationInput(value) {
+ while (typeof value === 'function') value = value();
+ if (value && typeof value.then === 'function') value = await value;
+ return value;
+ }
+ function unwrapOperationContainer(value) {
+ if (!value || Array.isArray(value)) return value;
+ if (Array.isArray(value.opParams)) return value.opParams;
+ if (Array.isArray(value.contents)) return value.contents;
+ if (value.operation && Array.isArray(value.operation.contents)) return value.operation.contents;
+ if (value.params) return value.params;
+ return value;
+ }
+ async function cleanOperations(ops) {
+ var resolved = unwrapOperationContainer(await resolveOperationInput(ops));
+ var arr = Array.isArray(resolved) ? resolved : [resolved];
+ return makeCloneable(arr).map(function(op) {
+ if (!op) return op;
+ if (!op.kind && op.code && (op.init || op.storage)) op.kind = 'origination';
+ if (!op.kind && (op.destination || op.to || op.contract || op.address)) {
+ op.kind = 'transaction';
+ if (!op.destination) op.destination = op.to || op.contract || op.address;
+ if (op.amount === undefined) op.amount = '0';
+ }
+ return op;
+ }).filter(function(op) { return op && op.kind; });
+ }
+ return {
+ getPKH: function() { return Promise.resolve(permission.pkh); },
+ mapTransferParamsToWalletParams: resolveWalletParams,
+ mapOriginateParamsToWalletParams: resolveWalletParams,
+ mapDelegateParamsToWalletParams: resolveWalletParams,
+ sendOperations: async function(ops) {
+ var opParams = await cleanOperations(ops);
+ if (!opParams.length) throw new Error('Temple direct adapter received no valid operation parameters. Raw payload: ' + oneLineJson(makeCloneable(ops), 520));
+ log('Temple op payload[0]: ' + oneLineJson(opParams[0], 520), 'info');
+ var templeResponse = await templePageRequest({
+ type: 'OPERATION_REQUEST',
+ sourcePkh: permission.pkh,
+ opParams: opParams
+ }, 120000);
+ log('Temple raw response: ' + oneLineJson(templeResponse, 520), 'info');
+ var opHash = extractOpHash(templeResponse);
+ log('Temple returned operation hash: ' + oneLineJson(opHash, 180), 'info');
+ if (typeof opHash !== 'string') throw new Error('Temple returned a successful operation response, but no operation hash string was found: ' + oneLineJson(templeResponse, 520));
+ lastSubmittedOpHash = opHash;
+ // Taquito WalletProvider.sendOperations must resolve to a plain operation-hash string.
+ // Returning a wrapper object here makes Taquito construct an invalid "[object Object]" hash.
+ return opHash;
+ },
+ sign: async function(bytes) {
+ var signature = await templePageRequest({
+ type: 'SIGN_REQUEST',
+ sourcePkh: permission.pkh,
+ payload: bytes
+ }, 90000);
+ return { bytes: bytes, sig: signature, prefixSig: signature, sbytes: bytes + signature };
+ }
+ };
+ }
+
+ function isEvmProvider(obj) {
+ return !!(obj && (
+ obj.isMetaMask ||
+ obj.isEIP6963 ||
+ obj.selectedAddress ||
+ obj.chainId ||
+ obj.isTempleWallet && typeof obj.request === 'function' && !obj.getAccount && !obj.getPKH && !obj.getAccountPkh && !obj.toTezos
+ ));
+ }
+
+ function isTempleTezosProvider(obj) {
+ return !!(obj && !isEvmProvider(obj) && (
+ typeof obj.connect === 'function' ||
+ typeof obj.requestPermission === 'function' ||
+ typeof obj.requestPermissions === 'function' ||
+ typeof obj.getAccount === 'function' ||
+ typeof obj.getPKH === 'function' ||
+ typeof obj.getAccountPkh === 'function' ||
+ typeof obj.toTezos === 'function'
+ ));
+ }
+
+ function templeDiagnostics() {
+ return [
+ 'templeWallet.tezos=' + compactKeys(window.templeWallet && window.templeWallet.tezos),
+ 'templeWallet=' + compactKeys(window.templeWallet),
+ 'temple.tezos=' + compactKeys(window.temple && window.temple.tezos),
+ 'temple=' + compactKeys(window.temple),
+ 'thanos=' + compactKeys(window.thanos)
+ ].join(' | ');
+ }
+
+ function getTempleCandidate() {
+ var candidates = [
+ window.templeWallet && window.templeWallet.tezos,
+ window.templeWallet,
+ window.TempleWallet,
+ window.temple && window.temple.tezos,
+ window.temple,
+ window.thanos
+ ].filter(Boolean);
+ for (var i=0; i<candidates.length; i++) {
+ var w = candidates[i];
+ if (isTempleTezosProvider(w)) return w;
+ }
+ return null;
+ }
+
+ async function connectTempleApi(wallet) {
+ if (!wallet) throw new Error('Temple extension not found.');
+ if (wallet.isDirectTempleDapp) {
+ return requestTempleDirectPermission();
+ }
+ if (typeof wallet.getCurrentPermission === 'function') {
+ var perm = await wallet.getCurrentPermission();
+ if (!perm && typeof wallet.requestPermission === 'function') {
+ perm = await wallet.requestPermission(templeDappNetwork(), { name:'NFT Launchpad' }, true);
+ }
+ return perm;
+ }
+ if (typeof wallet.isAvailable === 'function' && typeof wallet.requestPermission === 'function') {
+ var available = await wallet.isAvailable();
+ if (!available) throw new Error('Temple direct dApp API is not available.');
+ return wallet.requestPermission(templeDappNetwork(), { name:'NFT Launchpad' }, true);
+ }
+ if (typeof wallet.connect === 'function') {
+ try { await wallet.connect(network, { forcePermission:false }); }
+ catch(e1) {
+ try { await wallet.connect('NFT Launchpad', { forcePermission:false }); }
+ catch(e2) { throw e1; }
+ }
+ } else if (typeof wallet.requestPermission === 'function') {
+ await wallet.requestPermission({ network: network, appName:'NFT Launchpad', forcePermission:false });
+ } else if (typeof wallet.requestPermissions === 'function') {
+ await wallet.requestPermissions({ network: { type: network } });
+ }
+ }
+
+ async function templeAddress(wallet) {
+ if (wallet && wallet.permission) return wallet.permission.pkh || wallet.permission.address || wallet.permission.publicKeyHash;
+ if (typeof wallet.getPKH === 'function') return wallet.getPKH();
+ if (typeof wallet.getAccountPkh === 'function') return wallet.getAccountPkh();
+ if (typeof wallet.getAccount === 'function') {
+ var acc = await wallet.getAccount();
+ return acc && (acc.pkh || acc.address || acc.publicKeyHash);
+ }
+ if (wallet.permission) return wallet.permission.pkh || wallet.permission.address;
+ if (typeof wallet.toTezos === 'function') return wallet.toTezos().wallet.pkh();
+ throw new Error('Temple connected but did not expose an account address.');
+ }
+
+ async function useTempleProvider(wallet, addr) {
+ if (wallet.isDirectTempleDapp && wallet.permission) {
+ Tezos.setWalletProvider(templeDirectProvider(wallet.permission));
+ return;
+ }
+ if (typeof wallet.toTezos === 'function') {
+ Tezos = wallet.toTezos();
+ if (ctAddr) ct = await Tezos.wallet.at(ctAddr);
+ return;
+ }
+ var templeProvider = {
+ getPKH: function() { return Promise.resolve(addr); },
+ mapTransferParamsToWalletParams: function(p) { return p; },
+ sendOperations: async function(ops) {
+ if (typeof wallet.sendOperations === 'function') {
+ var sendResponse = await wallet.sendOperations(ops);
+ var sendHash = extractOpHash(sendResponse);
+ if (typeof sendHash !== 'string') throw new Error('Temple returned no readable operation hash: ' + oneLineJson(sendResponse, 520));
+ lastSubmittedOpHash = sendHash;
+ return sendHash;
+ }
+ if (typeof wallet.operations === 'function') {
+ var op = await wallet.operations(ops);
+ var operationHash = extractOpHash(op);
+ if (typeof operationHash !== 'string') throw new Error('Temple returned no readable operation hash: ' + oneLineJson(op, 520));
+ lastSubmittedOpHash = operationHash;
+ return operationHash;
+ }
+ throw new Error('Temple wallet cannot send operations through this injected API.');
+ },
+ sign: function(bytes, wm) {
+ if (typeof wallet.sign === 'function') return wallet.sign(bytes, wm);
+ throw new Error('Temple wallet cannot sign through this injected API.');
+ },
+ };
+ Tezos.setWalletProvider(templeProvider);
+ }
+ // Section
+ // This starts the P2P handshake in the background so it's ready
+ // by the time the user clicks Connect. Also restores any existing session.
+ function initBeacon(net) {
+ beaconWallet = new BeaconWallet(beaconOptions(net));
+ // Check for existing active session - no wallet prompt needed
+ beaconWallet.client.getActiveAccount().then(function(account) {
+ if (account) {
+ log('Resuming session: ' + account.address, 'ok');
+ finishConnect(account.address, false);
+ }
+ }).catch(function() {});
+ }
+
+ Tezos = new TezosToolkit(RPC[network]);
+ makeBeaconWallet(network);
+ // Restore session silently
+ beaconWallet.client.getActiveAccount().then(function(acc) {
+ if (acc) { log('Session restored: ' + acc.address, 'ok'); finishConnect(acc.address, false); }
+ }).catch(function(){});
+
+ document.getElementById('btn-connect').disabled = false;
+ // Section
+ function log(msg, type) {
+ type = type || 'info';
+ var s = document.createElement('span');
+ s.className = 'l' + type;
+ s.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+ logEl.appendChild(document.createElement('br'));
+ logEl.appendChild(s);
+ logEl.scrollTop = logEl.scrollHeight;
+ }
+ document.getElementById('btn-clr-log').onclick = function() {
+ logEl.innerHTML = '<span class="linfo">Cleared.</span>';
+ };
+ // Section
+ function setStep(n) {
+ [1,2,3].forEach(function(i) {
+ var el = document.getElementById('s'+i);
+ el.classList.remove('done','active');
+ if (i < n) el.classList.add('done');
+ if (i === n) el.classList.add('active');
+ });
+ }
+ // Section
+ document.getElementById('net-sel').onchange = function(e) {
+ network = e.target.value;
+ Tezos.setRpcProvider(RPC[network]);
+ makeBeaconWallet(network);
+ if (userAddr) log('Network changed. Reconnect your wallet before sending operations.', 'warn');
+ log('Switched to ' + network);
+ };
+ // Section
+ var modal = document.getElementById('wallet-modal');
+
+ document.getElementById('btn-connect').onclick = function() {
+ modal.classList.add('open');
+ };
+ document.getElementById('wm-cancel').onclick = function() {
+ modal.classList.remove('open');
+ };
+ modal.onclick = function(e) {
+ if (e.target === modal) modal.classList.remove('open');
+ };
+
+ // Temple (browser extension - instant, no P2P)
+ document.getElementById('wm-temple').onclick = async function() {
+ modal.classList.remove('open');
+ var templeAPI = getTempleCandidate();
+ if (!templeAPI) {
+ log('Temple injected Tezos object not found. Trying Temple direct dApp bridge...', 'warn');
+ if (await templeDirectAvailable()) {
+ templeAPI = { isDirectTempleDapp:true };
+ } else {
+ log('Temple Tezos provider not found. The detected Temple object looks like an EVM provider, not a Tezos signer, and the direct dApp bridge did not answer. Open/unlock Temple, enable the Tezos account/network, then try again. Detected: ' + templeDiagnostics(), 'err');
+ return;
+ }
+ }
+ try {
+ log('Connecting to Temple...', 'warn');
+ var permission = await connectTempleApi(templeAPI);
+ if (permission && permission.pkh) templeAPI.permission = permission;
+ var addr = permission && permission.pkh ? permission.pkh : await templeAddress(templeAPI);
+ await useTempleProvider(templeAPI, addr);
+ finishConnect(addr, true);
+ log('Temple direct connection ready OK', 'ok');
+ } catch(e) {
+ log('Temple connection failed: ' + errorText(e) + '. Detected Tezos API: ' + compactKeys(templeAPI), 'err');
+ }
+ };
+
+ // Beacon (works with any TZIP-10 wallet including Temple, Kukai, Naan, AirGap)
+ document.getElementById('wm-beacon').onclick = async function() {
+ modal.classList.remove('open');
+ var btn = document.getElementById('btn-connect');
+ btn.innerHTML = '<span class="spin"></span> Connecting...';
+ btn.disabled = true;
+ try {
+ log('Opening Beacon wallet selector - approve in your wallet...', 'warn');
+ log('Beacon network: ' + network + '. If no wallet window opens, allow popups for this localhost page and unlock a Beacon-compatible Tezos wallet.', 'info');
+ // beaconWallet is recreated whenever the selected network changes.
+ Tezos.setWalletProvider(beaconWallet);
+ try {
+ if (typeof beaconWallet.clearActiveAccount === 'function') await beaconWallet.clearActiveAccount();
+ else if (beaconWallet.client && typeof beaconWallet.client.clearActiveAccount === 'function') await beaconWallet.client.clearActiveAccount();
+ } catch(e) {}
+ await withTimeout(
+ beaconWallet.requestPermissions({ network: { type: network } }),
+ 90000,
+ 'Beacon did not return an approved account. Check for a blocked popup, wallet approval window, or locked wallet extension.'
+ );
+ var addr = await beaconWallet.getPKH();
+ finishConnect(addr, true);
+ } catch(e) {
+ log('Beacon connection failed: ' + errorText(e) + ' (network=' + network + ', rpc=' + RPC[network] + ')', 'err');
+ } finally {
+ btn.innerHTML = 'Connect Wallet';
+ btn.disabled = false;
+ }
+ };
+
+ function finishConnect(addr, showBtns) {
+ userAddr = addr;
+ document.getElementById('addr-pill').textContent = addr.slice(0,6)+'...'+addr.slice(-4);
+ document.getElementById('addr-pill').classList.add('show');
+ if (showBtns) {
+ document.getElementById('btn-connect').style.display = 'none';
+ document.getElementById('btn-disconnect').style.display = 'inline-flex';
+ }
+ document.getElementById('admin-addr').value = addr;
+ document.getElementById('xfer-from').value = addr;
+ document.getElementById('op-owner').value = addr;
+ document.getElementById('bal-owner').value = addr;
+ document.getElementById('royalty-recipient').value = addr;
+ document.getElementById('default-royalty-recipient').value = addr;
+ document.getElementById('token-royalty-recipient').value = addr;
+ document.getElementById('btn-deploy').disabled = false;
+ autoReplaceStorageTextarea(false);
+ setStep(2);
+ }
+
+ document.getElementById('btn-disconnect').onclick = async function() {
+ try { await beaconWallet.client.clearActiveAccount(); } catch(e){}
+ userAddr = null;
+ document.getElementById('addr-pill').classList.remove('show');
+ document.getElementById('btn-connect').style.display = 'inline-flex';
+ document.getElementById('btn-connect').disabled = false;
+ document.getElementById('btn-disconnect').style.display = 'none';
+ document.getElementById('btn-deploy').disabled = true;
+ setStep(1);
+ log('Disconnected.', 'warn');
+ };
+ // Section
+ document.getElementById('storage-input').addEventListener('paste', function() {
+ setTimeout(function() { autoReplaceStorageTextarea(true); }, 0);
+ });
+ document.getElementById('storage-input').addEventListener('blur', function() {
+ autoReplaceStorageTextarea(false);
+ });
+ document.getElementById('admin-addr').addEventListener('blur', function() {
+ autoReplaceStorageTextarea(false);
+ });
+
+ function parseJsonInput(id, label) {
+ var raw = document.getElementById(id).value.trim();
+ if (!raw) throw new Error('Paste your ' + label + ' JSON first.');
+ try { return JSON.parse(raw); }
+ catch(e) { throw new Error('Invalid ' + label + ' JSON: ' + e.message); }
+ }
+
+ function tezosAddressRegex() {
+ return /^(tz1|tz2|tz3|tz4|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/;
+ }
+
+ function replaceStorageAddresses(value, replacement) {
+ var count = 0;
+ var re = tezosAddressRegex();
+ function walk(v) {
+ if (typeof v === 'string') {
+ if (re.test(v)) {
+ count++;
+ return replacement;
+ }
+ return v;
+ }
+ if (Array.isArray(v)) return v.map(walk);
+ if (v && typeof v === 'object') {
+ var out = {};
+ Object.keys(v).forEach(function(k) { out[k] = walk(v[k]); });
+ return out;
+ }
+ return v;
+ }
+ return { storage: walk(value), count: count };
+ }
+
+ function micNat(n) { return { int:String(Number(n || 0)) }; }
+ function micBool(v) { return { prim:v ? 'True' : 'False' }; }
+ function micNone() { return { prim:'None' }; }
+ function micElt(k, v) { return { prim:'Elt', args:[k, v] }; }
+ function micPair(args) { return { prim:'Pair', args:args }; }
+ function stringToBytes(text) {
+ return Array.from(new TextEncoder().encode(String(text || ''))).map(function(b) {
+ return b.toString(16).padStart(2, '0');
+ }).join('');
+ }
+ function micBytesFromString(text) { return { bytes:stringToBytes(text) }; }
+ function uriItem(uri) {
+ return { uri:uri, uri_bytes:stringToBytes(uri) };
+ }
+
+ function normalizeMichelsonAddressValue(v, fallback) {
+ var addr = typeof v === 'string' ? v : (v && typeof v.string === 'string' ? v.string : fallback);
+ if (!tezosAddressRegex().test(addr)) throw new Error('Storage admin must be a valid Tezos address.');
+ return { string:addr };
+ }
+
+ function maybeNormalizeNamedStorage(storage, adminAddr) {
+ if (!storage || Array.isArray(storage) || typeof storage !== 'object') return storage;
+ if (storage.prim || storage.args || storage.string || storage.bytes || storage.int) return storage;
+ if (storage.admin === undefined && storage.paused === undefined && storage.next_token_id === undefined) return storage;
+
+ var tokenOwners = storage.token_owners || {};
+ var uriCount = storage.uri_count || {};
+ var pinned = storage.pinned || {};
+
+ function natAddressKeyBigMap(obj) {
+ return Object.keys(obj || {}).map(function(k) {
+ return micElt(micNat(k), normalizeMichelsonAddressValue(obj[k], adminAddr));
+ });
+ }
+ function natNatKeyBigMap(obj) {
+ return Object.keys(obj || {}).map(function(k) {
+ return micElt(micNat(k), micNat(obj[k]));
+ });
+ }
+ function natOptionNatKeyBigMap(obj) {
+ return Object.keys(obj || {}).map(function(k) {
+ var val = obj[k];
+ return micElt(micNat(k), val === null || val === undefined ? micNone() : { prim:'Some', args:[micNat(val)] });
+ });
+ }
+
+ log('Storage JSON looked like a named object, so it was converted to this contract Michelson storage layout.', 'info');
+ return micPair([
+ normalizeMichelsonAddressValue(storage.admin, adminAddr),
+ micPair([
+ storage.all_tokens && Array.isArray(storage.all_tokens)
+ ? storage.all_tokens.map(micNat)
+ : [],
+ micPair([
+ Array.isArray(storage.ledger) ? storage.ledger : [],
+ micPair([
+ micNat(storage.next_token_id),
+ micPair([
+ Array.isArray(storage.operators) ? storage.operators : [],
+ micPair([
+ micBool(!!storage.paused),
+ micPair([
+ natOptionNatKeyBigMap(pinned),
+ micPair([
+ natAddressKeyBigMap(tokenOwners),
+ micPair([
+ natNatKeyBigMap(uriCount),
+ Array.isArray(storage.uri_store) ? storage.uri_store : []
+ ])
+ ])
+ ])
+ ])
+ ])
+ ])
+ ])
+ ])
+ ]);
+ }
+
+ function emptyInitialStorage(adminAddr) {
+ var collectionName = document.getElementById('collection-name').value.trim() || 'Untitled Collection';
+ var collectionSymbol = document.getElementById('collection-symbol').value.trim() || 'NFT';
+ var collectionMetadataUri = document.getElementById('collection-metadata-uri').value.trim();
+ var royaltyRecipient = document.getElementById('royalty-recipient').value.trim() || adminAddr;
+ var royaltyBps = Number(document.getElementById('royalty-bps').value || 0);
+ if (!tezosAddressRegex().test(royaltyRecipient)) throw new Error('Default Royalty Recipient must be a valid Tezos address.');
+ if (!Number.isInteger(royaltyBps) || royaltyBps < 0 || royaltyBps > 10000) throw new Error('Default Royalty BPS must be between 0 and 10000.');
+ var metadataMap = collectionMetadataUri ? [
+ micElt({ string:'' }, micBytesFromString(collectionMetadataUri))
+ ] : [];
+ return { prim:'Pair', args:[
+ normalizeMichelsonAddressValue(adminAddr, adminAddr),
+ [],
+ { string:collectionMetadataUri },
+ { string:collectionName },
+ { string:collectionSymbol },
+ micPair([normalizeMichelsonAddressValue(royaltyRecipient, adminAddr), micNat(royaltyBps)]),
+ [],
+ metadataMap,
+ micNat(0),
+ [],
+ micBool(false),
+ [],
+ [],
+ [],
+ [],
+ [],
+ [],
+ [],
+ [],
+ []
+ ]};
+ }
+
+ function normalizeAdminInMichelsonStorage(storage, adminAddr) {
+ if (!storage || typeof storage !== 'object' || storage.prim !== 'Pair' || !Array.isArray(storage.args) || !storage.args.length) {
+ return storage;
+ }
+ var shouldReplace = document.getElementById('replace-storage-address').checked;
+ var first = storage.args[0];
+ if (shouldReplace || typeof first === 'string' || (first && typeof first === 'object' && first.string !== undefined)) {
+ storage = JSON.parse(JSON.stringify(storage));
+ storage.args[0] = normalizeMichelsonAddressValue(shouldReplace ? adminAddr : storage.args[0], adminAddr);
+ }
+ return storage;
+ }
+
+ function findStorageType(code) {
+ if (!Array.isArray(code)) return null;
+ for (var i = 0; i < code.length; i++) {
+ if (code[i] && code[i].prim === 'storage' && Array.isArray(code[i].args)) return code[i].args[0];
+ }
+ return null;
+ }
+
+ function firstPairLeaf(node) {
+ while (node && String(node.prim || '').toLowerCase() === 'pair' && Array.isArray(node.args) && node.args.length) node = node.args[0];
+ return node;
+ }
+
+ function pairLeafAt(node, index) {
+ var cur = node;
+ for (var i = 0; i < index; i++) {
+ if (!cur || String(cur.prim || '').toLowerCase() !== 'pair' || !Array.isArray(cur.args) || cur.args.length < 2) return null;
+ cur = cur.args[1];
+ }
+ return firstPairLeaf(cur);
+ }
+
+ function annotationHas(node, name) {
+ return !!(node && Array.isArray(node.annots) && node.annots.indexOf('%' + name) >= 0);
+ }
+
+ function preflightStorageAdmin(code, storage) {
+ var st = findStorageType(code);
+ var adminType = firstPairLeaf(st);
+ var adminValue = firstPairLeaf(storage);
+ if (adminType && annotationHas(adminType, 'admin') && String(adminType.prim || '').toLowerCase() !== 'address') {
+ throw new Error('Code JSON says %admin is ' + adminType.prim + ', not address. Code and storage are from different contract builds.');
+ }
+ if (adminType && String(adminType.prim || '').toLowerCase() === 'address' && (!adminValue || typeof adminValue.string !== 'string')) {
+ throw new Error('Storage %admin must be an address Micheline value like {"string":"tz1..."}');
+ }
+ if (adminValue && typeof adminValue.string === 'string') {
+ log('Deploy storage admin: ' + adminValue.string, 'info');
+ }
+ }
+
+ function oneLineJson(value, maxLen) {
+ var text;
+ try { text = JSON.stringify(value); }
+ catch(e) { text = String(value); }
+ maxLen = maxLen || 420;
+ return text.length > maxLen ? text.slice(0, maxLen) + '...' : text;
+ }
+
+ function extractOpHash(response) {
+ function looksLikeOpHash(v) {
+ return typeof v === 'string' && /^o[1-9A-HJ-NP-Za-km-z]{50,52}$/.test(v);
+ }
+ if (looksLikeOpHash(response)) return response;
+ if (Array.isArray(response)) {
+ for (var i = 0; i < response.length; i++) {
+ var fromItem = extractOpHash(response[i]);
+ if (typeof fromItem === 'string') return fromItem;
+ }
+ return response;
+ }
+ if (!response || typeof response !== 'object') return response;
+ var fields = ['opHash','hash','operationHash','transactionHash','op_hash','operation_hash','opHashes','hashes','operations','contents','payload','result','data'];
+ for (var j = 0; j < fields.length; j++) {
+ var nested = extractOpHash(response[fields[j]]);
+ if (typeof nested === 'string') return nested;
+ }
+ var keys = Object.keys(response);
+ for (var k = 0; k < keys.length; k++) {
+ var found = extractOpHash(response[keys[k]]);
+ if (typeof found === 'string') return found;
+ }
+ return response;
+ }
+
+ function delay(ms) {
+ return new Promise(function(resolve) { setTimeout(resolve, ms); });
+ }
+
+ function tzktBaseUrl() {
+ return network === 'mainnet' ? 'https://api.tzkt.io' : 'https://api.ghostnet.tzkt.io';
+ }
+
+ function collectOperationStatuses(value, out) {
+ out = out || [];
+ if (!value) return out;
+ if (Array.isArray(value)) {
+ for (var i = 0; i < value.length; i++) collectOperationStatuses(value[i], out);
+ return out;
+ }
+ if (typeof value !== 'object') return out;
+ if (typeof value.status === 'string') out.push(String(value.status).toLowerCase());
+ var keys = Object.keys(value);
+ for (var j = 0; j < keys.length; j++) collectOperationStatuses(value[keys[j]], out);
+ return out;
+ }
+
+ function isFailedOperationStatus(statuses) {
+ return statuses.some(function(status) {
+ return status === 'failed' || status === 'backtracked' || status === 'skipped';
+ });
+ }
+
+ function isAppliedOperationStatus(statuses) {
+ return statuses.indexOf('applied') >= 0;
+ }
+
+ async function waitForOperationInIndexer(opHash) {
+ if (typeof opHash !== 'string') throw new Error('Missing operation hash for confirmation.');
+ var urls = [
+ tzktBaseUrl() + '/v1/operations/' + encodeURIComponent(opHash),
+ tzktBaseUrl() + '/v1/operations/transactions/' + encodeURIComponent(opHash),
+ tzktBaseUrl() + '/v1/operations/originations/' + encodeURIComponent(opHash)
+ ];
+ var lastStatuses = [];
+ for (var attempt = 0; attempt < 24; attempt++) {
+ for (var i = 0; i < urls.length; i++) {
+ try {
+ var res = await fetch(urls[i]);
+ if (!res.ok) continue;
+ var data = await res.json();
+ var statuses = collectOperationStatuses(data, []);
+ if (!statuses.length) continue;
+ lastStatuses = statuses;
+ if (isAppliedOperationStatus(statuses)) return { opHash: opHash, statuses: statuses };
+ if (isFailedOperationStatus(statuses)) {
+ throw new Error('Operation was not applied. Status: ' + statuses.join(', '));
+ }
+ } catch(e) {
+ if (/Operation was not applied/.test(errorText(e))) throw e;
+ }
+ }
+ await delay(2500);
+ }
+ throw new Error('Operation confirmation timed out at the indexer. Last known statuses: ' + (lastStatuses.join(', ') || 'none'));
+ }
+
+ async function confirmOperation(opOrHash) {
+ var opHash = typeof opOrHash === 'string' ? opOrHash : extractOpHash(opOrHash);
+ if (typeof opHash !== 'string') throw new Error('Wallet returned no readable operation hash for confirmation.');
+ if (opOrHash && typeof opOrHash === 'object' && typeof opOrHash.confirmation === 'function') {
+ try {
+ return await withTimeout(opOrHash.confirmation(1), 120000, 'Wallet confirmation polling timed out.');
+ } catch(e) {
+ log('Wallet confirmation stream was unavailable; checking the confirmed operation through TzKT instead. ' + errorText(e), 'warn');
+ }
+ }
+ try {
+ if (Tezos && Tezos.operation && typeof Tezos.operation.createOperation === 'function') {
+ var created = await Tezos.operation.createOperation(opHash);
+ if (created && typeof created.confirmation === 'function') {
+ try {
+ return await withTimeout(created.confirmation(1), 120000, 'RPC confirmation polling timed out.');
+ } catch(createdError) {
+ log('RPC confirmation stream was unavailable; checking TzKT instead. ' + errorText(createdError), 'warn');
+ }
+ }
+ }
+ } catch(e) {}
+ return waitForOperationInIndexer(opHash);
+ }
+
+ function findOriginatedAddress(value) {
+ if (!value) return null;
+ if (typeof value === 'string' && value.indexOf('KT1') === 0) return value;
+ if (Array.isArray(value)) {
+ for (var i = 0; i < value.length; i++) {
+ var fromItem = findOriginatedAddress(value[i]);
+ if (fromItem) return fromItem;
+ }
+ return null;
+ }
+ if (typeof value !== 'object') return null;
+ var fields = ['originatedContract', 'originated_contract', 'contract', 'account', 'target', 'address'];
+ for (var j = 0; j < fields.length; j++) {
+ var found = findOriginatedAddress(value[fields[j]]);
+ if (found) return found;
+ }
+ var keys = Object.keys(value);
+ for (var k = 0; k < keys.length; k++) {
+ var nested = findOriginatedAddress(value[keys[k]]);
+ if (nested) return nested;
+ }
+ return null;
+ }
+
+ async function findOriginatedAddressFromIndexer(opHash) {
+ if (typeof opHash !== 'string') return null;
+ var urls = [
+ tzktBaseUrl() + '/v1/operations/originations/' + encodeURIComponent(opHash),
+ tzktBaseUrl() + '/v1/operations/' + encodeURIComponent(opHash)
+ ];
+ for (var attempt = 0; attempt < 18; attempt++) {
+ for (var i = 0; i < urls.length; i++) {
+ try {
+ var res = await fetch(urls[i]);
+ if (!res.ok) continue;
+ var data = await res.json();
+ var addr = findOriginatedAddress(data);
+ if (addr) return addr;
+ } catch(e) {}
+ }
+ await delay(2500);
+ }
+ return null;
+ }
+
+ async function resolveOriginatedContract(op) {
+ var opHash = extractOpHash(op);
+ if (typeof opHash === 'string') {
+ lastSubmittedOpHash = opHash;
+ log('Submitted (' + opHash + '). Waiting for confirmation...', 'info');
+ try {
+ await confirmOperation(op);
+ } catch(e) {
+ log('Confirmation check warning: ' + errorText(e), 'warn');
+ }
+ if (op && typeof op === 'object') op.opHash = opHash;
+ if (op && typeof op.contract === 'function') {
+ try { return await op.contract(); }
+ catch(e) { log('Wallet contract lookup warning: ' + errorText(e), 'warn'); }
+ }
+ var addr = await findOriginatedAddressFromIndexer(opHash);
+ if (addr) return { address: addr };
+ throw new Error('Origination was submitted, but the originated KT1 address was not found yet. Operation hash: ' + opHash);
+ }
+ throw new Error('Wallet returned no readable operation hash after signing. Raw response: ' + oneLineJson(op, 520));
+ }
+
+ function logDeployTrace(code, storage, label) {
+ label = label || 'Deploy trace';
+ var st = findStorageType(code);
+ var order = Array.isArray(code) ? code.map(function(s) { return s && s.prim; }).join(' -> ') : 'not-array';
+ log(label + ': code sections = ' + order, 'info');
+ log(label + ': storage type admin leaf = ' + oneLineJson(firstPairLeaf(st), 260), 'info');
+ log(label + ': storage value admin leaf = ' + oneLineJson(firstPairLeaf(storage), 260), 'info');
+ for (var i = 0; i < 10; i++) {
+ var typeLeaf = pairLeafAt(st, i);
+ var valueLeaf = pairLeafAt(storage, i);
+ if (!typeLeaf && !valueLeaf) break;
+ log(label + ': leaf[' + i + '] type=' + oneLineJson(typeLeaf, 120) + ' value=' + oneLineJson(valueLeaf, 120), 'info');
+ }
+ }
+
+ function normalizeCodeSections(code) {
+ var wanted = ['parameter', 'storage', 'code'];
+ var out = [];
+ wanted.forEach(function(name) {
+ var found = code.find(function(section) {
+ return section && String(section.prim || '').toLowerCase() === name;
+ });
+ if (found) out.push(found);
+ });
+ code.forEach(function(section) {
+ if (wanted.indexOf(String(section && section.prim || '').toLowerCase()) < 0) out.push(section);
+ });
+ return out.length ? out : code;
+ }
+
+ function currentAdminAddress() {
+ return document.getElementById('admin-addr').value.trim() || userAddr || '';
+ }
+
+ function autoReplaceStorageTextarea(showLog) {
+ var box = document.getElementById('storage-input');
+ var raw = box.value.trim();
+ var adminAddr = currentAdminAddress();
+ if (!raw || !document.getElementById('replace-storage-address').checked || !tezosAddressRegex().test(adminAddr)) return;
+ try {
+ var parsed = JSON.parse(raw);
+ var fullObject = parsed && parsed.storage !== undefined;
+ var target = fullObject ? parsed.storage : parsed;
+ var replaced = replaceStorageAddresses(target, adminAddr);
+ var normalized = normalizeAdminInMichelsonStorage(replaced.storage, adminAddr);
+ if (JSON.stringify(normalized) !== JSON.stringify(replaced.storage)) {
+ replaced.storage = normalized;
+ replaced.count++;
+ }
+ if (!replaced.count) return;
+ if (fullObject) parsed.storage = replaced.storage;
+ else parsed = replaced.storage;
+ box.value = JSON.stringify(parsed, null, 2);
+ if (showLog) log('Storage paste: replaced ' + replaced.count + ' address literal(s) with ' + adminAddr + '.', 'info');
+ } catch(e) {
+ if (showLog) log('Storage paste address replacement skipped until the JSON is valid.', 'warn');
+ }
+ }
+
+ function deployPartsFromInputs() {
+ var codeInput = parseJsonInput('code-input', 'code');
+ var storageRaw = document.getElementById('storage-input').value.trim();
+ var storageInput = storageRaw ? parseJsonInput('storage-input', 'storage') : null;
+ var code = codeInput && codeInput.code ? codeInput.code : codeInput;
+ var storage = storageInput && storageInput.storage !== undefined ? storageInput.storage : storageInput;
+ if (storage === null && codeInput && codeInput.storage !== undefined) storage = codeInput.storage;
+ if (!Array.isArray(code)) throw new Error('Code JSON must be the Michelson code array, or a full object with a "code" array.');
+ code = normalizeCodeSections(code);
+
+ var adminAddr = currentAdminAddress();
+ if (document.getElementById('replace-storage-address').checked) {
+ if (!tezosAddressRegex().test(adminAddr)) throw new Error('Admin Address must be a valid Tezos address before replacing storage addresses.');
+ if (!storageRaw) {
+ storage = emptyInitialStorage(adminAddr);
+ document.getElementById('storage-input').value = JSON.stringify(storage, null, 2);
+ log('Storage rebuilt from connected admin address for this FA2 contract.', 'info');
+ preflightStorageAdmin(code, storage);
+ logDeployTrace(code, storage);
+ return { code: code, storage: storage };
+ }
+ var replaced = replaceStorageAddresses(storage, adminAddr);
+ storage = replaced.storage;
+ if (replaced.count) log('Storage address replacement: ' + replaced.count + ' address literal(s) set to ' + adminAddr + '.', 'info');
+ else log('Storage address replacement was enabled, but no Tezos address literals were found in storage.', 'warn');
+ }
+ if (storage === undefined || storage === null) throw new Error('Storage JSON is required, unless address replacement is checked and the storage box is empty.');
+ storage = maybeNormalizeNamedStorage(storage, adminAddr);
+ storage = normalizeAdminInMichelsonStorage(storage, adminAddr);
+ preflightStorageAdmin(code, storage);
+ logDeployTrace(code, storage);
+ return { code: code, storage: storage };
+ }
+
+ function isRpcNetworkError(e) {
+ return /Failed to fetch|network|NetworkError|ERR_|EAI_AGAIN|ECONN|timeout|protocols/i.test(errorText(e));
+ }
+
+ function originationParams(script) {
+ return {
+ code: script.code,
+ init: script.storage
+ };
+ }
+
+ async function originateWithRpcFallback(script) {
+ var endpoints = RPCS[network] || [RPC[network]];
+ var lastErr = null;
+ for (var i = 0; i < endpoints.length; i++) {
+ RPC[network] = endpoints[i];
+ Tezos.setRpcProvider(RPC[network]);
+ if (i > 0) log('Retrying deploy with alternate RPC: ' + RPC[network], 'warn');
+ try {
+ return await Tezos.wallet.originate(originationParams(script)).send();
+ } catch(e) {
+ lastErr = e;
+ log('Deploy attempt failed on RPC ' + RPC[network] + ': ' + errorText(e), 'err');
+ if (isPostSubmitResultError(e) && lastSubmittedOpHash) {
+ log('Wallet submitted operation, but Taquito received a wrapped hash object. Continuing with extracted hash ' + lastSubmittedOpHash + '.', 'warn');
+ return {
+ opHash: lastSubmittedOpHash,
+ rawError: e,
+ confirmation: function() { return confirmOperation(lastSubmittedOpHash); }
+ };
+ }
+ if (!isRpcNetworkError(e) || i === endpoints.length - 1) throw e;
+ }
+ }
+ throw lastErr || new Error('Deploy failed before an operation was created.');
+ }
+
+ document.getElementById('btn-deploy').onclick = async function() {
+ if (!userAddr) { log('Connect wallet first.','err'); return; }
+ var script;
+ try { script = deployPartsFromInputs(); }
+ catch(e) { log(errorText(e),'err'); return; }
+ var btn = this;
+ btn.innerHTML='<span class="spin"></span> Waiting for signature...'; btn.disabled=true;
+ log('Originating - sign in your wallet...','warn'); setStep(3);
+ try {
+ lastSubmittedOpHash = '';
+ var op = await originateWithRpcFallback(script);
+ var contract = await resolveOriginatedContract(op);
+ ctAddr = contract.address;
+ ct = contract.methods || contract.methodsObject ? contract : await Tezos.wallet.at(ctAddr);
+ showDeployed(ctAddr); log('Deployed: '+ctAddr,'ok');
+ } catch(e) { log('Deploy failed: '+(e.message||e),'err'); setStep(2); }
+ finally { btn.innerHTML='Deploy Contract -> Sign in Wallet'; btn.disabled=false; }
+ };
+ // Section
+ document.getElementById('btn-load-existing').onclick = async function() {
+ if (!Tezos) { log('Connect wallet first.','err'); return; }
+ var addr = document.getElementById('existing-addr').value.trim();
+ if (!addr.startsWith('KT1')) { log('Enter a valid KT1... address.','err'); return; }
+ try {
+ ct = await Tezos.wallet.at(addr); ctAddr = addr;
+ showDeployed(addr); log('Contract loaded: '+addr,'ok');
+ } catch(e) { log('Load failed: '+e.message,'err'); }
+ };
+
+ function showDeployed(addr) {
+ document.getElementById('deployed-banner').classList.add('show');
+ document.getElementById('ct-addr-display').textContent = addr;
+ document.getElementById('tzkt-link').href = TZKT[network]+'/'+addr;
+ document.getElementById('collector-link').href = 'tezos_nft_collector_pin.html?contract=' + encodeURIComponent(addr);
+ document.getElementById('manage-section').style.display = 'block';
+ setStep(3);
+ }
+ document.getElementById('btn-copy-ct').onclick = function() {
+ if (ctAddr) { navigator.clipboard.writeText(ctAddr); log('Copied.','ok'); }
+ };
+ // Section
+ document.querySelectorAll('.tab').forEach(function(t) {
+ t.onclick = function() {
+ document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});
+ document.querySelectorAll('.panel').forEach(function(x){x.classList.remove('active');});
+ t.classList.add('active');
+ document.getElementById(t.dataset.panel).classList.add('active');
+ };
+ });
+ // Section
+ function req() {
+ if (!ct) throw new Error('Load or deploy a contract first.');
+ if (!userAddr) throw new Error('Connect your wallet first.');
+ }
+ function natFromInput(id, label) {
+ var raw = document.getElementById(id).value;
+ var n = Number(raw);
+ if (!Number.isInteger(n) || n < 0) throw new Error('Enter a valid ' + label + '.');
+ return n;
+ }
+ function bpsFromInput(id, label) {
+ var n = natFromInput(id, label);
+ if (n > 10000) throw new Error(label + ' must be 10000 or less.');
+ return n;
+ }
+ function esc(v) {
+ return String(v).replace(/[&<>"']/g, function(c) {
+ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+ });
+ }
+ function readFileAsText(file) {
+ return new Promise(function(resolve, reject) {
+ var reader = new FileReader();
+ reader.onload = function() { resolve(reader.result); };
+ reader.onerror = function() { reject(reader.error || new Error('Could not read file.')); };
+ reader.readAsText(file);
+ });
+ }
+ function readFileAsArrayBuffer(file) {
+ return new Promise(function(resolve, reject) {
+ var reader = new FileReader();
+ reader.onload = function() { resolve(reader.result); };
+ reader.onerror = function() { reject(reader.error || new Error('Could not read file.')); };
+ reader.readAsArrayBuffer(file);
+ });
+ }
+ function pinataHeaders() {
+ var jwt = document.getElementById('pinata-jwt').value.trim();
+ var apiKey = document.getElementById('pinata-api-key').value.trim();
+ var apiSecret = document.getElementById('pinata-api-secret').value.trim();
+ if (jwt) return { Authorization:'Bearer ' + jwt };
+ if (apiKey && apiSecret) return { pinata_api_key:apiKey, pinata_secret_api_key:apiSecret };
+ throw new Error('Paste a Pinata JWT, or enter both legacy API key and secret.');
+ }
+ function ipfsUri(cid) {
+ if (!cid) throw new Error('Pinata did not return an IPFS CID.');
+ return 'ipfs://' + cid;
+ }
+ function ipfsGatewayUrl(uri) {
+ return 'https://gateway.pinata.cloud/ipfs/' + String(uri || '').replace(/^ipfs:\/\//, '');
+ }
+ async function pinataReadResponse(res, label) {
+ var text = await res.text();
+ var data = {};
+ if (text) {
+ try { data = JSON.parse(text); }
+ catch(_) { data = { raw:text }; }
+ }
+ if (!res.ok) {
+ throw new Error(label + ' failed (' + res.status + '): ' + (data.error || data.message || data.raw || res.statusText));
+ }
+ return data;
+ }
+ async function pinataUploadFile(file) {
+ var fd = new FormData();
+ fd.append('file', file, file.name || 'asset');
+ fd.append('pinataMetadata', JSON.stringify({ name:file.name || 'asset' }));
+ fd.append('pinataOptions', JSON.stringify({ cidVersion:1 }));
+ var res = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+ method:'POST',
+ headers:pinataHeaders(),
+ body:fd
+ });
+ var data = await pinataReadResponse(res, 'Image upload');
+ return ipfsUri(data.IpfsHash || data.cid || data.Cid || data.Hash);
+ }
+ async function pinataUploadJson(json, name) {
+ var body = {
+ pinataOptions:{ cidVersion:1 },
+ pinataMetadata:{ name:name || 'token-metadata.json' },
+ pinataContent:json
+ };
+ var headers = pinataHeaders();
+ headers['Content-Type'] = 'application/json';
+ var res = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+ method:'POST',
+ headers:headers,
+ body:JSON.stringify(body)
+ });
+ var data = await pinataReadResponse(res, 'Metadata upload');
+ return ipfsUri(data.IpfsHash || data.cid || data.Cid || data.Hash);
+ }
+ function metadataAttributes() {
+ var trait = document.getElementById('meta-attr-trait').value.trim();
+ var value = document.getElementById('meta-attr-value').value.trim();
+ return trait || value ? [{ name:trait || 'Trait', value:value || '' }] : [];
+ }
+ function buildTokenMetadata(imageUri, imageFile) {
+ var name = document.getElementById('meta-name').value.trim();
+ var description = document.getElementById('meta-desc').value.trim();
+ var creator = document.getElementById('meta-creator').value.trim() || userAddr;
+ if (!name) throw new Error('Enter an NFT name.');
+ if (!creator || !tezosAddressRegex().test(creator)) throw new Error('Creator must be a valid Tezos address.');
+ var mime = imageFile.type || 'application/octet-stream';
+ return {
+ name:name,
+ description:description,
+ artifactUri:imageUri,
+ displayUri:imageUri,
+ thumbnailUri:imageUri,
+ creators:[creator],
+ attributes:metadataAttributes(),
+ formats:[{ uri:imageUri, mimeType:mime }]
+ };
+ }
+ function setFirstMintUri(uri) {
+ var first = document.querySelector('.m-uri');
+ if (!first) {
+ document.getElementById('btn-add-uri').click();
+ first = document.querySelector('.m-uri');
+ }
+ first.value = uri;
+ }
+ function setAppendUri(tokenId, uri) {
+ if (typeof tokenId === 'number' && tokenId >= 0) {
+ document.getElementById('ap-tid').value = String(tokenId);
+ document.getElementById('pin-tid').value = String(tokenId);
+ document.getElementById('view-tid').value = String(tokenId);
+ }
+ document.getElementById('ap-uri').value = uri;
+ }
+ function showPinataResult(imageUri, metadataUri, metadata) {
+ var box = document.getElementById('pinata-result');
+ box.style.display = 'block';
+ box.innerHTML =
+ '<div style="color:var(--acc);margin-bottom:6px">Ready to mint</div>' +
+ '<div>Image: <a style="color:var(--acc2)" target="_blank" href="'+esc(ipfsGatewayUrl(imageUri))+'">'+esc(imageUri)+'</a></div>' +
+ '<div>Metadata: <a style="color:var(--acc2)" target="_blank" href="'+esc(ipfsGatewayUrl(metadataUri))+'">'+esc(metadataUri)+'</a></div>' +
+ '<pre style="white-space:pre-wrap;margin:10px 0 0;color:var(--muted)">'+esc(JSON.stringify(metadata, null, 2))+'</pre>';
+ }
+ async function createPinataMetadataUri() {
+ if (!userAddr) throw new Error('Connect your wallet first.');
+ var imageFile = document.getElementById('pinata-image-file').files[0];
+ if (!imageFile) throw new Error('Choose an image or media file.');
+ log('Uploading media to Pinata/IPFS...', 'warn');
+ var imageUri = await pinataUploadFile(imageFile);
+ log('Media uploaded: ' + imageUri, 'ok');
+ var metadata = buildTokenMetadata(imageUri, imageFile);
+ var metadataName = (metadata.name || 'token').replace(/[^\w.-]+/g, '_') + '.json';
+ log('Uploading token metadata JSON to Pinata/IPFS...', 'warn');
+ var metadataUri = await pinataUploadJson(metadata, metadataName);
+ log('Metadata uploaded: ' + metadataUri, 'ok');
+ setFirstMintUri(metadataUri);
+ showPinataResult(imageUri, metadataUri, metadata);
+ return metadataUri;
+ }
+ function builderMintRecipient() {
+ return document.getElementById('pinata-mint-to').value.trim() || document.getElementById('mint-to').value.trim() || userAddr;
+ }
+ function builderAppendTokenId() {
+ var raw = document.getElementById('pinata-append-tid').value.trim();
+ if (!raw) throw new Error('Enter the existing token ID you want to append to.');
+ var n = Number(raw);
+ if (!Number.isInteger(n) || n < 0) throw new Error('Enter a valid existing token ID.');
+ return n;
+ }
+ function gatewayUrl(uri) {
+ uri = String(uri || '').trim();
+ if (!uri) return '';
+ if (/^ipfs:\/\//i.test(uri)) return 'https://ipfs.io/ipfs/' + uri.replace(/^ipfs:\/\//i, '');
+ if (/^ipfs\//i.test(uri)) return 'https://ipfs.io/' + uri;
+ if (/^https?:\/\//i.test(uri) || /^data:/i.test(uri)) return uri;
+ return uri;
+ }
+ function mediaUriFromMetadata(meta, fallbackUri) {
+ if (!meta || typeof meta !== 'object') return fallbackUri || '';
+ return meta.displayUri || meta.display_uri || meta.artifactUri || meta.artifact_uri || meta.thumbnailUri || meta.thumbnail_uri || meta.image || meta.imageUri || fallbackUri || '';
+ }
+ async function fetchJsonMaybe(uri) {
+ var url = gatewayUrl(uri);
+ if (!url) return null;
+ var res = await fetch(url, { cache:'no-store' });
+ if (!res.ok) throw new Error('Metadata fetch failed (' + res.status + ')');
+ return await res.json();
+ }
+ async function tokenInfoForGallery(tokenId) {
+ if (!ct || !ct.contractViews) throw new Error('Loaded contract does not expose metadata views.');
+ var info = await ct.contractViews.get_token_info(tokenId).executeView({viewCaller:userAddr});
+ var activeIndex = Number(info.active_index);
+ var count = Number(info.uri_count);
+ var activeUri = await ct.contractViews.get_active_uri(tokenId).executeView({viewCaller:userAddr});
+ var versions = [];
+ for (var i = 0; i < count; i++) {
+ var uri = await ct.contractViews.get_uri_at({token_id:tokenId,index:i}).executeView({viewCaller:userAddr});
+ var metadata;
+ try { metadata = await fetchJsonMaybe(uri); }
+ catch(e) { metadata = { name:'Token #' + tokenId + ' Metadata #' + i, description:'Metadata could not be fetched: ' + errorText(e) }; }
+ versions.push({ index:i, uri:uri, metadata:metadata, mediaUri:mediaUriFromMetadata(metadata, uri), isActive:i === activeIndex });
+ }
+ var activeVersion = versions[activeIndex] || versions[versions.length - 1] || null;
+ return { tokenId:tokenId, info:info, activeIndex:activeIndex, uriCount:count, activeUri:activeUri, uris:versions.map(function(v){ return v.uri; }), versions:versions, metadata:activeVersion ? activeVersion.metadata : {}, mediaUri:activeVersion ? activeVersion.mediaUri : activeUri };
+ }
+ async function discoverTokenLimit(defaultCount) {
+ try {
+ var storage = await ct.storage();
+ if (storage && storage.next_token_id !== undefined) return Number(storage.next_token_id && storage.next_token_id.toString ? storage.next_token_id.toString() : storage.next_token_id);
+ } catch(_) {}
+ return defaultCount;
+ }
+
+ function shortContract(addr) {
+ return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
+ }
+ function metadataStorage(uri) {
+ return /^ipfs:///i.test(String(uri || '')) ? 'IPFS' : /^https?:///i.test(String(uri || '')) ? 'HTTP' : 'URI';
+ }
+ function mediaTypeFromUri(uri) {
+ uri = String(uri || '').split('?')[0].toLowerCase();
+ if (/\.(png|jpg|jpeg|gif|webp|svg)$/.test(uri)) return uri.split('.').pop().toUpperCase();
+ if (/\.(mp4|webm|ogg)$/.test(uri)) return uri.split('.').pop().toUpperCase();
+ if (/\.(glb|gltf)$/.test(uri)) return uri.split('.').pop().toUpperCase();
+ return 'Media';
+ }
+ function detailsHtml(item, version) {
+return '<div class="nft-details"><div class="nft-details-title">Details</div>' +
+'<div class="nft-details-row"><span>Token ID</span><span>'+item.tokenId+'</span></div>' +
+'<div class="nft-details-row"><span>Metadata option</span><span>'+version.index+(version.isActive ? ' active' : '')+'</span></div>' +
+'<div class="nft-details-row"><span>Chain</span><span>Tezos '+esc(network === 'ghostnet' ? 'Ghostnet' : 'Mainnet')+'</span></div>' +
+'<div class="nft-details-row"><span>Contract</span><span>'+esc(shortAddr(ctAddr || document.getElementById('contract-address').value.trim()))+'</span></div>' +
+'<div class="nft-details-row"><span>Type</span><span>FA2</span></div>' +
+'<div class="nft-details-row"><span>Metadata</span><span>'+metadataStorage(version.uri)+'</span></div>' +
+'<div class="nft-details-row"><span>Media</span><span>'+mediaTypeFromUri(version.mediaUri)+'</span></div>' +
+'</div>';
+}
+
+ function mediaMarkup(version, cls) {
+ var url = gatewayUrl(version.mediaUri);
+ var name = version.metadata && version.metadata.name ? version.metadata.name : 'Token preview';
+ cls = cls || 'token-media';
+ if (!url) return '<div class="'+cls+'">No image URI</div>';
+ if (/\.(mp4|webm|ogg)(\?|#|$)/i.test(url)) return '<div class="'+cls+'"><video controls src="'+esc(url)+'"></video></div>';
+ return '<div class="'+cls+'"><img src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy" onerror="this.parentNode.textContent=\'Image unavailable\'"></div>';
+ }
+ function sortedVersions(item) {
+ var versions = (item.versions || []).slice();
+ versions.sort(function(a, b) {
+ if (a.isActive && !b.isActive) return -1;
+ if (!a.isActive && b.isActive) return 1;
+ return a.index - b.index;
+ });
+ return versions;
+ }
+ function renderTokenVersion(item, version) {
+ var meta = version.metadata || {};
+ var title = meta.name || ('Token #' + item.tokenId + ' Metadata #' + version.index);
+ return '<button class="token-version'+(version.isActive ? ' active' : '')+' js-select-version" type="button" data-token-id="'+item.tokenId+'" data-index="'+version.index+'" data-title="'+esc(title)+'" data-uri="'+esc(version.uri)+'" data-media="'+esc(gatewayUrl(version.mediaUri))+'" data-desc="'+esc(meta.description || '')+'">' +
+ mediaMarkup(version, 'token-media') + '<div class="token-version-title">'+version.index+'</div><div class="token-version-body"><div class="token-version-uri">'+esc(version.uri)+'</div></div></button>';
+ }
+ function heroHtml(item, version) {
+var meta = version.metadata || {};
+var title = meta.name || ('Token #' + item.tokenId + ' Metadata #' + version.index);
+var desc = meta.description ? '<div class="token-meta" style="margin-top:6px">'+esc(meta.description)+'</div>' : '';
+var versionLine = '<div class="token-meta" style="margin-top:6px">Metadata #'+version.index+(version.isActive ? ' - active' : '')+'</div>';
+return '<div class="token-hero" data-token-id="'+item.tokenId+'"><div class="js-hero-media">'+mediaMarkup(version, 'token-hero-media')+'</div><div class="token-hero-info"><div><div class="token-hero-title">'+esc(title)+'</div>'+versionLine+desc+'</div><div class="token-hero-actions"><a class="btn btn-ghost btn-sm js-hero-metadata" target="_blank" href="'+esc(gatewayUrl(version.uri))+'">Metadata</a><button class="btn btn-sec btn-sm js-fullscreen" type="button" data-media="'+esc(gatewayUrl(version.mediaUri))+'">Full screen</button>' +
+
+'</div></div></div>';
+}
+ function renderTokenCard(item) {
+var versions = sortedVersions(item);
+var first = versions[0] || { index:0, uri:item.activeUri, mediaUri:item.mediaUri, metadata:item.metadata || {}, isActive:true };
+return '<div class="token-card'+(item.info.is_pinned ? ' active' : '')+'"><div class="token-body">' +
+'<div class="js-token-hero-wrap">' + heroHtml(item, first) + '</div>' +
+'<div class="token-version-grid">' + versions.map(function(version){ return renderTokenVersion(item, version); }).join('') + '</div>' +
+'<div class="js-token-details">' + detailsHtml(item, first) + '</div>' +
+'</div></div>';
+}
+ var fullscreenItems = [];
+ var fullscreenIndex = 0;
+var fullscreenZoom = 1;
+ function renderFullscreen() {
+var viewer = document.getElementById('fullscreen-viewer');
+var box = document.getElementById('fullscreen-media');
+var caption = document.getElementById('fullscreen-caption');
+var item = fullscreenItems[fullscreenIndex];
+if (!viewer || !box || !item) return;
+if (/\.(mp4|webm|ogg)(\?|#|$)/i.test(item.media)) {
+box.innerHTML = '<video controls autoplay src="'+esc(item.media)+'"></video>';
+fullscreenZoom = 1;
+} else {
+box.innerHTML = '<img class="zoomable" src="'+esc(item.media)+'" alt="'+esc(item.title || 'Full screen token preview')+'">';
+}
+applyFullscreenZoom();
+caption.textContent = (fullscreenIndex + 1) + ' / ' + fullscreenItems.length + ' - ' + (item.title || item.uri || 'Token preview');
+viewer.querySelector('.fullscreen-prev').disabled = fullscreenItems.length < 2;
+viewer.querySelector('.fullscreen-next').disabled = fullscreenItems.length < 2;
+}
+ function applyFullscreenZoom() {
+var viewer = document.getElementById('fullscreen-viewer');
+if (!viewer) return;
+var img = viewer.querySelector('#fullscreen-media img.zoomable');
+var label = viewer.querySelector('.fullscreen-zoom-label');
+if (img) img.style.transform = 'scale(' + fullscreenZoom.toFixed(2) + ')';
+if (label) label.textContent = Math.round(fullscreenZoom * 100) + '%';
+}
+function setFullscreenZoom(nextZoom) {
+fullscreenZoom = Math.max(1, Math.min(5, Number(nextZoom) || 1));
+applyFullscreenZoom();
+}
+function stepFullscreen(delta) {
+ if (!fullscreenItems.length) return;
+ fullscreenIndex = (fullscreenIndex + delta + fullscreenItems.length) % fullscreenItems.length;
+ renderFullscreen();
+ }
+ function openFullscreen(mediaUrl, items, startIndex) {
+ if (!mediaUrl && (!items || !items.length)) return;
+ fullscreenItems = items && items.length ? items : [{ media:mediaUrl, title:'Token preview', uri:'' }];
+ fullscreenIndex = Math.max(0, Math.min(Number(startIndex) || 0, fullscreenItems.length - 1));
+fullscreenZoom = 1;
+ var viewer = document.getElementById('fullscreen-viewer');
+ if (!viewer) {
+ viewer = document.createElement('div');
+ viewer.id = 'fullscreen-viewer';
+ viewer.className = 'fullscreen-viewer';
+ viewer.innerHTML = '<div class="fullscreen-tools"><button class="btn btn-sec btn-sm fullscreen-zoom-out" type="button">-</button><span class="fullscreen-zoom-label">100%</span><button class="btn btn-sec btn-sm fullscreen-zoom-in" type="button">+</button><button class="btn btn-ghost btn-sm fullscreen-zoom-reset" type="button">Reset</button></div><button class="btn btn-sec btn-sm fullscreen-close" type="button">Close</button><button class="btn btn-sec btn-sm fullscreen-nav fullscreen-prev" type="button">&lt;</button><div id="fullscreen-media"></div><button class="btn btn-sec btn-sm fullscreen-nav fullscreen-next" type="button">&gt;</button><div id="fullscreen-caption" class="fullscreen-caption"></div>';
+ document.body.appendChild(viewer);
+ viewer.querySelector('.fullscreen-close').onclick = function(){ viewer.classList.remove('open'); };
+ viewer.querySelector('.fullscreen-prev').onclick = function(e){ e.stopPropagation(); stepFullscreen(-1); };
+ viewer.querySelector('.fullscreen-next').onclick = function(e){ e.stopPropagation(); stepFullscreen(1); };
+viewer.querySelector('.fullscreen-zoom-in').onclick = function(e){ e.stopPropagation(); setFullscreenZoom(fullscreenZoom + .25); };
+viewer.querySelector('.fullscreen-zoom-out').onclick = function(e){ e.stopPropagation(); setFullscreenZoom(fullscreenZoom - .25); };
+viewer.querySelector('.fullscreen-zoom-reset').onclick = function(e){ e.stopPropagation(); setFullscreenZoom(1); };
+viewer.querySelector('#fullscreen-media').onwheel = function(e){ if (!viewer.querySelector('#fullscreen-media img.zoomable')) return; e.preventDefault(); setFullscreenZoom(fullscreenZoom + (e.deltaY < 0 ? .2 : -.2)); };
+ viewer.onclick = function(e){ if (e.target === viewer) viewer.classList.remove('open'); };
+ document.addEventListener('keydown', function(e) {
+ if (!viewer.classList.contains('open')) return;
+ if (e.key === 'Escape') viewer.classList.remove('open');
+ if (e.key === 'ArrowLeft') stepFullscreen(-1);
+ if (e.key === 'ArrowRight') stepFullscreen(1);
+if (e.key === '+' || e.key === '=') setFullscreenZoom(fullscreenZoom + .25);
+if (e.key === '-' || e.key === '_') setFullscreenZoom(fullscreenZoom - .25);
+if (e.key === '0') setFullscreenZoom(1);
+ });
+ }
+ renderFullscreen();
+ viewer.classList.add('open');
+ }
+ function fullscreenItemsFromCard(card) {
+ return Array.from(card.querySelectorAll('.js-select-version')).map(function(btn) {
+ return { media:btn.dataset.media, title:btn.dataset.title || ('Metadata #' + btn.dataset.index), uri:btn.dataset.uri, index:Number(btn.dataset.index) };
+ });
+ }
+ function bindVersionViewers(grid) {
+ grid.querySelectorAll('.js-select-version').forEach(function(btn) {
+ btn.onclick = function() {
+ var card = btn.closest('.token-card');
+ var tokenId = btn.dataset.tokenId;
+ var versionIndex = btn.dataset.index;
+ var mediaUrl = btn.dataset.media;
+ var uri = btn.dataset.uri;
+ var title = btn.dataset.title || ('Metadata #' + versionIndex);
+ var desc = btn.dataset.desc ? '<div class="token-meta" style="margin-top:6px">'+esc(btn.dataset.desc)+'</div>' : '';
+ card.querySelectorAll('.js-select-version').forEach(function(x){ x.classList.remove('active'); });
+ btn.classList.add('active');
+ var media = /\.(mp4|webm|ogg)(\?|#|$)/i.test(mediaUrl) ? '<div class="token-hero-media"><video controls src="'+esc(mediaUrl)+'"></video></div>' : '<div class="token-hero-media"><img src="'+esc(mediaUrl)+'" alt="'+esc(title)+'" loading="lazy" onerror="this.parentNode.textContent=\'Image unavailable\'"></div>';
+ card.querySelector('.js-hero-media').innerHTML = media;
+ card.querySelector('.token-hero-info').innerHTML = '<div><div class="token-hero-title">'+esc(title)+'</div><div class="token-meta" style="margin-top:6px">Metadata #'+versionIndex+'</div>'+desc+'</div><div class="token-hero-actions"><a class="btn btn-ghost btn-sm js-hero-metadata" target="_blank" href="'+esc(gatewayUrl(uri))+'">Metadata</a><button class="btn btn-sec btn-sm js-fullscreen" type="button" data-media="'+esc(mediaUrl)+'">Full screen</button>' +
+
+'</div>';
+ var details = card.querySelector('.js-token-details');
+if (details) details.innerHTML = detailsHtml({ tokenId:Number(tokenId) }, { index:Number(versionIndex), uri:uri, mediaUri:mediaUrl, isActive:btn.classList.contains('active') });
+ bindHeroButtons(card);
+ };
+ });
+ grid.querySelectorAll('.token-card').forEach(bindHeroButtons);
+ }
+ function bindHeroButtons(scope) {
+ scope.querySelectorAll('.js-fullscreen').forEach(function(btn){ btn.onclick = function(){ var card = btn.closest('.token-card'); var items = fullscreenItemsFromCard(card); var selected = card.querySelector('.js-select-version.active'); var selectedIndex = selected ? items.findIndex(function(item){ return item.index === Number(selected.dataset.index); }) : 0; openFullscreen(btn.dataset.media, items, selectedIndex < 0 ? 0 : selectedIndex); }; });
+ }
+
+ async function loadTokenGallery(gridId, startId, count) {
+ req();
+ var grid = document.getElementById(gridId);
+ grid.innerHTML = '<div class="token-empty">Loading token metadata...</div>';
+ var limit = await discoverTokenLimit(startId + count);
+ var end = Math.min(startId + count, limit || (startId + count));
+ var items = [];
+ for (var id = startId; id < end; id++) {
+ try { items.push(await tokenInfoForGallery(id)); }
+ catch(e) { log('Skipping token #' + id + ': ' + errorText(e), 'warn'); }
+ }
+ grid.innerHTML = items.length ? items.map(renderTokenCard).join('') : '<div class="token-empty">No tokens found in that range.</div>';
+ bindVersionViewers(grid);
+ log('Loaded ' + items.length + ' token previews.', 'ok');
+ }
+ function galleryCount(id, label) {
+ var n = natFromInput(id, label);
+ if (n < 1 || n > 100) throw new Error(label + ' must be between 1 and 100.');
+ return n;
+ }
+ function entrypointCall(name, positionalArgs, objectArg) {
+ if (ct && ct.methodsObject && typeof ct.methodsObject[name] === 'function' && objectArg !== undefined) {
+ return ct.methodsObject[name](objectArg);
+ }
+ if (ct && ct.methods && typeof ct.methods[name] === 'function') {
+ return ct.methods[name].apply(ct.methods, positionalArgs || []);
+ }
+ if (ct && ct.methodsObject && typeof ct.methodsObject[name] === 'function') {
+ return ct.methodsObject[name].apply(ct.methodsObject, positionalArgs || []);
+ }
+ var available = [];
+ if (ct && ct.methods) available = available.concat(Object.keys(ct.methods));
+ if (ct && ct.methodsObject) available = available.concat(Object.keys(ct.methodsObject));
+ throw new Error('Entrypoint "' + name + '" is not available on the loaded contract. Available: ' + (available.join(', ') || 'none'));
+ }
+ function mintCall(to_, uris) {
+ var items = uris.map(uriItem);
+ return entrypointCall('mint', [items, to_], { initial_uris: items, to_: to_ });
+ }
+ function appendTokenUriCall(tokenId, uri) {
+ var item = uriItem(uri);
+ return entrypointCall('append_token_uri', [item, tokenId], { new_uri: item, token_id: tokenId });
+ }
+ function pinTokenUriCall(tokenId, index) {
+ return entrypointCall('pin_token_uri', [index, tokenId], { index: index, token_id: tokenId });
+ }
+ function unpinTokenUriCall(tokenId) {
+ return entrypointCall('unpin_token_uri', [tokenId], tokenId);
+ }
+ function transferCall(from_, to_, tokenId) {
+ var txs = [{ from_: from_, txs: [{ to_: to_, token_id: tokenId, amount: 1 }] }];
+ return entrypointCall('transfer', [txs], txs);
+ }
+ function addOperatorCall(owner, operator, tokenId) {
+ return entrypointCall('add_operator', [operator, owner, tokenId], { operator: operator, owner: owner, token_id: tokenId });
+ }
+ function removeOperatorCall(owner, operator, tokenId) {
+ return entrypointCall('remove_operator', [operator, owner, tokenId], { operator: operator, owner: owner, token_id: tokenId });
+ }
+ function setCollectionMetadataCall(name, symbol, uri) {
+ var bytes = stringToBytes(uri);
+ return entrypointCall('set_collection_metadata', [uri, bytes, name, symbol], { metadata_uri: uri, metadata_uri_bytes: bytes, name: name, symbol: symbol });
+ }
+ function setDefaultRoyaltyCall(recipient, bps) {
+ return entrypointCall('set_default_royalty', [bps, recipient], { bps: bps, recipient: recipient });
+ }
+ function setTokenRoyaltyCall(tokenId, recipient, bps) {
+ return entrypointCall('set_token_royalty', [bps, recipient, tokenId], { bps: bps, recipient: recipient, token_id: tokenId });
+ }
+ async function send(label, promise, btnEl) {
+ var orig = btnEl && btnEl.innerHTML;
+ if (btnEl) { btnEl.innerHTML='<span class="spin"></span> Waiting...'; btnEl.disabled=true; }
+ log(label+': sign in wallet...','warn');
+ try {
+ lastSubmittedOpHash = '';
+ var op = await promise;
+ var opHash = extractOpHash(op);
+ if (typeof opHash === 'string') {
+ lastSubmittedOpHash = opHash;
+ log(label+': submitted ('+opHash+'). Waiting for confirmation...','info');
+ try {
+ await confirmOperation(op);
+ log(label+': confirmed OK','ok');
+ } catch(confirmationError) {
+ log(label+': submitted successfully. Confirmation could not be read yet; this is not a wallet failure. Check '+TZKT[network]+'/'+opHash+'. '+errorText(confirmationError),'warn');
+ return { opHash:opHash, rawResponse:op, confirmationWarning:confirmationError };
+ }
+ } else if (lastSubmittedOpHash) {
+ log(label+': wallet returned an unreadable result object, but the operation hash was captured: '+lastSubmittedOpHash+'. Waiting for confirmation...','warn');
+ try {
+ await confirmOperation(lastSubmittedOpHash);
+ log(label+': confirmed OK','ok');
+ } catch(confirmErr) {
+ log(label+': submitted, but confirmation check failed. Check TzKT for '+lastSubmittedOpHash+'. Confirmation warning: '+errorText(confirmErr),'warn');
+ }
+ return { opHash:lastSubmittedOpHash, rawResponse:op };
+ } else {
+ log(label+': signed/submitted, but wallet returned no readable operation hash. Check TzKT with your wallet address. Raw response: '+oneLineJson(op, 520),'warn');
+ }
+ return op;
+ } catch(e) {
+ if (isPostSubmitResultError(e) && lastSubmittedOpHash) {
+ log(label+': wallet signed/submitted, but Taquito returned a wrapped/undefined result. Continuing with extracted hash '+lastSubmittedOpHash+'.','warn');
+ try {
+ await confirmOperation(lastSubmittedOpHash);
+ log(label+': confirmed OK','ok');
+ } catch(confirmErr) {
+ log(label+': submitted, but confirmation check failed. Check TzKT for '+lastSubmittedOpHash+'. Confirmation warning: '+errorText(confirmErr),'warn');
+ }
+ return { opHash:lastSubmittedOpHash, recoveredFrom:e };
+ }
+ log(label+' failed: '+(e.message||e),'err');
+ throw e;
+ }
+ finally { if (btnEl){ btnEl.innerHTML=orig; btnEl.disabled=false; } }
+ }
+ // Section
+ document.getElementById('btn-add-uri').onclick = function() {
+ var list=document.getElementById('mint-uri-list');
+ var row=document.createElement('div'); row.className='uri-row';
+ row.innerHTML='<input placeholder="ipfs://Qm..." class="m-uri"><button class="uri-del">x</button>';
+ row.querySelector('.uri-del').onclick=function(){row.remove();};
+ list.appendChild(row);
+ };
+ // Section
+ document.getElementById('btn-pinata-build').onclick = async function() {
+ var btn = this;
+ var orig = btn.innerHTML;
+ try {
+ btn.innerHTML = '<span class="spin"></span> Uploading...';
+ btn.disabled = true;
+ await createPinataMetadataUri();
+ } catch(e) {
+ log('Pinata metadata build failed: ' + errorText(e), 'err');
+ } finally {
+ btn.innerHTML = orig;
+ btn.disabled = false;
+ }
+ };
+
+ document.getElementById('btn-pinata-mint').onclick = async function() {
+ var btn = this;
+ var orig = btn.innerHTML;
+ try {
+ req();
+ btn.innerHTML = '<span class="spin"></span> Uploading...';
+ btn.disabled = true;
+ var metadataUri = await createPinataMetadataUri();
+ var to_ = builderMintRecipient();
+ await send('Mint Pinata NFT', mintCall(to_, [metadataUri]).send(), this);
+ } catch(e) {
+ log('Pinata upload/mint failed: ' + errorText(e), 'err');
+ } finally {
+ btn.innerHTML = orig;
+ btn.disabled = false;
+ }
+ };
+
+ document.getElementById('btn-pinata-append').onclick = async function() {
+ var btn = this;
+ var orig = btn.innerHTML;
+ try {
+ req();
+ btn.innerHTML = '<span class="spin"></span> Uploading...';
+ btn.disabled = true;
+ var tokenId = builderAppendTokenId();
+ var metadataUri = await createPinataMetadataUri();
+ setAppendUri(tokenId, metadataUri);
+ await send('Append Pinata Metadata #' + tokenId, appendTokenUriCall(tokenId, metadataUri).send(), this);
+ } catch(e) {
+ log('Pinata upload/append failed: ' + errorText(e), 'err');
+ } finally {
+ btn.innerHTML = orig;
+ btn.disabled = false;
+ }
+ };
+
+ document.getElementById('btn-mint').onclick = async function() {
+ try {
+ req();
+ var to_=document.getElementById('mint-to').value.trim()||userAddr;
+ var uris=Array.from(document.querySelectorAll('.m-uri')).map(function(i){return i.value.trim();}).filter(Boolean);
+ if (!uris.length){log('Add at least one URI.','err');return;}
+ await send('Mint', mintCall(to_, uris).send(), this);
+ }catch(e){log(e.message||e,'err');}
+ };
+
+ document.getElementById('btn-append').onclick = async function() {
+ try {
+ req();
+ var tid=natFromInput('ap-tid','token ID');
+ var uri=document.getElementById('ap-uri').value.trim();
+ if (!uri){log('Enter a URI.','err');return;}
+ await send('Append Token ID #'+tid, appendTokenUriCall(tid, uri).send(), this);
+ }catch(e){log(e.message||e,'err');}
+ };
+
+ document.getElementById('btn-pin').onclick = async function() {
+ try {
+ req();
+ var tid=natFromInput('pin-tid','token ID');
+ var idx=natFromInput('pin-idx','URI index');
+ await send('Pin #'+tid+'->'+idx, pinTokenUriCall(tid, idx).send(), this);
+ }catch(e){log(e.message||e,'err');}
+ };
+
+ document.getElementById('btn-unpin').onclick = async function() {
+ try {
+ req();
+ var tid=natFromInput('pin-tid','token ID');
+ await send('Unpin #'+tid, unpinTokenUriCall(tid).send(), this);
+ }catch(e){log(e.message||e,'err');}
+ };
+
+ document.getElementById('btn-view').onclick = async function() {
+ try {
+ req();
+ var tid=natFromInput('view-tid','token ID');
+ var info=await ct.contractViews.get_token_info(tid).executeView({viewCaller:userAddr});
+ var ai=Number(info.active_index);
+ var count=Number(info.uri_count);
+ var activeUri=await ct.contractViews.get_active_uri(tid).executeView({viewCaller:userAddr});
+ var uris=[];
+ for (var i=0; i<count; i++) {
+ uris.push(await ct.contractViews.get_uri_at({token_id:tid,index:i}).executeView({viewCaller:userAddr}));
+ }
+ var box=document.getElementById('uri-result'); box.style.display='block';
+ box.innerHTML='<div style="color:var(--acc);margin-bottom:6px">Token #'+tid+'</div>'+
+ '<div>Active index: <b>'+ai+'</b> &nbsp; Count: <b>'+count+'</b> &nbsp; Pinned: <b>'+(info.is_pinned?'YES':'NO')+'</b></div>'+
+ '<div style="margin-top:8px;color:var(--muted)">Active URI:</div>'+
+ '<div style="padding:2px 0;color:var(--acc);word-break:break-all">'+esc(activeUri)+'</div>'+
+ '<div style="margin-top:8px;color:var(--muted)">URIs:</div>'+
+ uris.map(function(u,i){
+ return '<div style="padding:2px 0;color:'+(i===ai?'var(--acc)':'var(--tx)')+';word-break:break-all">['+i+'] '+esc(u)+(i===ai?' active':'')+'</div>';
+ }).join('');
+ log('Token #'+tid+' queried.','ok');
+ }catch(e){log('View failed: '+e.message,'err');}
+ };
+ document.getElementById('btn-preview-load').onclick = async function() {
+ var orig = this.innerHTML;
+ try {
+ this.innerHTML = '<span class="spin"></span> Loading...'; this.disabled = true;
+ await loadTokenGallery('preview-grid', natFromInput('preview-start','start token ID'), galleryCount('preview-count','preview count'));
+ } catch(e) { log('Preview failed: ' + errorText(e), 'err'); }
+ finally { this.innerHTML = orig; this.disabled = false; }
+ };
+
+ document.getElementById('btn-transfer').onclick = async function() {
+ try {
+ req();
+ var from_=document.getElementById('xfer-from').value.trim()||userAddr;
+ var tid=natFromInput('xfer-tid','token ID');
+ var to_=document.getElementById('xfer-to').value.trim();
+ if (!to_){log('Enter recipient.','err');return;}
+ await send('Transfer', transferCall(from_, to_, tid).send(), this);
+ }catch(e){log(e.message||e,'err');}
+ };
+
+ document.getElementById('btn-add-op').onclick = async function() {
+ try {
+ req();
+ var owner=document.getElementById('op-owner').value.trim()||userAddr;
+ var op=document.getElementById('op-operator').value.trim();
+ var tid=natFromInput('op-tid','token ID');
+ if (!op){log('Enter operator address.','err');return;}
+ await send('Add operator', addOperatorCall(owner, op, tid).send(), this);
+ }catch(e){log(e.message||e,'err');}
+ };
+
+ document.getElementById('btn-rem-op').onclick = async function() {
+ try {
+ req();
+ var owner=document.getElementById('op-owner').value.trim()||userAddr;
+ var op=document.getElementById('op-operator').value.trim();
+ var tid=natFromInput('op-tid','token ID');
+ if (!op){log('Enter operator address.','err');return;}
+ await send('Remove operator', removeOperatorCall(owner, op, tid).send(), this);
+ }catch(e){log(e.message||e,'err');}
+ };
+
+ document.getElementById('btn-check-bal').onclick = async function() {
+ try {
+ req();
+ var owner=document.getElementById('bal-owner').value.trim();
+ var tid=natFromInput('bal-tid','token ID');
+ if (!owner){log('Enter owner address.','err');return;}
+ var r=await ct.contractViews.get_balance({owner:owner,token_id:tid}).executeView({viewCaller:userAddr});
+ document.getElementById('bal-result').textContent='Balance: '+Number(r);
+ log('Balance for token #'+tid+': '+Number(r),'ok');
+ }catch(e){log('Balance check failed: '+e.message,'err');}
+ };
+
+ document.getElementById('btn-pause').onclick = async function() {
+ try{req(); await send('Pause', entrypointCall('set_paused', [true], true).send(), this);}catch(e){log(e.message||e,'err');}
+ };
+ document.getElementById('btn-unpause').onclick = async function() {
+ try{req(); await send('Unpause', entrypointCall('set_paused', [false], false).send(), this);}catch(e){log(e.message||e,'err');}
+ };
+ document.getElementById('btn-update-collection').onclick = async function() {
+ try {
+ req();
+ var name=document.getElementById('update-collection-name').value.trim();
+ var symbol=document.getElementById('update-collection-symbol').value.trim();
+ var uri=document.getElementById('update-collection-uri').value.trim();
+ if (!name || !symbol || !uri){log('Enter collection name, symbol, and metadata URI.','err');return;}
+ await send('Update collection metadata', setCollectionMetadataCall(name, symbol, uri).send(), this);
+ }catch(e){log(e.message||e,'err');}
+ };
+ document.getElementById('btn-set-default-royalty').onclick = async function() {
+ try {
+ req();
+ var recipient=document.getElementById('default-royalty-recipient').value.trim()||userAddr;
+ var bps=bpsFromInput('default-royalty-bps','default royalty BPS');
+ await send('Set default royalty', setDefaultRoyaltyCall(recipient, bps).send(), this);
+ }catch(e){log(e.message||e,'err');}
+ };
+ document.getElementById('btn-set-token-royalty').onclick = async function() {
+ try {
+ req();
+ var tid=natFromInput('token-royalty-id','token ID');
+ var recipient=document.getElementById('token-royalty-recipient').value.trim()||userAddr;
+ var bps=bpsFromInput('token-royalty-bps','token royalty BPS');
+ await send('Set token royalty #'+tid, setTokenRoyaltyCall(tid, recipient, bps).send(), this);
+ }catch(e){log(e.message||e,'err');}
+ };
+ document.getElementById('btn-set-admin').onclick = async function() {
+ try {
+ req();
+ var addr=document.getElementById('new-admin').value.trim();
+ if (!addr){log('Enter new admin address.','err');return;}
+ if (!confirm('Transfer admin to '+addr+'? This is permanent.'))return;
+ await send('Set admin', entrypointCall('set_admin', [addr], addr).send(), this);
+ }catch(e){log(e.message||e,'err');}
+ };
+
+}); // end window.onload
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
