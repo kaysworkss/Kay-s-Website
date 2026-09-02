@@ -378,6 +378,18 @@ body {
   display: none; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;
 }
 .cc-chooser.show { display: grid; }
+.cc-open-banner {
+  display: none; grid-column: 1 / -1; align-items: center; gap: 9px;
+  padding: 10px 13px; border: 1px solid rgba(107,124,92,.45);
+  border-radius: var(--r); background: rgba(107,124,92,.1);
+  font-family: 'Cinzel', serif; font-size: .48rem;
+  letter-spacing: .15em; text-transform: uppercase; color: var(--sand);
+}
+.cc-open-banner.show { display: flex; }
+.cc-open-banner-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--moss); box-shadow: 0 0 0 4px rgba(107,124,92,.12);
+}
 #cc-offer-anchor { grid-column: 1 / -1; }
 #cc-chooser > #offer-section {
   grid-column: 1 / -1;
@@ -2201,6 +2213,10 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 
           <!-- Cross-chain chooser — shown when piece has crossChainPairKey, hidden once chain claimed -->
           <div class="cc-chooser" id="cc-chooser">
+            <div class="cc-open-banner" id="cc-open-banner" role="status">
+              <span class="cc-open-banner-dot"></span>
+              <span>This auction is open to everyone</span>
+            </div>
             <div class="cc-choice" id="cc-eth-choice">
               <div class="cc-lock-overlay">
                 <div class="cc-lock-icon">⏳</div>
@@ -2836,6 +2852,8 @@ function _setAuctionOpenToEveryone(open) {
   _auctionOpenToEveryone = !!open;
   const gateNotice = document.getElementById("live-gate-notice");
   if (gateNotice && _auctionOpenToEveryone) gateNotice.style.display = "none";
+  const pairedOpenBanner = document.getElementById("cc-open-banner");
+  if (pairedOpenBanner) pairedOpenBanner.classList.toggle("show", _auctionOpenToEveryone);
 }
 
 function _activeAuctionNeedsGateToken() {
@@ -4392,6 +4410,7 @@ async function _switchAuction(idx) {
   bidHistory = [];
   endTimestamp = 0; isLive = false; minNextBid = 0n; minNextBidMutez = 0;
   _ccReset(); // clear cross-chain banner and polling for previous piece
+  _setAuctionOpenToEveryone(false); // unknown until this piece's phase is loaded
   // Reset chat lock state for this piece
   clearTimeout(_chatLockTimer);
   _auctionSettled     = false;
@@ -4461,11 +4480,13 @@ async function _switchAuction(idx) {
   cfg.gateName     = slot.gateName;
   cfg.gateLink     = slot.gateLink;
 
-  // Show / hide the gate access warning in the live bid panel
+  // Keep the warning hidden until refreshState() loads the current on-chain
+  // phase. Configuration alone may still name a gate after the public phase
+  // begins, which otherwise causes a stale token warning to flash on load.
   const _lgNotice = document.getElementById("live-gate-notice");
   if (_lgNotice) {
-    if (slot.gateName && !_auctionOpenToEveryone) {
-      _lgNotice.style.display = "block";
+    _lgNotice.style.display = "none";
+    if (slot.gateName) {
       const _lgName = document.getElementById("live-gate-name-inline");
       if (_lgName) _lgName.textContent = slot.gateName;
       const _lgLink = document.getElementById("live-gate-link");
@@ -4477,8 +4498,6 @@ async function _switchAuction(idx) {
           _lgLink.style.display = "none";
         }
       }
-    } else {
-      _lgNotice.style.display = "none";
     }
   }
 
