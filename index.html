@@ -141,17 +141,31 @@
     position: fixed; top: 0; width: 100%; z-index: 100;
     display: flex; justify-content: space-between; align-items: center;
     padding: 1.2rem 2.5rem;
-    background: rgba(10,8,7,0.58);
-    backdrop-filter: blur(10px);
+    background: transparent;
+    backdrop-filter: none;
     transition: background 0.4s, backdrop-filter 0.4s;
     will-change: transform;
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
   }
   nav.scrolled {
-    background: rgba(10,8,7,0.92);
+    background: rgba(10,8,7,0.3);
     backdrop-filter: blur(12px);
   }
+  nav.on-light {
+    background: rgba(245,237,224,.82);
+    backdrop-filter: blur(12px);
+  }
+  nav.on-light .nav-logo,
+  nav.on-light .nav-links a { color: var(--bark); }
+  nav.on-light .nav-links a:hover { color: var(--rust); }
+  nav.on-light .nav-series-link,
+  nav.on-light .nav-shop-link {
+    color: #6f3a22 !important;
+    border-color: rgba(158,79,46,.5) !important;
+    background: rgba(255,248,232,.72) !important;
+  }
+  nav.on-light .theme-toggle { color: var(--rust); }
   .nav-series-link {
     font-family: 'Cinzel', serif !important;
     font-size: 0.58rem !important;
@@ -1860,6 +1874,7 @@
       background: #f5ead8; border-radius: 2px;
       transition: transform 0.3s, opacity 0.3s, background 0.3s;
     }
+    nav.on-light .hamburger span { background: var(--bark); }
     body.dark .hamburger span { background: #e0c8a8; }
     .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
     .hamburger.open span:nth-child(2) { opacity: 0; }
@@ -3681,9 +3696,16 @@ body.kwp-viewer-open {
 
   // Nav scroll
   const nav = document.getElementById('mainNav');
-  window.addEventListener('scroll', () => {
+  const updateNavTone = () => {
     nav.classList.toggle('scrolled', window.scrollY > 60);
-  });
+    const section = document.elementFromPoint(window.innerWidth / 2, nav.offsetHeight + 8)?.closest('section');
+    const lightSection = section && ['portfolio', 'commissions', 'about'].includes(section.id);
+    nav.classList.toggle('on-light', Boolean(lightSection) && !document.body.classList.contains('dark'));
+  };
+  window.addEventListener('scroll', updateNavTone, { passive: true });
+  window.addEventListener('resize', updateNavTone);
+  document.querySelectorAll('.theme-toggle').forEach(button => button.addEventListener('click', () => requestAnimationFrame(updateNavTone)));
+  updateNavTone();
 
   // Scroll reveal
   const reveals = document.querySelectorAll('.reveal');
@@ -4257,6 +4279,9 @@ body.kwp-viewer-open {
   <a href="https://www.transient.xyz/@kaysworks" target="_blank" rel="noopener noreferrer">
     <span class="mcb-icon">⬡</span>Transient
   </a>
+  <a href="https://objkt.com/@kaysworks" target="_blank" rel="noopener noreferrer">
+    <span class="mcb-icon">◆</span>objkt
+  </a>
   <a href="https://mallow.art/kaysworks" target="_blank" rel="noopener noreferrer">
     <span class="mcb-icon">✦</span>Mallow
   </a>
@@ -4265,9 +4290,6 @@ body.kwp-viewer-open {
   </a>
   <a href="https://opensea.io/Kaysworks" target="_blank" rel="noopener noreferrer">
     <span class="mcb-icon">⛵</span>OpenSea
-  </a>
-  <a href="https://objkt.com/@kaysworks" target="_blank" rel="noopener noreferrer">
-    <span class="mcb-icon">◆</span>objkt
   </a>
   <a href="https://www.raster.art/artist/kaysworks" target="_blank" rel="noopener noreferrer">
     <span class="mcb-icon">⬛</span>Raster
