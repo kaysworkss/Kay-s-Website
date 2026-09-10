@@ -238,7 +238,25 @@
     filter: contrast(1.04) saturate(1.08);
     transform: scale(1.015);
     animation: heroArtworkArrive .9s ease-out both;
+    transition: background-position .18s ease-out;
   }
+  .hero-eye-overlay {
+    position: absolute;
+    z-index: 1;
+    width: clamp(86px, 8vw, 144px);
+    aspect-ratio: 1;
+    pointer-events: none;
+    clip-path: ellipse(43% 46% at 50% 50%);
+    background-image: url('images/look here .jpg');
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    background-size: 106vw auto;
+    background-position: calc(100% + var(--hero-pupil-x, 0px)) calc(80% + var(--hero-pupil-y, 0px));
+    filter: contrast(1.04) saturate(1.08);
+    transition: background-position .12s ease-out;
+  }
+  .hero-eye-left { left: 25.4%; top: 48.5%; }
+  .hero-eye-right { left: 72.3%; top: 49.5%; }
   body.dark #hero { background: #100f0e; }
   .hero-left {
     display: flex; flex-direction: column; justify-content: center;
@@ -1950,6 +1968,7 @@
       transform: none;
       animation: heroArtworkArrive .9s ease-out both;
     }
+    .hero-eye-overlay { display: none; }
     .hero-left {
       width: 100%;
       max-width: 680px;
@@ -2921,6 +2940,8 @@ body.kwp-viewer-open {
       <a href="#series" class="btn-ghost">New Series →</a>
     </div>
   </div>
+  <span class="hero-eye-overlay hero-eye-left" aria-hidden="true"></span>
+  <span class="hero-eye-overlay hero-eye-right" aria-hidden="true"></span>
 
   <div class="hero-scroll-hint">
     <span class="scroll-label">Scroll</span>
@@ -3706,6 +3727,22 @@ body.kwp-viewer-open {
   window.addEventListener('resize', updateNavTone);
   document.querySelectorAll('.theme-toggle').forEach(button => button.addEventListener('click', () => requestAnimationFrame(updateNavTone)));
   updateNavTone();
+
+  // Desktop iris overlays create a restrained gaze-following effect.
+  const hero = document.getElementById('hero');
+  if (hero && window.matchMedia('(min-width: 901px) and (prefers-reduced-motion: no-preference)').matches) {
+    hero.addEventListener('pointermove', (event) => {
+      const rect = hero.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width - 0.5) * 7;
+      const y = ((event.clientY - rect.top) / rect.height - 0.5) * 4;
+      hero.style.setProperty('--hero-pupil-x', `${x.toFixed(2)}px`);
+      hero.style.setProperty('--hero-pupil-y', `${y.toFixed(2)}px`);
+    });
+    hero.addEventListener('pointerleave', () => {
+      hero.style.setProperty('--hero-pupil-x', '0px');
+      hero.style.setProperty('--hero-pupil-y', '0px');
+    });
+  }
 
   // Scroll reveal
   const reveals = document.querySelectorAll('.reveal');
