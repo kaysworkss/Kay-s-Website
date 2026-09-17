@@ -2056,7 +2056,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           <div class="status-line upcoming-line" style="margin-top:8px">Bidding opens at the time above</div>
         </div>
 
-        <div style="background:rgba(196,132,90,0.05);border:1px solid var(--divider);border-radius:var(--r);padding:16px 18px">
+        <div id="upcoming-gate-panel" style="display:none;background:rgba(196,132,90,0.05);border:1px solid var(--divider);border-radius:var(--r);padding:16px 18px">
           <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">Entry requirement</div>
           <div style="font-family:'Cormorant Garamond',serif;font-size:1.15rem;color:var(--clay);margin-bottom:6px" id="upcoming-gate-name">Token-gated auction</div>
           <div style="font-family:'Crimson Pro',serif;font-size:0.85rem;color:var(--text-muted);line-height:1.6;font-style:italic" id="upcoming-gate-detail">Hold the entry token to participate during the gated phase.</div>
@@ -3588,6 +3588,12 @@ window.addEventListener("load", async () => {
     initUpcoming();
   } else {
     document.getElementById("view-landing").classList.add("show");
+    const hasGateToken = [cfg.gateName, ..._auctions.map(slot => slot?.gateName)]
+      .some(name => typeof name === "string" && name.trim().length > 0);
+    document.querySelector("#view-landing .landing-eyebrow").textContent = hasGateToken ? "Private auction" : "Auction";
+    document.getElementById("landing-sub").textContent = hasGateToken
+      ? "An exclusive token-gated auction is being prepared. Check back soon."
+      : "An auction is being prepared. Check back soon.";
     if (cfg.artTitle || (_auctions[0]?.artTitle)) {
       document.getElementById("landing-title").textContent = cfg.artTitle || _auctions[0]?.artTitle;
     }
@@ -3845,11 +3851,16 @@ function _loadUpcomingPiece(idx) {
   const gateNameEl   = document.getElementById("upcoming-gate-name");
   const gateDetailEl = document.getElementById("upcoming-gate-detail");
   const gateLinkEl   = document.getElementById("upcoming-gate-link");
-  if (slot.gateName && gateNameEl) {
-    gateNameEl.textContent = slot.gateName;
+  const gatePanel    = document.getElementById("upcoming-gate-panel");
+  const gateName     = typeof slot.gateName === "string" ? slot.gateName.trim() : "";
+  const hasGateToken = gateName.length > 0;
+
+  if (gatePanel) gatePanel.style.display = hasGateToken ? "block" : "none";
+  if (hasGateToken && gateNameEl) {
+    gateNameEl.textContent = gateName;
     if (gateDetailEl) gateDetailEl.textContent = "Hold this entry token to participate during the gated phase.";
   }
-  if (slot.gateLink && gateLinkEl) {
+  if (hasGateToken && slot.gateLink && gateLinkEl) {
     gateLinkEl.href = slot.gateLink.startsWith("http") ? slot.gateLink : "#";
     gateLinkEl.textContent = slot.gateLink.startsWith("http") ? "Acquire gate token →" : slot.gateLink;
     gateLinkEl.style.display = "block";
