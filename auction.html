@@ -4205,8 +4205,20 @@ function _setPieceTabsBusy(isBusy) {
   updateAuctionNav(isBusy);
 }
 
+// Position of a slot in the arrow/tab order. Cross-chain pairs appear once in that order
+// (represented by their ETH half), so when the Tezos half is active — after a collector
+// picks Tezos, a deep link, or a post-bid redirect — map it to its pair's entry.
+// Without this the active slot wasn't found and both arrows were disabled.
+function _liveOrderIndexOf(idx) {
+  const direct = _visibleLiveIndexes.indexOf(idx);
+  if (direct >= 0) return direct;
+  const pairKey = _pairKeyForSlot(_auctions[idx]);
+  if (!pairKey) return -1;
+  return _visibleLiveIndexes.findIndex(i => _pairKeyForSlot(_auctions[i]) === pairKey);
+}
+
 function activeAuctionOrder() {
-  const orderIdx = _visibleLiveIndexes.indexOf(_activeIdx);
+  const orderIdx = _liveOrderIndexOf(_activeIdx);
   return {
     current: orderIdx >= 0 ? orderIdx + 1 : _activeIdx + 1,
     total: _visibleLiveIndexes.length || _auctions.length || 1,
@@ -4471,9 +4483,10 @@ async function _switchAuction(idx, opts = {}) {
   const ccKeep = !!(opts.keepCcClaim && _ccPairKey && _ccClaimRow && _ccIsActiveBrowser);
 
   // Update tab UI — match by dataset.idx, scroll active card into view
+  const _tabRepIdx = _visibleLiveIndexes[_liveOrderIndexOf(idx)] ?? idx;
   document.querySelectorAll(".piece-tab").forEach(btn => {
     const tabIdx = parseInt(btn.dataset.idx, 10);
-    const active = tabIdx === idx;
+    const active = tabIdx === _tabRepIdx;
     btn.classList.toggle("active", active);
     if (active) btn.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
   });
