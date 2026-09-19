@@ -5896,6 +5896,7 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
 
     if (mode === 1 && !live && noBids && deposited && !settled) {
       countdownSection.style.display = "block";
+      window._gateCountdownActive = !!(holderOnly && gateEndsAt > now);
       if (holderOnly && gateEndsAt > now) {
         countdownSection.classList.remove("reserve-waiting");
         endTimestamp = gateEndsAt;
@@ -6051,14 +6052,25 @@ function tickCountdown() {
   document.getElementById("cd-s").textContent = String(diff % 60).padStart(2,"0");
   if (diff === 0 && isLive) {
     isLive = false;
-    document.getElementById("status-line").textContent = "Ended — awaiting settlement";
-    document.getElementById("status-line").className   = "status-line ended";
-    document.getElementById("bid-form").style.display  = "none";
-    // Refresh state so seller sees the settle button
-    refreshState().catch(() => {});
+    if (_slotChain(_activeCfg()) === "tezos") {
+      // A zero on Tezos is either the real end, or the holder→public switch. Only the
+      // former should flash "Ended"; either way re-read Tezos state (refreshState() is ETH-only).
+      if (!window._gateCountdownActive) {
+        document.getElementById("status-line").textContent = "Ended — awaiting settlement";
+        document.getElementById("status-line").className   = "status-line ended";
+        document.getElementById("bid-form").style.display  = "none";
+      }
+      refreshTezosState().catch(() => {});
+    } else {
+      document.getElementById("status-line").textContent = "Ended — awaiting settlement";
+      document.getElementById("status-line").className   = "status-line ended";
+      document.getElementById("bid-form").style.display  = "none";
+      // Refresh state so seller sees the settle button
+      refreshState().catch(() => {});
+    }
   }
-  // Last-minute warnings
-  if (isLive && (diff === 300 || diff === 120 || diff === 60)) aucLastMinutes(diff);
+  // Last-minute warnings (not for the holder-phase countdown — the auction isn't ending)
+  if (isLive && !window._gateCountdownActive && (diff === 300 || diff === 120 || diff === 60)) aucLastMinutes(diff);
 }
 
 // ─── Eligibility ──────────────────────────────────────────────────────────────
@@ -6145,6 +6157,7 @@ function _normalizeTezosAuction(raw) {
     activeReserveMutez,
     gateDurationSec,
     gateStartMs,
+    gateEndMs: isPhased ? gateStartMs + gateDurationSec * 1000 : 0,
     holderOnly,
     isPhased,
     buyNowMutez: _tezosNat(a.buy_now_price),
@@ -6265,8 +6278,17 @@ async function refreshTezosState(runToken = _switchToken, prefetched = null) {
 
     const countdownSection = document.getElementById("countdown-section");
     countdownSection.style.display = "block";
-    countdownSection.classList.toggle("reserve-waiting", auction.mode === 2 && !auction.started && noBids && !auction.settled && !auction.cancelled);
-    if (auction.started && auction.endTimeMs > 0) tickCountdown();
+    // Reserve-mode auction with no first bid yet. If the holder window is still running,
+    // count down to the public phase (mirrors the ETH side's gateEndsAt countdown).
+    // gate_start is written at creation, so the end time is known before any bid.
+    const awaitingFirstBid = auction.mode === 2 && !auction.started && noBids && !auction.settled && !auction.cancelled;
+    const gateCountdown    = awaitingFirstBid && auction.isPhased && auction.holderOnly && auction.gateEndMs > nowMs;
+    window._gateCountdownActive = gateCountdown;
+    countdownSection.classList.toggle("reserve-waiting", awaitingFirstBid && !gateCountdown);
+    if (gateCountdown) {
+      endTimestamp = Math.ceil(auction.gateEndMs / 1000);
+      tickCountdown();
+    } else if (auction.started && auction.endTimeMs > 0) tickCountdown();
     else ["cd-d","cd-h","cd-m","cd-s"].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = "00"; });
 
     const sl = document.getElementById("status-line");
@@ -6275,7 +6297,12 @@ async function refreshTezosState(runToken = _switchToken, prefetched = null) {
       : "";
     if (auction.cancelled)                         { sl.textContent = "Tezos auction cancelled"; sl.className = "status-line ended"; }
     else if (auction.settled)                      { sl.textContent = "Tezos auction settled"; sl.className = "status-line settled"; }
-    else if (auction.mode === 2 && !auction.started && noBids) { sl.textContent = "Open - first XTZ bid starts the clock" + phaseSuffix; sl.className = "status-line live"; }
+    else if (auction.mode === 2 && !auction.started && noBids) {
+      sl.textContent = gateCountdown
+        ? "Holder phase - public opens when countdown ends"
+        : "Open - first XTZ bid starts the clock" + phaseSuffix;
+      sl.className = "status-line live";
+    }
     else if (auction.started && auction.endTimeMs > nowMs)     { sl.textContent = "Live - XTZ bids open" + phaseSuffix; sl.className = "status-line live"; }
     else if (!auction.started)                     { sl.textContent = "Waiting for Tezos auction start"; sl.className = "status-line upcoming-line"; }
     else                                           { sl.textContent = "Ended - awaiting settlement"; sl.className = "status-line ended"; }
