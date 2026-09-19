@@ -401,10 +401,14 @@ body {
 .cc-choice {
   background: var(--bg-alt); border: 1px solid var(--divider);
   border-radius: var(--r); overflow: hidden; cursor: pointer;
-  transition: border-color .2s, opacity .3s;
+  transition: border-color .2s, opacity .3s, transform .12s;
   position: relative;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none; -webkit-user-select: none;
 }
-.cc-choice:hover:not(.locked) { border-color: var(--clay); }
+.cc-choice:hover:not(.locked):not(.waiting),
+.cc-choice:focus-within:not(.locked):not(.waiting) { border-color: var(--clay); }
+.cc-choice:active:not(.locked):not(.waiting) { transform: scale(.985); }
 .cc-choice.locked { opacity: 0.25; pointer-events: none; }
 .cc-choice-head {
   padding: 9px 12px; border-bottom: 1px solid var(--divider);
@@ -444,12 +448,14 @@ body {
   color: #6ea8d8; border-color: rgba(110,168,216,.4);
   background: rgba(110,168,216,.08);
 }
-.cc-choice-btn.eth:hover { background: rgba(110,168,216,.16); }
+.cc-choice-btn.eth:hover,
+.cc-choice:hover:not(.locked):not(.waiting) .cc-choice-btn.eth { background: rgba(110,168,216,.16); }
 .cc-choice-btn.xtz {
   color: #a88fd8; border-color: rgba(168,143,216,.4);
   background: rgba(168,143,216,.08);
 }
-.cc-choice-btn.xtz:hover { background: rgba(168,143,216,.16); }
+.cc-choice-btn.xtz:hover,
+.cc-choice:hover:not(.locked):not(.waiting) .cc-choice-btn.xtz { background: rgba(168,143,216,.16); }
 .cc-lock-overlay {
   position: absolute; inset: 0; display: none;
   flex-direction: column; align-items: center; justify-content: center;
@@ -3022,10 +3028,56 @@ function _ccHideChooser() {
   if (simTrigger) simTrigger.classList.remove("show");
 }
 
-// Called when collector clicks one of the two chain buttons.
-// This is the moment the 60-second no-bid window starts.
-async function _ccChooseChain(chain) {
+// ── Tezos prefetch ────────────────────────────────────────────────────────────
+// Reading a Tezos auction takes several sequential TzKT round-trips, which is what made
+// the Tezos card feel slow next to Ethereum. We start that read early (chooser load,
+// pointer-over, and again at click time in parallel with the claim call) and let the bid
+// panel paint from it.
+const CC_TEZOS_PREFETCH_MS = 20000;
+let _ccTezosPrefetch = null; // { key, ts, promise }
+
+function _ccTezosPrefetchFor(slot, force = false) {
+  const key = _auctionKeyForSlot(slot);
+  const now = Date.now();
+  if (!force && _ccTezosPrefetch && _ccTezosPrefetch.key === key && now - _ccTezosPrefetch.ts < CC_TEZOS_PREFETCH_MS) {
+    return _ccTezosPrefetch;
+  }
+  const entry = { key, ts: now, promise: null };
+  entry.promise = _readTezosAuction(slot).catch(e => {
+    console.warn("_ccTezosPrefetch:", e);
+    if (_ccTezosPrefetch === entry) _ccTezosPrefetch = null;
+    return null;
+  });
+  _ccTezosPrefetch = entry;
+  return entry;
+}
+
+function _ccWarmTezos() {
   if (!_ccPairKey) return;
+  const idx  = _findPairedSlotIndex(_ccPairKey, "tezos");
+  const slot = idx >= 0 ? _auctions[idx] : null;
+  if (slot?.tezosContractAddr) _ccTezosPrefetchFor(slot);
+}
+
+// The whole chain card is a click target, not just its button. The inner <button> stays
+// the keyboard/screen-reader control; a click anywhere else on the card forwards to it.
+document.addEventListener("click", ev => {
+  const card = ev.target.closest?.(".cc-choice");
+  if (!card || ev.target.closest(".cc-choice-btn")) return;
+  if (card.classList.contains("locked") || card.classList.contains("waiting")) return;
+  const btn = card.querySelector(".cc-choice-btn");
+  if (btn && !btn.disabled) btn.click();
+});
+document.addEventListener("pointerover", ev => {
+  const card = ev.target.closest?.("#cc-xtz-choice");
+  if (card && !card.classList.contains("locked") && !card.classList.contains("waiting")) _ccWarmTezos();
+});
+
+// Called when collector picks a chain (card or button).
+// This is the moment the 60-second no-bid window starts.
+let _ccChoosing = false;
+async function _ccChooseChain(chain) {
+  if (!_ccPairKey || _ccChoosing) return;
   const targetIdx = _findPairedSlotIndex(_ccPairKey, chain);
   const slot      = targetIdx >= 0 ? _auctions[targetIdx] : _activeCfg();
   const aucKey    = _auctionKeyForSlot(slot);
@@ -3036,63 +3088,69 @@ async function _ccChooseChain(chain) {
     return;
   }
 
+  _ccChoosing = true;
   // Disable both buttons immediately to prevent double-click
   const ethBtn = document.querySelector("#cc-eth-choice .cc-choice-btn");
   const xtzBtn = document.querySelector("#cc-xtz-choice .cc-choice-btn");
   if (ethBtn) ethBtn.disabled = true;
   if (xtzBtn) xtzBtn.disabled = true;
 
-  // Register the claim — starts the 60s no-bid window in Supabase
-  await _ccRegisterClaim(_ccPairKey, chain, aucKey, 60);
+  // Start reading the Tezos auction now, in parallel with the claim call (or reuse a
+  // fresh read from hover / chooser load) so the bid panel isn't waiting on it later.
+  const tezPrefetch = (chain === "tezos" && slot?.tezosContractAddr) ? _ccTezosPrefetchFor(slot) : null;
 
-  // Always start polling so this browser detects reset if no bid is placed
-  _ccStartPolling(_ccPairKey);
+  try {
+    // Register the claim — starts the 60s no-bid window in Supabase
+    await _ccRegisterClaim(_ccPairKey, chain, aucKey, 60);
 
-  // If claim succeeded (our chain is now active), show the bid UI
-  if (_ccIsActiveBrowser && _ccClaimRow && _ccClaimRow.active_chain === chain) {
-    if (targetIdx >= 0 && targetIdx !== _activeIdx) {
-      const savedClaim = _ccClaimRow;
-      await _switchAuction(targetIdx);
-      _ccPairKey = savedClaim.pair_key || _ccPairKey;
-      _ccClaimRow = savedClaim;
-      _ccStartPolling(_ccPairKey);
-      _renderCcBanner();
-    }
-    _ccHideChooser();
-    _placeOfferSection("bid");
-    _closeOfferPanel();
-    const offerSection = document.getElementById("offer-section");
-    if (offerSection) offerSection.style.display = "none";
-    _ccStartNoBidCountdown();
-    // Immediately populate the bid panel — don't wait for the 15s poll timer
-    const _refreshChain = _slotChain(_activeCfg());
-    if (_refreshChain === "tezos") {
-      refreshTezosState(_switchToken).catch(() => {});
-    } else {
-      refreshState(_switchToken, auctionContract).catch(() => {});
-    }
-    notify(
-      "info",
-      "Bidding window open",
-      `You have 60 seconds to place the first bid on ${chain === "tezos" ? "Tezos" : "Ethereum"} before both chains unlock again.`
-    );
-  } else if (_ccClaimRow) {
-    // Another browser already claimed the other chain — show locked state
-    _ccSetWaitingState(_ccClaimRow);
-    if (!window._ccClaimNoticeShown) {
-      window._ccClaimNoticeShown = true;
+    // Always start polling so this browser detects reset if no bid is placed
+    _ccStartPolling(_ccPairKey);
+
+    // If claim succeeded (our chain is now active), show the bid UI
+    if (_ccIsActiveBrowser && _ccClaimRow && _ccClaimRow.active_chain === chain) {
+      // Swap chooser → bid panel *now*. Chain switching and data loading continue
+      // in the background instead of holding the UI hostage.
+      _ccHideChooser();
+      _placeOfferSection("bid");
+      _closeOfferPanel();
+      const offerSection = document.getElementById("offer-section");
+      if (offerSection) offerSection.style.display = "none";
+      _ccStartNoBidCountdown();
       notify(
         "info",
-        "Chain being claimed",
-        `Another collector is starting the auction on ${_ccClaimRow.active_chain === "eth" ? "Ethereum" : "Tezos"}. Both chains are paused until they bid or the window expires.`
+        "Bidding window open",
+        `You have 60 seconds to place the first bid on ${chain === "tezos" ? "Tezos" : "Ethereum"} before both chains unlock again.`
       );
+
+      if (targetIdx >= 0 && targetIdx !== _activeIdx) {
+        // Not awaited. keepCcClaim preserves the claim (incl. _ccIsActiveBrowser) across the switch.
+        _switchAuction(targetIdx, { keepCcClaim: true, tezosPrefetch: tezPrefetch })
+          .catch(e => console.warn("_ccChooseChain switch:", e));
+      } else if (chain === "tezos") {
+        refreshTezosState(_switchToken, tezPrefetch ? tezPrefetch.promise : null).catch(() => {});
+      } else {
+        refreshState(_switchToken, auctionContract).catch(() => {});
+      }
+    } else if (_ccClaimRow) {
+      // Another browser already claimed the other chain — show locked state
+      _ccSetWaitingState(_ccClaimRow);
+      if (!window._ccClaimNoticeShown) {
+        window._ccClaimNoticeShown = true;
+        notify(
+          "info",
+          "Chain being claimed",
+          `Another collector is starting the auction on ${_ccClaimRow.active_chain === "eth" ? "Ethereum" : "Tezos"}. Both chains are paused until they bid or the window expires.`
+        );
+      }
+      if (ethBtn) ethBtn.disabled = false;
+      if (xtzBtn) xtzBtn.disabled = false;
+    } else {
+      // Claim failed (network error) — re-enable
+      if (ethBtn) ethBtn.disabled = false;
+      if (xtzBtn) xtzBtn.disabled = false;
     }
-    if (ethBtn) ethBtn.disabled = false;
-    if (xtzBtn) xtzBtn.disabled = false;
-  } else {
-    // Claim failed (network error) — re-enable
-    if (ethBtn) ethBtn.disabled = false;
-    if (xtzBtn) xtzBtn.disabled = false;
+  } finally {
+    _ccChoosing = false;
   }
 }
 
@@ -4274,8 +4332,17 @@ function _refreshChat() {
   });
 }
 
-function _setupCrossChainForSlot(slot) {
+function _setupCrossChainForSlot(slot, keepClaim = false) {
   const ccKey = _pairKeyForSlot(slot);
+  // The collector just picked this chain and holds the claim — keep the chooser hidden,
+  // keep the claim/phase/reserve state we already have, and just resume polling.
+  if (keepClaim && ccKey) {
+    _ccPairKey = ccKey;
+    window._ccUsdHardCap = _usdHardCapForPair(ccKey, slot, window._ccPhase) || window._ccUsdHardCap || null;
+    _renderCcBanner();
+    _ccStartPolling(ccKey);
+    return;
+  }
   window._ccUsdHardCap = null;
   window._ccEthReserveWei = null;
   window._ccPhase = null;
@@ -4305,7 +4372,8 @@ async function _ccPopulateChooserPrices(pairKey) {
 
   if (tezSlot?.tezosContractAddr) {
     try {
-      const aucRaw = await _tzktFetchAuction(tezSlot);
+      // force=true: refresh the cache on every chooser load, so a later click paints from fresh data
+      const aucRaw = await _ccTezosPrefetchFor(tezSlot, true).promise;
       tezosAuction = _normalizeTezosAuction(aucRaw);
       if (tezosAuction) {
         hardCap = _setCrossChainPhase(tezosAuction.isPhased && !tezosAuction.holderOnly ? "public" : "holder");
@@ -4387,7 +4455,7 @@ async function _ccPopulateChooserPrices(pairKey) {
   }
 }
 
-async function _switchAuction(idx) {
+async function _switchAuction(idx, opts = {}) {
   if (idx < 0 || idx >= _auctions.length) return;
   if (!_slotMatchesStatus(_auctions[idx], "live")) {
     const firstLive = _visibleLiveIndexes[0] ?? _auctions.findIndex(slot => _slotMatchesStatus(slot, "live"));
@@ -4398,6 +4466,9 @@ async function _switchAuction(idx) {
   _setPieceTabsBusy(true);
   const switchToken = ++_switchToken;
   _activeIdx = idx;
+  // Switching to the other half of a pair *because this collector just claimed it*
+  // must not wipe the claim (that used to drop _ccIsActiveBrowser and re-lock the bid panel).
+  const ccKeep = !!(opts.keepCcClaim && _ccPairKey && _ccClaimRow && _ccIsActiveBrowser);
 
   // Update tab UI — match by dataset.idx, scroll active card into view
   document.querySelectorAll(".piece-tab").forEach(btn => {
@@ -4416,7 +4487,8 @@ async function _switchAuction(idx) {
   if (auctionContract) { try { auctionContract.removeAllListeners(); } catch(_) {} }
   bidHistory = [];
   endTimestamp = 0; isLive = false; minNextBid = 0n; minNextBidMutez = 0;
-  _ccReset(); // clear cross-chain banner and polling for previous piece
+  if (ccKeep) _ccStopPolling(); // polling resumes in _setupCrossChainForSlot
+  else _ccReset(); // clear cross-chain banner and polling for previous piece
   _setAuctionOpenToEveryone(false); // unknown until this piece's phase is loaded
   // Reset chat lock state for this piece
   clearTimeout(_chatLockTimer);
@@ -4511,14 +4583,24 @@ async function _switchAuction(idx) {
   populateAbout("live", slot);
   loadStaticImage("live", slot);
   _syncCollectorRoomForSlot(slot);
-  _setupCrossChainForSlot(slot);
+  _setupCrossChainForSlot(slot, ccKeep);
   _auctionSwitching = false;
   _setPieceTabsBusy(false);
+
+  if (ccKeep) {
+    // Chooser is already hidden — show a light loading state until the chain's data lands
+    const _ldSl = document.getElementById("status-line");
+    if (_ldSl) {
+      _ldSl.textContent = `Loading ${_slotChain(slot) === "tezos" ? "Tezos" : "Ethereum"} auction...`;
+      _ldSl.className = "status-line upcoming-line";
+    }
+    document.getElementById("countdown-section").style.display = "block";
+  }
 
   if (!_isEthAuctionSlot(slot)) {
     const isCrossChainChooser = !!String(slot.crossChainPairKey || "").trim();
     const sl = document.getElementById("status-line");
-    if (sl) {
+    if (sl && !ccKeep) {
       if (isCrossChainChooser) {
         sl.textContent = "";
         sl.className = "status-line";
@@ -4532,8 +4614,11 @@ async function _switchAuction(idx) {
       }
     }
     if (_slotChain(slot) === "tezos") {
-      await refreshTezosState(switchToken);
+      const _pf = opts.tezosPrefetch || null;
+      await refreshTezosState(switchToken, _pf ? _pf.promise : null);
       if (switchToken !== _switchToken) return;
+      // Painted from a cached read? Follow up with a live one in the background.
+      if (_pf && Date.now() - _pf.ts > 2000) refreshTezosState(switchToken).catch(() => {});
       countdownTimer = setInterval(() => {
         if (switchToken !== _switchToken) return;
         tickCountdown();
@@ -4639,7 +4724,9 @@ async function _switchAuction(idx) {
   // explicitly clicks a chain button (_ccChooseChain). This matches the
   // intended UX: both chains dormant, no timer, until a chain is chosen.
   const _ccKey = (slot.crossChainPairKey || "").trim().toLowerCase();
-  if (_ccKey) {
+  if (_ccKey && ccKeep) {
+    _ccPairKey = _ccKey; // claim already held — chooser stays hidden, polling already running
+  } else if (_ccKey) {
     _ccPairKey = _ccKey;
     // Show the chooser, hide the bid UI until a chain is picked
     _ccShowChooser();
@@ -6133,14 +6220,17 @@ async function _readTezosAuction(slot = _activeCfg()) {
   throw new Error("Could not read Tezos auction storage.");
 }
 
-async function refreshTezosState(runToken = _switchToken) {
+async function refreshTezosState(runToken = _switchToken, prefetched = null) {
   const slot = _activeCfg();
   if (_slotChain(slot) !== "tezos" || !slot.tezosContractAddr || runToken !== _switchToken) return;
   // Cross-chain chooser is active — update internal state only, don't touch bid-panel DOM
   const _ccChooserActive = _ccShouldHoldBidPanel(slot);
   try {
     if (!window.taquito?.TezosToolkit) throw new Error("Taquito did not load.");
-    const auction = _normalizeTezosAuction(await _readTezosAuction(slot));
+    // A prefetched record (started when the collector hovered / clicked the Tezos card)
+    // lets the bid panel paint immediately instead of waiting on the TzKT round-trips.
+    const _prefetchedRaw = prefetched ? await prefetched : null;
+    const auction = _normalizeTezosAuction(_prefetchedRaw ?? await _readTezosAuction(slot));
     if (!auction) throw new Error("Auction data was empty.");
     if (runToken !== _switchToken) return;
     const openToEveryone = _tezosAuctionOpenToEveryone(auction);
