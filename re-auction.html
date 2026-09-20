@@ -2197,6 +2197,31 @@ async function getMarketplaceInfo(marketplace) {
   return { c, next };
 }
 
+// Runtime-code hash of the exact marketplace build this page's ABI describes.
+const EXPECTED_RUNTIME_HASH = "0xdcd0eba49823aee1201419563c14314909d653177fe39d5fb87488fef3a5a5fa";
+
+// Explains WHY a read failed to decode: different deployed build, or a reply of the wrong size.
+async function diagnoseAuctionRead(marketplace, id) {
+  const iface = new ethers.Interface(MARKETPLACE_ABI);
+  const out = [];
+  try {
+    const hash = ethers.keccak256(await provider.getCode(marketplace));
+    out.push(hash === EXPECTED_RUNTIME_HASH
+      ? "Deployed code: exact match for the build this page expects."
+      : `Deployed code: a DIFFERENT build from the one this page expects (code hash ${hash}).`);
+  } catch (e) { out.push("Could not read deployed code: " + (e.shortMessage || e.message)); }
+  for (const name of ["auctions", "auctionState"]) {
+    const fn = iface.getFunction(name);
+    try {
+      const raw = await provider.call({ to: marketplace, data: iface.encodeFunctionData(fn, [BigInt(id)]) });
+      const words = (raw.length - 2) / 64;
+      const wrong = raw === "0x" || words !== fn.outputs.length;
+      out.push(`${name}(${id}): returned ${raw === "0x" ? "nothing" : words + " value" + (words === 1 ? "" : "s")}; this page expects ${fn.outputs.length}.` + (wrong && raw !== "0x" ? " Raw reply: " + raw : ""));
+    } catch (e) { out.push(`${name}(${id}): call failed - ${e.shortMessage || e.message}`); }
+  }
+  return out;
+}
+
 let idLoadToken = 0;
 async function loadAuctionIds() {
   const hint = $("auctionIdHint"), list = $("auctionIdList");
@@ -2234,7 +2259,15 @@ async function loadState() {
   const last = Number(next) - 1;
   if (last < 1) return log("manageLog", "This marketplace has no auctions yet.", "err");
   if (BigInt(auctionId) < 1n || BigInt(auctionId) > BigInt(last)) return log("manageLog", `Auction #${auctionId} does not exist on this marketplace. Valid IDs are 1-${last}.`, "err");
-  const [a, s] = await Promise.all([c.auctions(auctionId), c.auctionState(auctionId)]);
+  let a, s;
+  try {
+    [a, s] = await Promise.all([c.auctions(auctionId), c.auctionState(auctionId)]);
+  } catch (e) {
+    if (e.code !== "BAD_DATA") throw e;
+    log("manageLog", `The contract answered, but not in the format this page expects. Diagnostics for auction #${auctionId}:`, "err");
+    for (const line of await diagnoseAuctionRead(marketplace, auctionId)) log("manageLog", line, "err");
+    return;
+  }
   if (a.seller === ethers.ZeroAddress) return log("manageLog", `Auction #${auctionId} is empty.`, "err");
   loadedAuction = { marketplace, id: BigInt(auctionId), raw: a, state: s };
 
