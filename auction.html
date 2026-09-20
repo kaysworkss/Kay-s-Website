@@ -3982,16 +3982,28 @@ function tickUpcoming(launchMs) {
 const _contractCache = {};
 
 async function initLive() {
-  // Connect provider once
+  // Connect a READ provider once. Do not require an injected wallet just to
+  // render the auction: ordinary mobile browsers (Chrome/Safari) usually have
+  // no window.ethereum, but visitors must still be able to see the artwork,
+  // reserve/current bid and auction state before connecting a wallet.
   if (!provider) {
     if (cfg.rpcUrl) {
       try { provider = new ethers.JsonRpcProvider(cfg.rpcUrl); } catch(_) {}
-    } else if (window.ethereum) {
-      provider = new ethers.BrowserProvider(window.ethereum);
+    }
+    if (!provider && window.ethereum) {
+      try { provider = new ethers.BrowserProvider(window.ethereum); } catch(_) {}
+    }
+    if (!provider) {
+      try { provider = new ethers.JsonRpcProvider("https://ethereum-rpc.publicnode.com"); } catch(_) {}
     }
   }
   const hasEthLive = _auctions.some(slot => _slotMatchesStatus(slot, "live") && _slotChain(slot) !== "tezos");
-  if (!provider && hasEthLive) return;
+  if (!provider && hasEthLive) {
+    console.warn("[auction] No Ethereum read provider available; rendering static auction details only.");
+    // Crucially, do not return here. _switchAuction() paints the artwork and
+    // metadata before any chain reads, so the page should never remain an empty
+    // shell merely because a public RPC is unavailable.
+  }
 
   await _loadManualSoldOverrides();
 
