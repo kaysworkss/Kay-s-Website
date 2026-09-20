@@ -1915,11 +1915,107 @@ function refreshSummary() {
   if (ethers.isAddress(f.marketplace)) setSavedMarketplace(f.marketplace);
 }
 
-async function activateWallet(raw,source){provider=new ethers.BrowserProvider(raw);signer=await provider.getSigner();const net=await provider.getNetwork();chainId=Number(net.chainId);$("walletAddr").textContent=await signer.getAddress();$("netPill").textContent=(NETS[chainId]?.[0]||"Chain "+chainId)+" / "+source;$("netPill").style.display="inline-block";$("connectBtn").disabled=true;$("walletConnectBtn").disabled=true;$("blockNum").textContent=(await provider.getBlockNumber()).toLocaleString();refreshSummary();await loadAdminState().catch(()=>{});}
-async function connectInjected(){if(!window.ethereum)throw Error("No browser wallet detected. Use Scan QR.");await window.ethereum.request({method:"eth_requestAccounts"});await activateWallet(window.ethereum,"Browser");}
-async function connectWalletConnect(){const projectId=$("walletConnectProjectId").value.trim();if(!projectId)throw Error("Enter a WalletConnect Project ID first.");localStorage.setItem(WALLETCONNECT_PROJECT_KEY,projectId);$("walletConnectBtn").textContent="Opening QR...";const m=await import("https://esm.sh/@walletconnect/ethereum-provider@2.21.8"),EP=m.EthereumProvider||m.default,wc=await EP.init({projectId,chains:[1],optionalChains:[11155111,137,80002,56,97,8453,84532,42161,421614,10,11155420,43114,43113],showQrModal:true,metadata:{name:"Kaysworks Marketplace",description:"Deploy and manage auctions",url:location.href,icons:[]}});wc.on("chainChanged",()=>location.reload());wc.on("accountsChanged",()=>location.reload());wc.on("disconnect",()=>location.reload());await wc.connect();await activateWallet(wc,"WalletConnect");}
-$("connectBtn").addEventListener("click",()=>connectInjected().catch(e=>alert(e.shortMessage||e.message)));
-$("walletConnectBtn").addEventListener("click",()=>connectWalletConnect().catch(e=>{$("walletConnectBtn").textContent="Scan QR";alert(e.shortMessage||e.message);}));
+/* ---------- Wallet connection ---------- */
+// Public WalletConnect Cloud project ID (same one Contract Studio uses). It is prefilled so the
+// launcher works inside the Studio iframe without pasting anything; you can still override it in the field.
+const DEFAULT_WC_PROJECT_ID = "42dc845feb4ebf8f5cbe5725c2e07672";
+const WC_PROVIDER_VERSIONS = ["2.21.8", "2.17.2"]; // tried in order if a CDN build fails to load
+let wcProvider = null, wcProviderProjectId = "", watchedProvider = null;
+
+// Browser wallets sometimes inject only into the top page. When this launcher runs inside the
+// Studio iframe (same origin) fall back to the parent's provider.
+function findInjectedProvider() {
+  if (window.ethereum) return window.ethereum;
+  try { if (window.parent && window.parent !== window && window.parent.ethereum) return window.parent.ethereum; } catch (e) {}
+  return null;
+}
+
+async function activateWallet(raw, source) {
+  // Build everything first; only commit state once the wallet has really answered.
+  const prov = new ethers.BrowserProvider(raw);
+  const sig = await prov.getSigner();
+  const addr = await sig.getAddress();
+  const net = await prov.getNetwork();
+  provider = prov; signer = sig; chainId = Number(net.chainId);
+  $("walletAddr").textContent = addr;
+  $("netPill").textContent = (NETS[chainId]?.[0] || "Chain " + chainId) + " / " + source;
+  $("netPill").style.display = "inline-block";
+  $("connectBtn").disabled = true;
+  $("walletConnectBtn").disabled = true;
+  if (source === "WalletConnect") $("walletConnectBtn").textContent = "Connected";
+  // The block number is cosmetic - a slow or blocked RPC must never leave the page half-connected.
+  try { $("blockNum").textContent = (await provider.getBlockNumber()).toLocaleString(); } catch (e) {}
+  refreshSummary(); // this is what enables Approve NFT / Create Auction
+  await loadAdminState().catch(() => {});
+}
+
+function resetWallet() {
+  provider = null; signer = undefined; chainId = undefined;
+  $("walletAddr").textContent = "Not connected";
+  $("netPill").style.display = "none";
+  $("connectBtn").disabled = false;
+  $("walletConnectBtn").disabled = false;
+  $("walletConnectBtn").textContent = "Scan QR";
+  refreshSummary();
+}
+
+// Attach change listeners only AFTER a successful connect. WalletConnect fires chainChanged and
+// accountsChanged as part of connect() itself, so listeners attached earlier saw those events and
+// reloaded the page the instant the wallet approved. Re-syncing in place also keeps the form intact.
+function watchWallet(raw, source) {
+  if (watchedProvider === raw || typeof raw.on !== "function") return;
+  watchedProvider = raw;
+  const resync = () => activateWallet(raw, source).catch(e => log("log", "Wallet update failed: " + (e.shortMessage || e.message), "err"));
+  raw.on("accountsChanged", accs => (accs && accs.length ? resync() : resetWallet()));
+  raw.on("chainChanged", resync);
+  raw.on("disconnect", resetWallet);
+}
+
+async function connectInjected() {
+  const eth = findInjectedProvider();
+  if (!eth) throw Error("No browser wallet detected. Use Scan QR.");
+  await eth.request({ method: "eth_requestAccounts" });
+  await activateWallet(eth, "Browser");
+  watchWallet(eth, "Browser");
+}
+
+async function importWalletConnect() {
+  let lastErr;
+  for (const v of WC_PROVIDER_VERSIONS) {
+    try {
+      const m = await import("https://esm.sh/@walletconnect/ethereum-provider@" + v);
+      const EP = m.EthereumProvider || m.default;
+      if (EP) return EP;
+    } catch (e) { lastErr = e; }
+  }
+  throw Error("Could not load the WalletConnect library" + (lastErr ? ": " + (lastErr.message || lastErr) : "."));
+}
+
+async function connectWalletConnect() {
+  const projectId = $("walletConnectProjectId").value.trim();
+  if (!projectId) throw Error("Enter a WalletConnect Project ID first.");
+  localStorage.setItem(WALLETCONNECT_PROJECT_KEY, projectId);
+  $("walletConnectBtn").textContent = "Opening QR...";
+  if (!wcProvider || wcProviderProjectId !== projectId) {
+    const EP = await importWalletConnect();
+    wcProvider = await EP.init({
+      projectId,
+      chains: [1],
+      optionalChains: [11155111, 137, 80002, 56, 97, 8453, 84532, 42161, 421614, 10, 11155420, 43114, 43113],
+      showQrModal: true,
+      metadata: { name: "Kaysworks Marketplace", description: "Deploy and manage auctions", url: location.href, icons: [] }
+    });
+    wcProviderProjectId = projectId;
+    watchedProvider = null;
+  }
+  // Reuse a live session; only show the QR when there isn't one (a retry after a failed step won't re-pair).
+  if (!wcProvider.session) await wcProvider.connect();
+  await activateWallet(wcProvider, "WalletConnect");
+  watchWallet(wcProvider, "WalletConnect");
+}
+
+$("connectBtn").addEventListener("click", () => connectInjected().catch(e => alert(e.shortMessage || e.message)));
+$("walletConnectBtn").addEventListener("click", () => connectWalletConnect().catch(e => { $("walletConnectBtn").textContent = "Scan QR"; alert(e.shortMessage || e.message); }));
 
 $("deployMarketplaceBtn").addEventListener("click", async () => {
   if (!signer) return log("deployLog", "Connect wallet first", "err");
@@ -2163,7 +2259,7 @@ $("operatorBtn").addEventListener("click", () => {
 
 $("dateLabel").textContent = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
 renderSavedMarketplace();
-$("walletConnectProjectId").value=localStorage.getItem(WALLETCONNECT_PROJECT_KEY)||"";
+$("walletConnectProjectId").value=localStorage.getItem(WALLETCONNECT_PROJECT_KEY)||DEFAULT_WC_PROJECT_ID;
 const saved = getSavedMarketplace();
 if (saved) applyMarketplaceAddress(saved, false);
 refreshSummary();
