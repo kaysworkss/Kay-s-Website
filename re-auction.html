@@ -2151,6 +2151,9 @@ $("approveBtn").addEventListener("click", async () => {
 $("createBtn").addEventListener("click", async () => {
   const f = readForm();
   if (f.errs.length) return log("log", f.errs.join("; "), "err");
+  let info;
+  try { info = await getMarketplaceInfo(f.marketplace); } catch (e) { return log("log", e.shortMessage || e.message, "err"); }
+  if (info.supports.createAuction === false) return log("log", "This deployed marketplace has no createAuction() matching this page, so the transaction would fail. Nothing was sent.", "err");
   const c = new ethers.Contract(f.marketplace, MARKETPLACE_ABI, signer);
   const paramsArray = [
     f.params.nftContract,
@@ -2194,7 +2197,62 @@ async function getMarketplaceInfo(marketplace) {
   let next;
   try { next = await c.nextAuctionId(); }
   catch (e) { throw Error(`The contract at ${short(marketplace)} on ${netName} is not a compatible marketplace (nextAuctionId() failed).`); }
-  return { c, next };
+  return { c, next, supports: supportedFunctions(code) };
+}
+
+// Which of this page's contract functions exist in the DEPLOYED bytecode (checks each 4-byte selector).
+// An older marketplace build may lack newer functions; calling them would just revert.
+function supportedFunctions(code) {
+  const lc = code.toLowerCase(), out = {};
+  new ethers.Interface(MARKETPLACE_ABI).forEachFunction(f => { out[f.name] = lc.includes("63" + f.selector.slice(2)); });
+  return out;
+}
+const WRITE_FUNCTIONS = ["createAuction", "startAuction", "bid", "buyNow", "settle", "cancel", "setOperator", "setProceedsRecipient"];
+const missingWrites = supports => WRITE_FUNCTIONS.filter(n => supports[n] === false);
+
+// ---- Older-build support for auctions(): decode by VERIFIED layout, never by guess ----
+const AUCTION_FIELDS_USED = ["seller", "nftContract", "tokenId", "reservePrice", "publicReservePrice", "gateDuration", "operator", "operatorLocked", "proceedsRecipient"];
+// Stored values that auctionState() repeats. A candidate layout is only accepted if it agrees with these.
+const AUCTION_CROSS_CHECK = [["deposited", "deposited"], ["settled", "settled"], ["cancelled", "cancelled"], ["auctionMode", "mode"], ["custodyMode", "custodyMode"], ["buyNowPrice", "buyNowPrice"], ["highestBidder", "highestBidder"], ["highestBid", "highestBid"]];
+
+function parseAuctionWords(words, outs) {
+  const rec = {};
+  for (let i = 0; i < outs.length; i++) {
+    const w = words[i], o = outs[i];
+    if (o.type === "address") { if (!/^0{24}/.test(w)) return null; rec[o.name] = ethers.getAddress("0x" + w.slice(24)); }
+    else if (o.type === "bool") { if (!/^0{63}[01]$/.test(w)) return null; rec[o.name] = w.endsWith("1"); }
+    else { const v = BigInt("0x" + w); if (o.type === "uint8" && v > 255n) return null; rec[o.name] = v; }
+  }
+  return rec;
+}
+const sameVal = (x, y) => (typeof x === "bigint" || typeof y === "bigint") ? BigInt(x) === BigInt(y) : x === y;
+const zeroish = v => v === undefined || v === 0n || v === false || v === ethers.ZeroAddress ? "0" : String(v);
+
+// Handles a deployed marketplace whose auctions() record has exactly ONE field fewer than this page's ABI.
+async function readAuctionAdaptive(marketplace, id, s) {
+  const iface = new ethers.Interface(MARKETPLACE_ABI);
+  const fn = iface.getFunction("auctions");
+  const raw = await provider.call({ to: marketplace, data: iface.encodeFunctionData(fn, [BigInt(id)]) });
+  const h = raw.slice(2);
+  if (!h.length || h.length % 64 !== 0) return null;
+  const words = h.match(/.{64}/g), expected = fn.outputs;
+  if (words.length !== expected.length - 1) return null;
+  const good = [];
+  for (let miss = 0; miss < expected.length; miss++) {
+    const rec = parseAuctionWords(words, expected.filter((_, i) => i !== miss));
+    if (!rec) continue;
+    // A layout that lacks one of the cross-checked fields cannot be verified on that field, so it counts for less.
+    const checkable = AUCTION_CROSS_CHECK.filter(([ak]) => rec[ak] !== undefined);
+    if (checkable.every(([ak, sk]) => sameVal(rec[ak], s[sk]))) good.push({ missing: expected[miss].name, rec, checks: checkable.length });
+  }
+  if (!good.length) return null;
+  const best = Math.max(...good.map(g => g.checks));
+  good.splice(0, good.length, ...good.filter(g => g.checks === best));   // keep only the most-verified layouts
+  const sig = r => AUCTION_FIELDS_USED.map(k => zeroish(r[k])).join("|");
+  if (!good.every(g => sig(g.rec) === sig(good[0].rec))) return null;   // still ambiguous on what we display: refuse
+  const rec = { ...good[0].rec };
+  for (const o of expected) if (rec[o.name] === undefined) rec[o.name] = o.type === "address" ? ethers.ZeroAddress : o.type === "bool" ? false : 0n;
+  return { rec, candidates: good.map(g => g.missing) };
 }
 
 // Runtime-code hash of the exact marketplace build this page's ABI describes.
@@ -2232,15 +2290,16 @@ async function loadAuctionIds() {
   if (!ethers.isAddress(marketplace)) { hint.textContent = "Enter the marketplace contract address to load auction IDs."; return; }
   hint.textContent = "Loading auction IDs...";
   try {
-    const { next } = await getMarketplaceInfo(marketplace);
+    const { next, supports } = await getMarketplaceInfo(marketplace);
     if (token !== idLoadToken) return;
+    const gone = missingWrites(supports);
     const last = Number(next) - 1;
     if (last < 1) { hint.textContent = "This marketplace has no auctions yet."; return; }
     const first = Math.max(1, last - 199);
     let opts = "";
     for (let id = last; id >= first; id--) opts += `<option value="${id}"></option>`;
     list.innerHTML = opts;
-    hint.textContent = `${last} auction${last === 1 ? "" : "s"} on this marketplace (IDs 1-${last}). Newest is #${last}.`;
+    hint.textContent = `${last} auction${last === 1 ? "" : "s"} on this marketplace (IDs 1-${last}). Newest is #${last}.` + (gone.length ? ` Note: this deployed build has no ${gone.join(", ")}.` : "");
   } catch (e) {
     if (token === idLoadToken) hint.textContent = e.shortMessage || e.message;
   }
@@ -2255,19 +2314,25 @@ async function loadState() {
   if (!/^\d+$/.test(auctionId)) return log("manageLog", "Auction ID must be a whole number", "err");
 
   // Preflight: fail with a readable reason instead of "could not decode result data".
-  const { c, next } = await getMarketplaceInfo(marketplace);
+  const { c, next, supports } = await getMarketplaceInfo(marketplace);
   const last = Number(next) - 1;
   if (last < 1) return log("manageLog", "This marketplace has no auctions yet.", "err");
   if (BigInt(auctionId) < 1n || BigInt(auctionId) > BigInt(last)) return log("manageLog", `Auction #${auctionId} does not exist on this marketplace. Valid IDs are 1-${last}.`, "err");
-  let a, s;
-  try {
-    [a, s] = await Promise.all([c.auctions(auctionId), c.auctionState(auctionId)]);
-  } catch (e) {
-    if (e.code !== "BAD_DATA") throw e;
+  let a, s, adapted = null;
+  const [aRes, sRes] = await Promise.allSettled([c.auctions(auctionId), c.auctionState(auctionId)]);
+  if (aRes.status === "fulfilled" && sRes.status === "fulfilled") { a = aRes.value; s = sRes.value; }
+  else if (sRes.status === "fulfilled" && aRes.reason?.code === "BAD_DATA") {
+    adapted = await readAuctionAdaptive(marketplace, auctionId, sRes.value);
+    if (adapted) { a = adapted.rec; s = sRes.value; }
+  }
+  if (!a) {
+    const err = aRes.status === "rejected" ? aRes.reason : sRes.reason;
+    if (err?.code !== "BAD_DATA") throw err;
     log("manageLog", `The contract answered, but not in the format this page expects. Diagnostics for auction #${auctionId}:`, "err");
     for (const line of await diagnoseAuctionRead(marketplace, auctionId)) log("manageLog", line, "err");
     return;
   }
+  if (adapted) log("manageLog", "This marketplace is an older build: its auction record has one field fewer than this page's. The layout was verified against auctionState() before use.", "info");
   if (a.seller === ethers.ZeroAddress) return log("manageLog", `Auction #${auctionId} is empty.`, "err");
   loadedAuction = { marketplace, id: BigInt(auctionId), raw: a, state: s };
 
@@ -2307,6 +2372,14 @@ async function loadState() {
   $("cancelBtn").disabled = !(isSeller || isOperator) || s.settled || s.cancelled;
   $("operatorBtn").disabled = !isSeller || a.operatorLocked || s.live || s.settled;
   $("recipientBtn").disabled = !isSeller || s.settled || s.cancelled;
+  // Never offer an action this deployed build cannot perform.
+  const needs = { startBtn: "startAuction", bidBtn: "bid", buyNowBtn: "buyNow", settleBtn: "settle", cancelBtn: "cancel", operatorBtn: "setOperator", recipientBtn: "setProceedsRecipient" };
+  const gone = [];
+  for (const [btn, fnName] of Object.entries(needs)) {
+    if (supports[fnName] === false) { $(btn).disabled = true; $(btn).title = `This deployed marketplace has no ${fnName}()`; gone.push(fnName); }
+    else $(btn).title = "";
+  }
+  if (gone.length) log("manageLog", `Disabled because this deployed build has no ${gone.join(", ")}.`, "info");
   log("manageLog", "State loaded", "ok");
 }
 
