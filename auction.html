@@ -4391,91 +4391,112 @@ async function _ccPopulateChooserPrices(pairKey) {
   const xtzPriceEl  = document.getElementById("cc-xtz-price");
   const xtzSubEl    = document.getElementById("cc-xtz-price-sub");
   const xtzStatusEl = document.getElementById("cc-xtz-status");
-  let hardCap       = _activeUsdHardCap();
-  let tezosAuction  = null;
 
-  if (tezSlot?.tezosContractAddr) {
-    try {
-      // force=true: refresh the cache on every chooser load, so a later click paints from fresh data
-      const aucRaw = await _ccTezosPrefetchFor(tezSlot, true).promise;
-      tezosAuction = _normalizeTezosAuction(aucRaw);
-      if (tezosAuction) {
-        hardCap = _setCrossChainPhase(tezosAuction.isPhased && !tezosAuction.holderOnly ? "public" : "holder");
-      }
-    } catch(e) {
-      console.warn("_ccPopulateChooserPrices phase read:", e);
+  // Do not paint either chain's number until the shared floor is resolved.
+  // This prevents a flash where one chain shows its raw on-chain reserve while
+  // the other is already using the admin/ETH-derived cross-chain floor.
+  if (ethPriceEl) ethPriceEl.textContent = "";
+  if (ethSubEl) ethSubEl.textContent = "Resolving shared floor…";
+  if (xtzPriceEl) xtzPriceEl.textContent = "";
+  if (xtzSubEl) xtzSubEl.textContent = "Resolving shared floor…";
+  if (ethStatusEl) ethStatusEl.style.display = "none";
+  if (xtzStatusEl) xtzStatusEl.style.display = "none";
+
+  // ETH and Tezos reads start together. Previously the Tezos phase read was
+  // awaited before the ETH RPC request even began, which made ETH look slow.
+  const ethRead = (async () => {
+    if (!_isEthAuctionSlot(ethSlot) || !provider) return null;
+    let c = _contractCache[_ethContractKeyForSlot(ethSlot)];
+    if (!c) {
+      c = _makeEthAuctionContract(ethSlot, provider);
+      _contractCache[_ethContractKeyForSlot(ethSlot)] = c;
     }
+    return c.auctionState();
+  })();
+
+  const tezRead = (async () => {
+    if (!tezSlot?.tezosContractAddr) return null;
+    const aucRaw = await _ccTezosPrefetchFor(tezSlot, true).promise;
+    return _normalizeTezosAuction(aucRaw);
+  })();
+
+  let ethState = null;
+  let tezosAuction = null;
+  const [ethResult, tezResult] = await Promise.allSettled([ethRead, tezRead]);
+  if (ethResult.status === "fulfilled") ethState = ethResult.value;
+  else console.warn("_ccPopulateChooserPrices ETH read:", ethResult.reason);
+  if (tezResult.status === "fulfilled") tezosAuction = tezResult.value;
+  else console.warn("_ccPopulateChooserPrices Tezos read:", tezResult.reason);
+
+  // Resolve the phase-specific admin cap first. The Tezos auction tells us
+  // whether the pair is in holder/public phase, but the cap itself is shared.
+  if (tezosAuction) {
+    _setCrossChainPhase(tezosAuction.isPhased && !tezosAuction.holderOnly ? "public" : "holder");
   }
 
+  // ETH is the source of truth. Save its reserve, then compute ONE USD floor:
+  // max(admin hard cap, live USD value of ETH reserve).
+  if (ethState) window._ccEthReserveWei = ethState[7];
+  const ethReserveWei = window._ccEthReserveWei ?? null;
+  const sharedUsdFloor = _usdAnchor(ethReserveWei);
+  const ethUsdNow = _ethUsd();
+
   // ── ETH card ──────────────────────────────────────────────────────────────
-  if (_isEthAuctionSlot(ethSlot) && provider) {
+  if (ethState) {
     try {
-      let c = _contractCache[_ethContractKeyForSlot(ethSlot)];
-      if (!c) { c = _makeEthAuctionContract(ethSlot, provider); _contractCache[_ethContractKeyForSlot(ethSlot)] = c; }
-      const s        = await c.auctionState();
-      const noBids   = s[5] === ethers.ZeroAddress;
-      window._ccEthReserveWei = s[7]; // reserve in wei
-      const ethUsdNow = _ethUsd();
-      if (hardCap && ethUsdNow) {
-        // Hard cap set — back-calculate ETH from the fixed USD value
-        const ethFromCap = (hardCap / ethUsdNow).toFixed(4).replace(/\.?0+$/, "");
-        if (ethPriceEl) ethPriceEl.textContent = ethFromCap + " ETH";
-        if (ethSubEl)   ethSubEl.textContent   = "\u2248 " + _fmtUsd(hardCap);
+      const noBids = ethState[5] === ethers.ZeroAddress;
+      if (noBids && sharedUsdFloor && ethUsdNow) {
+        const ethFromFloor = (sharedUsdFloor / ethUsdNow).toFixed(4).replace(/\.?0+$/, "");
+        if (ethPriceEl) ethPriceEl.textContent = ethFromFloor + " ETH";
+        if (ethSubEl) ethSubEl.textContent = "≈ " + _fmtUsd(sharedUsdFloor);
       } else {
-        // No hard cap — show on-chain price, derive USD sub-label
-        const displayWei = s[1] && !noBids ? s[6] : s[7];
+        const displayWei = ethState[1] && !noBids ? ethState[6] : ethState[7];
         if (ethPriceEl) ethPriceEl.textContent = ethers.formatEther(displayWei) + " ETH";
         const derivedUsd = _usdFromEthWei(displayWei);
         if (ethSubEl) ethSubEl.textContent = derivedUsd
-          ? "\u2248 " + _fmtUsd(derivedUsd)
-          : (noBids ? "\u2248 minimum bid" : "\u2248 current bid");
+          ? "≈ " + _fmtUsd(derivedUsd)
+          : (noBids ? "≈ minimum bid" : "≈ current bid");
       }
       if (ethStatusEl) ethStatusEl.style.display = "";
-    } catch(_) {}
-  } else if (hardCap && _ethUsd()) {
-    // No ETH contract but hard cap is set — still show cap-derived ETH
-    const ethFromCap = (hardCap / _ethUsd()).toFixed(4).replace(/\.?0+$/, "");
-    if (ethPriceEl) ethPriceEl.textContent = ethFromCap + " ETH";
-    if (ethSubEl)   ethSubEl.textContent   = "\u2248 " + _fmtUsd(hardCap);
+    } catch(e) { console.warn("_ccPopulateChooserPrices ETH render:", e); }
+  } else if (sharedUsdFloor && ethUsdNow) {
+    const ethFromFloor = (sharedUsdFloor / ethUsdNow).toFixed(4).replace(/\.?0+$/, "");
+    if (ethPriceEl) ethPriceEl.textContent = ethFromFloor + " ETH";
+    if (ethSubEl) ethSubEl.textContent = "≈ " + _fmtUsd(sharedUsdFloor);
     if (ethStatusEl) ethStatusEl.style.display = "";
+  } else if (ethSubEl) {
+    ethSubEl.textContent = "Price unavailable";
   }
 
   // ── XTZ card ──────────────────────────────────────────────────────────────
-  if (tezSlot?.tezosContractAddr) {
+  if (tezosAuction) {
     try {
-      const auction = tezosAuction || _normalizeTezosAuction(await _tzktFetchAuction(tezSlot));
-      if (auction) {
-        hardCap = _setCrossChainPhase(auction.isPhased && !auction.holderOnly ? "public" : "holder");
-        const noBids = !auction.highestBidder;
-        const mutez  = noBids ? auction.minNextBidMutez : auction.highestBidMutez;
-        const rate   = _xtzRate();
-        const ethRsv = window._ccEthReserveWei ?? null;
+      const noBids = !tezosAuction.highestBidder;
+      const mutez  = noBids ? tezosAuction.minNextBidMutez : tezosAuction.highestBidMutez;
 
-        if (noBids && rate && (hardCap || ethRsv)) {
-          // Derive XTZ from USD anchor (hard cap preferred, ETH reserve fallback)
-          const ethEquivXtz = _xtzEthEquivFloor(auction.minNextBidMutez, ethRsv);
-          const displayXtz  = ethEquivXtz && ethEquivXtz > 0
-            ? Math.ceil(ethEquivXtz).toLocaleString()
-            : Math.ceil(mutez / 1_000_000).toLocaleString();
-          if (xtzPriceEl) xtzPriceEl.textContent = displayXtz + " XTZ";
-          const usdLabel = hardCap || _usdFromEthWei(ethRsv);
-          if (xtzSubEl) xtzSubEl.textContent = usdLabel
-            ? "\u2248 " + _fmtUsd(usdLabel)
-            : "\u2248 minimum bid";
-        } else {
-          // Bids exist — show current XTZ amount with live USD value
-          const displayXtz = noBids
-            ? Math.ceil(mutez / 1_000_000).toLocaleString()
-            : (mutez / 1_000_000).toFixed(6).replace(/\.?0+$/, "");
-          if (xtzPriceEl) xtzPriceEl.textContent = displayXtz + " XTZ";
-          const bidUsd = _xtzUsd() ? (mutez / 1_000_000) * _xtzUsd() : null;
-          if (xtzSubEl) xtzSubEl.textContent = bidUsd
-            ? "\u2248 " + _fmtUsd(bidUsd)
-            : (noBids ? "\u2248 minimum bid" : "\u2248 current bid");
-        }
-        if (xtzStatusEl) xtzStatusEl.style.display = "";
+      if (noBids && sharedUsdFloor) {
+        // Tezos never establishes the cross-chain floor. It follows the same
+        // USD floor resolved from admin cap + ETH reserve, subject to its own
+        // on-chain minimum as a safety floor.
+        const fromShared = _xtzFromUsd(sharedUsdFloor);
+        const rawOnChain = mutez / 1_000_000;
+        const displayXtz = Math.ceil(Math.max(fromShared ?? 0, rawOnChain)).toLocaleString();
+        if (xtzPriceEl) xtzPriceEl.textContent = displayXtz + " XTZ";
+        if (xtzSubEl) xtzSubEl.textContent = "≈ " + _fmtUsd(sharedUsdFloor);
+      } else {
+        const displayXtz = noBids
+          ? Math.ceil(mutez / 1_000_000).toLocaleString()
+          : (mutez / 1_000_000).toFixed(6).replace(/\.?0+$/, "");
+        if (xtzPriceEl) xtzPriceEl.textContent = displayXtz + " XTZ";
+        const bidUsd = _xtzUsd() ? (mutez / 1_000_000) * _xtzUsd() : null;
+        if (xtzSubEl) xtzSubEl.textContent = bidUsd
+          ? "≈ " + _fmtUsd(bidUsd)
+          : (noBids ? "≈ minimum bid" : "≈ current bid");
       }
-    } catch(_) {}
+      if (xtzStatusEl) xtzStatusEl.style.display = "";
+    } catch(e) { console.warn("_ccPopulateChooserPrices XTZ render:", e); }
+  } else if (xtzSubEl) {
+    xtzSubEl.textContent = "Price unavailable";
   }
 }
 
@@ -8506,11 +8527,14 @@ function _xtzEthEquivFloor(minNextBidMutez, ethReserveWei) {
  * Priority: admin-fixed hard cap → derived from ETH reserve at runtime.
  */
 function _usdAnchor(ethReserveWei) {
-  const hardCap = _activeUsdHardCap();
-  if (hardCap) {
-    return hardCap;
-  }
-  return _usdFromEthWei(ethReserveWei);
+  // ETH is the source of truth for the shared cross-chain floor.
+  // The admin hard cap is the baseline, but it must never drag the pair below
+  // the live USD value of the ETH on-chain reserve. Tezos follows this result.
+  const hardCap      = _activeUsdHardCap();
+  const ethReserveUsd = _usdFromEthWei(ethReserveWei);
+
+  if (hardCap && ethReserveUsd) return Math.max(hardCap, ethReserveUsd);
+  return hardCap || ethReserveUsd || null;
 }
 
 // Boot the engine on page load
