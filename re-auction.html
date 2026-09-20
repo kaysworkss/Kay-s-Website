@@ -373,13 +373,15 @@
       <div class="grid">
         <div class="field">
           <label>Auction ID</label>
-          <input id="auctionId" placeholder="1" />
+          <input id="auctionId" placeholder="1" inputmode="numeric" list="auctionIdList" autocomplete="off" />
         </div>
         <div class="field">
           <label>Marketplace Contract</label>
           <input id="manageMarketplaceAddr" placeholder="0x..." />
         </div>
       </div>
+      <datalist id="auctionIdList"></datalist>
+      <div id="auctionIdHint" class="mono" style="margin:4px 0 12px;">Connect a wallet to load auction IDs.</div>
       <div class="actions">
         <button class="dark" id="loadBtn">Load State</button>
       </div>
@@ -1766,6 +1768,7 @@ function applyMarketplaceAddress(addr, shouldSave = false) {
   if (shouldSave) setSavedMarketplace(addr);
   refreshSummary();
   loadAdminState().catch(() => {});
+  loadAuctionIds();
 }
 
 function fmtSecs(s) {
@@ -1946,6 +1949,7 @@ async function activateWallet(raw, source) {
   // The block number is cosmetic - a slow or blocked RPC must never leave the page half-connected.
   try { $("blockNum").textContent = (await provider.getBlockNumber()).toLocaleString(); } catch (e) {}
   refreshSummary(); // this is what enables Approve NFT / Create Auction
+  loadAuctionIds();
   await loadAdminState().catch(() => {});
 }
 
@@ -1957,6 +1961,7 @@ function resetWallet() {
   $("walletConnectBtn").disabled = false;
   $("walletConnectBtn").textContent = "Scan QR";
   refreshSummary();
+  loadAuctionIds();
 }
 
 // Attach change listeners only AFTER a successful connect. WalletConnect fires chainChanged and
@@ -2172,10 +2177,49 @@ $("createBtn").addEventListener("click", async () => {
     $("auctionId").value = id;
     $("manageMarketplaceAddr").value = f.marketplace;
     log("log", `Auction created with ID ${id}`, "ok");
+    loadAuctionIds();
   }
 });
 
 $("resetBtn").addEventListener("click", () => location.reload());
+
+// Confirms a real marketplace contract exists at this address on the CONNECTED network.
+// A call to an address with no code returns "0x", which ethers reports as "could not decode result data".
+async function getMarketplaceInfo(marketplace) {
+  if (!provider) throw Error("Connect wallet first");
+  const netName = NETS[chainId]?.[0] || "chain " + chainId;
+  const code = await provider.getCode(marketplace);
+  if (code === "0x") throw Error(`No contract found at ${short(marketplace)} on ${netName}. Switch your wallet to the network this marketplace was deployed on, or check the address.`);
+  const c = new ethers.Contract(marketplace, MARKETPLACE_ABI, provider);
+  let next;
+  try { next = await c.nextAuctionId(); }
+  catch (e) { throw Error(`The contract at ${short(marketplace)} on ${netName} is not a compatible marketplace (nextAuctionId() failed).`); }
+  return { c, next };
+}
+
+let idLoadToken = 0;
+async function loadAuctionIds() {
+  const hint = $("auctionIdHint"), list = $("auctionIdList");
+  const marketplace = $("manageMarketplaceAddr").value.trim();
+  const token = ++idLoadToken;
+  list.innerHTML = "";
+  if (!provider) { hint.textContent = "Connect a wallet to load auction IDs."; return; }
+  if (!ethers.isAddress(marketplace)) { hint.textContent = "Enter the marketplace contract address to load auction IDs."; return; }
+  hint.textContent = "Loading auction IDs...";
+  try {
+    const { next } = await getMarketplaceInfo(marketplace);
+    if (token !== idLoadToken) return;
+    const last = Number(next) - 1;
+    if (last < 1) { hint.textContent = "This marketplace has no auctions yet."; return; }
+    const first = Math.max(1, last - 199);
+    let opts = "";
+    for (let id = last; id >= first; id--) opts += `<option value="${id}"></option>`;
+    list.innerHTML = opts;
+    hint.textContent = `${last} auction${last === 1 ? "" : "s"} on this marketplace (IDs 1-${last}). Newest is #${last}.`;
+  } catch (e) {
+    if (token === idLoadToken) hint.textContent = e.shortMessage || e.message;
+  }
+}
 
 async function loadState() {
   if (!signer) return log("manageLog", "Connect wallet first", "err");
@@ -2183,9 +2227,15 @@ async function loadState() {
   const auctionId = $("auctionId").value.trim();
   if (!ethers.isAddress(marketplace)) return log("manageLog", "Invalid marketplace address", "err");
   if (!auctionId) return log("manageLog", "Auction ID required", "err");
+  if (!/^\d+$/.test(auctionId)) return log("manageLog", "Auction ID must be a whole number", "err");
 
-  const c = new ethers.Contract(marketplace, MARKETPLACE_ABI, provider);
+  // Preflight: fail with a readable reason instead of "could not decode result data".
+  const { c, next } = await getMarketplaceInfo(marketplace);
+  const last = Number(next) - 1;
+  if (last < 1) return log("manageLog", "This marketplace has no auctions yet.", "err");
+  if (BigInt(auctionId) < 1n || BigInt(auctionId) > BigInt(last)) return log("manageLog", `Auction #${auctionId} does not exist on this marketplace. Valid IDs are 1-${last}.`, "err");
   const [a, s] = await Promise.all([c.auctions(auctionId), c.auctionState(auctionId)]);
+  if (a.seller === ethers.ZeroAddress) return log("manageLog", `Auction #${auctionId} is empty.`, "err");
   loadedAuction = { marketplace, id: BigInt(auctionId), raw: a, state: s };
 
   const me = (await signer.getAddress()).toLowerCase();
@@ -2208,7 +2258,7 @@ async function loadState() {
     ["Remaining", Number(s.timeRemaining) ? fmtSecs(Number(s.timeRemaining)) : "-"],
     ["Access", s.holderOnly ? "Holder-only" : "Public"],
     ["Holder Phase", a.gateDuration > 0n ? fmtSecs(Number(a.gateDuration)) : "-"],
-    ["Public After", s.gateEndsAt > 0n ? fmtEpoch(s.gateEndsAt) : "-"],
+    ["Public After", s.gateEndsAt_ > 0n ? fmtEpoch(s.gateEndsAt_) : "-"],
     ["Operator", a.operator !== ethers.ZeroAddress ? short(a.operator) : "-"],
     ["Proceeds Wallet", a.proceedsRecipient !== ethers.ZeroAddress ? short(a.proceedsRecipient) : short(a.seller)]
   ];
@@ -2258,6 +2308,8 @@ $("operatorBtn").addEventListener("click", () => {
 });
 
 $("dateLabel").textContent = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+$("manageMarketplaceAddr").addEventListener("input", () => { if (ethers.isAddress($("manageMarketplaceAddr").value.trim())) loadAuctionIds(); });
+$("marketplaceAddr").addEventListener("change", loadAuctionIds);
 renderSavedMarketplace();
 $("walletConnectProjectId").value=localStorage.getItem(WALLETCONNECT_PROJECT_KEY)||DEFAULT_WC_PROJECT_ID;
 const saved = getSavedMarketplace();
