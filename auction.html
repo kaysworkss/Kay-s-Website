@@ -4358,6 +4358,7 @@ function _setupCrossChainForSlot(slot, keepClaim = false) {
   window._ccUsdHardCap = null;
   window._ccEthReserveWei = null;
   window._ccPhase = null;
+  window._ccChooserPricePending = false;
   _ccPairKey = null;
   if (!ccKey) return;
   _ccPairKey = ccKey;
@@ -4367,6 +4368,10 @@ function _setupCrossChainForSlot(slot, keepClaim = false) {
   _ccStartPolling(ccKey);
   _ccPopulateChooserPrices(ccKey).catch(e => console.warn("_ccPopulateChooserPrices:", e));
 }
+
+// How long the chooser cards wait for the price feed before showing "Fetching live price…".
+// The wait runs in parallel with the on-chain reads, so it costs nothing on a healthy connection.
+const CC_PRICE_WAIT_MS = 5000;
 
 async function _ccPopulateChooserPrices(pairKey) {
   const ethIdx  = _findPairedSlotIndex(pairKey, "eth");
@@ -4381,6 +4386,19 @@ async function _ccPopulateChooserPrices(pairKey) {
   const xtzStatusEl = document.getElementById("cc-xtz-status");
   let hardCap       = _activeUsdHardCap();
   let tezosAuction  = null;
+  let ethPending    = false;
+  let xtzPending    = false;
+
+  // Never show a figure that depends on the price feed before the feed has answered — a raw
+  // on-chain number that then jumps to the real one is exactly the confusion collectors saw.
+  // Start from a neutral placeholder (this also clears stale numbers from a previously viewed piece).
+  const pricesP = _whenPricesReady(CC_PRICE_WAIT_MS);
+  const _showPending = (priceEl, subEl) => {
+    if (priceEl) priceEl.textContent = "\u2026";
+    if (subEl)   subEl.textContent   = _pricePendingLabel();
+  };
+  _showPending(ethPriceEl, ethSubEl);
+  _showPending(xtzPriceEl, xtzSubEl);
 
   if (tezSlot?.tezosContractAddr) {
     try {
@@ -4394,6 +4412,12 @@ async function _ccPopulateChooserPrices(pairKey) {
       console.warn("_ccPopulateChooserPrices phase read:", e);
     }
   }
+
+  // Both cards paint from the same price snapshot: wait for the feed (already running in
+  // parallel with the read above), then freeze it if the chooser is open and not yet frozen.
+  const pricesOk = await pricesP;
+  if (pricesOk && document.getElementById("cc-chooser")?.classList.contains("show")) lockXtzRateIfNeeded();
+  hardCap = _activeUsdHardCap();
 
   // ── ETH card ──────────────────────────────────────────────────────────────
   if (_isEthAuctionSlot(ethSlot) && provider) {
@@ -4409,6 +4433,10 @@ async function _ccPopulateChooserPrices(pairKey) {
         const ethFromCap = (hardCap / ethUsdNow).toFixed(4).replace(/\.?0+$/, "");
         if (ethPriceEl) ethPriceEl.textContent = ethFromCap + " ETH";
         if (ethSubEl)   ethSubEl.textContent   = "\u2248 " + _fmtUsd(hardCap);
+      } else if (hardCap) {
+        // Hard cap set but the price feed hasn't answered — keep the placeholder, repaint when it does
+        _showPending(ethPriceEl, ethSubEl);
+        ethPending = true;
       } else {
         // No hard cap — show on-chain price, derive USD sub-label
         const displayWei = s[1] && !noBids ? s[6] : s[7];
@@ -4426,6 +4454,8 @@ async function _ccPopulateChooserPrices(pairKey) {
     if (ethPriceEl) ethPriceEl.textContent = ethFromCap + " ETH";
     if (ethSubEl)   ethSubEl.textContent   = "\u2248 " + _fmtUsd(hardCap);
     if (ethStatusEl) ethStatusEl.style.display = "";
+  } else if (hardCap) {
+    ethPending = true;
   }
 
   // ── XTZ card ──────────────────────────────────────────────────────────────
@@ -4439,7 +4469,11 @@ async function _ccPopulateChooserPrices(pairKey) {
         const rate   = _xtzRate();
         const ethRsv = window._ccEthReserveWei ?? null;
 
-        if (noBids && rate && (hardCap || ethRsv)) {
+        if (noBids && !rate && (hardCap || ethRsv)) {
+          // Anchored to USD but no rate yet — never fall back to the raw on-chain XTZ figure here
+          _showPending(xtzPriceEl, xtzSubEl);
+          xtzPending = true;
+        } else if (noBids && rate && (hardCap || ethRsv)) {
           // Derive XTZ from USD anchor (hard cap preferred, ETH reserve fallback)
           const ethEquivXtz = _xtzEthEquivFloor(auction.minNextBidMutez, ethRsv);
           const displayXtz  = ethEquivXtz && ethEquivXtz > 0
@@ -4465,7 +4499,40 @@ async function _ccPopulateChooserPrices(pairKey) {
       }
     } catch(_) {}
   }
+
+  // Anything still showing the placeholder that isn't genuinely waiting on the feed (read failed,
+  // no such contract) goes back to blank rather than a stuck "…".
+  const _clearIfIdle = (pending, priceEl, subEl) => {
+    if (!pending && priceEl && priceEl.textContent === "\u2026") {
+      priceEl.textContent = "";
+      if (subEl) subEl.textContent = "";
+    }
+  };
+  _clearIfIdle(ethPending, ethPriceEl, ethSubEl);
+  _clearIfIdle(xtzPending, xtzPriceEl, xtzSubEl);
+  // The price-ready listener below repaints the chooser if it gave up waiting on the feed.
+  window._ccChooserPricePending = ethPending || xtzPending;
 }
+
+// The price feed answered after the first paint (slow network, cold API…). Repaint whatever was
+// showing a placeholder, so the collector goes straight from "…" to the right number.
+window.addEventListener("xtz-prices-updated", (ev) => {
+  if (!ev.detail?.first) return;
+  try {
+    const chooserOpen = document.getElementById("cc-chooser")?.classList.contains("show");
+    if (chooserOpen) {
+      if (window._ccChooserPricePending && _ccPairKey) {
+        lockXtzRateIfNeeded();
+        _ccPopulateChooserPrices(_ccPairKey).catch(e => console.warn("_ccPopulateChooserPrices:", e));
+      }
+      return;
+    }
+    if (document.getElementById("stats-grid")?.style.display === "grid") {
+      if (_slotChain(_activeCfg()) === "tezos") refreshTezosState();
+      else refreshState();
+    }
+  } catch(e) { console.warn("price repaint:", e); }
+});
 
 async function _switchAuction(idx, opts = {}) {
   if (idx < 0 || idx >= _auctions.length) return;
@@ -6017,12 +6084,17 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
       // stat-min: show hard cap equivalent when set and no bids yet
       const _ethStatHardCap = _activeUsdHardCap();
       const _ethStatUsdNow  = _ethUsd();
-      const _ethStatMin     = (_ethStatHardCap && _ethStatUsdNow && noBids)
-        ? (_ethStatHardCap / _ethStatUsdNow).toFixed(4).replace(/\.?0+$/, "") + " ETH"
-        : ethers.formatEther(mnb) + " ETH";
-      const _ethStatSub     = (_ethStatHardCap && _ethStatUsdNow && noBids)
-        ? "\u2248 " + _fmtUsd(_ethStatHardCap)
-        : (noBids ? "Reserve price" : "Min increment");
+      const _ethStatPending = noBids && _ethAnchorPending();
+      const _ethStatMin     = _ethStatPending
+        ? "\u2026"
+        : (_ethStatHardCap && _ethStatUsdNow && noBids)
+          ? (_ethStatHardCap / _ethStatUsdNow).toFixed(4).replace(/\.?0+$/, "") + " ETH"
+          : ethers.formatEther(mnb) + " ETH";
+      const _ethStatSub     = _ethStatPending
+        ? _pricePendingLabel()
+        : (_ethStatHardCap && _ethStatUsdNow && noBids)
+          ? "\u2248 " + _fmtUsd(_ethStatHardCap)
+          : (noBids ? "Reserve price" : "Min increment");
       document.getElementById("stat-min").textContent     = _ethStatMin;
       document.getElementById("stat-min-sub").textContent = _ethStatSub;
     }
@@ -6079,8 +6151,13 @@ function updateBidHint() {
     const minRounded = Math.ceil(floor);
     const _usdCap    = _usdAnchor(ethRsv);
 
-    document.getElementById("bid-hint").textContent = `Minimum bid: ${minRounded.toLocaleString()} XTZ${_usdCap ? ` · ≈ ${_fmtUsd(_usdCap)}` : ""}`;
-    if (!bidInput.value) bidInput.value = minRounded;
+    // USD-anchored but the price feed hasn't answered yet: don't show or prefill the raw on-chain
+    // number (it isn't what the auction asks for). The hint and prefill land as soon as prices do.
+    const _pending = _xtzAnchorPending(ethRsv);
+    document.getElementById("bid-hint").textContent = _pending
+      ? _pricePendingLabel()
+      : `Minimum bid: ${minRounded.toLocaleString()} XTZ${_usdCap ? ` · ≈ ${_fmtUsd(_usdCap)}` : ""}`;
+    if (!_pending && !bidInput.value) bidInput.value = minRounded;
     bidInput.step = "1";
     if (currLabel) currLabel.textContent = "XTZ";
     const btn = document.getElementById("bid-btn");
@@ -6098,8 +6175,11 @@ function updateBidHint() {
     ? Math.max(_ethCapMin, parseFloat(min)).toFixed(4).replace(/\.?0+$/, "")
     : min;
   const _ethUsdHint = _ethHardCap ? ` · ≈ ${_fmtUsd(_ethHardCap)}` : "";
-  document.getElementById("bid-hint").textContent = `Minimum bid: ${_ethFloor} ETH${_ethUsdHint}`;
-  if (!bidInput.value) bidInput.value = _ethFloor;
+  const _ethPending = _ethAnchorPending(); // hard cap set but no price yet — don't prefill a wrong floor
+  document.getElementById("bid-hint").textContent = _ethPending
+    ? _pricePendingLabel()
+    : `Minimum bid: ${_ethFloor} ETH${_ethUsdHint}`;
+  if (!_ethPending && !bidInput.value) bidInput.value = _ethFloor;
   bidInput.step = "0.0001";
   if (currLabel) currLabel.textContent = "ETH";
   const btn = document.getElementById("bid-btn");
@@ -6127,7 +6207,9 @@ function onBidInput() {
   }
 
   const ok = document.getElementById("eligibility").classList.contains("yes");
-  document.getElementById("bid-btn").disabled = val < min || !ok || !isLive;
+  // The floor isn't known until the price feed answers on a USD-anchored auction
+  const floorUnknown = isTezos ? _xtzAnchorPending(window._ccEthReserveWei ?? null) : _ethAnchorPending();
+  document.getElementById("bid-btn").disabled = floorUnknown || val < min || !ok || !isLive;
 }
 
 // ─── Countdown ────────────────────────────────────────────────────────────────
@@ -6415,15 +6497,20 @@ async function refreshTezosState(runToken = _switchToken, prefetched = null) {
     const _statEthRsv     = window._ccEthReserveWei ?? null;
     const _statEquivFloor = noBids ? _xtzEthEquivFloor(auction.minNextBidMutez, _statEthRsv) : null;
     const _statRawXtz     = auction.minNextBidMutez / 1_000_000;
-    const _statMin        = (_statEquivFloor && _statEquivFloor > _statRawXtz)
-      ? Math.ceil(_statEquivFloor).toLocaleString() + " XTZ"
-      : `${(auction.minNextBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "")} XTZ`;
+    const _statPending    = noBids && _xtzAnchorPending(_statEthRsv);
+    const _statMin        = _statPending
+      ? "\u2026"
+      : (_statEquivFloor && _statEquivFloor > _statRawXtz)
+        ? Math.ceil(_statEquivFloor).toLocaleString() + " XTZ"
+        : `${(auction.minNextBidMutez / 1000000).toFixed(6).replace(/\.?0+$/, "")} XTZ`;
     document.getElementById("stat-min").textContent = _statMin;
     // Sub-label: show USD cap when available, otherwise generic label
     const _statUsd = noBids ? _usdAnchor(_statEthRsv) : null;
-    document.getElementById("stat-min-sub").textContent = noBids
-      ? (_statUsd ? `≈ ${_fmtUsd(_statUsd)}` : "Minimum bid")
-      : "Min increment";
+    document.getElementById("stat-min-sub").textContent = _statPending
+      ? _pricePendingLabel()
+      : noBids
+        ? (_statUsd ? `≈ ${_fmtUsd(_statUsd)}` : "Minimum bid")
+        : "Min increment";
     document.getElementById("bid-form").style.display = acceptingBids ? "block" : "none";
     document.getElementById("history-section").style.display = "block";
     // Private offer — only while no bids have been placed on Tezos
@@ -8404,13 +8491,22 @@ function simSettle() {
 // ─────────────────────────────────────────────────────────────────────────────
 //  XTZ / ETH Price Engine
 //  • Polls CoinGecko every 5 minutes (PRICE_TTL_MS) for live ETH→XTZ rate
+//  • Validates every quote; retries quickly until the first good pair lands
+//  • _pricesReady() / _whenPricesReady() gate anything price-derived so the UI never
+//    paints a raw on-chain number and then jumps when the rate arrives
 //  • Exposes _xtzRate()  → XTZ per 1 ETH  (or null while loading)
 //  • lockXtzRate()       → snapshot used once chooser modal opens
 //  • unlockXtzRate()     → clears snapshot so live rate resumes
 //  • _xtzEthEquivFloor(minNextBidMutez) → minimum XTZ bid that equals the
 //    ETH reserve at the locked (or live) rate, always ≥ the on-chain floor
 // ─────────────────────────────────────────────────────────────────────────────
-const _XTZ_PRICE_TTL_MS = 5 * 60 * 1000;
+const _XTZ_PRICE_TTL_MS       = 5 * 60 * 1000;
+const _PRICE_FETCH_TIMEOUT_MS = 8000;
+// While we have no price at all, retry quickly instead of waiting a full TTL.
+const _PRICE_RETRY_MS         = [1500, 3000, 6000, 12000, 20000];
+// A refresh that moves either price by more than this since the last trusted one is treated as bad data.
+const _PRICE_MAX_JUMP         = 0.5;
+const _PRICE_JUMP_GUARD_MS    = 60 * 60 * 1000;
 
 const _xtzPriceState = {
   ethUsd:      null,   // USD per 1 ETH
@@ -8422,61 +8518,143 @@ const _xtzPriceState = {
   fetchedAt:   0,
   fetching:    false,
   intervalId:  null,
+  ready:       false,  // true once a validated price pair has been received
+  failedCycles: 0,     // consecutive fetch cycles where every source failed
+  retryTimer:  null,
+  waiters:     [],     // resolvers for _whenPricesReady()
 };
 
+function _isGoodPrice(n) { return typeof n === "number" && Number.isFinite(n) && n > 0; }
+
+async function _priceJson(url) {
+  // AbortSignal.timeout() is missing on older iOS Safari and throws there, which used to make
+  // every price source fail; an AbortController works everywhere.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), _PRICE_FETCH_TIMEOUT_MS);
+  try {
+    const r = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return await r.json();
+  } finally { clearTimeout(timer); }
+}
+
+// Primary: CoinGecko — returns both USD prices in one call
+async function _pricesFromCoinGecko() {
+  const d = await _priceJson("https://api.coingecko.com/api/v3/simple/price?ids=tezos%2Cethereum&vs_currencies=usd");
+  const ethUsd = Number(d?.ethereum?.usd);
+  const xtzUsd = Number(d?.tezos?.usd);
+  if (!_isGoodPrice(ethUsd) || !_isGoodPrice(xtzUsd)) throw new Error("unusable payload");
+  return { ethUsd, xtzUsd, source: "CoinGecko" };
+}
+
+// Fallback: Binance USDT pairs
+async function _pricesFromBinance() {
+  const [eth, xtz] = await Promise.all([
+    _priceJson("https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT"),
+    _priceJson("https://api.binance.com/api/v3/ticker/price?symbol=XTZUSDT"),
+  ]);
+  const ethUsd = parseFloat(eth?.price);
+  const xtzUsd = parseFloat(xtz?.price);
+  if (!_isGoodPrice(ethUsd) || !_isGoodPrice(xtzUsd)) throw new Error("unusable payload");
+  return { ethUsd, xtzUsd, source: "Binance" };
+}
+
+// Refuse a refresh that lurches away from the price we already trust (bad / stale feed data).
+// Only applies while the trusted price is fresh, so a genuine move after a long idle tab still lands.
+function _isPlausibleVsTrusted(p) {
+  const st = _xtzPriceState;
+  if (!st.ready || Date.now() - st.fetchedAt > _PRICE_JUMP_GUARD_MS) return true;
+  const jump = (a, b) => Math.abs(a - b) / b;
+  return jump(p.ethUsd, st.ethUsd) <= _PRICE_MAX_JUMP && jump(p.xtzUsd, st.xtzUsd) <= _PRICE_MAX_JUMP;
+}
+
+function _acceptPrices(p) {
+  const st = _xtzPriceState;
+  st.ethUsd       = p.ethUsd;
+  st.xtzUsd       = p.xtzUsd;
+  st.liveRate     = p.ethUsd / p.xtzUsd;
+  st.fetchedAt    = Date.now();
+  st.failedCycles = 0;
+  clearTimeout(st.retryTimer); st.retryTimer = null;
+  const first = !st.ready;
+  st.ready = true;
+  console.debug(`[xtzPrice] ${p.source} ETH=$${p.ethUsd} XTZ=$${p.xtzUsd} rate=${st.liveRate.toFixed(2)}`);
+  if (first) st.waiters.splice(0).forEach(fn => fn());
+  try { window.dispatchEvent(new CustomEvent("xtz-prices-updated", { detail: { first } })); } catch(_) {}
+}
+
+function _scheduleQuickPriceRetry() {
+  const st = _xtzPriceState;
+  if (st.retryTimer) return;
+  const delay = _PRICE_RETRY_MS[Math.min(Math.max(st.failedCycles - 1, 0), _PRICE_RETRY_MS.length - 1)];
+  st.retryTimer = setTimeout(() => { st.retryTimer = null; _fetchXtzRate(); }, delay);
+}
+
 async function _fetchXtzRate() {
-  if (_xtzPriceState.fetching) return;
-  _xtzPriceState.fetching = true;
-
-  // Primary: CoinGecko — returns both USD prices in one call
+  const st = _xtzPriceState;
+  if (st.fetching) return;
+  st.fetching = true;
+  let got = null;
   try {
-    const r = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=tezos%2Cethereum&vs_currencies=usd",
-      { cache: "no-store", signal: AbortSignal.timeout(8000) }
-    );
-    if (r.ok) {
-      const d = await r.json();
-      const ethUsd = d?.ethereum?.usd;
-      const xtzUsd = d?.tezos?.usd;
-      if (ethUsd && xtzUsd) {
-        _xtzPriceState.ethUsd     = ethUsd;
-        _xtzPriceState.xtzUsd     = xtzUsd;
-        _xtzPriceState.liveRate   = ethUsd / xtzUsd;
-        _xtzPriceState.fetchedAt  = Date.now();
-        console.debug(`[xtzPrice] ETH=$${ethUsd} XTZ=$${xtzUsd} rate=${_xtzPriceState.liveRate.toFixed(2)}`);
-        _xtzPriceState.fetching = false;
-        return;
-      }
+    for (const source of [_pricesFromCoinGecko, _pricesFromBinance]) {
+      try {
+        const p = await source();
+        if (!_isPlausibleVsTrusted(p)) {
+          console.warn(`[xtzPrice] ${p.source} rejected — moved too far from the last trusted price`, p);
+          continue;
+        }
+        got = p;
+        break;
+      } catch(e) { console.warn(`[xtzPrice] ${source.name} failed:`, e.message); }
     }
-  } catch(e) { console.warn("[xtzPrice] CoinGecko failed:", e.message); }
+  } finally { st.fetching = false; }
 
-  // Fallback: Binance USDT pairs
-  try {
-    const [eth, xtz] = await Promise.all([
-      fetch("https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT", { cache: "no-store", signal: AbortSignal.timeout(8000) }).then(r => r.json()),
-      fetch("https://api.binance.com/api/v3/ticker/price?symbol=XTZUSDT", { cache: "no-store", signal: AbortSignal.timeout(8000) }).then(r => r.json()),
-    ]);
-    const ethUsd = parseFloat(eth?.price);
-    const xtzUsd = parseFloat(xtz?.price);
-    if (ethUsd && xtzUsd) {
-      _xtzPriceState.ethUsd    = ethUsd;
-      _xtzPriceState.xtzUsd    = xtzUsd;
-      _xtzPriceState.liveRate  = ethUsd / xtzUsd;
-      _xtzPriceState.fetchedAt = Date.now();
-      console.debug(`[xtzPrice] Binance ETH=$${ethUsd} XTZ=$${xtzUsd}`);
-      _xtzPriceState.fetching = false;
-      return;
-    }
-  } catch(e) { console.warn("[xtzPrice] Binance failed:", e.message); }
+  if (got) { _acceptPrices(got); return; }
 
-  _xtzPriceState.fetching = false;
-  console.warn("[xtzPrice] all sources failed — keeping stale prices");
+  st.failedCycles++;
+  if (st.ready) {
+    console.warn("[xtzPrice] all sources failed — keeping last good prices");
+  } else {
+    console.warn("[xtzPrice] all sources failed — no price yet, retrying shortly");
+    _scheduleQuickPriceRetry();
+  }
 }
 
 function _initXtzPriceEngine() {
   if (_xtzPriceState.intervalId) return;
   _fetchXtzRate();
   _xtzPriceState.intervalId = setInterval(_fetchXtzRate, _XTZ_PRICE_TTL_MS);
+}
+
+/** True once a validated USD price pair has arrived. Nothing price-derived should be painted before this. */
+function _pricesReady() { return _xtzPriceState.ready; }
+
+/** Resolves true as soon as prices are ready, or false if they still aren't after timeoutMs. */
+function _whenPricesReady(timeoutMs = 4000) {
+  const st = _xtzPriceState;
+  if (st.ready) return Promise.resolve(true);
+  return new Promise(resolve => {
+    const waiter = () => { clearTimeout(timer); resolve(true); };
+    const timer = setTimeout(() => {
+      const i = st.waiters.indexOf(waiter);
+      if (i >= 0) st.waiters.splice(i, 1);
+      resolve(false);
+    }, timeoutMs);
+    st.waiters.push(waiter);
+  });
+}
+
+/** ETH side is USD-anchored (admin hard cap) but the price feed hasn't answered yet. */
+function _ethAnchorPending() { return !_pricesReady() && !!_activeUsdHardCap(); }
+
+/** XTZ side is USD-anchored (hard cap, or derived from the paired ETH reserve) but no price yet. */
+function _xtzAnchorPending(ethReserveWei) {
+  return !_pricesReady() && (!!_activeUsdHardCap() || ethReserveWei != null);
+}
+
+/** Small label for spots that would otherwise show a number we can't compute yet. */
+function _pricePendingLabel() {
+  return _xtzPriceState.failedCycles >= 2 ? "Live price unavailable \u2014 retrying" : "Fetching live price\u2026";
 }
 
 /** XTZ-per-ETH rate: locked snapshot while chooser is open, else live */
@@ -8492,6 +8670,11 @@ function _ethUsd() {
 /** USD per XTZ: locked snapshot while chooser is open, else live */
 function _xtzUsd() {
   return _xtzPriceState.lockedXtzUsd ?? _xtzPriceState.xtzUsd;
+}
+
+/** Lock only if no snapshot exists yet (used when prices arrive after the chooser opened) */
+function lockXtzRateIfNeeded() {
+  if (!_xtzPriceState.lockedRate) lockXtzRate();
 }
 
 /** Lock all prices the moment the chooser modal opens */
