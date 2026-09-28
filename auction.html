@@ -3296,9 +3296,10 @@ function _ccStartNoBidCountdown() {
   }
 
   clearInterval(_ccNoBidCountdownRef);
+  _renderCcBanner();
   _ccNoBidCountdownRef = setInterval(() => {
     // Bid placed or piece switched — stop
-    if (!_ccClaimRow || _ccClaimRow.status !== "waiting-bid") {
+    if (!_ccClaimRow || _ccClaimStatus(_ccClaimRow) !== "waiting-bid") {
       clearInterval(_ccNoBidCountdownRef);
       _ccNoBidCountdownRef = null;
       if (barWrap) barWrap.classList.remove("show");
@@ -3622,7 +3623,8 @@ function _renderCcBanner() {
   if (!el) return;
   if (!_ccClaimRow) { el.style.display = "none"; return; }
 
-  const { status, active_chain, reset_at } = _ccClaimRow;
+  const { active_chain, reset_at } = _ccClaimRow;
+  const status = _ccClaimStatus(_ccClaimRow);
   const slot      = _activeCfg();
   const thisChain = (slot?.chain || "eth") === "tezos" ? "tezos" : "eth";
   const sameChain = active_chain === thisChain;
@@ -4903,7 +4905,7 @@ async function _switchAuction(idx, opts = {}) {
       countdownTimer = setInterval(() => {
         if (switchToken !== _switchToken) return;
         tickCountdown();
-        if (_ccClaimRow?.status === "waiting-bid") _renderCcBanner();
+        if (_ccClaimStatus(_ccClaimRow) === "waiting-bid") _renderCcBanner();
       }, 1000);
       pollTimer = setInterval(() => refreshTezosState(switchToken), 15000);
     }
@@ -4954,7 +4956,7 @@ async function _switchAuction(idx, opts = {}) {
     if (switchToken !== _switchToken) return;
     tickCountdown();
     // Re-render the cross-chain banner every tick so the no-bid countdown stays live
-    if (_ccClaimRow?.status === "waiting-bid") _renderCcBanner();
+    if (_ccClaimStatus(_ccClaimRow) === "waiting-bid") _renderCcBanner();
   }, 1000);
   pollTimer = setInterval(() => refreshState(switchToken, activeContract), 15000);
 
