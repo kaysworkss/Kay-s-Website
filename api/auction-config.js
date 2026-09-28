@@ -100,6 +100,15 @@ function cors(res) {
 
 // ── Sanitisers ────────────────────────────────────────────────────────────────
 
+function sanitiseRpcUrls(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter(url => typeof url === "string" && url.length <= 500)
+    .map(url => url.trim()).filter(url => {
+      try { const parsed = new URL(url); return parsed.protocol === "https:" && !parsed.username && !parsed.password; }
+      catch (_) { return false; }
+    }))].slice(0, 4);
+}
+
 function sanitisePiece(p) {
   if (!p || typeof p !== "object") return null;
   const chain = String(p.chain || "eth").toLowerCase() === "tezos" ? "tezos" : "eth";
@@ -115,6 +124,7 @@ function sanitisePiece(p) {
       ? String(p.tezosNetwork || "").toLowerCase()
       : "mainnet",
     tezosRpcUrl: String(p.tezosRpcUrl || "").slice(0, 500),
+    tezosRpcUrls: sanitiseRpcUrls(p.tezosRpcUrls),
     crossChainPairKey: String(p.crossChainPairKey || "").slice(0, 100),
     usdHardCap:        p.usdHardCap != null && isFinite(parseFloat(p.usdHardCap)) && parseFloat(p.usdHardCap) > 0
       ? parseFloat(p.usdHardCap)
@@ -161,6 +171,7 @@ const DEFAULT_CONFIG = {
   tezosAuctionId:   "",
   tezosNetwork:     "mainnet",
   tezosRpcUrl:      "",
+  tezosRpcUrls:     [],
   crossChainPairKey:"",
   usdHardCap:       null,
   holderUsdHardCap: null,
@@ -229,6 +240,7 @@ module.exports = async function handler(req, res) {
         ? String(body.tezosNetwork || "").toLowerCase()
         : "mainnet",
       tezosRpcUrl:      String(body.tezosRpcUrl       || "").slice(0, 500),
+      tezosRpcUrls:     sanitiseRpcUrls(body.tezosRpcUrls),
       crossChainPairKey:String(body.crossChainPairKey || "").slice(0, 100),
       usdHardCap:       body.usdHardCap != null && isFinite(parseFloat(body.usdHardCap)) && parseFloat(body.usdHardCap) > 0
         ? parseFloat(body.usdHardCap)
