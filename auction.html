@@ -1851,6 +1851,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
   background: var(--bg);
 }
 #view-loading.show { display: flex; }
+#loading-message { max-width: 28rem; padding: 0 24px; text-align: center; }
 .loading-eyebrow {
   font-family: 'Cinzel', serif; font-size: 0.6rem;
   letter-spacing: 0.3em; text-transform: uppercase;
@@ -1955,8 +1956,8 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 </div>
 
 <!-- ── LOADING VIEW ── -->
-<div id="view-loading">
-  <div class="loading-eyebrow">Loading auction</div>
+<div id="view-loading" role="status" aria-live="polite" aria-busy="true">
+  <div class="loading-eyebrow" id="loading-message">Loading auction</div>
   <div class="loading-bar-wrap"><div class="loading-bar-fill"></div></div>
 </div>
 
@@ -2523,14 +2524,18 @@ async function loadConfig() {
       if (raw) { console.log("[auction] Preview mode"); return JSON.parse(raw); }
     } catch (e) { console.warn("[auction] preview cfg:", e); }
   }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
   try {
-    const res  = await fetch(AUCTION_API);
+    const res  = await fetch(AUCTION_API, { signal: controller.signal });
+    if (!res.ok) throw new Error("Auction configuration could not be loaded.");
     const json = await res.json();
-    return json.ok ? json.config : {};
+    if (!json.ok || !json.config) throw new Error("Auction configuration is unavailable.");
+    return json.config;
   } catch (e) {
     console.warn("Could not load auction config from API:", e);
-    return {};
-  }
+    throw e;
+  } finally { clearTimeout(timer); }
 }
 
 // ─── ABI ─────────────────────────────────────────────────────────────────────
@@ -3037,17 +3042,17 @@ const CC_TEZOS_PREFETCH_MS = 20000;
 let _ccTezosPrefetch = null; // { key, ts, promise }
 
 function _ccTezosPrefetchFor(slot, force = false) {
-  const key = _auctionKeyForSlot(slot);
+  const key = JSON.stringify([_tezosNetworkForSlot(slot), _auctionKeyForSlot(slot), _tezosRpcUrlsForSlot(slot)]);
   const now = Date.now();
-  if (!force && _ccTezosPrefetch && _ccTezosPrefetch.key === key && now - _ccTezosPrefetch.ts < CC_TEZOS_PREFETCH_MS) {
+  if (_ccTezosPrefetch && _ccTezosPrefetch.key === key && (_ccTezosPrefetch.pending || (!force && now - _ccTezosPrefetch.ts < CC_TEZOS_PREFETCH_MS))) {
     return _ccTezosPrefetch;
   }
-  const entry = { key, ts: now, promise: null };
+  const entry = { key, ts: now, promise: null, pending: true };
   entry.promise = _readTezosAuction(slot).catch(e => {
     console.warn("_ccTezosPrefetch:", e);
     if (_ccTezosPrefetch === entry) _ccTezosPrefetch = null;
     return null;
-  });
+  }).finally(() => { entry.pending = false; });
   _ccTezosPrefetch = entry;
   return entry;
 }
@@ -3077,6 +3082,7 @@ document.addEventListener("pointerover", ev => {
 // This is the moment the 60-second no-bid window starts.
 let _ccChoosing = false;
 async function _ccChooseChain(chain) {
+  if (_auctionReadinessBlocked) return;
   if (!_ccPairKey || _ccChoosing) return;
   const targetIdx = _findPairedSlotIndex(_ccPairKey, chain);
   const slot      = targetIdx >= 0 ? _auctions[targetIdx] : _activeCfg();
@@ -3100,6 +3106,17 @@ async function _ccChooseChain(chain) {
   const tezPrefetch = (chain === "tezos" && slot?.tezosContractAddr) ? _ccTezosPrefetchFor(slot) : null;
 
   try {
+    // Resolve data before reserving either chain's bidding window.
+    if (tezPrefetch) {
+      if (xtzBtn) xtzBtn.textContent = "Preparing Tezos bid...";
+      const raw = await tezPrefetch.promise;
+      if (!_normalizeTezosAuction(raw)) throw new Error("Tezos auction data is unavailable. Please try again.");
+      if (_auctionKeyForSlot(slot) !== aucKey || _ccPairKey !== _pairKeyForSlot(slot)) {
+        if (ethBtn) ethBtn.disabled = false;
+        if (xtzBtn) xtzBtn.disabled = false;
+        return;
+      }
+    }
     // Register the claim — starts the 60s no-bid window in Supabase
     await _ccRegisterClaim(_ccPairKey, chain, aucKey, 60);
 
@@ -3149,7 +3166,12 @@ async function _ccChooseChain(chain) {
       if (ethBtn) ethBtn.disabled = false;
       if (xtzBtn) xtzBtn.disabled = false;
     }
+  } catch (e) {
+    if (ethBtn) ethBtn.disabled = false;
+    if (xtzBtn) xtzBtn.disabled = false;
+    notify("err", "Could not prepare bid", e?.message || "Please try again.");
   } finally {
+    if (xtzBtn) xtzBtn.textContent = "Start the Bid on Tezos";
     _ccChoosing = false;
   }
 }
@@ -3568,18 +3590,104 @@ async function _loadManualSoldOverrides() {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
+let _auctionReadinessBlocked = true;
+let _auctionLoadStartedAt = 0;
+
+function _showAuctionLoadError(error) {
+  console.warn("Auction preparation:", error);
+  const loading = document.getElementById("view-loading");
+  loading.classList.add("show");
+  loading.setAttribute("aria-busy", "true");
+  document.getElementById("loading-message").textContent = "Connecting to auction...";
+}
+
+async function _waitForAuctionPresentation(view, signal) {
+  // Poll the actual rendered assets: metadata and gateway fallbacks can replace src.
+  while (!signal.aborted) {
+    const artwork = document.getElementById(`${view}-img`);
+    const images = [artwork].filter(Boolean);
+    const loaded = artwork && images.every(img => img.getAttribute("src") && img.complete && img.naturalWidth > 0);
+    let pricesReady = true;
+    if (view === "live" && document.getElementById("cc-chooser")?.classList.contains("show")) {
+      const slots = ["eth", "tezos"].filter(chain => _findPairedSlotIndex(_ccPairKey, chain) >= 0);
+      pricesReady = slots.length > 0 && slots.every(chain => {
+        const text = document.getElementById(chain === "eth" ? "cc-eth-price" : "cc-xtz-price")?.textContent || "";
+        if (text === "Unavailable") throw new Error("Auction prices are unavailable.");
+        return /\d/.test(text) && text.includes(chain === "eth" ? "ETH" : "XTZ");
+      });
+    } else if (view === "live") {
+      pricesReady = /\d/.test(document.getElementById("stat-min")?.textContent || "");
+    }
+    if (loaded && pricesReady) {
+      const sources = images.map(img => img.currentSrc || img.src);
+      await Promise.all(images.map(img => img.decode()));
+      if (signal.aborted) break;
+      if (images.every((img, i) => (img.currentSrc || img.src) === sources[i] && img.naturalWidth > 0)) return;
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  throw new Error("Auction preparation cancelled.");
+}
+
+async function _prepareAuctionView(view, initialise) {
+  const root = document.getElementById(`view-${view}`);
+  root.inert = true;
+  root.classList.add("show");
+  // Paint saved details before any chain or sold-status requests can stall.
+  const linked = _linkedPieceIndex();
+  const slot = cfg._preview && typeof cfg._pieceIdx === "number" ? _auctions[cfg._pieceIdx]
+    : linked >= 0 ? _auctions[linked] : _auctions.find(piece => piece._effectiveStatus === view) || _auctions[0];
+  if (slot) {
+    const title = document.getElementById(`${view}-art-name`);
+    const artist = document.getElementById(`${view}-art-artist`);
+    if (title) title.textContent = slot.artTitle || "Auction";
+    if (artist) artist.textContent = slot.artArtist || "";
+    populateAbout(view, slot);
+    loadStaticImage(view, slot);
+  }
+  const controller = new AbortController();
+  try {
+    await withTimeout((async () => {
+      await initialise();
+      if (view === "live" && _ccChooserPricesReady) await _ccChooserPricesReady;
+      await _waitForAuctionPresentation(view, controller.signal);
+    })(), _auctionLoadStartedAt ? Math.max(1, 6000 - (Date.now() - _auctionLoadStartedAt)) : 6000,
+    "Remaining auction content will load in the background.");
+  } catch (error) {
+    console.info("Auction loading continues:", error.message);
+  } finally {
+    // Stop only the presentation watcher; network reads and refreshes continue.
+    controller.abort();
+    _auctionReadinessBlocked = false;
+    root.inert = false;
+    if (view === "live") onBidInput();
+    const loading = document.getElementById("view-loading");
+    loading.setAttribute("aria-busy", "false");
+    loading.classList.remove("show");
+  }
+  return true;
+}
+
 window.addEventListener("load", async () => {
+  _auctionLoadStartedAt = Date.now();
   document.getElementById("view-loading").classList.add("show");
 
-  cfg = await loadConfig();
+  while (true) {
+    try { cfg = await loadConfig(); break; }
+    catch (error) {
+      _showAuctionLoadError(error);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  }
   const globalStatus = normaliseStatus(cfg.status) || "off";
 
   // Normalise auctions array — supports both single and multi-auction configs
   if (Array.isArray(cfg.auctions) && cfg.auctions.length > 0) {
     _auctions = cfg.auctions;
-  } else if (cfg.contractAddr || cfg.marketplaceAddr) {
+  } else if (cfg.contractAddr || cfg.marketplaceAddr || cfg.tezosContractAddr) {
     // Single-auction legacy config — wrap into array
     _auctions = [{
+      ...cfg,
       contractAddr: cfg.contractAddr,
       marketplaceAddr: cfg.marketplaceAddr || "",
       marketplaceAuctionId: cfg.marketplaceAuctionId || "",
@@ -3634,17 +3742,14 @@ window.addEventListener("load", async () => {
     else                  routeStatus = "off";
   }
 
-  document.getElementById("view-loading").classList.remove("show");
-
   if (routeStatus === "live") {
-    document.getElementById("view-live").classList.add("show");
-    await initLive();
+    if (!await _prepareAuctionView("live", initLive)) return;
     aucOnOpen();
     initCollectorRoom();
   } else if (routeStatus === "upcoming") {
-    document.getElementById("view-upcoming").classList.add("show");
-    initUpcoming();
+    if (!await _prepareAuctionView("upcoming", initUpcoming)) return;
   } else {
+    document.getElementById("view-loading").classList.remove("show");
     document.getElementById("view-landing").classList.add("show");
     document.querySelector("#view-landing .landing-eyebrow").textContent = "Auction";
     document.getElementById("landing-sub").textContent = "An auction is being prepared. Check back soon.";
@@ -4183,7 +4288,7 @@ async function _pollAllTabBids() {
       if (manualSold) _setTabSoldState(i, true);
       return;
     }
-    const aucRaw  = await _tzktFetchAuction(slot);
+    const aucRaw  = await _readTezosAuction(slot);
     const auction = _normalizeTezosAuction(aucRaw);
     if (!auction) return;
 
@@ -4344,6 +4449,7 @@ function _refreshChat() {
   });
 }
 
+let _ccChooserPricesReady = null;
 function _setupCrossChainForSlot(slot, keepClaim = false) {
   const ccKey = _pairKeyForSlot(slot);
   // The collector just picked this chain and holds the claim — keep the chooser hidden,
@@ -4366,7 +4472,7 @@ function _setupCrossChainForSlot(slot, keepClaim = false) {
   _ccShowChooser();
   // Poll immediately on load so refreshing collectors see current state right away.
   _ccStartPolling(ccKey);
-  _ccPopulateChooserPrices(ccKey).catch(e => console.warn("_ccPopulateChooserPrices:", e));
+  _ccChooserPricesReady = _ccPopulateChooserPrices(ccKey).catch(e => console.warn("_ccPopulateChooserPrices:", e));
 }
 
 // How long the chooser cards wait for the price feed before showing "Fetching live price…".
@@ -4374,6 +4480,8 @@ function _setupCrossChainForSlot(slot, keepClaim = false) {
 const CC_PRICE_WAIT_MS = 5000;
 
 async function _ccPopulateChooserPrices(pairKey) {
+  const chooserToken = _switchToken;
+  const isCurrent = () => pairKey === _ccPairKey && chooserToken === _switchToken;
   const ethIdx  = _findPairedSlotIndex(pairKey, "eth");
   const tezIdx  = _findPairedSlotIndex(pairKey, "tezos");
   const ethSlot = ethIdx >= 0 ? _auctions[ethIdx] : null;
@@ -4404,6 +4512,7 @@ async function _ccPopulateChooserPrices(pairKey) {
     try {
       // force=true: refresh the cache on every chooser load, so a later click paints from fresh data
       const aucRaw = await _ccTezosPrefetchFor(tezSlot, true).promise;
+      if (!isCurrent()) return;
       tezosAuction = _normalizeTezosAuction(aucRaw);
       if (tezosAuction) {
         hardCap = _setCrossChainPhase(tezosAuction.isPhased && !tezosAuction.holderOnly ? "public" : "holder");
@@ -4416,6 +4525,7 @@ async function _ccPopulateChooserPrices(pairKey) {
   // Both cards paint from the same price snapshot: wait for the feed (already running in
   // parallel with the read above), then freeze it if the chooser is open and not yet frozen.
   const pricesOk = await pricesP;
+  if (!isCurrent()) return;
   if (pricesOk && document.getElementById("cc-chooser")?.classList.contains("show")) lockXtzRateIfNeeded();
   hardCap = _activeUsdHardCap();
 
@@ -4424,7 +4534,8 @@ async function _ccPopulateChooserPrices(pairKey) {
     try {
       let c = _contractCache[_ethContractKeyForSlot(ethSlot)];
       if (!c) { c = _makeEthAuctionContract(ethSlot, provider); _contractCache[_ethContractKeyForSlot(ethSlot)] = c; }
-      const s        = await c.auctionState();
+      const s        = await withTimeout(c.auctionState(), 8000, "Ethereum auction read timed out.");
+      if (!isCurrent()) return;
       const noBids   = s[5] === ethers.ZeroAddress;
       window._ccEthReserveWei = s[7]; // reserve in wei
       const ethUsdNow = _ethUsd();
@@ -4447,7 +4558,7 @@ async function _ccPopulateChooserPrices(pairKey) {
           : (noBids ? "\u2248 minimum bid" : "\u2248 current bid");
       }
       if (ethStatusEl) ethStatusEl.style.display = "";
-    } catch(_) {}
+    } catch(e) { console.warn("Ethereum chooser read:", e); }
   } else if (hardCap && _ethUsd()) {
     // No ETH contract but hard cap is set — still show cap-derived ETH
     const ethFromCap = (hardCap / _ethUsd()).toFixed(4).replace(/\.?0+$/, "");
@@ -4459,9 +4570,10 @@ async function _ccPopulateChooserPrices(pairKey) {
   }
 
   // ── XTZ card ──────────────────────────────────────────────────────────────
+  if (!isCurrent()) return;
   if (tezSlot?.tezosContractAddr) {
     try {
-      const auction = tezosAuction || _normalizeTezosAuction(await _tzktFetchAuction(tezSlot));
+      const auction = tezosAuction;
       if (auction) {
         hardCap = _setCrossChainPhase(auction.isPhased && !auction.holderOnly ? "public" : "holder");
         const noBids = !auction.highestBidder;
@@ -4504,8 +4616,8 @@ async function _ccPopulateChooserPrices(pairKey) {
   // no such contract) goes back to blank rather than a stuck "…".
   const _clearIfIdle = (pending, priceEl, subEl) => {
     if (!pending && priceEl && priceEl.textContent === "\u2026") {
-      priceEl.textContent = "";
-      if (subEl) subEl.textContent = "";
+      priceEl.textContent = "Unavailable";
+      if (subEl) subEl.textContent = "Could not load auction data. Retry when connected.";
     }
   };
   _clearIfIdle(ethPending, ethPriceEl, ethSubEl);
@@ -5723,6 +5835,17 @@ function _tezosRpcForSlot(slot = _activeCfg()) {
     || (slot?.tezosNetwork === "ghostnet" ? "https://rpc.ghostnet.teztnets.com" : "https://rpc.tzkt.io/mainnet");
 }
 
+function _tezosRpcUrlsForSlot(slot = _activeCfg()) {
+  const defaults = _tezosNetworkForSlot(slot) === "mainnet"
+    ? ["https://mainnet.smartpy.io", "https://rpc.tzbeta.net"]
+    : [];
+  return [...new Set([slot?.tezosRpcUrl, ...(Array.isArray(slot?.tezosRpcUrls) ? slot.tezosRpcUrls : []),
+    ...defaults, _tezosRpcForSlot(slot)].filter(Boolean))].filter(url => {
+      try { const parsed = new URL(url); return parsed.protocol === "https:" && !parsed.username && !parsed.password; }
+      catch (_) { return false; }
+    });
+}
+
 function _tezosNetworkForSlot(slot = _activeCfg()) {
   return slot?.tezosNetwork === "ghostnet" ? "ghostnet" : "mainnet";
 }
@@ -6188,6 +6311,10 @@ function updateBidHint() {
 }
 
 function onBidInput() {
+  if (_auctionReadinessBlocked) {
+    document.getElementById("bid-btn").disabled = true;
+    return;
+  }
   const val     = parseFloat(document.getElementById("bid-input").value || "0");
   const isTezos = _slotChain(_activeCfg()) === "tezos";
 
@@ -6264,10 +6391,10 @@ function setEligibilityChecking(detail = "Checking wallet eligibility on-chain..
 }
 
 function withTimeout(promise, ms, message) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms))
-  ]);
+  let timer;
+  return Promise.race([promise, new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  })]).finally(() => clearTimeout(timer));
 }
 
 function _unwrapTezosOption(value) {
@@ -6351,7 +6478,13 @@ function _normalizeTezosAuction(raw) {
 //   1. auctions field is a bigmap (TzKT returns it as an integer ID) → use /bigmaps/{id}/keys/{auctionId}
 //   2. auctions field is an inline object/map → index directly
 //   3. flat single-auction contract → storage is the auction record
-async function _tzktFetchAuction(slot) {
+async function _tzktFetchAuction(slot, signal) {
+  if (!signal) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    try { return await _tzktFetchAuction(slot, controller.signal); }
+    finally { clearTimeout(timer); }
+  }
   if (!slot?.tezosContractAddr) throw new Error("Tezos contract not configured.");
   const auctionId = Number(slot.tezosAuctionId || 0);
   const network   = _tezosNetworkForSlot(slot);
@@ -6359,7 +6492,7 @@ async function _tzktFetchAuction(slot) {
   const addr      = encodeURIComponent(slot.tezosContractAddr);
 
   // Step 1: fetch contract storage
-  const storageRes = await fetch(`${base}/v1/contracts/${addr}/storage`);
+  const storageRes = await fetch(`${base}/v1/contracts/${addr}/storage`, { signal });
   if (!storageRes.ok) throw new Error(`TzKT storage ${storageRes.status}`);
   const storage = await storageRes.json();
 
@@ -6370,7 +6503,7 @@ async function _tzktFetchAuction(slot) {
     // Bigmap: TzKT represents it as a plain integer (the bigmap ID)
     if (typeof auc === "number" || typeof auc === "string" && /^\d+$/.test(auc)) {
       const bigmapId = Number(auc);
-      const keyRes   = await fetch(`${base}/v1/bigmaps/${bigmapId}/keys/${auctionId}`);
+  const keyRes   = await fetch(`${base}/v1/bigmaps/${bigmapId}/keys/${auctionId}`, { signal });
       if (!keyRes.ok) throw new Error(`TzKT bigmap key ${keyRes.status}`);
       const keyData  = await keyRes.json();
       return keyData?.value ?? null;
@@ -6388,7 +6521,17 @@ async function _tzktFetchAuction(slot) {
   throw new Error("Could not resolve auction record from TzKT storage.");
 }
 
-async function _readTezosAuction(slot = _activeCfg()) {
+const _tezosReadsInFlight = new Map();
+function _readTezosAuction(slot = _activeCfg()) {
+  const key = JSON.stringify([_tezosNetworkForSlot(slot), slot?.tezosContractAddr,
+    slot?.tezosAuctionId, _tezosRpcUrlsForSlot(slot)]);
+  if (_tezosReadsInFlight.has(key)) return _tezosReadsInFlight.get(key);
+  const pending = _readTezosAuctionUncached(slot).finally(() => _tezosReadsInFlight.delete(key));
+  _tezosReadsInFlight.set(key, pending);
+  return pending;
+}
+
+async function _readTezosAuctionUncached(slot) {
   // Try fast TzKT path first
   try {
     const rec = await _tzktFetchAuction(slot);
@@ -6398,16 +6541,34 @@ async function _readTezosAuction(slot = _activeCfg()) {
   }
   // Fallback: Taquito RPC
   if (!window.taquito?.TezosToolkit) throw new Error("Taquito did not load.");
-  const Tezos    = tezosToolkit || new window.taquito.TezosToolkit(_tezosRpcForSlot(slot));
+  const urls = _tezosRpcUrlsForSlot(slot);
+  if (!urls.length) throw new Error("No valid Tezos RPC configured.");
+  try {
+    // Read-only clients never replace or retry the wallet's transaction client.
+    return await Promise.any(urls.map(url => withTimeout(
+      _readTezosAuctionRpc(slot, url), 7000, "Tezos RPC read timed out: " + url)));
+  } catch (e) {
+    console.warn("Tezos RPC backups failed:", e);
+    throw new Error("Tezos auction is unavailable. Check your connection and retry.");
+  }
+}
+
+async function _readTezosAuctionRpc(slot, url) {
+  const Tezos = new window.taquito.TezosToolkit(url);
   const contract = await Tezos.contract.at(slot.tezosContractAddr);
   if (contract.contractViews?.get_auction) {
-    return contract.contractViews.get_auction(Number(slot.tezosAuctionId || 0))
+    const record = await contract.contractViews.get_auction(Number(slot.tezosAuctionId || 0))
       .executeView({ viewCaller: slot.tezosContractAddr });
+    if (record != null) return record;
   }
   const storage = await contract.storage();
   const id      = Number(slot.tezosAuctionId || 0);
-  if (storage?.auctions?.get) return storage.auctions.get(id);
+  if (storage?.auctions?.get) {
+    const record = await storage.auctions.get(id);
+    if (record != null) return record;
+  }
   if (storage?.auctions?.[id] != null) return storage.auctions[id];
+  if (storage?.reserve_price != null || storage?.highest_bid != null) return storage;
   throw new Error("Could not read Tezos auction storage.");
 }
 
@@ -6781,6 +6942,7 @@ async function submitPrivateOffer() {
 }
 
 async function placeBid() {
+  if (_auctionReadinessBlocked) return;
   if (_slotChain(_activeCfg()) === "tezos") return placeTezosBid();
   if (!signer || !auctionContract) { notify("err","Not connected","Connect wallet first"); return; }
   const amt = document.getElementById("bid-input").value.trim();
@@ -6818,6 +6980,7 @@ async function placeBid() {
 // ─── Buy now ─────────────────────────────────────────────────────────────────
 
 async function placeTezosBid() {
+  if (_auctionReadinessBlocked) return;
   const slot = _activeCfg();
   if (!tezosWallet || !tezosToolkit || !tezosAddress) {
     notify("err", "Not connected", "Connect Tezos wallet first");
