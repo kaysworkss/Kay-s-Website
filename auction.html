@@ -439,7 +439,23 @@ body {
 .cc-choice-head { border-radius: var(--r) var(--r) 0 0; }
 .cc-choice .cc-lock-overlay, .cc-choice .cc-wait-overlay { border-radius: inherit; }
 @keyframes choice-gold-orbit { to { --choice-glow-angle: 360deg; } }
+.cc-choice.preparing::before, .cc-choice.preparing::after { animation-duration: 1.6s; opacity: 1; }
+.cc-choice.preparing-other { opacity: .35; }
+.cc-choice-btn { min-height: 44px; }
+.cc-choice.preparing .cc-choice-btn { display: flex; align-items: center; justify-content: center; gap: 7px; }
+.cc-preparing-spinner { flex: 0 0 12px; width: 12px; height: 12px; border: 1.5px solid rgba(221,172,65,.25); border-top-color: #ffe8a3; border-radius: 50%; animation: cc-spinner-turn .8s linear infinite; }
+.cc-bid-reveal { animation: cc-bid-enter .25s ease-out both; }
+@keyframes cc-spinner-turn { to { transform: rotate(360deg); } }
+@keyframes cc-bid-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@media (hover: hover) and (pointer: fine) {
+  #cc-chooser:has(.cc-choice:hover) .cc-choice:not(:hover):not(.preparing)::before,
+  #cc-chooser:has(.cc-choice:hover) .cc-choice:not(:hover):not(.preparing)::after {
+    opacity: 0;
+    animation-play-state: paused;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
+  .cc-preparing-spinner, .cc-bid-reveal { animation: none; }
   .cc-choice::before, .cc-choice::after { animation: none; }
   .cc-choice::before { background: rgba(201,153,58,.45); }
   .cc-choice::after { display: none; }
@@ -3117,8 +3133,46 @@ document.addEventListener("pointerover", ev => {
 });
 
 // Called when collector picks a chain (card or button).
-// This is the moment the 60-second no-bid window starts.
+// Preparation feedback starts immediately; the claim starts the no-bid window later.
 let _ccChoosing = false;
+function _ccPreparingFeedback(chain) {
+  const chosen = document.getElementById(chain === "tezos" ? "cc-xtz-choice" : "cc-eth-choice");
+  const other = document.getElementById(chain === "tezos" ? "cc-eth-choice" : "cc-xtz-choice");
+  const button = chosen?.querySelector(".cc-choice-btn");
+  const original = button?.innerHTML;
+  chosen?.classList.add("preparing");
+  chosen?.setAttribute("aria-busy", "true");
+  other?.classList.add("preparing-other");
+  if (button) button.innerHTML = '<span class="cc-preparing-spinner" aria-hidden="true"></span><span role="status" aria-live="polite">Preparing your bid...</span>';
+  const slowTimer = setTimeout(() => {
+    const label = button?.querySelector('[role="status"]');
+    if (label) label.textContent = `Still connecting to ${chain === "tezos" ? "Tezos" : "Ethereum"}...`;
+  }, 3000);
+  return () => {
+    clearTimeout(slowTimer);
+    chosen?.classList.remove("preparing");
+    chosen?.removeAttribute("aria-busy");
+    other?.classList.remove("preparing-other");
+    if (button) button.innerHTML = original;
+  };
+}
+
+async function _ccTransitionToBid() {
+  const chooser = document.getElementById("cc-chooser");
+  if (chooser?.animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const fade = chooser.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: "ease-out" });
+    await fade.finished.catch(() => {});
+  }
+  _ccHideChooser();
+  for (const id of ["countdown-section", "stats-grid", "bid-form"]) {
+    const section = document.getElementById(id);
+    if (!section) continue;
+    section.classList.remove("cc-bid-reveal");
+    void section.offsetWidth;
+    section.classList.add("cc-bid-reveal");
+  }
+}
+
 async function _ccChooseChain(chain) {
   if (_auctionReadinessBlocked) return;
   if (!_ccPairKey || _ccChoosing) return;
@@ -3138,15 +3192,14 @@ async function _ccChooseChain(chain) {
   const xtzBtn = document.querySelector("#cc-xtz-choice .cc-choice-btn");
   if (ethBtn) ethBtn.disabled = true;
   if (xtzBtn) xtzBtn.disabled = true;
+  const clearFeedback = _ccPreparingFeedback(chain);
 
-  // Start reading the Tezos auction now, in parallel with the claim call (or reuse a
-  // fresh read from hover / chooser load) so the bid panel isn't waiting on it later.
+  // Reuse a fresh read or prepare Tezos data before registering the claim.
   const tezPrefetch = (chain === "tezos" && slot?.tezosContractAddr) ? _ccTezosPrefetchFor(slot) : null;
 
   try {
     // Resolve data before reserving either chain's bidding window.
     if (tezPrefetch) {
-      if (xtzBtn) xtzBtn.textContent = "Preparing Tezos bid...";
       const raw = await tezPrefetch.promise;
       if (!_normalizeTezosAuction(raw)) throw new Error("Tezos auction data is unavailable. Please try again.");
       if (_auctionKeyForSlot(slot) !== aucKey || _ccPairKey !== _pairKeyForSlot(slot)) {
@@ -3165,7 +3218,7 @@ async function _ccChooseChain(chain) {
     if (_ccIsActiveBrowser && _ccClaimRow && _ccClaimRow.active_chain === chain) {
       // Swap chooser → bid panel *now*. Chain switching and data loading continue
       // in the background instead of holding the UI hostage.
-      _ccHideChooser();
+      await _ccTransitionToBid();
       _placeOfferSection("bid");
       _closeOfferPanel();
       const offerSection = document.getElementById("offer-section");
@@ -3209,7 +3262,7 @@ async function _ccChooseChain(chain) {
     if (xtzBtn) xtzBtn.disabled = false;
     notify("err", "Could not prepare bid", e?.message || "Please try again.");
   } finally {
-    if (xtzBtn) xtzBtn.textContent = "Start the Bid on Tezos";
+    clearFeedback();
     _ccChoosing = false;
   }
 }
