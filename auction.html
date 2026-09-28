@@ -524,6 +524,10 @@ body {
   border-radius: 1px; overflow: hidden; margin-bottom: 14px;
 }
 .cc-nobid-bar-wrap.show { display: block; }
+.cc-opening-prompt { display: none; align-items: baseline; gap: 10px; margin: 0 0 14px; color: var(--gold); font-size: .9rem; line-height: 1.5; }
+.cc-opening-prompt strong { flex-shrink: 0; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.cc-nobid-bar-wrap.show + .cc-opening-prompt { display: flex; }
+.cc-nobid-bar-wrap.show ~ #cc-status-banner.cc-waiting { display: none !important; }
 .cc-nobid-bar {
   height: 100%; background: var(--gold); border-radius: 1px; width: 100%;
 }
@@ -2326,6 +2330,10 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           <div class="cc-nobid-bar-wrap" id="cc-nobid-bar-wrap">
             <div class="cc-nobid-bar" id="cc-nobid-bar"></div>
           </div>
+          <div class="cc-opening-prompt">
+            <strong id="cc-opening-time" role="timer" aria-label="Time to place the opening bid">01:00</strong>
+            <span id="cc-opening-copy">Place the opening bid before both chains unlock.</span>
+          </div>
           <button class="cc-cancel-claim-btn" id="cc-cancel-claim-btn" onclick="_ccCancelClaim()">
             ← Back to chain selection
           </button>
@@ -2987,6 +2995,7 @@ function _ccSetWaitingState(claimRow) {
   document.querySelectorAll(".cc-wait-sub").forEach(el => el.textContent = subText);
 
   // Show the draining no-bid bar
+  _ccUpdateOpeningPrompt(resetAt, false);
   const barWrap = document.getElementById("cc-nobid-bar-wrap");
   const bar     = document.getElementById("cc-nobid-bar");
   if (barWrap) barWrap.classList.add("show");
@@ -3005,6 +3014,7 @@ function _ccSetWaitingState(claimRow) {
   // Tick the wait timers every second
   clearInterval(_ccWaitTickRef);
   _ccWaitTickRef = setInterval(() => {
+    _ccUpdateOpeningPrompt(resetAt, false);
     const rem = Math.max(0, Math.floor((resetAt - Date.now()) / 1000));
     const mm  = String(Math.floor(rem / 60)).padStart(2, "0");
     const ss  = String(rem % 60).padStart(2, "0");
@@ -3268,6 +3278,15 @@ async function _ccChooseChain(chain) {
 // Start the draining no-bid bar and update banner countdown every second.
 // Cancelled the moment _ccSignalBid fires (first bid confirmed).
 let _ccNoBidCountdownRef = null;
+function _ccUpdateOpeningPrompt(resetAt, active) {
+  const remaining = Math.max(0, Math.ceil((resetAt - Date.now()) / 1000));
+  const timer = document.getElementById("cc-opening-time");
+  const copy = document.getElementById("cc-opening-copy");
+  if (timer) timer.textContent = `${String(Math.floor(remaining / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`;
+  if (copy) copy.textContent = active
+    ? "Place the opening bid before both chains unlock."
+    : "Another collector is preparing a bid. Both chains unlock if time runs out.";
+}
 function _ccStartNoBidCountdown() {
   const barWrap = document.getElementById("cc-nobid-bar-wrap");
   const bar     = document.getElementById("cc-nobid-bar");
@@ -3281,6 +3300,7 @@ function _ccStartNoBidCountdown() {
     : Date.now() + 60000;
 
   if (barWrap) barWrap.classList.add("show");
+  _ccUpdateOpeningPrompt(resetAt, true);
   // Show "go back" button while the no-bid window is open
   const _cancelBtn    = document.getElementById("cc-cancel-claim-btn");
   const _cancelBtnBid = document.getElementById("cc-cancel-claim-btn-bid");
@@ -3306,6 +3326,7 @@ function _ccStartNoBidCountdown() {
       return;
     }
     // Update the countdown banner text
+    _ccUpdateOpeningPrompt(resetAt, true);
     _renderCcBanner();
     // Local clock passed expiry — reset immediately without waiting for a poll
     if (Date.now() >= resetAt) {
