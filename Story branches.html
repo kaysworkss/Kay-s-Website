@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Story branches</title>
+<link href="https://fonts.googleapis.com/css2?family=Literata:wght@400;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{color-scheme:light dark;--bg:#eef0f3;--panel:#fff;--ink:#1d2330;--muted:#667085;--line:#cfd5df;--field:#f7f8fa;--accent:#2f5bd8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#13161d;--panel:#1d222c;--ink:#e7e9ee;--muted:#9aa3b2;--line:#323a48;--field:#151921;--accent:#6c8cff}}
+:root[data-theme="dark"]{--bg:#13161d;--panel:#1d222c;--ink:#e7e9ee;--muted:#9aa3b2;--line:#323a48;--field:#151921;--accent:#6c8cff}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,sans-serif;display:flex;flex-direction:column}
+button{font:inherit;font-size:13px;padding:7px 12px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+#bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+#bar h1{margin:0;font:600 17px Literata,Georgia,serif}
+#stats{color:var(--muted);font-size:13px}
+#sync{color:var(--muted);font-size:12px}
+.sp{flex:1}
+#hint{flex-basis:100%;margin:0;font-size:12px;color:var(--muted)}
+#wrap{flex:1;min-height:0;overflow:auto}
+#canvas{position:relative;min-width:2400px;min-height:1600px}
+#lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.node{position:absolute;width:260px;box-sizing:border-box;background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--c);border-radius:8px;padding:6px 10px 10px}
+.grip{padding:4px 0;font-size:12px;font-weight:600;color:var(--c);cursor:grab;touch-action:none;user-select:none}
+.fmt{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.fmt button{width:34px;padding:4px 0}
+.fmt button.on{background:var(--c);border-color:var(--c);color:#fff}
+.ed{width:100%;box-sizing:border-box;min-height:110px;max-height:320px;overflow:auto;resize:vertical;white-space:pre-wrap;word-break:break-word;font:16px/1.5 Literata,Georgia,serif;background:var(--field);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px}
+.ed:empty:before{content:attr(data-ph);color:var(--muted)}
+.pp{margin:0 0 .35em}
+.pp.h{font-size:1.25em;font-weight:700}
+.ed h2{font-size:1.2em;margin:.2em 0}
+.fmt button.open{width:auto;margin-left:auto;padding:4px 10px}
+.fmt button.openst{width:auto;padding:4px 10px}
+.linking .node *{pointer-events:none}
+.linking .node{cursor:pointer;outline:2px dashed var(--c);outline-offset:2px}
+.linking .node.src{outline-style:solid}
+#linkmsg{flex-basis:100%;margin:0;display:flex;align-items:center;gap:8px;font-size:13px}
+#doc,#story{position:fixed;inset:0;z-index:8;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+#dbar,#sbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+#dtitle,#stitle{font:600 16px Literata,Georgia,serif;color:var(--c)}
+#dcount,#scount{color:var(--muted);font-size:13px}
+#dtool,#stool{display:flex;gap:4px;overflow-x:auto;padding:6px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+#dtool button,#stool button{flex:none;min-width:34px}
+#dtool button.on,#stool button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+#dpage,#spage{flex:1;overflow:auto;padding:16px 8px}
+#dEd{max-width:760px;min-height:100%;margin:0 auto;box-sizing:border-box;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:28px 24px;font:17px/1.7 Literata,Georgia,serif;outline:none;white-space:pre-wrap;word-break:break-word}
+#dEd:empty:before{content:attr(data-ph);color:var(--muted)}
+#dEd h2{font-size:1.5em;margin:.2em 0}
+.foot{display:flex;justify-content:space-between;gap:8px;margin:6px 0;font-size:12px;color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:6px}
+.row button{flex:1 1 auto;padding:7px 6px}
+.branch{background:var(--c);border-color:var(--c);color:#fff}
+#panel,#chars{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);box-sizing:border-box;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;padding:calc(12px + env(safe-area-inset-top,0px)) 14px calc(12px + env(safe-area-inset-bottom,0px));z-index:5}
+#phead,#chead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+#phead h2,#chead h2{margin:0;font:600 17px Literata,Georgia,serif}
+#vers{flex:1;overflow:auto}
+.ver h3{display:flex;align-items:center;gap:6px;margin:0 0 4px;font-size:14px}
+.chip{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--c)}
+.ver .pre{margin:0 0 16px;font:14px/1.5 Literata,Georgia,serif}
+#acts{display:flex;flex-wrap:wrap;gap:8px;padding-top:8px;border-top:1px solid var(--line)}
+#note,#status{flex-basis:100%;margin:0;font-size:12px;color:var(--muted)}
+#chars{z-index:9}
+#dchips,#schips{display:contents}
+#dchips button,#schips button{white-space:nowrap;border-style:dashed}
+#sparts{max-width:760px;margin:0 auto}
+.sp{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--c);border-radius:4px;margin-bottom:14px}
+.sph{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:600;color:var(--c);padding:8px 14px 0}
+.sed{padding:6px 14px 14px;min-height:3em;font:17px/1.7 Literata,Georgia,serif;outline:none;white-space:pre-wrap;word-break:break-word}
+.sed:empty:before{content:attr(data-ph);color:var(--muted)}
+.sed h2{font-size:1.5em;margin:.2em 0}
+#clist{overflow:auto;margin-bottom:10px}
+.cnote{font-size:12px;color:var(--muted);margin:0 0 10px}
+.crow{display:flex;gap:6px;margin-bottom:8px}
+.crow input{min-width:0;padding:7px 8px;border-radius:6px;border:1px solid var(--line);background:var(--field);color:var(--ink);font-size:16px}
+.crow .ck{width:64px;flex:none}
+.crow .cname{flex:1}
+dialog.choice{max-width:560px;max-height:80vh;overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);padding:20px}dialog::backdrop{background:#0006}.choices{display:grid;gap:8px;margin:16px 0}.choices button{text-align:left}.ver{padding:10px 0;border-bottom:1px solid var(--line)}.ver label{cursor:pointer}button:disabled{opacity:.5;cursor:default}#loginForm{display:grid;gap:12px}#loginForm label{display:grid;gap:4px}#loginForm input{font:inherit;padding:9px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--ink)}#accountDialog{width:min(420px,85vw)}#accountStatus{overflow-wrap:anywhere}</style>
+</head>
+<body>
+<header id="bar">
+  <h1>Story branches</h1>
+  <span id="stats"></span>
+  <span id="sync" role="status" aria-live="polite"></span>
+  <button id="accountBtn">Sign in</button><button id="retrySync" hidden>Retry sync</button><button id="publishLocal" hidden>Sync this local project</button><button id="guestProject" hidden>Open device-only project</button>
+  <dialog id="accountDialog" class="choice"><h2>Story account</h2>
+    <p>Use the same email and password on every device. Your story is private to your Firebase account.</p>
+    <form id="loginForm"><label>Email <input id="loginEmail" type="email" autocomplete="username" required></label>
+    <label>Password <input id="loginPassword" type="password" autocomplete="current-password" required></label>
+    <button id="loginSubmit" class="pri" type="submit">Sign in</button><button id="resetPassword" type="button">Reset password</button></form>
+    <p id="accountStatus" role="status" aria-live="polite"></p><button id="logout" hidden>Sign out</button><button id="closeAccount">Close</button>
+  </dialog>
+  <span class="sp"></span>
+  <button id="charBtn">Characters</button><button id="tidyBtn">Tidy layout</button><button id="freeBtn">+ Free node</button><button id="openBtn">+ Opening</button>
+  <button id="exportBtn" class="pri">Preview &amp; export</button>
+  <button id="backupBtn">Backup project</button><button id="importBtn">Import backup</button><button id="recoverBtn" hidden>Restore previous</button><input id="importFile" type="file" accept=".json,application/json" hidden><button id="resetBtn">Reset</button><p id="backupStatus" role="status" aria-live="polite" style="flex-basis:100%;margin:0;font-size:13px"></p>
+  <p id="hint">Each color is a storyline. Write unconnected ideas with Free node, then choose Attach to storyline. Insert before/after keeps the current storyline. Branch lets you resume an earlier coloured storyline after shared parts, insert a part, or start a new branch. Preview & export lets you select versions. Tap Open for the full document editor. Tap Link, then another box, to share one part between storylines. Drag a box by its title. Parts flow from top to bottom, and Tidy layout re-flows the whole map. Use Characters to give speakers a short code, like A: for Ade, and exports will show the full name. Tap Storyline to edit all the parts of one storyline in a single window.</p>
+<p id="linkmsg" hidden><span id="lm"></span><button id="lc">Cancel</button></p>
+</header>
+<main id="wrap"><div id="canvas"><svg id="lines"></svg></div></main>
+<section id="doc" hidden>
+  <div id="dbar"><button id="dback" class="pri">Back to boxes</button><span id="dtitle"></span><span id="dcount"></span><span class="sp"></span><button id="dchars">Characters</button><button id="dstory">Storyline</button><button id="dbackup">Backup project</button><button id="dbefore">Insert before</button><button id="dafter">Insert after</button><button id="dprev">Previous part</button><button id="dnext">Next part</button></div>
+  <div id="dtool"><button data-c="bold"><b>B</b></button><button data-c="italic"><i>I</i></button><button data-c="underline"><u>U</u></button><button data-c="h2">Heading</button><button data-c="justifyLeft">Left</button><button data-c="justifyCenter">Center</button><button data-c="justifyRight">Right</button><button data-c="undo">Undo</button><button data-c="redo">Redo</button><span id="dchips"></span></div>
+  <div id="dpage"><div id="dEd" contenteditable="true"></div></div>
+</section>
+<section id="story" hidden>
+  <div id="sbar"><button id="sback" class="pri">Back to boxes</button><span id="stitle"></span><span id="scount"></span><span class="sp"></span><button id="schars">Characters</button></div>
+  <div id="stool"><button data-c="bold"><b>B</b></button><button data-c="italic"><i>I</i></button><button data-c="underline"><u>U</u></button><button data-c="h2">Heading</button><button data-c="justifyLeft">Left</button><button data-c="justifyCenter">Center</button><button data-c="justifyRight">Right</button><button data-c="undo">Undo</button><button data-c="redo">Redo</button><span id="schips"></span></div>
+  <div id="spage"><div id="sparts"></div></div>
+</section>
+<aside id="chars" hidden>
+  <div id="chead"><h2>Characters</h2><button id="cclose">Close</button></div>
+  <p class="cnote">Give each speaker a short code. Start a line with the code and a colon, like A: did this. The preview and exports show the full name instead, like Ade: did this.</p>
+  <label class="cnote"><input type="checkbox" id="cbold"> Bold speaker names in the preview and exports</label>
+  <div id="clist"></div><p id="cempty" class="cnote">No characters yet.</p>
+  <button id="cadd" class="pri">+ Add character</button>
+</aside>
+<aside id="panel" hidden>
+  <div id="phead"><h2>Versions</h2><button id="closeBtn">Close</button></div>
+  <p>Tick the versions you want to export. Free drafts are excluded.</p><div class="row"><button id="selectAll">Select all</button><button id="selectNone">Clear selection</button></div><p id="selectionCount" aria-live="polite"></p><div id="vers"></div>
+  <div id="acts">
+    <button id="docx" class="pri" hidden>Save as Word</button>
+    <button id="txt" hidden>Save as text</button>
+    <p id="note" hidden>Saving files isn't available in this view. Copy the text above instead.</p>
+    <p id="status"></p>
+  </div>
+</aside>
+<script>
+const PAL=["#c2570c","#177e6f","#6d4aff","#c42b8a","#2563c9","#6b7f10","#b42318","#0e7490"];
+let S={nodes:{},next:1,col:1},V=[],DL=null,DLdone=false,LF=null,DID=null,SID=null,SED=null,SLAB="";
+const els={},$=id=>document.getElementById(id);
+const GX=300,STEP=410,ROW=n=>(els[n.id]?.offsetHeight||320)+90;
+const wc=t=>{t=t.trim();return t?t.split(/\s+/).length:0};
+const col=n=>PAL[n.color%PAL.length];
+const clone=o=>JSON.parse(JSON.stringify(o)),sig=n=>JSON.stringify(Object.fromEntries(Object.keys(n).filter(k=>k!="t").sort().map(k=>[k,n[k]])));
+// Firebase records are isolated by Authentication UID. No password is stored by this app.
+let COL=null,SYNC=false,PEND=0,tm,pushing=false,CM=null,SYNC_C='[[],false]',DC=0;
+const SYN={},DIRTY={},DEL={};
+let FB=null,AUTH=null,DB=null,USER=null,storageKey='storyBranches',generation=0,unsubscribe=null;
+// Reopen the last account's local copy even if the Firebase CDN is unavailable offline.
+// Authentication still decides which UID may connect; caches never migrate between accounts.
+try{const uid=localStorage.getItem('storyBranches:lastUid');if(uid)storageKey='storyBranches:firebase:'+uid}catch(e){}
+let latestSnapshot=null,ready=false,lastClock=0,loadingSDK=null,localStorageFailed=false;
+const firebaseConfig={apiKey:'AIzaSyDKJKLN0QwlZVp6fXs0ejV8iB54P91KCfQ',authDomain:'script-writing-35561.firebaseapp.com',projectId:'script-writing-35561',storageBucket:'script-writing-35561.firebasestorage.app',messagingSenderId:'788720046897',appId:'1:788720046897:web:c3318bf33e66ec8d3a9610',measurementId:'G-M15TDPVRYB'};
+const tick=()=>lastClock=Math.max(Date.now(),lastClock+1);
+function setSync(t){$('sync').textContent=t+(localStorageFailed?' · Local storage unavailable: download a backup.':'')}
+function hasPending(){return Object.keys(DIRTY).length||Object.keys(DEL).length||DC}
+function ls(){
+  S._pending={dirty:{...DIRTY},deleted:{...DEL},chars:DC};
+  try{localStorage.setItem(storageKey,JSON.stringify(S));localStorageFailed=false}
+  catch(e){localStorageFailed=true;setSync('Local save failed — download a backup')}
+}
+function seedTracking(){
+  for(const bag of [SYN,DIRTY,DEL])for(const id in bag)delete bag[id];
+  for(const [id,n] of Object.entries(S.nodes)){SYN[id]=sig(n);lastClock=Math.max(lastClock,n.t||0)}
+  Object.assign(DIRTY,S._pending?.dirty||{});Object.assign(DEL,S._pending?.deleted||{});
+  DC=S._pending?.chars||0;SYNC_C=JSON.stringify([S.chars||[],!!S.boldNames]);lastClock=Math.max(lastClock,S.ct||0);
+}
+function save(){
+  for(const [id,n] of Object.entries(S.nodes))if(SYN[id]!==sig(n)){
+    n.t=tick();DIRTY[id]=n.t;delete DEL[id];SYN[id]=sig(n);
+  }
+  for(const id in SYN)if(!S.nodes[id]){DEL[id]=tick();delete DIRTY[id];delete SYN[id]}
+  const chars=JSON.stringify([S.chars||[],!!S.boldNames]);
+  if(chars!==SYNC_C){S.ct=tick();DC=S.ct;SYNC_C=chars}
+  ls();if(SYNC&&hasPending())schedule();
+}
+function schedule(){clearTimeout(tm);tm=setTimeout(push,1200);setSync(navigator.onLine?'Saving to cloud…':'Offline · changes saved on this device')}
+function stopSync(){generation++;clearTimeout(tm);unsubscribe?.();unsubscribe=null;SYNC=false;ready=false;latestSnapshot=null;pushing=false}
+function syncError(e){
+  const code=e?.code||'connection-error';
+  const reason=code.includes('permission-denied')?'Check the Firestore security rules for this account.':code.includes('resource-exhausted')?'Firestore quota has been reached.':code.includes('invalid-argument')?'A story part may be too large. Split it into smaller parts.':'Check your connection and Firebase setup.';
+  setSync('Cloud sync paused ('+code+'). '+reason+' Changes kept locally.');$('retrySync').hidden=false;
+}
+function accountUI(){
+  $('accountBtn').textContent=USER?'Account: '+(USER.email||'signed in'):'Sign in';
+  $('loginForm').hidden=!!USER;$('logout').hidden=!USER;
+  $('publishLocal').hidden=!USER||!(S.localOnly||importedLocally);
+  $('guestProject').hidden=!USER;
+  if(USER)$('accountStatus').textContent='Signed in as '+USER.email;
+}
+function resetView(){
+  DID=null;SID=null;SED=null;V=[];PEND=0;setLF(null);
+  for(const id of ['doc','story','panel','chars'])$(id).hidden=true;
+  render();refreshChips();
+  try{$('recoverBtn').hidden=!localStorage.getItem(RECOVERY_KEY)}catch(e){}
+}
+function editing(){const a=document.activeElement;return a&&(a.isContentEditable||a.closest?.('#chars'))}
+function graphReady(){return Object.values(S.nodes).every(n=>[n.parentId,...(n.ups||[]),...(n.children||[])].filter(Boolean).every(id=>S.nodes[id]))}
+function refresh(){
+  if(editing()){PEND=1;return}PEND=0;
+  if(!graphReady()){setSync('Receiving connected story parts…');return}
+  if(SID){if(SID.every(i=>S.nodes[i]))openStory(SID);else closeStory()}
+  else if(DID){if(!S.nodes[DID])closeDoc();else{dEd.innerHTML=clean(S.nodes[DID].html);counts()}}
+  else render();
+  refreshChips();if(!$('chars').hidden)renderChars();
+}
+function decodeRecord(d){
+  const r=d.data();if(!Number.isSafeInteger(r.t)||r.t<0)throw Error('Invalid cloud timestamp');
+  if(r.deleted)return {id:d.id,t:r.t,deleted:true};
+  const n=JSON.parse(r.payload);
+  if(d.id==='_chars')return {id:d.id,t:r.t,list:okChars(n.list),bold:!!n.bold};
+  if(n.id!==d.id||!/^n[a-zA-Z0-9_-]+$/.test(d.id)||!Array.isArray(n.children)||!Array.isArray(n.ups))throw Error('Invalid cloud story part');
+  n.html=safeBackupHTML(n.html||'');return {id:d.id,t:r.t,node:fix({...n,t:r.t})};
+}
+function onSnap(snap){
+  if(!SYNC||S.localOnly)return;
+  if(editing()){latestSnapshot=snap;PEND=1;return}
+  let changed=false;
+  try{
+    // Decode everything first: a malformed record must not partially replace the story.
+    const records=snap.docs.map(decodeRecord);
+    for(const r of records){
+      lastClock=Math.max(lastClock,r.t);
+      if(r.id==='_chars'){
+        if(r.t>(S.ct||0)||(!DC&&r.t===(S.ct||0))){S.chars=r.list;S.boldNames=r.bold;S.ct=r.t;DC=0;SYNC_C=JSON.stringify([S.chars,!!S.boldNames]);changed=true}
+        continue;
+      }
+      const localT=Math.max(S.nodes[r.id]?.t||0,DEL[r.id]||0);
+      if(r.t<localT||(r.t===localT&&(DIRTY[r.id]||DEL[r.id])))continue;
+      if(r.deleted){if(S.nodes[r.id]){delete S.nodes[r.id];changed=true}delete SYN[r.id]}
+      else{if(!S.nodes[r.id]||sig(S.nodes[r.id])!==sig(r.node)){S.nodes[r.id]=r.node;changed=true}SYN[r.id]=sig(r.node)}
+      delete DIRTY[r.id];delete DEL[r.id];
+    }
+    // Concurrent deletion wins over links to the deleted part, without breaking the canvas.
+    const gone=new Set(records.filter(r=>r.deleted&&!S.nodes[r.id]).map(r=>r.id));
+    let repaired=false;
+    for(const n of Object.values(S.nodes)){
+      const before=sig(n);n.children=n.children.filter(id=>!gone.has(id));n.ups=n.ups.filter(id=>!gone.has(id));
+      if(gone.has(n.parentId))n.parentId=n.ups.shift()||null;
+      if(n.continuations)for(const [origin,next] of Object.entries(n.continuations))if(gone.has(origin)||gone.has(next))delete n.continuations[origin];
+      if(before!==sig(n))repaired=true;
+    }
+    if(repaired){save();changed=true}
+    // A new account starts with one opening only after the server confirms it is empty.
+    if(!snap.metadata.fromCache&&!records.length&&!Object.keys(S.nodes).length){mk(null,40,40);save();changed=true}
+    ls();if(changed)refresh();
+    if(!snap.metadata.fromCache){ready=true;$('retrySync').hidden=true;if(hasPending())schedule();else setSync('Synced · '+USER.email)}
+    else setSync('Connecting · local copy available');
+  }catch(e){syncError(e)}
+}
+function connectSync(){
+  if(!USER||!FB||S.localOnly)return;
+  stopSync();const token=generation;SYNC=true;setSync('Connecting to your cloud story…');
+  COL=FB.collection(DB,'users',USER.uid,'stories','main','records');
+  unsubscribe=FB.onSnapshot(COL,{includeMetadataChanges:true},snap=>{if(token===generation)onSnap(snap)},e=>{if(token===generation){ready=false;syncError(e)}});
+}
+async function push(){
+  if(!SYNC||!ready||pushing||!USER||S.localOnly)return;
+  if(!navigator.onLine){setSync('Offline · changes saved on this device');return}
+  const token=generation,collection=COL;pushing=true;
+  const jobs=[];
+  for(const id of Object.keys(DIRTY))if(S.nodes[id])jobs.push({id,t:DIRTY[id],deleted:false,payload:JSON.stringify(S.nodes[id])});
+  for(const id of Object.keys(DEL))jobs.push({id,t:DEL[id],deleted:true,payload:''});
+  if(DC)jobs.push({id:'_chars',t:DC,deleted:false,payload:JSON.stringify({list:S.chars||[],bold:!!S.boldNames})});
+  try{
+    // Read-before-write transactions prevent a stale/offline client from overwriting a newer timestamp.
+    for(let start=0;start<jobs.length;){
+      if(token!==generation)return;
+      const chunk=[];let bytes=0;
+      while(start<jobs.length&&chunk.length<200){
+        const r=jobs[start],size=new TextEncoder().encode(r.payload).length;
+        if(size>800000)throw Object.assign(Error('Story part too large'),{code:'invalid-argument'});
+        if(chunk.length&&bytes+size>6000000)break;
+        chunk.push(r);bytes+=size;start++;
+      }
+      const conflicted=await FB.runTransaction(DB,async tx=>{
+        const refs=chunk.map(r=>FB.doc(collection,r.id)),docs=await Promise.all(refs.map(ref=>tx.get(ref)));
+        if(token!==generation)throw Error('Account changed');
+        let conflict=false;
+        chunk.forEach((r,i)=>{if(!docs[i].exists()||r.t>docs[i].data().t)tx.set(refs[i],r);else if(JSON.stringify(docs[i].data())!==JSON.stringify(r))conflict=true});
+        return conflict;
+      });
+      if(token!==generation)return;
+      for(const r of chunk){if(r.id==='_chars'){if(DC===r.t)DC=0}else if(r.deleted){if(DEL[r.id]===r.t)delete DEL[r.id]}else if(DIRTY[r.id]===r.t)delete DIRTY[r.id]}
+      ls();
+      if(conflicted){const snap=await FB.getDocsFromServer(collection);if(token!==generation)return;onSnap(snap)}
+    }
+    // Re-apply the latest snapshot after acknowledgements, including equal-timestamp winners.
+    if(latestSnapshot&&!editing()){const snap=latestSnapshot;latestSnapshot=null;onSnap(snap)}
+    if(hasPending())schedule();else setSync('Synced · '+USER.email);
+  }catch(e){if(token===generation){syncError(e);if(!String(e.code).includes('permission-denied')&&!String(e.code).includes('invalid-argument'))tm=setTimeout(push,8000)}}
+  finally{if(token===generation)pushing=false}
+}
+async function accountChanged(user){
+  save();stopSync();USER=user;storageKey=user?'storyBranches:firebase:'+user.uid:'storyBranches';RECOVERY_KEY=RECOVERY_KEY_BASE+(user?':'+user.uid:'');
+  try{if(user)localStorage.setItem('storyBranches:lastUid',user.uid);else localStorage.removeItem('storyBranches:lastUid')}catch(e){}
+  S={nodes:{},next:1,col:1};load();importedLocally=!!S.localOnly;
+  if(!Object.keys(S.nodes).length&&!user)mk(null,40,40);
+  seedTracking();resetView();accountUI();
+  if(!user){setSync('Device-only project · sign in to sync');return}
+  if(S.localOnly){setSync('Imported project · saved on this device');return}
+  connectSync();
+}
+async function publishProject(){
+  if(!USER||pushing)return;
+  if(!confirm('Replace the cloud story for '+USER.email+' with this local project? This affects your other devices. Download a backup first if you need the current cloud version.'))return;
+  try{
+    const token=generation,collection=FB.collection(DB,'users',USER.uid,'stories','main','records');
+    const snap=await FB.getDocsFromServer(collection);if(token!==generation)return;
+    stopSync();seedTracking();
+    for(const d of snap.docs)lastClock=Math.max(lastClock,d.data().t||0);
+    for(const d of snap.docs)if(d.id!=='_chars'&&!S.nodes[d.id])DEL[d.id]=tick();
+    for(const [id,n] of Object.entries(S.nodes)){n.t=tick();DIRTY[id]=n.t;SYN[id]=sig(n)}
+    S.ct=tick();DC=S.ct;delete S.localOnly;importedLocally=false;ls();accountUI();connectSync();
+  }catch(e){syncError(e)}
+}
+function authMessage(e){
+  const messages={'auth/invalid-credential':'Email or password is incorrect.','auth/wrong-password':'Email or password is incorrect.','auth/user-not-found':'Email or password is incorrect.','auth/invalid-email':'Enter a valid email address.','auth/too-many-requests':'Too many attempts. Please try again later.','auth/network-request-failed':'Could not connect. Check your internet connection.','auth/operation-not-allowed':'Enable Email/Password in Firebase Authentication.','auth/unauthorized-domain':'Add this hostname to Firebase Authentication authorized domains.','auth/user-disabled':'This account has been disabled.'};
+  return messages[e.code]||'Sign-in error ('+(e.code||e.message)+').';
+}
+async function initSync(){
+  $('accountBtn').onclick=()=>{$('accountDialog').showModal();accountUI()};$('closeAccount').onclick=()=>$('accountDialog').close();
+  $('loginForm').onsubmit=async e=>{e.preventDefault();$('loginSubmit').disabled=true;try{await loadFirebase();await FB.signInWithEmailAndPassword(AUTH,$('loginEmail').value.trim(),$('loginPassword').value);$('loginPassword').value='';$('accountDialog').close()}catch(e){$('accountStatus').textContent=authMessage(e)}finally{$('loginSubmit').disabled=false}};
+  $('resetPassword').onclick=async()=>{try{if(!$('loginEmail').value.trim())throw {code:'auth/invalid-email'};await loadFirebase();await FB.sendPasswordResetEmail(AUTH,$('loginEmail').value.trim());$('accountStatus').textContent='If this email has an account, a password-reset email will arrive shortly.'}catch(e){$('accountStatus').textContent=authMessage(e)}};
+  $('logout').onclick=async()=>{try{save();await FB.signOut(AUTH);$('accountDialog').close()}catch(e){$('accountStatus').textContent=authMessage(e)}};
+  $('publishLocal').onclick=publishProject;
+  $('guestProject').onclick=()=>{try{const raw=localStorage.getItem('storyBranches');if(!raw)throw Error('No device-only project is saved here. Import a backup instead.');confirmImport(validateBackup({format:BACKUP_FORMAT,version:BACKUP_VERSION,project:JSON.parse(raw)}),'Device-only project')}catch(e){backupStatus(e.message)}};
+  $('retrySync').onclick=()=>{if(FB&&USER)connectSync();else loadFirebase().catch(syncError)};
+  accountUI();setSync('Local copy available · connecting to sign-in…');
+  try{await loadFirebase()}catch(e){setSync('Firebase unavailable · local editing and backups still work');$('retrySync').hidden=false}
+}
+function loadFirebase(){
+  if(loadingSDK)return loadingSDK;
+  loadingSDK=(async()=>{
+    if(location.protocol==='file:')throw Error('Host this file on https://kaysworks.com to sign in.');
+    const [app,auth,store]=await Promise.all([
+      import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js'),
+      import('https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js')
+    ]);
+    FB={...auth,...store};const instance=app.initializeApp(firebaseConfig);AUTH=auth.getAuth(instance);DB=store.getFirestore(instance);
+    await auth.setPersistence(AUTH,auth.browserLocalPersistence);
+    auth.onAuthStateChanged(AUTH,u=>{accountChanged(u).catch(syncError)},syncError);
+  })().catch(e=>{loadingSDK=null;throw e});return loadingSDK;
+}
+document.addEventListener('focusout',()=>setTimeout(()=>{if(editing())return;if(latestSnapshot){const snap=latestSnapshot;latestSnapshot=null;onSnap(snap)}else if(PEND)refresh()},300));
+document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(SYNC){clearTimeout(tm);push()}}});
+window.addEventListener('online',()=>{if(USER&&!S.localOnly)connectSync()});
+window.addEventListener('offline',()=>setSync('Offline · changes saved on this device'));
+window.addEventListener('beforeunload',()=>ls());
+
+function fix(n){n.ups=n.ups||[];n.children=n.children||[];n.num=n.num||parseInt(String(n.id).slice(1))||1;
+  if(n.html===undefined)n.html=esc(n.text||"").replace(/\n/g,"<br>");return n}
+function load(){try{const r=localStorage.getItem(storageKey);if(r){const d=JSON.parse(r);if(d&&d.nodes&&typeof d.nodes==="object"&&!Array.isArray(d.nodes)){S=d;for(const k in S.nodes)fix(S.nodes[k]);return true}}}catch(e){}return false}
+function pick(){const k={};Object.values(S.nodes).forEach(n=>k[n.color]=(k[n.color]||0)+1);let b=0;for(let i=1;i<PAL.length;i++)if((k[i]||0)<(k[b]||0))b=i;return b}
+function mk(pid,x,y){const id="n"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);let c=0;
+  if(pid){const p=S.nodes[pid];c=p.children.length?pick():p.color;p.children.push(id)}else if(Object.keys(S.nodes).length)c=pick();
+  const num=1+Math.max(0,...Object.values(S.nodes).map(n=>n.num||0));
+  S.nodes[id]={id,parentId:pid,x,y,text:"",html:"",ups:[],color:c,children:[],num,lay:2};return id}
+function insertPart(id,where,neighbor){
+  const n=S.nodes[id];
+  if(!n)throw new Error("Part no longer exists.");
+  const before=where==="before", options=before?ups(n):n.children;
+  if(options.length && !options.includes(neighbor))throw new Error("Choose an existing connection.");
+  const a=before?neighbor:id,b=before?id:neighbor;
+  const target=b?S.nodes[b]:null;
+  const y=target?target.y:n.y+ROW(n),x=target?target.x:n.x;
+  for(const m of Object.values(S.nodes))if(m.y>=y)m.y+=STEP;
+  const fresh=mk(null,x,y),f=S.nodes[fresh];
+  f.color=before?n.color:(target?target.color:n.color);if((target||n).branchOrigin)f.branchOrigin=(target||n).branchOrigin;
+  f.parentId=a||null;f.children=b?[b]:[];if(before&&!a&&n.detached){f.detached=true;n.detached=false}
+  if(a){
+    const p=S.nodes[a];
+    if(b){p.children=p.children.map(c=>c===b?fresh:c);remapContinuation(p,b,fresh)}
+    else p.children.push(fresh);
+  }
+  if(b){
+    const q=S.nodes[b];
+    if(!a||q.parentId===a)q.parentId=fresh;
+    else q.ups=q.ups.map(p=>p===a?fresh:p);
+  }
+  return fresh;
+}
+function finishInsert(id,where,neighbor){
+  const fresh=insertPart(id,where,neighbor);
+  setLF(null);save();render();
+  if(DID)openDoc(fresh);
+  else{
+    els[fresh].scrollIntoView({behavior:"smooth",block:"center",inline:"center"});
+    els[fresh].querySelector(".ed").focus({preventScroll:true});
+  }
+}
+function chooseInsert(id,where){
+  const n=S.nodes[id],choices=where==="before"?ups(n):n.children;
+  if(choices.length<2){finishInsert(id,where,choices[0]);return}
+  const dialog=document.createElement("dialog");
+  dialog.style.cssText="max-width:420px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);padding:20px";
+  const title=document.createElement("h2");title.textContent="Insert "+where+" "+lab(id);title.style.fontSize="18px";
+  const help=document.createElement("p");help.textContent="Choose the storyline connection for the new part.";
+  const list=document.createElement("div");list.style.cssText="display:grid;gap:8px";
+  const close=()=>{dialog.close();dialog.remove()};
+  choices.forEach(other=>{
+    const m=S.nodes[other],button=document.createElement("button");
+    button.style.textAlign="left";
+    button.textContent=(where==="before"?"From ":"To ")+lab(other)+(m.text.trim()?" — "+m.text.trim().slice(0,70):" (empty)");
+    button.onclick=()=>{close();finishInsert(id,where,other)};
+    list.append(button);
+  });
+  const cancel=document.createElement("button");cancel.textContent="Cancel";cancel.style.marginTop="16px";cancel.onclick=close;
+  dialog.append(title,help,list,cancel);dialog.addEventListener("cancel",()=>dialog.remove());
+  document.body.append(dialog);dialog.showModal();
+}
+const ups=n=>[n.parentId,...n.ups].filter(Boolean);
+function rm(id){const n=S.nodes[id];
+  ups(n).forEach(q=>{const m=S.nodes[q];if(m)m.children=m.children.filter(c=>c!==id)});
+  [...n.children].forEach(c=>{const m=S.nodes[c];if(!m)return;
+    if(m.parentId===id)m.parentId=m.ups.shift()||null;else m.ups=m.ups.filter(u=>u!==id);
+    if(!m.parentId)rm(c)});
+  delete S.nodes[id]}
+function reach(a,b,seen){seen=seen||{};if(a===b)return true;if(seen[a])return false;seen[a]=1;return S.nodes[a].children.some(c=>reach(c,b,seen))}
+const roots=()=>Object.values(S.nodes).filter(n=>!n.parentId&&!n.detached);
+function lab(id){const n=S.nodes[id];if(n.detached)return"Free draft "+n.num;if(n.parentId)return"Part "+n.num;const r=roots();return r.length>1?"Opening "+(r.indexOf(n)+1):"Opening"}
+
+const COLOR_NAMES=["Orange","Green","Purple","Pink","Blue","Olive","Red","Teal"];
+function routeNext(n,a){
+ const routes=Object.entries(n.continuations||{}).filter(([k,v])=>S.nodes[k]&&n.children.includes(v));
+ const match=[...a].reverse().map(m=>routes.find(([k])=>(k===m.id||k===m.branchOrigin)&&(S.nodes[k].parentId||!a.some((v,i)=>i>0&&((v.branchOrigin&&v.branchOrigin!==k)||(!v.ups.length&&v.color!==a[i-1].color)))))).find(Boolean);
+ if(match)return [match[1],...n.children.filter(c=>c!==match[1]&&S.nodes[c].explicitFork&&!routes.some(([,v])=>v===c))];
+ const reserved=new Set(routes.map(([,v])=>v));
+ return n.children.filter(c=>!reserved.has(c));
+}
+function paths(){const out=[];function walk(n,a){
+ if(a.some(m=>m.id===n.id))return;
+ a=[...a,n];const children=routeNext(n,a);
+ if(children.length)children.forEach(c=>{if(S.nodes[c])walk(S.nodes[c],a)});
+ else out.push(a);
+ }roots().forEach(r=>walk(r,[]));return out}
+function storyOrigins(id){
+ const found=new Map();
+ for(const path of paths()){
+  const end=path.findIndex(n=>n.id===id);if(end<0)continue;
+  path.slice(0,end+1).forEach((n,i)=>{
+   const p=path[i-1];
+   if(n.branchOrigin){const origin=S.nodes[n.branchOrigin];if(origin)found.set(origin.id,origin)}
+   else if(!p||(!n.ups.length&&n.color!==p.color))found.set(n.id,n);
+  });
+ }
+ return [...found.values()];
+}
+function continueStory(id,origin){
+ const n=S.nodes[id],o=S.nodes[origin];
+ if(!n||!o||!storyOrigins(id).some(m=>m.id===origin))throw Error("That storyline does not reach this part.");
+ const existing=n.continuations&&n.continuations[origin];
+ if(existing&&S.nodes[existing]&&n.children.includes(existing))return existing;
+ const x=n.children.length?Math.max(...n.children.map(c=>S.nodes[c].x))+GX:n.x;
+ const fresh=mk(id,x,n.y+ROW(n));
+ S.nodes[fresh].color=o.color;S.nodes[fresh].branchOrigin=origin;
+ n.continuations={...n.continuations,[origin]:fresh};return fresh;
+}
+function remapContinuation(n,oldId,newId){
+ if(n.continuations)for(const k of Object.keys(n.continuations))if(n.continuations[k]===oldId)n.continuations[k]=newId;
+}
+function arm(b,fn){if(b.dataset.a){fn();return}const t=b.textContent;b.dataset.a=1;b.textContent="Tap to confirm";setTimeout(()=>{delete b.dataset.a;b.textContent=t},3000)}
+function counts(){let tot=0;const P=paths();
+  for(const id in S.nodes){const n=S.nodes[id],e=els[id],w=wc(n.text);tot+=w;
+    if(DID===id)$("dcount").textContent=w+" words";
+    if(!e)continue;
+    e.querySelector(".wc").textContent=w+" words";
+    const q=P.filter(p=>p[p.length-1].id===id).map(p=>p.reduce((a,m)=>a+wc(m.text),0));
+    e.querySelector(".pw").textContent=!q.length?"":q.length==1?"Full path: "+q[0]+" words":q.length+" paths: "+Math.min(...q)+"–"+Math.max(...q)+" words"}
+  const L=P.length;$("stats").textContent=tot+" words · "+L+" version"+(L==1?"":"s")}
+function lines(){const s=$("lines");s.innerHTML="";
+  for(const id in S.nodes){const n=S.nodes[id],ne=els[id];if(!ne)continue;
+    ups(n).forEach((pid,k)=>{const p=S.nodes[pid],pe=els[pid];if(!p||!pe)return;
+      const x1=p.x+pe.offsetWidth/2,y1=p.y+pe.offsetHeight,x2=n.x+ne.offsetWidth/2,y2=n.y,m=(y1+y2)/2;
+      const a=document.createElementNS("http://www.w3.org/2000/svg","path");
+      a.setAttribute("d","M"+x1+" "+y1+"C"+x1+" "+m+" "+x2+" "+m+" "+x2+" "+y2);
+      a.setAttribute("stroke",k?col(p):col(n));a.setAttribute("stroke-width","3");a.setAttribute("fill","none");
+      if(k)a.setAttribute("stroke-dasharray","7 5");s.appendChild(a)})}}
+function drag(e,n){const g=e.querySelector(".grip");let sx,sy,ox,oy,on=false;
+  g.onpointerdown=ev=>{on=true;sx=ev.clientX;sy=ev.clientY;ox=n.x;oy=n.y;g.setPointerCapture(ev.pointerId)};
+  g.onpointermove=ev=>{if(!on)return;n.x=Math.max(0,ox+ev.clientX-sx);n.y=Math.max(0,oy+ev.clientY-sy);e.style.left=n.x+"px";e.style.top=n.y+"px";lines()};
+  g.onpointerup=g.onpointercancel=()=>{if(on){on=false;save()}}}
+function paras(h){const r=document.createElement("div");r.innerHTML=h;const out=[];let cur=[],bp={};
+  const fl=()=>{cur.h=bp.h;cur.al=bp.al;out.push(cur);cur=[]};
+  (function w(n,f){for(const c of n.childNodes){
+    if(c.nodeType==3){if(c.data)cur.push({t:c.data,...f})}
+    else if(c.nodeType==1){const g=c.tagName;if(g=="BR"){fl();continue}
+      const o={...f};if(g=="B"||g=="STRONG")o.b=1;if(g=="I"||g=="EM")o.i=1;if(g=="U")o.u=1;
+      const blk=/^(DIV|P|H[1-6])$/.test(g),ob=bp;
+      if(blk){if(cur.length)fl();const ta=c.style.textAlign;bp={h:/^H/.test(g)?1:ob.h,al:["left","center","right"].includes(ta)?ta:ob.al}}
+      w(c,o);if(blk){if(cur.length)fl();bp=ob}}}})(r,{});
+  if(cur.length||!out.length)fl();return out}
+function clean(h){const ps=paras(h||"");if(!ps.some(p=>p.length))return"";
+  return ps.map(p=>{const t=p.h?"h2":"div";return"<"+t+(p.al?' style="text-align:'+p.al+'"':"")+">"+(p.length?p.map(r=>{let s=esc(r.t);if(r.u)s="<u>"+s+"</u>";if(r.i)s="<i>"+s+"</i>";if(r.b)s="<b>"+s+"</b>";return s}).join(""):"<br>")+"</"+t+">"}).join("")}
+function nm(t){const m=t.match(/^([^\s:]{1,12})(\s*):/);if(!m)return null;
+  const c=(S.chars||[]).find(x=>x.n.trim()&&x.k&&x.k.toLowerCase()===m[1].toLowerCase());return c?{cut:m[1].length+m[2].length,n:c.n.trim()}:null}
+function expand(ps){return ps.map(p=>{const m=nm(p.map(r=>r.t).join(""));if(!m)return p;
+  let k=m.cut,f=null;const q=[];for(const r of p){if(k>0){f=f||r;if(r.t.length<=k){k-=r.t.length;continue}q.push({...r,t:r.t.slice(k)});k=0}else q.push(r)}
+  const o=[{...f,t:m.n,...(S.boldNames?{b:1}:{})},...q];o.h=p.h;o.al=p.al;return o})}
+const xp=h=>expand(paras(h)),xt=t=>t.split("\n").map(l=>{const m=nm(l);return m?m.n+l.slice(m.cut):l}).join("\n");
+function show(el,h){xp(h).forEach(p=>{const d=document.createElement("p");d.className="pp"+(p.h?" h":"");if(p.al)d.style.textAlign=p.al;if(!p.length)d.innerHTML="<br>";
+  p.forEach(r=>{const s=document.createElement("span");s.textContent=r.t;if(r.b)s.style.fontWeight=700;if(r.i)s.style.fontStyle="italic";if(r.u)s.style.textDecoration="underline";d.append(s)});el.append(d)})}
+function marks(){const a=document.activeElement;if(!a||!a.classList)return;
+  if(a.classList.contains("ed"))a.closest(".node").querySelectorAll(".fmt button[data-c]").forEach(b=>b.classList.toggle("on",document.queryCommandState(b.dataset.c)));
+  else if(a.id=="dEd"||a.classList.contains("sed"))$(a.id=="dEd"?"dtool":"stool").querySelectorAll("button").forEach(b=>{const c=b.dataset.c;b.classList.toggle("on",c=="h2"?document.queryCommandValue("formatBlock").toLowerCase()=="h2":/^(bold|italic|underline|justify)/.test(c)&&document.queryCommandState(c))})}
+document.addEventListener("selectionchange",marks);
+let nt;function note(t,keep){const m=$("linkmsg");$("lm").textContent=t;$("lc").hidden=!keep;m.hidden=false;clearTimeout(nt);if(!keep)nt=setTimeout(()=>{m.hidden=true},3500)}
+function setLF(v){LF=v;$("canvas").classList.toggle("linking",!!v);if(!v)$("linkmsg").hidden=true}
+function startLink(id){if(LF===id){setLF(null);render();return}
+  setLF(id);render();note("Linking from "+lab(id)+": tap the box that should come next.",1)}
+function doLink(a,b){const A=S.nodes[a],B=S.nodes[b];let m="";
+  if(B.detached&&!B.parentId){attachChoice(a,b);return} if(!B.parentId)m="The opening can't come after another part."; else if(floating(A))m="Attach the free draft to a storyline first.";
+  else if(A.children.includes(b))m="Those parts are already linked.";
+  else if(reach(b,a))m="That would loop the story back on itself.";
+  if(m){note(m,1);return}
+  A.children.push(b);B.ups.push(a);save();setLF(null);render();note("Linked. That part now appears in both storylines.")}
+$("lc").onclick=()=>{setLF(null);render()};
+const dEd=$("dEd");
+function openDoc(id){setLF(null);DID=id;const n=S.nodes[id];
+  $("dtitle").textContent=lab(id);$("doc").style.setProperty("--c",col(n));
+  dEd.innerHTML=clean(n.html);dEd.dataset.ph="Write this part of the story…";
+  $("dprev").disabled=!n.parentId;$("dnext").disabled=!n.children.length;
+  $("doc").hidden=false;$("dpage").scrollTop=0;refreshChips();counts()}
+function closeDoc(){DID=null;$("doc").hidden=true;render()}
+function dUpd(){const n=S.nodes[DID];if(!dEd.textContent)dEd.innerHTML="";n.html=dEd.innerHTML;n.text=dEd.innerText;save();counts()}
+dEd.oninput=dUpd;dEd.onpaste=ev=>{ev.preventDefault();document.execCommand("insertText",false,ev.clipboardData.getData("text/plain"))};
+$("dback").onclick=closeDoc;
+$("dbefore").onclick=()=>chooseInsert(DID,"before");
+$("dafter").onclick=()=>chooseInsert(DID,"after");
+$("dprev").onclick=()=>{const n=S.nodes[DID];if(n.parentId)openDoc(n.parentId)};
+$("dnext").onclick=()=>{const n=S.nodes[DID];if(n.children.length)openDoc(n.children[0])};
+$("dtool").querySelectorAll("button").forEach(b=>{b.onpointerdown=ev=>ev.preventDefault();b.onclick=()=>{dEd.focus();const c=b.dataset.c;
+  if(c=="h2")document.execCommand("formatBlock",false,document.queryCommandValue("formatBlock").toLowerCase()=="h2"?"<div>":"<h2>");else document.execCommand(c);dUpd();marks()}});
+function render(){const cv=$("canvas");
+  cv.querySelectorAll(".node").forEach(e=>e.remove());for(const k in els)delete els[k];
+  for(const id in S.nodes){const n=S.nodes[id],e=document.createElement("div");
+    e.className="node";e.style.cssText="left:"+n.x+"px;top:"+n.y+"px;--c:"+col(n);
+    e.innerHTML='<div class="grip">'+lab(id)+(n.ups.length?" · shared":"")+'</div><div class="fmt"><button data-c="bold"><b>B</b></button><button data-c="italic"><i>I</i></button><button data-c="underline"><u>U</u></button><button class="open">Open</button><button class="openst">Storyline</button></div><div class="ed" contenteditable="true"></div><div class="foot"><span class="wc"></span><span class="pw"></span></div><div class="row"><button class="ins-before">Insert before</button><button class="ins-after">Insert after</button></div><div class="row"><button class="branch">+ Branch</button><button class="lnk">Link</button>'+(n.ups.length?'<button class="unl">Unlink</button>':"")+(n.detached||n.parentId||roots().length>1?'<button class="del">Delete</button>':"")+'</div>';
+    const ed=e.querySelector(".ed"),upd=()=>{if(!ed.textContent)ed.innerHTML="";n.html=ed.innerHTML;n.text=ed.innerText;save();counts()};
+    ed.innerHTML=clean(n.html);ed.dataset.ph=n.detached?"Write a free draft — attach it whenever you are ready.":n.parentId?"Write this part of the story…":"Start your story here…";
+    ed.oninput=upd;ed.onpaste=ev=>{ev.preventDefault();document.execCommand("insertText",false,ev.clipboardData.getData("text/plain"))};
+    e.querySelectorAll(".fmt button[data-c]").forEach(b=>{b.onpointerdown=ev=>ev.preventDefault();b.onclick=()=>{ed.focus();document.execCommand(b.dataset.c);upd();marks()}});
+    e.querySelector(".branch").onclick=()=>branchChoice(id);
+    if(n.detached){const attach=document.createElement("button");attach.textContent="Attach to storyline";attach.onclick=()=>attachDraft(id);e.querySelector(".row").append(attach)}
+    e.querySelector(".ins-before").onclick=()=>chooseInsert(id,"before");
+    e.querySelector(".ins-after").onclick=()=>chooseInsert(id,"after");
+    e.querySelector(".lnk").onclick=()=>startLink(id);
+    const u=e.querySelector(".unl");if(u)u.onclick=()=>{const q=n.ups.pop();const m=S.nodes[q];m.children=m.children.filter(c=>c!==id);save();render();note("Unlinked.")};
+    e.querySelector(".open").onclick=()=>openDoc(id);
+    e.querySelector(".openst").onclick=()=>openStoryFor(id);
+    e.onclick=()=>{if(LF&&LF!==id)doLink(LF,id)};
+    if(LF===id)e.classList.add("src");if(LF)ed.setAttribute("contenteditable","false");
+    const d=e.querySelector(".del");if(d)d.onclick=()=>arm(d,()=>{rm(id);save();render()});
+    drag(e,n);cv.appendChild(e);els[id]=e;new ResizeObserver(lines).observe(e)}
+  cv.style.minWidth=Math.max(2400,...Object.values(S.nodes).map(n=>n.x+320))+"px";
+  cv.style.minHeight=Math.max(1600,...Object.values(S.nodes).map(n=>n.y+(els[n.id]?.offsetHeight||300)+60))+"px";
+  counts();lines()}
+function versions(){return paths().map((p,i)=>{const l=p[p.length-1],k=p.filter(m=>m.text.trim());return{n:i+1,color:col(l),parts:k.map(m=>m.html),plain:k.map(m=>m.text.trim()),words:p.reduce((a,m)=>a+wc(m.text),0)}})}
+function sync(){$("docx").hidden=!window.JSZip;$("txt").hidden=false;$("note").hidden=true;selectionChanged()}
+function openExport(){V=versions().map(v=>({...v,selected:false}));$("vers").innerHTML="";$("status").textContent="";
+  V.forEach(v=>{const d=document.createElement("div");d.className="ver";d.style.setProperty("--c",v.color);
+    const h=document.createElement("h3");h.innerHTML='<i class="chip"></i>';const label=document.createElement("label"),check=document.createElement("input");check.type="checkbox";check.checked=v.selected;check.onchange=()=>{v.selected=check.checked;selectionChanged()};label.append(check," Version "+v.n+" · "+v.words+" words");h.append(label);
+    const pre=document.createElement("div");pre.className="pre";if(v.parts.length)v.parts.forEach((x,k)=>{if(k)pre.append(document.createElement("br"));show(pre,x)});else pre.textContent="(empty)";d.append(h,pre);$("vers").append(d)});
+  $("panel").hidden=false;sync()}
+async function put(name,data){try{if(!selectedVersions().length)return;if(DL){await DL.save({filename:name,data})}else{const blob=data instanceof Blob?data:new Blob([data],{type:"text/plain;charset=utf-8"});const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}$("status").textContent="Saved "+name}
+  catch(e){$("status").textContent=e&&e.code==="declined"?"Save cancelled.":"Couldn't save the file ("+((e&&e.code)||"error")+")."}}
+const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function R(t,o){return"<w:r><w:rPr>"+(o.b?"<w:b/>":"")+(o.i?"<w:i/>":"")+(o.c?'<w:color w:val="'+o.c+'"/>':"")+(o.sz?'<w:sz w:val="'+o.sz+'"/>':"")+(o.u?'<w:u w:val="single"/>':"")+'</w:rPr><w:t xml:space="preserve">'+esc(t)+"</w:t></w:r>"}
+function P(t,o){return"<w:p>"+(o.pb?"<w:pPr><w:pageBreakBefore/></w:pPr>":"")+R(t,o)+"</w:p>"}
+async function saveDocx(){
+  if(!selectedVersions().length)return; const body=selectedVersions().map((v,i)=>P("Version "+v.n,{b:1,c:v.color.slice(1),sz:36,pb:i})+P(v.words+" words",{i:1,c:"666666"})+
+    v.parts.map((h,k)=>(k?"<w:p/>":"")+xp(h).map(q=>"<w:p>"+(q.al?'<w:pPr><w:jc w:val="'+q.al+'"/></w:pPr>':"")+q.map(r=>R(r.t,q.h?{...r,b:1,sz:32}:r)).join("")+"</w:p>").join("")).join("")).join("");
+  if(typeof JSZip==="undefined"){$("status").textContent="Word export library unavailable. Reconnect and reload, or use text export / Backup project.";return}const z=new JSZip(),H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  z.file("[Content_Types].xml",H+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+  z.file("_rels/.rels",H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+  z.file("word/document.xml",H+'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+body+"<w:sectPr/></w:body></w:document>");
+  put("story_versions.docx",await z.generateAsync({type:"blob"}))}
+$("openBtn").onclick=()=>{const x=Math.max(0,...Object.values(S.nodes).map(n=>n.x))+GX+20;mk(null,x,40);save();render();$("wrap").scrollTo(Math.max(0,x-20),0)};
+$("exportBtn").onclick=openExport;
+$("closeBtn").onclick=()=>{$("panel").hidden=true};
+$("docx").onclick=saveDocx;
+$("txt").onclick=()=>put("story_versions.txt",selectedVersions().map(v=>"===== VERSION "+v.n+" ("+v.words+" words) =====\n\n"+v.plain.map(xt).join("\n\n")).join("\n\n\n"));
+$("resetBtn").onclick=()=>arm($("resetBtn"),()=>{S={nodes:{},next:1,col:1,chars:S.chars,ct:S.ct,boldNames:S.boldNames,localOnly:S.localOnly};mk(null,40,40);save();render();$("panel").hidden=true});
+DLdone=true;
+
+function menu(title,description,items){
+ const d=document.createElement("dialog");d.className="choice";
+ const h=document.createElement("h2");h.textContent=title;
+ const p=document.createElement("p");p.textContent=description;
+ const list=document.createElement("div");list.className="choices";
+ const close=()=>{d.close();d.remove()};
+ items.forEach(item=>{const b=document.createElement("button");b.textContent=item.label;b.onclick=()=>{close();item.action()};list.append(b)});
+ const cancel=document.createElement("button");cancel.textContent="Cancel";cancel.onclick=close;
+ d.append(h,p,list,cancel);d.oncancel=()=>d.remove();document.body.append(d);d.showModal();
+}
+function partLabel(id){const n=S.nodes[id];return lab(id)+(n.text.trim()?" — "+n.text.trim().slice(0,80):" (empty)")}
+function floating(n,seen=new Set()){
+ if(!n||seen.has(n.id))return true;seen.add(n.id);
+ return n.parentId?floating(S.nodes[n.parentId],seen):!!n.detached;
+}
+function focusPart(id){save();render();els[id].scrollIntoView({block:"center",inline:"center"});els[id].querySelector(".ed").focus({preventScroll:true})}
+
+function branchChoice(id){
+ const n=S.nodes[id],origins=storyOrigins(id);
+ const choices=origins.map(o=>({
+  label:"Continue "+COLOR_NAMES[o.color%PAL.length]+" storyline (from "+lab(o.id)+")",
+  action:()=>focusPart(continueStory(id,o.id))
+ }));
+ if(n.children.length)choices.push(...n.children.map(c=>({label:"Insert before "+partLabel(c),action:()=>finishInsert(id,"after",c)})));
+ choices.push({label:"Start a new branch",action:()=>{
+  const x=n.children.length?Math.max(...n.children.map(c=>S.nodes[c].x))+GX:n.x;
+  const fresh=mk(id,x,n.y+ROW(n));S.nodes[fresh].color=pick();S.nodes[fresh].explicitFork=true;focusPart(fresh);
+ }});
+ menu("Branch or continue a storyline","Resume an earlier storyline after shared parts, or create a separate branch.",choices);
+}
+function attachNode(a,b,next){
+ const A=S.nodes[a],B=S.nodes[b];
+ if(!A||!B||!B.detached||B.parentId||a===b||reach(b,a))throw Error("This connection would be invalid.");
+ if(next&&(!A.children.includes(next)||reach(next,b)))throw Error("This connection would create a loop.");
+ if(next&&B.children.length)throw Error("Attach a draft with continuations as a branch.");
+ if(next){
+   A.children=A.children.map(c=>c===next?b:c);remapContinuation(A,next,b);
+   const C=S.nodes[next];if(C.parentId===a)C.parentId=b;else C.ups=C.ups.map(p=>p===a?b:p);
+   // Put the existing continuation after the free draft's final part.
+   B.children.push(next);B.color=C.color;
+ }else{B.color=A.children.length?pick():A.color;A.children.push(b)}
+ B.parentId=a;B.detached=false;
+ B.y=A.y+ROW(A);B.x=next?S.nodes[next].x:Math.max(A.x,...A.children.filter(c=>c!==b).map(c=>S.nodes[c].x+GX));
+ if(next)for(const m of Object.values(S.nodes))if(m.id!==b&&m.y>=B.y)m.y+=STEP;
+}
+function attachChoice(a,b){
+ const A=S.nodes[a],B=S.nodes[b];
+ if(!A||!B||reach(b,a)){note("That connection would loop the story.");return}
+ const finish=next=>{attachNode(a,b,next);setLF(null);focusPart(b);note("Draft attached. Its text has been kept.")};
+ // A draft with continuations can attach as its own branch. Inserting a draft chain is intentionally not offered here.
+ if(!A.children.length){finish();return}
+ menu("Attach draft","Choose an existing branch for this draft, or attach it as a new branch.",[
+ ...(!B.children.length?A.children.filter(c=>!reach(c,b)).map(c=>({label:"Insert into existing branch → "+partLabel(c),action:()=>finish(c)})):[]),
+ {label:"Attach as a new branch",action:()=>finish()}
+ ]);
+}
+function attachDraft(id){
+ const candidates=Object.values(S.nodes).filter(n=>!floating(n)&&n.id!==id&&!reach(id,n.id));
+ if(!candidates.length){note("Create an opening first, then attach this draft.");return}
+ menu("Attach to storyline","Choose the part that should come before this draft.",candidates.map(n=>({label:partLabel(n.id),action:()=>attachChoice(n.id,id)})));
+}
+function selectionChanged(){
+ const count=selectedVersions().length;
+ $("selectionCount").textContent=count+" of "+V.length+" versions selected";
+ $("docx").disabled=$("txt").disabled=!count;
+}
+function selectedVersions(){return V.filter(v=>v.selected)}
+$("freeBtn").onclick=()=>{
+ const y=Math.max(40,...Object.values(S.nodes).map(n=>n.y+(els[n.id]?.offsetHeight||260)))+50;
+ const id=mk(null,40,y);S.nodes[id].detached=true;focusPart(id);
+};
+
+$("selectAll").onclick=()=>{V.forEach(v=>v.selected=true);$("vers").querySelectorAll("input").forEach(c=>c.checked=true);selectionChanged()};
+$("selectNone").onclick=()=>{V.forEach(v=>v.selected=false);$("vers").querySelectorAll("input").forEach(c=>c.checked=false);selectionChanged()};
+
+let importedLocally=false;
+const BACKUP_FORMAT="story-branches-backup",BACKUP_VERSION=1,RECOVERY_KEY_BASE="storyBranchesBeforeImport";
+let RECOVERY_KEY=RECOVERY_KEY_BASE+(storageKey.startsWith("storyBranches:firebase:")?":"+storageKey.slice("storyBranches:firebase:".length):"");
+function backupStatus(message){$("backupStatus").textContent=message}
+function backupPayload(state=S){return {format:BACKUP_FORMAT,version:BACKUP_VERSION,exportedAt:new Date().toISOString(),project:clone(state)}}
+function safeBackupHTML(html){
+ const doc=new DOMParser().parseFromString(html,"text/html");
+ const allowed=new Set(["B","STRONG","I","EM","U","BR","DIV","P","H1","H2","H3","H4","H5","H6","SPAN"]);
+ const omit=new Set(["SCRIPT","STYLE","IFRAME","OBJECT","EMBED","SVG","MATH","TEMPLATE"]);
+ function emit(node){
+  if(node.nodeType===3)return esc(node.data);
+  if(node.nodeType!==1||omit.has(node.tagName))return "";
+  const content=[...node.childNodes].map(emit).join("");
+  if(!allowed.has(node.tagName))return content;
+  const tag=node.tagName.toLowerCase(),align=node.style.textAlign;
+  return "<"+tag+(["left","center","right"].includes(align)?' style="text-align:'+align+'"':"")+">"+content+(tag==="br"?"":"</"+tag+">");
+ }
+ return [...doc.body.childNodes].map(emit).join("");
+}
+function validateBackup(value){
+ const fail=message=>{throw Error(message)};
+ if(!value||value.format!==BACKUP_FORMAT)fail("This is not a Story branches project backup. Choose a JSON file created with Backup project.");
+ if(value.version!==BACKUP_VERSION)fail("This backup uses an unsupported format version. Open it with a compatible editor.");
+ const project=value.project;
+ if(!project||!project.nodes||typeof project.nodes!=="object"||Array.isArray(project.nodes))fail("The backup is missing its story nodes.");
+ const entries=Object.entries(project.nodes);
+ if(!entries.length||entries.length>5000)fail("The backup must contain between 1 and 5,000 nodes.");
+ const nodes=Object.create(null);
+ const validId=id=>typeof id==="string"&&/^[a-zA-Z0-9_-]{1,128}$/.test(id)&&!["__proto__","constructor","prototype"].includes(id);
+ const list=(v,name)=>{if(!Array.isArray(v)||v.some(x=>!validId(x))||new Set(v).size!==v.length)fail("Invalid "+name+" list.");return [...v]};
+ for(const [id,n] of entries){
+  if(!validId(id)||!n||n.id!==id)fail("The backup contains an invalid node identifier.");
+  if(typeof n.text!=="string"||typeof n.html!=="string")fail("A node is missing its story text.");
+  if(!Number.isFinite(n.x)||!Number.isFinite(n.y)||n.x<0||n.y<0||n.x>1000000||n.y>1000000)fail("A node has invalid canvas coordinates.");
+  if(!Number.isInteger(n.color)||n.color<0||!Number.isSafeInteger(n.color)||!Number.isSafeInteger(n.num)||n.num<1)fail("A node has an invalid colour or part number.");
+  if(n.parentId!==null&&!validId(n.parentId))fail("A node has an invalid parent.");
+  const item={id,parentId:n.parentId,children:list(n.children,"children"),ups:list(n.ups||[],"shared parents"),x:n.x,y:n.y,color:n.color,num:n.num,text:n.text,html:safeBackupHTML(n.html)};
+  if(n.lay===2)item.lay=2;
+  for(const flag of ["detached","explicitFork"])if(n[flag]!==undefined){if(typeof n[flag]!=="boolean")fail("Invalid node flag.");item[flag]=n[flag]}
+  if(n.branchOrigin!==undefined){if(!validId(n.branchOrigin))fail("Invalid storyline origin.");item.branchOrigin=n.branchOrigin}
+  if(n.continuations!==undefined){
+   if(!n.continuations||typeof n.continuations!=="object"||Array.isArray(n.continuations))fail("Invalid storyline continuations.");
+   item.continuations=Object.create(null);
+   for(const [origin,next] of Object.entries(n.continuations)){
+    if(!validId(origin)||!validId(next))fail("Invalid storyline continuation.");item.continuations[origin]=next;
+   }
+  }
+  nodes[id]=item;
+ }
+ for(const n of Object.values(nodes)){
+  const parents=[n.parentId,...n.ups].filter(Boolean);
+  if(new Set(parents).size!==parents.length||(!n.parentId&&n.ups.length)||n.detached&&n.parentId)fail("Invalid parent connections.");
+  for(const p of parents)if(!nodes[p]||!nodes[p].children.includes(n.id))fail("A parent connection is missing or inconsistent.");
+  for(const c of n.children)if(!nodes[c]||![nodes[c].parentId,...nodes[c].ups].includes(n.id))fail("A child connection is missing or inconsistent.");
+  if(n.branchOrigin&&!nodes[n.branchOrigin])fail("A storyline origin is missing.");
+  for(const [origin,next] of Object.entries(n.continuations||{}))if(!nodes[origin]||!n.children.includes(next))fail("A storyline continuation is missing.");
+ }
+ const degree=new Map(Object.values(nodes).map(n=>[n.id,[n.parentId,...n.ups].filter(Boolean).length]));
+ const queue=[...degree].filter(([,d])=>d===0).map(([id])=>id);let visited=0;
+ for(let i=0;i<queue.length;i++){visited++;for(const c of nodes[queue[i]].children){degree.set(c,degree.get(c)-1);if(degree.get(c)===0)queue.push(c)}}
+ if(visited!==entries.length)fail("The backup contains a story loop and cannot be imported.");
+ return {nodes,next:Number.isSafeInteger(project.next)&&project.next>0?project.next:1,col:Number.isSafeInteger(project.col)&&project.col>=0?project.col:1,chars:okChars(project.chars),boldNames:project.boldNames===true};
+}
+async function downloadBackup(){
+ try{
+  if(DID)dUpd();
+  const data=JSON.stringify(backupPayload(),null,2);
+  const filename="story-branches-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";
+  const blob=new Blob([data],{type:"application/json"});
+  if(DL)await DL.save({filename,data:blob});
+  else{const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}
+  backupStatus("Backup download requested. Keep this JSON file to continue on another computer.");
+ }catch(e){backupStatus("Backup was not saved: "+(e.message||"download cancelled"))}
+}
+function importProject(project){
+ project={...project,localOnly:true};
+ if(pushing)throw Error("Cloud saving is in progress. Wait a moment, then import again.");
+ // Persist both copies before changing the active project; a storage failure leaves it untouched.
+ const previous=JSON.stringify(S),incoming=JSON.stringify(project);
+ try{localStorage.setItem(RECOVERY_KEY,previous);localStorage.setItem(storageKey,incoming)}
+ catch(e){throw Error("Your browser could not save this import. The open project has not changed. Free some browser storage and retry.")}
+ stopSync();importedLocally=true;SYNC=false;clearTimeout(tm);
+ for(const bag of [DIRTY,DEL,SYN])for(const k of Object.keys(bag))delete bag[k];
+ S=project;seedTracking();SID=null;SED=null;$("story").hidden=true;$("chars").hidden=true;DID=null;PEND=0;V=[];setLF(null);$("doc").hidden=true;$("panel").hidden=true;
+ render();ensureLayout();$("wrap").scrollTo(0,0);setSync("Imported project · saved on this device");
+ $("recoverBtn").hidden=false;accountUI();
+ backupStatus("Project imported. Your previous project is available under Restore previous. Use Sync this local project to replace your signed-in account’s cloud story, or keep editing locally.");
+}
+function confirmImport(project,filename){
+ const count=Object.keys(project.nodes).length,drafts=Object.values(project.nodes).filter(n=>n.detached).length;
+ menu("Import project backup",filename+" contains "+count+" nodes, including "+drafts+" free drafts. Import replaces the open project; it does not merge projects. A recovery copy will be kept on this browser.",[
+ {label:"Back up current project first",action:async()=>{await downloadBackup();confirmImport(project,filename)}},
+ {label:"Replace with this backup",action:()=>{try{importProject(project)}catch(e){backupStatus(e.message)}}}
+ ]);
+}
+$("backupBtn").onclick=$("dbackup").onclick=downloadBackup;
+$("importBtn").onclick=()=>{$("importFile").value="";$("importFile").click()};
+$("importFile").onchange=async event=>{
+ const file=event.target.files[0];if(!file)return;
+ try{
+  if(file.size>20*1024*1024)throw Error("This file exceeds the 20 MB backup limit.");
+  let data;try{data=JSON.parse(await file.text())}catch(e){throw Error("This file is not valid JSON. Choose a Story branches backup.")}
+  const project=validateBackup(data);confirmImport(project,file.name);
+ }catch(e){backupStatus("Import cancelled: "+e.message)}
+};
+$("recoverBtn").onclick=()=>{
+ try{const raw=localStorage.getItem(RECOVERY_KEY);if(!raw)throw Error("No previous project is available.");
+  confirmImport(validateBackup({format:BACKUP_FORMAT,version:BACKUP_VERSION,project:JSON.parse(raw)}),"Previous project recovery copy");
+ }catch(e){backupStatus(e.message)}
+};
+try{$("recoverBtn").hidden=!localStorage.getItem(RECOVERY_KEY)}catch(e){}
+
+const okChars=v=>Array.isArray(v)?v.slice(0,100).filter(c=>c&&typeof c.k=="string"&&typeof c.n=="string").map(c=>({k:c.k.replace(/[\s:]/g,"").slice(0,12),n:c.n.slice(0,80)})):[];
+function renderChars(){const l=$("clist");l.innerHTML="";S.chars=S.chars||[];
+  S.chars.forEach((c,i)=>{const r=document.createElement("div");r.className="crow";
+    r.innerHTML='<input class="ck" maxlength="12" placeholder="A" aria-label="Short code"><input class="cname" placeholder="Full name" aria-label="Full name"><button>Remove</button>';
+    const [k,n]=r.querySelectorAll("input");k.value=c.k;n.value=c.n;
+    k.oninput=()=>{c.k=k.value.replace(/[\s:]/g,"");if(k.value!==c.k)k.value=c.k;save();refreshChips()};
+    n.oninput=()=>{c.n=n.value;save();refreshChips()};
+    r.querySelector("button").onclick=()=>{S.chars.splice(i,1);save();refreshChips();renderChars()};l.append(r)});
+  $("cempty").hidden=S.chars.length>0;$("cbold").checked=!!S.boldNames}
+$("charBtn").onclick=$("dchars").onclick=$("schars").onclick=()=>{renderChars();$("chars").hidden=false};
+$("cclose").onclick=()=>{$("chars").hidden=true};
+$("cadd").onclick=()=>{(S.chars=S.chars||[]).push({k:"",n:""});save();renderChars();const i=$("clist").querySelectorAll("input");i[i.length-2].focus()};
+function sCount(){let t=0;(SID||[]).forEach(i=>{if(S.nodes[i])t+=wc(S.nodes[i].text)});$("scount").textContent=t+" words"}
+function openStory(ids,label){setLF(null);SID=ids;SLAB=label||SLAB;SED=null;
+  $("stitle").textContent=SLAB;$("story").style.setProperty("--c",col(S.nodes[ids[ids.length-1]]));
+  const host=$("sparts");host.innerHTML="";
+  ids.forEach(id=>{const n=S.nodes[id];if(!n)return;
+    const b=document.createElement("section");b.className="sp";b.style.setProperty("--c",col(n));
+    const h=document.createElement("div"),a=document.createElement("span"),w=document.createElement("span");h.className="sph";
+    a.textContent=lab(id)+(n.ups.length?" · shared with other storylines":"");w.textContent=wc(n.text)+" words";h.append(a,w);
+    const ed=document.createElement("div");ed.className="sed";ed.contentEditable="true";ed.dataset.ph="Write this part of the story…";ed.innerHTML=clean(n.html);
+    ed._upd=()=>{const m=S.nodes[id];if(!m)return;if(!ed.textContent)ed.innerHTML="";m.html=ed.innerHTML;m.text=ed.innerText;w.textContent=wc(m.text)+" words";save();sCount()};
+    ed.oninput=ed._upd;ed.onfocus=()=>{SED=ed};
+    ed.onpaste=ev=>{ev.preventDefault();document.execCommand("insertText",false,ev.clipboardData.getData("text/plain"))};
+    b.append(h,ed);host.append(b)});
+  refreshChips();sCount();$("story").hidden=false}
+function closeStory(){SID=null;SED=null;$("story").hidden=true;if(DID&&S.nodes[DID]){dEd.innerHTML=clean(S.nodes[DID].html);counts()}render()}
+function openStoryFor(id){const P=paths().map((p,i)=>({p,i})).filter(x=>x.p.some(m=>m.id===id));
+  if(!P.length){openStory([id],lab(id));return}
+  const go=x=>openStory(x.p.map(m=>m.id),"Storyline · Version "+(x.i+1));
+  if(P.length==1){go(P[0]);return}
+  menu("Which storyline?","This part appears in "+P.length+" storylines. Choose the one to edit as a single document.",
+    P.map(x=>{const l=x.p[x.p.length-1];return{label:"Version "+(x.i+1)+" · "+COLOR_NAMES[l.color%COLOR_NAMES.length]+" · ends at "+lab(l.id)+" · "+x.p.reduce((a,m)=>a+wc(m.text),0)+" words",action:()=>go(x)}}))}
+function lineBefore(ed){const s=getSelection();if(!s.rangeCount)return"";const r=s.getRangeAt(0);let b=r.startContainer;
+  while(b&&b!==ed&&!(b.nodeType==1&&/^(DIV|P|H[1-6])$/.test(b.tagName)))b=b.parentNode;
+  const q=document.createRange();q.selectNodeContents(b||ed);q.setEnd(r.startContainer,r.startOffset);return q.toString()}
+function insertSpeaker(kind,k){const ed=kind=="d"?dEd:(SED||[...$("sparts").querySelectorAll(".sed")].pop());if(!ed)return;
+  if(document.activeElement!==ed){ed.focus();const s=getSelection();s.selectAllChildren(ed);s.collapseToEnd()}
+  if(lineBefore(ed).trim())document.execCommand("insertParagraph");
+  document.execCommand("insertText",false,k+": ");
+  if(kind=="d")dUpd();else ed._upd()}
+function refreshChips(){[["d",$("dchips")],["s",$("schips")]].forEach(([kind,host])=>{host.innerHTML="";
+  (S.chars||[]).filter(c=>c.k&&c.n.trim()).forEach(c=>{const b=document.createElement("button");b.textContent=c.k+" · "+c.n.trim();b.title="Insert "+c.k+": for "+c.n.trim();
+    b.onpointerdown=ev=>ev.preventDefault();b.onclick=()=>insertSpeaker(kind,c.k);host.append(b)})})}
+$("sback").onclick=closeStory;
+$("dstory").onclick=()=>openStoryFor(DID);
+$("cbold").onchange=()=>{S.boldNames=$("cbold").checked;save()};
+$("stool").querySelectorAll("button[data-c]").forEach(b=>{b.onpointerdown=ev=>ev.preventDefault();b.onclick=()=>{const ed=SED;if(!ed)return;ed.focus();const c=b.dataset.c;
+  if(c=="h2")document.execCommand("formatBlock",false,document.queryCommandValue("formatBlock").toLowerCase()=="h2"?"<div>":"<h2>");else document.execCommand(c);ed._upd();marks()}});
+function tidy(){const all=Object.values(S.nodes),rs=all.filter(n=>!n.parentId);
+  const dep={},ind={};all.forEach(n=>{dep[n.id]=0;ind[n.id]=ups(n).filter(q=>S.nodes[q]).length});
+  const q=all.filter(n=>!ind[n.id]);
+  for(let i=0;i<q.length;i++){const n=q[i];n.children.forEach(c=>{if(!S.nodes[c])return;dep[c]=Math.max(dep[c],dep[n.id]+1);if(--ind[c]==0)q.push(S.nodes[c])})}
+  const X={},gOf={};let slot=0;
+  const dfs=(n,g)=>{if(n.id in X)return X[n.id];gOf[n.id]=g;X[n.id]=null;
+    const xs=n.children.filter(c=>S.nodes[c]).map(c=>dfs(S.nodes[c],g)).filter(v=>v!==null);
+    return X[n.id]=xs.length?(Math.min(...xs)+Math.max(...xs))/2:slot++};
+  let base=40;
+  [0,1].forEach(g=>{slot=0;rs.filter(r=>!!r.detached==!!g).forEach(r=>dfs(r,g));
+    const mem=all.filter(n=>gOf[n.id]===g);if(!mem.length)return;
+    const maxD=Math.max(...mem.map(n=>dep[n.id])),top=[base];
+    for(let d=0;d<=maxD;d++){const h=Math.max(0,...mem.filter(n=>dep[n.id]==d).map(n=>els[n.id]?.offsetHeight||320));top[d+1]=top[d]+h+90}
+    for(let d=0;d<=maxD;d++){let last=-9;mem.filter(n=>dep[n.id]==d).sort((a,b)=>X[a.id]-X[b.id]).forEach(n=>{if(X[n.id]<last+1)X[n.id]=last+1;last=X[n.id]})}
+    mem.forEach(n=>{n.x=Math.round(40+X[n.id]*GX);n.y=top[dep[n.id]];n.lay=2});
+    base=top[maxD+1]+60});
+  all.forEach(n=>{n.lay=2});save();render()}
+function ensureLayout(){if(Object.values(S.nodes).some(n=>n.lay!==2))tidy()}
+$("tidyBtn").onclick=()=>arm($("tidyBtn"),tidy);
+if(!load())mk(null,40,40);
+seedTracking();
+render();
+ensureLayout();
+refreshChips();
+initSync();
+</script>
+</body>
+</html>
