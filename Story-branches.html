@@ -780,6 +780,17 @@ $("charBtn").onclick=$("dchars").onclick=$("schars").onclick=()=>{renderChars();
 $("cclose").onclick=()=>{$("chars").hidden=true};
 $("cadd").onclick=()=>{(S.chars=S.chars||[]).push({k:"",n:""});save();renderChars();const i=$("clist").querySelectorAll("input");i[i.length-2].focus()};
 function sCount(){let t=0;(SID||[]).forEach(i=>{if(S.nodes[i])t+=wc(S.nodes[i].text)});$("scount").textContent=t+" words"}
+function branchFromStory(id){
+  if(!SID||!SID.includes(id)||!S.nodes[id])return;
+  if(SED&&SED._upd)SED._upd();
+  const prefix=SID.slice(0,SID.indexOf(id)+1),n=S.nodes[id];
+  const x=n.children.length?Math.max(...n.children.map(c=>S.nodes[c].x))+GX:n.x;
+  const fresh=mk(id,x,n.y+ROW(n));
+  S.nodes[fresh].color=pick();S.nodes[fresh].explicitFork=true;
+  save();render();openStory([...prefix,fresh],"Storyline · New branch");
+  const editor=$("sparts").lastElementChild.querySelector(".sed");
+  editor.focus({preventScroll:true});editor.scrollIntoView({block:"center",behavior:"smooth"});
+}
 function openStory(ids,label){setLF(null);SID=ids;SLAB=label||SLAB;SED=null;
   $("stitle").textContent=SLAB;$("story").style.setProperty("--c",col(S.nodes[ids[ids.length-1]]));
   const host=$("sparts");host.innerHTML="";
@@ -787,6 +798,10 @@ function openStory(ids,label){setLF(null);SID=ids;SLAB=label||SLAB;SED=null;
     const b=document.createElement("section");b.className="sp";b.style.setProperty("--c",col(n));
     const h=document.createElement("div"),a=document.createElement("span"),w=document.createElement("span");h.className="sph";
     a.textContent=lab(id)+(n.ups.length?" · shared with other storylines":"");w.textContent=wc(n.text)+" words";h.append(a,w);
+    const branch=document.createElement("button");branch.type="button";branch.textContent="+ Branch here";
+    branch.title="Start a new branch after this part and edit it here";
+    branch.setAttribute("aria-label","Branch here after "+lab(id));
+    branch.onclick=()=>branchFromStory(id);h.append(branch);h.style.flexWrap="wrap";h.style.alignItems="center";
     const ed=document.createElement("div");ed.className="sed";ed.contentEditable="true";ed.dataset.ph="Write this part of the story…";ed.innerHTML=clean(n.html);
     ed._upd=()=>{const m=S.nodes[id];if(!m)return;if(!ed.textContent)ed.innerHTML="";m.html=ed.innerHTML;m.text=ed.innerText;w.textContent=wc(m.text)+" words";save();sCount()};
     ed.oninput=ed._upd;ed.onfocus=()=>{SED=ed};
