@@ -80,13 +80,39 @@ button{font:inherit;font-size:13px;padding:7px 12px;border-radius:6px;border:1px
 .crow input{min-width:0;padding:7px 8px;border-radius:6px;border:1px solid var(--line);background:var(--field);color:var(--ink);font-size:16px}
 .crow .ck{width:64px;flex:none}
 .crow .cname{flex:1}
-dialog.choice{max-width:560px;max-height:80vh;overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);padding:20px}dialog::backdrop{background:#0006}.choices{display:grid;gap:8px;margin:16px 0}.choices button{text-align:left}.ver{padding:10px 0;border-bottom:1px solid var(--line)}.ver label{cursor:pointer}button:disabled{opacity:.5;cursor:default}#loginForm{display:grid;gap:12px}#loginForm label{display:grid;gap:4px}#loginForm input{font:inherit;padding:9px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--ink)}#accountDialog{width:min(420px,85vw)}#accountStatus{overflow-wrap:anywhere}</style>
+dialog.choice{max-width:560px;max-height:80vh;overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);padding:20px}dialog::backdrop{background:#0006}.choices{display:grid;gap:8px;margin:16px 0}.choices button{text-align:left}.ver{padding:10px 0;border-bottom:1px solid var(--line)}.ver label{cursor:pointer}button:disabled{opacity:.5;cursor:default}#loginForm{display:grid;gap:12px}#loginForm label{display:grid;gap:4px}#loginForm input{font:inherit;padding:9px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--ink)}#accountDialog{width:min(420px,85vw)}#accountStatus{overflow-wrap:anywhere}
+.chs{width:100%;box-sizing:border-box;margin:2px 0 6px;padding:5px;font-size:13px;border-radius:6px;border:1px solid var(--line);background:var(--field);color:var(--ink)}
+#chbar{display:flex;gap:6px;overflow-x:auto;padding:6px 12px;background:var(--panel);border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
+#chbar button{flex:none;white-space:nowrap}#chbar button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+#menuBtn{display:none}html{-webkit-text-size-adjust:100%}#wrap{-webkit-overflow-scrolling:touch}
+@supports(height:100dvh){#doc,#story{height:100dvh;bottom:auto}}
+@media(max-width:700px){
+ button{min-height:40px;padding:8px 12px}
+ #menuBtn{display:inline-block}
+ #bar{padding:6px 8px;gap:6px;max-height:55vh;overflow-y:auto}
+ #bar h1{font-size:15px}#hint{display:none}#stats{display:none}
+ #bar.min>*:not(h1):not(#sync):not(#menuBtn):not(#accountBtn):not(#storiesBtn):not(#exportBtn):not(dialog):not(#linkmsg):not(#retrySync):not(#publishLocal):not(#guestProject):not(#backupStatus){display:none}
+ #sync{flex-basis:100%;order:5}
+ #chbar{padding:6px 8px}
+ .fmt button{width:44px}.fmt button.open,.fmt button.openst{width:auto}
+ .row button{padding:10px 6px}
+ .ed{min-height:140px;max-height:50vh}
+ #dbar,#sbar{flex-wrap:nowrap;overflow-x:auto;padding:6px 8px}#dbar>*,#sbar>*{flex:none;white-space:nowrap}
+ #dtool,#stool{padding:6px 8px}#dtool button,#stool button{min-width:44px}
+ #dpage,#spage{padding:0}
+ #dEd{border-radius:0;border-left:0;border-right:0;padding:16px 14px;font-size:18px;min-height:100%}
+ #sparts{max-width:none}.sp{border-radius:0}.sed{padding:6px 12px 14px;font-size:18px}
+ #panel,#chars{width:100%;border-left:0}
+ dialog.choice{width:calc(100vw - 24px);max-width:none;padding:16px;box-sizing:border-box}
+ .crow input{font-size:16px}
+}
+</style>
 </head>
 <body>
 <header id="bar">
   <h1>Story branches</h1>
   <span id="stats"></span>
-  <span id="sync" role="status" aria-live="polite"></span>
+  <span id="sync" role="status" aria-live="polite"></span><button id="menuBtn" aria-expanded="false">More ▾</button>
   <button id="accountBtn">Sign in to sync</button><button id="storiesBtn" hidden>Stories</button><button id="retrySync" hidden>Retry sync</button><button id="publishLocal" hidden>Sync this local project</button><button id="guestProject" hidden>Open device-only project</button>
   <dialog id="storiesDialog" class="choice"><h2>Your stories</h2><p class="cnote">Each story has its own parts, storylines and characters, saved to your account on every device. Use one story per chapter, book or project.</p><div id="storyList"></div><div class="crow"><input id="newStoryName" placeholder="New story name"><button id="newStoryBtn" class="pri">+ New story</button></div><button id="closeStories">Close</button></dialog>
   <dialog id="accountDialog" class="choice"><h2>Story account</h2>
@@ -103,6 +129,7 @@ dialog.choice{max-width:560px;max-height:80vh;overflow:auto;border:1px solid var
   <p id="hint">Each color is a storyline. Write unconnected ideas with Free node, then choose Attach to storyline. Insert before/after keeps the current storyline. Branch lets you resume an earlier coloured storyline after shared parts, insert a part, or start a new branch. Preview & export lets you select versions. Tap Open for the full document editor. Tap Link, then another box, to share one part between storylines. Drag a box by its title. Parts flow from top to bottom, and Tidy layout re-flows the whole map. Use Characters to give speakers a short code, like A: for Ade, and exports will show the full name. Tap Storyline to edit all the parts of one storyline in a single window.</p>
 <p id="linkmsg" hidden><span id="lm"></span><button id="lc">Cancel</button></p>
 </header>
+<nav id="chbar" aria-label="Chapters"></nav>
 <main id="wrap"><div id="canvas"><svg id="lines"></svg></div></main>
 <section id="doc" hidden>
   <div id="dbar"><button id="dback" class="pri">Back to boxes</button><span id="dtitle"></span><span id="dcount"></span><span class="sp"></span><button id="dchars">Characters</button><button id="dstory">Storyline</button><button id="dbackup">Backup project</button><button id="dbefore">Insert before</button><button id="dafter">Insert after</button><button id="dprev">Previous part</button><button id="dnext">Next part</button></div>
@@ -145,6 +172,7 @@ const SYN={},DIRTY={},DEL={};
 let FB=null,AUTH=null,DB=null,USER=null,storageKey='storyBranches',generation=0,unsubscribe=null;
 // Reopen the last account's local copy even if the Firebase CDN is unavailable offline.
 // Authentication still decides which UID may connect; caches never migrate between accounts.
+let CH='';const okChaps=a=>Array.isArray(a)?a.filter(c=>c&&typeof c.id==='string'&&typeof c.name==='string').slice(0,200).map(c=>({id:c.id.slice(0,40),name:c.name.slice(0,80)})):[];
 let STORY='main',LIB=[{id:'main',name:'My story'}];
 try{STORY=localStorage.getItem('storyBranches:lastStory')||'main'}catch(e){}
 const skeyFor=id=>USER?'storyBranches:firebase:'+USER.uid+(id==='main'?'':':'+id):'storyBranches';
@@ -163,14 +191,14 @@ function seedTracking(){
   for(const bag of [SYN,DIRTY,DEL])for(const id in bag)delete bag[id];
   for(const [id,n] of Object.entries(S.nodes)){SYN[id]=sig(n);lastClock=Math.max(lastClock,n.t||0)}
   Object.assign(DIRTY,S._pending?.dirty||{});Object.assign(DEL,S._pending?.deleted||{});
-  DC=S._pending?.chars||0;SYNC_C=JSON.stringify([S.chars||[],!!S.boldNames]);lastClock=Math.max(lastClock,S.ct||0);
+  DC=S._pending?.chars||0;SYNC_C=JSON.stringify([S.chars||[],!!S.boldNames,S.chapters||[]]);lastClock=Math.max(lastClock,S.ct||0);
 }
 function save(){
   for(const [id,n] of Object.entries(S.nodes))if(SYN[id]!==sig(n)){
     n.t=tick();DIRTY[id]=n.t;delete DEL[id];SYN[id]=sig(n);
   }
   for(const id in SYN)if(!S.nodes[id]){DEL[id]=tick();delete DIRTY[id];delete SYN[id]}
-  const chars=JSON.stringify([S.chars||[],!!S.boldNames]);
+  const chars=JSON.stringify([S.chars||[],!!S.boldNames,S.chapters||[]]);
   if(chars!==SYNC_C){S.ct=tick();DC=S.ct;SYNC_C=chars}
   ls();if(SYNC&&hasPending())schedule();
 }
@@ -189,7 +217,7 @@ function accountUI(){
   if(USER)$('accountStatus').textContent='Signed in as '+USER.email;
 }
 function resetView(){
-  DID=null;SID=null;SED=null;V=[];PEND=0;setLF(null);
+  CH='';DID=null;SID=null;SED=null;V=[];PEND=0;setLF(null);
   for(const id of ['doc','story','panel','chars'])$(id).hidden=true;
   render();refreshChips();
   try{$('recoverBtn').hidden=!localStorage.getItem(RECOVERY_KEY)}catch(e){}
@@ -209,7 +237,7 @@ function decodeRecord(d){
   if(r.deleted)return {id:d.id,t:r.t,deleted:true};
   if(d.id==='_library')return {id:d.id,t:r.t,skip:true};
   const n=JSON.parse(r.payload);
-  if(d.id==='_chars')return {id:d.id,t:r.t,list:okChars(n.list),bold:!!n.bold};
+  if(d.id==='_chars')return {id:d.id,t:r.t,list:okChars(n.list),bold:!!n.bold,chaps:okChaps(n.chaps)};
   if(n.id!==d.id||!/^n[a-zA-Z0-9_-]+$/.test(d.id)||!Array.isArray(n.children)||!Array.isArray(n.ups))throw Error('Invalid cloud story part');
   n.html=safeBackupHTML(n.html||'');return {id:d.id,t:r.t,node:fix({...n,t:r.t})};
 }
@@ -224,7 +252,7 @@ function onSnap(snap){
       lastClock=Math.max(lastClock,r.t);
       if(r.skip)continue;
       if(r.id==='_chars'){
-        if(r.t>(S.ct||0)||(!DC&&r.t===(S.ct||0))){S.chars=r.list;S.boldNames=r.bold;S.ct=r.t;DC=0;SYNC_C=JSON.stringify([S.chars,!!S.boldNames]);changed=true}
+        if(r.t>(S.ct||0)||(!DC&&r.t===(S.ct||0))){S.chars=r.list;S.boldNames=r.bold;S.chapters=r.chaps;S.ct=r.t;DC=0;SYNC_C=JSON.stringify([S.chars,!!S.boldNames,S.chapters]);changed=true}
         continue;
       }
       const localT=Math.max(S.nodes[r.id]?.t||0,DEL[r.id]||0);
@@ -263,7 +291,7 @@ async function push(){
   const jobs=[];
   for(const id of Object.keys(DIRTY))if(S.nodes[id])jobs.push({id,t:DIRTY[id],deleted:false,payload:JSON.stringify(S.nodes[id])});
   for(const id of Object.keys(DEL))jobs.push({id,t:DEL[id],deleted:true,payload:''});
-  if(DC)jobs.push({id:'_chars',t:DC,deleted:false,payload:JSON.stringify({list:S.chars||[],bold:!!S.boldNames})});
+  if(DC)jobs.push({id:'_chars',t:DC,deleted:false,payload:JSON.stringify({list:S.chars||[],bold:!!S.boldNames,chaps:S.chapters||[]})});
   try{
     // Read-before-write transactions prevent a stale/offline client from overwriting a newer timestamp.
     for(let start=0;start<jobs.length;){
@@ -372,6 +400,8 @@ async function initSync(){
   $('accountBtn').onclick=()=>{$('accountDialog').showModal();accountUI()};$('closeAccount').onclick=()=>$('accountDialog').close();
   $('loginForm').onsubmit=async e=>{e.preventDefault();$('loginSubmit').disabled=true;try{await loadFirebase();await FB.signInWithEmailAndPassword(AUTH,$('loginEmail').value.trim(),$('loginPassword').value);$('loginPassword').value='';$('accountDialog').close()}catch(e){$('accountStatus').textContent=authMessage(e)}finally{$('loginSubmit').disabled=false}};
   $('resetPassword').onclick=async()=>{try{if(!$('loginEmail').value.trim())throw {code:'auth/invalid-email'};await loadFirebase();await FB.sendPasswordResetEmail(AUTH,$('loginEmail').value.trim());$('accountStatus').textContent='If this email has an account, a password-reset email will arrive shortly.'}catch(e){$('accountStatus').textContent=authMessage(e)}};
+  {const bar=$('bar'),mq=matchMedia('(max-width:700px)'),fit=()=>{bar.classList.toggle('min',mq.matches);$('menuBtn').textContent='More ▾'};fit();mq.onchange=fit;
+   $('menuBtn').onclick=()=>{const m=bar.classList.toggle('min');$('menuBtn').textContent=m?'More ▾':'Less ▴';$('menuBtn').setAttribute('aria-expanded',String(!m))}}
   $('storiesBtn').onclick=()=>{storiesUI();$('storiesDialog').showModal()};$('closeStories').onclick=()=>$('storiesDialog').close();
   $('newStoryBtn').onclick=async()=>{const n=$('newStoryName').value.trim()||'Untitled story',id='s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
     try{await saveLib(l=>[...l,{id,name:n.slice(0,80)}]);$('newStoryName').value='';$('storiesDialog').close();switchStory(id)}catch(e){syncError(e)}};
@@ -409,7 +439,7 @@ function pick(){const k={};Object.values(S.nodes).forEach(n=>k[n.color]=(k[n.col
 function mk(pid,x,y){const id="n"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);let c=0;
   if(pid){const p=S.nodes[pid];c=p.children.length?pick():p.color;p.children.push(id)}else if(Object.keys(S.nodes).length)c=pick();
   const num=1+Math.max(0,...Object.values(S.nodes).map(n=>n.num||0));
-  S.nodes[id]={id,parentId:pid,x,y,text:"",html:"",ups:[],color:c,children:[],num,lay:2};return id}
+  S.nodes[id]={id,parentId:pid,x,y,text:"",html:"",ups:[],color:c,children:[],num,lay:2};{const q=pid&&S.nodes[pid],ch=(q&&q.chap)||CH;if(ch&&(S.chapters||[]).some(c=>c.id===ch))S.nodes[id].chap=ch}return id}
 function insertPart(id,where,neighbor){
   const n=S.nodes[id];
   if(!n)throw new Error("Part no longer exists.");
@@ -522,6 +552,26 @@ function counts(){let tot=0;const P=paths();
     const q=P.filter(p=>p[p.length-1].id===id).map(p=>p.reduce((a,m)=>a+wc(m.text),0));
     e.querySelector(".pw").textContent=!q.length?"":q.length==1?"Full path: "+q[0]+" words":q.length+" paths: "+Math.min(...q)+"–"+Math.max(...q)+" words"}
   const L=P.length;$("stats").textContent=tot+" words · "+L+" version"+(L==1?"":"s")}
+
+function chapSel(e,n){const sl=e.querySelector('.chs'),cs=S.chapters||[];sl.add(new Option('No chapter',''));for(const c of cs)sl.add(new Option(c.name,c.id));
+  sl.value=cs.some(c=>c.id===n.chap)?n.chap:'';sl.onchange=()=>{if(sl.value)n.chap=sl.value;else delete n.chap;save();render()};
+  if(CH&&n.chap!==CH){e.style.opacity='.2';e.style.pointerEvents='none'}}
+function renderChaps(){const b=$('chbar');if(!b)return;b.textContent='';S.chapters=S.chapters||[];
+  if(CH&&!S.chapters.some(c=>c.id===CH))CH='';
+  const mk1=(t,f,on)=>{const x=document.createElement('button');x.textContent=t;if(on)x.className='on';x.onclick=f;b.append(x)};
+  const go=id=>()=>{CH=id;render()};
+  mk1('All parts',go(''),!CH);
+  for(const c of S.chapters)mk1(c.name+' · '+Object.values(S.nodes).filter(n=>n.chap===c.id).length,go(c.id),CH===c.id);
+  mk1('+ Chapter',()=>{const n=prompt('Chapter name','Chapter '+(S.chapters.length+1));if(!n||!n.trim())return;
+    const id='c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);S.chapters.push({id,name:n.trim().slice(0,80)});CH=id;save();render()});
+  const cur=S.chapters.find(c=>c.id===CH);
+  if(cur){
+    mk1('Rename',()=>{const n=prompt('Chapter name',cur.name);if(n&&n.trim()){cur.name=n.trim().slice(0,80);save();render()}});
+    mk1('Add unassigned parts',()=>{let k=0;for(const n of Object.values(S.nodes))if(!n.chap||!S.chapters.some(c=>c.id===n.chap)){n.chap=cur.id;k++}if(k){save();render()}});
+    mk1('Delete chapter',()=>{if(!confirm('Delete the chapter "'+cur.name+'"? Its parts are kept and become unassigned.'))return;
+      S.chapters=S.chapters.filter(c=>c.id!==cur.id);for(const n of Object.values(S.nodes))if(n.chap===cur.id)delete n.chap;CH='';save();render()});
+  }
+}
 function lines(){const s=$("lines");s.innerHTML="";
   for(const id in S.nodes){const n=S.nodes[id],ne=els[id];if(!ne)continue;
     ups(n).forEach((pid,k)=>{const p=S.nodes[pid],pe=els[pid];if(!p||!pe)return;
@@ -585,11 +635,11 @@ $("dprev").onclick=()=>{const n=S.nodes[DID];if(n.parentId)openDoc(n.parentId)};
 $("dnext").onclick=()=>{const n=S.nodes[DID];if(n.children.length)openDoc(n.children[0])};
 $("dtool").querySelectorAll("button").forEach(b=>{b.onpointerdown=ev=>ev.preventDefault();b.onclick=()=>{dEd.focus();const c=b.dataset.c;
   if(c=="h2")document.execCommand("formatBlock",false,document.queryCommandValue("formatBlock").toLowerCase()=="h2"?"<div>":"<h2>");else document.execCommand(c);dUpd();marks()}});
-function render(){const cv=$("canvas");
+function render(){renderChaps();const cv=$("canvas");
   cv.querySelectorAll(".node").forEach(e=>e.remove());for(const k in els)delete els[k];
   for(const id in S.nodes){const n=S.nodes[id],e=document.createElement("div");
     e.className="node";e.style.cssText="left:"+n.x+"px;top:"+n.y+"px;--c:"+col(n);
-    e.innerHTML='<div class="grip">'+lab(id)+(n.ups.length?" · shared":"")+'</div><div class="fmt"><button data-c="bold"><b>B</b></button><button data-c="italic"><i>I</i></button><button data-c="underline"><u>U</u></button><button class="open">Open</button><button class="openst">Storyline</button></div><div class="ed" contenteditable="true"></div><div class="foot"><span class="wc"></span><span class="pw"></span></div><div class="row"><button class="ins-before">Insert before</button><button class="ins-after">Insert after</button></div><div class="row"><button class="branch">+ Branch</button><button class="lnk">Link</button>'+(n.ups.length?'<button class="unl">Unlink</button>':"")+(n.detached||n.parentId||roots().length>1?'<button class="del">Delete</button>':"")+'</div>';
+    e.innerHTML='<div class="grip">'+lab(id)+(n.ups.length?" · shared":"")+'</div><select class="chs" aria-label="Chapter"></select><div class="fmt"><button data-c="bold"><b>B</b></button><button data-c="italic"><i>I</i></button><button data-c="underline"><u>U</u></button><button class="open">Open</button><button class="openst">Storyline</button></div><div class="ed" contenteditable="true"></div><div class="foot"><span class="wc"></span><span class="pw"></span></div><div class="row"><button class="ins-before">Insert before</button><button class="ins-after">Insert after</button></div><div class="row"><button class="branch">+ Branch</button><button class="lnk">Link</button>'+(n.ups.length?'<button class="unl">Unlink</button>':"")+(n.detached||n.parentId||roots().length>1?'<button class="del">Delete</button>':"")+'</div>';
     const ed=e.querySelector(".ed"),upd=()=>{if(!ed.textContent)ed.innerHTML="";n.html=ed.innerHTML;n.text=ed.innerText;save();counts()};
     ed.innerHTML=clean(n.html);ed.dataset.ph=n.detached?"Write a free draft — attach it whenever you are ready.":n.parentId?"Write this part of the story…":"Start your story here…";
     ed.oninput=upd;ed.onpaste=ev=>{ev.preventDefault();document.execCommand("insertText",false,ev.clipboardData.getData("text/plain"))};
@@ -605,7 +655,7 @@ function render(){const cv=$("canvas");
     e.onclick=()=>{if(LF&&LF!==id)doLink(LF,id)};
     if(LF===id)e.classList.add("src");if(LF)ed.setAttribute("contenteditable","false");
     const d=e.querySelector(".del");if(d)d.onclick=()=>arm(d,()=>{rm(id);save();render()});
-    drag(e,n);cv.appendChild(e);els[id]=e;new ResizeObserver(lines).observe(e)}
+    chapSel(e,n);drag(e,n);cv.appendChild(e);els[id]=e;new ResizeObserver(lines).observe(e)}
   cv.style.minWidth=Math.max(2400,...Object.values(S.nodes).map(n=>n.x+320))+"px";
   cv.style.minHeight=Math.max(1600,...Object.values(S.nodes).map(n=>n.y+(els[n.id]?.offsetHeight||300)+60))+"px";
   counts();lines()}
@@ -634,7 +684,7 @@ $("exportBtn").onclick=openExport;
 $("closeBtn").onclick=()=>{$("panel").hidden=true};
 $("docx").onclick=saveDocx;
 $("txt").onclick=()=>put("story_versions.txt",selectedVersions().map(v=>"===== VERSION "+v.n+" ("+v.words+" words) =====\n\n"+v.plain.map(xt).join("\n\n")).join("\n\n\n"));
-$("resetBtn").onclick=()=>arm($("resetBtn"),()=>{S={nodes:{},next:1,col:1,chars:S.chars,ct:S.ct,boldNames:S.boldNames,localOnly:S.localOnly};mk(null,40,40);save();render();$("panel").hidden=true});
+$("resetBtn").onclick=()=>arm($("resetBtn"),()=>{S={nodes:{},next:1,col:1,chars:S.chars,chapters:S.chapters,ct:S.ct,boldNames:S.boldNames,localOnly:S.localOnly};mk(null,40,40);save();render();$("panel").hidden=true});
 DLdone=true;
 
 function menu(title,description,items){
@@ -750,6 +800,7 @@ function validateBackup(value){
   if(n.parentId!==null&&!validId(n.parentId))fail("A node has an invalid parent.");
   const item={id,parentId:n.parentId,children:list(n.children,"children"),ups:list(n.ups||[],"shared parents"),x:n.x,y:n.y,color:n.color,num:n.num,text:n.text,html:safeBackupHTML(n.html)};
   if(n.lay===2)item.lay=2;
+  if(typeof n.chap==="string"&&n.chap.length<=40)item.chap=n.chap;
   for(const flag of ["detached","explicitFork"])if(n[flag]!==undefined){if(typeof n[flag]!=="boolean")fail("Invalid node flag.");item[flag]=n[flag]}
   if(n.branchOrigin!==undefined){if(!validId(n.branchOrigin))fail("Invalid storyline origin.");item.branchOrigin=n.branchOrigin}
   if(n.continuations!==undefined){
@@ -773,7 +824,7 @@ function validateBackup(value){
  const queue=[...degree].filter(([,d])=>d===0).map(([id])=>id);let visited=0;
  for(let i=0;i<queue.length;i++){visited++;for(const c of nodes[queue[i]].children){degree.set(c,degree.get(c)-1);if(degree.get(c)===0)queue.push(c)}}
  if(visited!==entries.length)fail("The backup contains a story loop and cannot be imported.");
- return {nodes,next:Number.isSafeInteger(project.next)&&project.next>0?project.next:1,col:Number.isSafeInteger(project.col)&&project.col>=0?project.col:1,chars:okChars(project.chars),boldNames:project.boldNames===true};
+ return {nodes,next:Number.isSafeInteger(project.next)&&project.next>0?project.next:1,col:Number.isSafeInteger(project.col)&&project.col>=0?project.col:1,chars:okChars(project.chars),chapters:okChaps(project.chapters),boldNames:project.boldNames===true};
 }
 async function downloadBackup(){
  try{
