@@ -87,7 +87,8 @@ dialog.choice{max-width:560px;max-height:80vh;overflow:auto;border:1px solid var
   <h1>Story branches</h1>
   <span id="stats"></span>
   <span id="sync" role="status" aria-live="polite"></span>
-  <button id="accountBtn">Sign in</button><button id="retrySync" hidden>Retry sync</button><button id="publishLocal" hidden>Sync this local project</button><button id="guestProject" hidden>Open device-only project</button>
+  <button id="accountBtn">Sign in to sync</button><button id="storiesBtn" hidden>Stories</button><button id="retrySync" hidden>Retry sync</button><button id="publishLocal" hidden>Sync this local project</button><button id="guestProject" hidden>Open device-only project</button>
+  <dialog id="storiesDialog" class="choice"><h2>Your stories</h2><p class="cnote">Each story has its own parts, storylines and characters, saved to your account on every device. Use one story per chapter, book or project.</p><div id="storyList"></div><div class="crow"><input id="newStoryName" placeholder="New story name"><button id="newStoryBtn" class="pri">+ New story</button></div><button id="closeStories">Close</button></dialog>
   <dialog id="accountDialog" class="choice"><h2>Story account</h2>
     <p>Use the same email and password on every device. Your story is private to your Firebase account.</p>
     <form id="loginForm"><label>Email <input id="loginEmail" type="email" autocomplete="username" required></label>
@@ -144,7 +145,10 @@ const SYN={},DIRTY={},DEL={};
 let FB=null,AUTH=null,DB=null,USER=null,storageKey='storyBranches',generation=0,unsubscribe=null;
 // Reopen the last account's local copy even if the Firebase CDN is unavailable offline.
 // Authentication still decides which UID may connect; caches never migrate between accounts.
-try{const uid=localStorage.getItem('storyBranches:lastUid');if(uid)storageKey='storyBranches:firebase:'+uid}catch(e){}
+let STORY='main',LIB=[{id:'main',name:'My story'}];
+try{STORY=localStorage.getItem('storyBranches:lastStory')||'main'}catch(e){}
+const skeyFor=id=>USER?'storyBranches:firebase:'+USER.uid+(id==='main'?'':':'+id):'storyBranches';
+try{const uid=localStorage.getItem('storyBranches:lastUid');if(uid)storageKey='storyBranches:firebase:'+uid+(STORY==='main'?'':':'+STORY)}catch(e){}
 let latestSnapshot=null,ready=false,lastClock=0,loadingSDK=null,localStorageFailed=false;
 const firebaseConfig={apiKey:'AIzaSyDKJKLN0QwlZVp6fXs0ejV8iB54P91KCfQ',authDomain:'script-writing-35561.firebaseapp.com',projectId:'script-writing-35561',storageBucket:'script-writing-35561.firebasestorage.app',messagingSenderId:'788720046897',appId:'1:788720046897:web:c3318bf33e66ec8d3a9610',measurementId:'G-M15TDPVRYB'};
 const tick=()=>lastClock=Math.max(Date.now(),lastClock+1);
@@ -178,7 +182,7 @@ function syncError(e){
   setSync('Cloud sync paused ('+code+'). '+reason+' Changes kept locally.');$('retrySync').hidden=false;
 }
 function accountUI(){
-  $('accountBtn').textContent=USER?'Account: '+(USER.email||'signed in'):'Sign in';
+  $('accountBtn').textContent=USER?'Account: '+(USER.email||'signed in'):'Sign in to sync';$('storiesBtn').hidden=!USER;
   $('loginForm').hidden=!!USER;$('logout').hidden=!USER;
   $('publishLocal').hidden=!USER||!(S.localOnly||importedLocally);
   $('guestProject').hidden=!USER;
@@ -203,6 +207,7 @@ function refresh(){
 function decodeRecord(d){
   const r=d.data();if(!Number.isSafeInteger(r.t)||r.t<0)throw Error('Invalid cloud timestamp');
   if(r.deleted)return {id:d.id,t:r.t,deleted:true};
+  if(d.id==='_library')return {id:d.id,t:r.t,skip:true};
   const n=JSON.parse(r.payload);
   if(d.id==='_chars')return {id:d.id,t:r.t,list:okChars(n.list),bold:!!n.bold};
   if(n.id!==d.id||!/^n[a-zA-Z0-9_-]+$/.test(d.id)||!Array.isArray(n.children)||!Array.isArray(n.ups))throw Error('Invalid cloud story part');
@@ -217,6 +222,7 @@ function onSnap(snap){
     const records=snap.docs.map(decodeRecord);
     for(const r of records){
       lastClock=Math.max(lastClock,r.t);
+      if(r.skip)continue;
       if(r.id==='_chars'){
         if(r.t>(S.ct||0)||(!DC&&r.t===(S.ct||0))){S.chars=r.list;S.boldNames=r.bold;S.ct=r.t;DC=0;SYNC_C=JSON.stringify([S.chars,!!S.boldNames]);changed=true}
         continue;
@@ -238,7 +244,7 @@ function onSnap(snap){
     }
     if(repaired){save();changed=true}
     // A new account starts with one opening only after the server confirms it is empty.
-    if(!snap.metadata.fromCache&&!records.length&&!Object.keys(S.nodes).length){mk(null,40,40);save();changed=true}
+    if(!snap.metadata.fromCache&&!records.filter(r=>r.id!=='_library').length&&!Object.keys(S.nodes).length){mk(null,40,40);save();changed=true}
     ls();if(changed)refresh();
     if(!snap.metadata.fromCache){ready=true;$('retrySync').hidden=true;if(hasPending())schedule();else setSync('Synced · '+USER.email)}
     else setSync('Connecting · local copy available');
@@ -247,7 +253,7 @@ function onSnap(snap){
 function connectSync(){
   if(!USER||!FB||S.localOnly)return;
   stopSync();const token=generation;SYNC=true;setSync('Connecting to your cloud story…');
-  COL=FB.collection(DB,'users',USER.uid,'stories','main','records');
+  COL=FB.collection(DB,'users',USER.uid,'stories',STORY,'records');
   unsubscribe=FB.onSnapshot(COL,{includeMetadataChanges:true},snap=>{if(token===generation)onSnap(snap)},e=>{if(token===generation){ready=false;syncError(e)}});
 }
 async function push(){
@@ -288,12 +294,60 @@ async function push(){
   finally{if(token===generation)pushing=false}
 }
 async function accountChanged(user){
-  save();stopSync();USER=user;storageKey=user?'storyBranches:firebase:'+user.uid:'storyBranches';RECOVERY_KEY=RECOVERY_KEY_BASE+(user?':'+user.uid:'');
+  save();stopSync();USER=user;storageKey=skeyFor(STORY);RECOVERY_KEY=RECOVERY_KEY_BASE+(user?':'+user.uid+(STORY==='main'?'':':'+STORY):'');
   try{if(user)localStorage.setItem('storyBranches:lastUid',user.uid);else localStorage.removeItem('storyBranches:lastUid')}catch(e){}
   S={nodes:{},next:1,col:1};load();importedLocally=!!S.localOnly;
   if(!Object.keys(S.nodes).length&&!user)mk(null,40,40);
   seedTracking();resetView();accountUI();
   if(!user){setSync('Device-only project · sign in to sync');return}
+  if(S.localOnly){setSync('Imported project · saved on this device');return}
+  connectSync();loadLib();
+}
+
+const libRef=()=>FB.doc(FB.collection(DB,'users',USER.uid,'stories','main','records'),'_library');
+const libKey=()=>'storyBranches:lib:'+USER.uid;
+function libSave(l){LIB=l;try{localStorage.setItem(libKey(),JSON.stringify(l))}catch(e){}storiesUI()}
+async function loadLib(){
+  const uid=USER.uid;
+  try{const c=JSON.parse(localStorage.getItem(libKey()));if(Array.isArray(c)&&c.length)LIB=c}catch(e){}
+  storiesUI();
+  try{const d=await FB.getDocFromServer(libRef());if(!USER||USER.uid!==uid)return;
+    if(d.exists()){const l=JSON.parse(d.data().payload).stories;if(Array.isArray(l)&&l.length)libSave(l)}
+    else await saveLib(l=>l)}catch(e){}
+  if(USER&&USER.uid===uid&&!LIB.some(x=>x.id===STORY))switchStory(LIB[0].id,true);
+}
+async function saveLib(mut){
+  const ref=libRef();let out=null;
+  await FB.runTransaction(DB,async tx=>{const d=await tx.get(ref);
+    let l=d.exists()?JSON.parse(d.data().payload).stories:[{id:'main',name:'My story'}];
+    out=mut(l);tx.set(ref,{t:Date.now(),deleted:false,payload:JSON.stringify({stories:out})})});
+  libSave(out);
+}
+function storiesUI(){
+  const cur=LIB.find(s=>s.id===STORY);$('storiesBtn').textContent='Story: '+(cur?cur.name:'My story');
+  const box=$('storyList');box.textContent='';
+  for(const s of LIB){
+    const r=document.createElement('div');r.className='crow';
+    const o=document.createElement('button');o.className='cname';o.style.textAlign='left';o.textContent=(s.id===STORY?'● ':'')+s.name;
+    o.onclick=()=>{$('storiesDialog').close();switchStory(s.id)};
+    const rn=document.createElement('button');rn.textContent='Rename';
+    rn.onclick=async()=>{const n=prompt('Story name',s.name);if(n&&n.trim())try{await saveLib(l=>l.map(x=>x.id===s.id?{...x,name:n.trim().slice(0,80)}:x))}catch(e){syncError(e)}};
+    const dl=document.createElement('button');dl.textContent='Delete';dl.disabled=s.id===STORY||LIB.length<2;dl.onclick=()=>delStory(s);
+    r.append(o,rn,dl);box.append(r);
+  }
+}
+async function delStory(s){
+  if(!confirm('Delete "'+s.name+'" and all its parts from every device? Download a backup first if unsure.'))return;
+  try{const snap=await FB.getDocsFromServer(FB.collection(DB,'users',USER.uid,'stories',s.id,'records'));
+    await Promise.all(snap.docs.filter(d=>d.id!=='_library').map(d=>FB.deleteDoc(d.ref)));
+    await saveLib(l=>l.filter(x=>x.id!==s.id));try{localStorage.removeItem(skeyFor(s.id))}catch(e){}}catch(e){syncError(e)}
+}
+async function switchStory(id,force){
+  if(!USER||(!force&&id===STORY))return;
+  save();if(SYNC&&hasPending()){clearTimeout(tm);try{await push()}catch(e){}}
+  stopSync();STORY=id;try{localStorage.setItem('storyBranches:lastStory',id)}catch(e){}
+  storageKey=skeyFor(id);RECOVERY_KEY=RECOVERY_KEY_BASE+':'+USER.uid+(id==='main'?'':':'+id);
+  S={nodes:{},next:1,col:1};load();importedLocally=!!S.localOnly;seedTracking();resetView();accountUI();storiesUI();
   if(S.localOnly){setSync('Imported project · saved on this device');return}
   connectSync();
 }
@@ -301,7 +355,7 @@ async function publishProject(){
   if(!USER||pushing)return;
   if(!confirm('Replace the cloud story for '+USER.email+' with this local project? This affects your other devices. Download a backup first if you need the current cloud version.'))return;
   try{
-    const token=generation,collection=FB.collection(DB,'users',USER.uid,'stories','main','records');
+    const token=generation,collection=FB.collection(DB,'users',USER.uid,'stories',STORY,'records');
     const snap=await FB.getDocsFromServer(collection);if(token!==generation)return;
     stopSync();seedTracking();
     for(const d of snap.docs)lastClock=Math.max(lastClock,d.data().t||0);
@@ -318,6 +372,9 @@ async function initSync(){
   $('accountBtn').onclick=()=>{$('accountDialog').showModal();accountUI()};$('closeAccount').onclick=()=>$('accountDialog').close();
   $('loginForm').onsubmit=async e=>{e.preventDefault();$('loginSubmit').disabled=true;try{await loadFirebase();await FB.signInWithEmailAndPassword(AUTH,$('loginEmail').value.trim(),$('loginPassword').value);$('loginPassword').value='';$('accountDialog').close()}catch(e){$('accountStatus').textContent=authMessage(e)}finally{$('loginSubmit').disabled=false}};
   $('resetPassword').onclick=async()=>{try{if(!$('loginEmail').value.trim())throw {code:'auth/invalid-email'};await loadFirebase();await FB.sendPasswordResetEmail(AUTH,$('loginEmail').value.trim());$('accountStatus').textContent='If this email has an account, a password-reset email will arrive shortly.'}catch(e){$('accountStatus').textContent=authMessage(e)}};
+  $('storiesBtn').onclick=()=>{storiesUI();$('storiesDialog').showModal()};$('closeStories').onclick=()=>$('storiesDialog').close();
+  $('newStoryBtn').onclick=async()=>{const n=$('newStoryName').value.trim()||'Untitled story',id='s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    try{await saveLib(l=>[...l,{id,name:n.slice(0,80)}]);$('newStoryName').value='';$('storiesDialog').close();switchStory(id)}catch(e){syncError(e)}};
   $('logout').onclick=async()=>{try{save();await FB.signOut(AUTH);$('accountDialog').close()}catch(e){$('accountStatus').textContent=authMessage(e)}};
   $('publishLocal').onclick=publishProject;
   $('guestProject').onclick=()=>{try{const raw=localStorage.getItem('storyBranches');if(!raw)throw Error('No device-only project is saved here. Import a backup instead.');confirmImport(validateBackup({format:BACKUP_FORMAT,version:BACKUP_VERSION,project:JSON.parse(raw)}),'Device-only project')}catch(e){backupStatus(e.message)}};
