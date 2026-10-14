@@ -659,20 +659,17 @@
     flex-direction: column;
     gap: 1rem;
   }
-  .ao-box-views { display:grid; grid-template-columns:2fr 1fr 1fr; gap:1rem; align-items:start; }
-  .ao-box-views figure { margin:0; min-width:0; }
-  .ao-box-views img { width:100%; height:auto; display:block; }
-  .ao-box-views figcaption { margin-top:0.65rem; }
-  .ao-box-videos { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; margin-top:1.5rem; }
-  .ao-box-videos figure { margin:0; min-width:0; }
-  .ao-box-videos video { display:block; width:100%; aspect-ratio:1; object-fit:contain; background:#080604; border-radius:5px; }
-  .ao-box-videos figcaption { margin-top:0.7rem; color:var(--text-soft); }
-  .ao-box-videos a { color:inherit; }
-  @media (max-width:600px) { .ao-box-videos { grid-template-columns:1fr; } }
-  @media (max-width:700px) {
-    .ao-box-views { grid-template-columns:1fr 1fr; }
-    .ao-box-views > :first-child { grid-column:1 / -1; }
-  }
+  .ao-box-stage { background:#0c0906; border-radius:5px; overflow:hidden; }
+  .ao-box-stage img, .ao-box-stage video { display:block; width:100%; height:clamp(260px,45vw,560px); object-fit:contain; }
+  .ao-box-stage [hidden] { display:none !important; }
+  .ao-box-caption { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin:1rem 0; }
+  .ao-box-caption p { margin:0; }
+  .ao-box-thumbnails { display:flex; gap:0.65rem; overflow-x:auto; padding:0.25rem 0 0.6rem; }
+  .ao-box-thumb { flex:0 0 100px; padding:4px; border:1px solid rgba(201,153,58,0.25); background:transparent; color:var(--text); border-radius:4px; cursor:pointer; }
+  .ao-box-thumb img, .ao-box-thumb video { display:block; width:100%; height:65px; object-fit:cover; border-radius:2px; background:#0c0906; pointer-events:none; }
+  .ao-box-thumb span { display:block; padding:0.45rem 0.2rem 0.2rem; font:inherit; font-size:0.75rem; }
+  .ao-box-thumb[aria-pressed="true"] { border-color:#c9993a; box-shadow:0 0 0 1px #c9993a; }
+  .ao-box-thumb:focus-visible { outline:2px solid #c9993a; outline-offset:3px; }
   .ao-chapter-item {
     border: 1px solid rgba(201,153,58,0.16);
     border-radius: 5px;
@@ -2568,44 +2565,24 @@
       <article class="ao-chapter-text-panel">
         <p class="ao-chapter-item-type">Sculpture</p>
         <h3 class="ao-chapter-item-title">Àpótí Ọlọ́wẹ̀ &middot; The Box</h3>
-        <div class="ao-box-views">
-          <figure><div class="ao-chapter-card-image"><img src="images/apotiolowebox.webp" alt="Àpótí Ọlọ́wẹ̀ carved box, Chapter 5 sculpture" loading="lazy"></div></figure>
-          <figure>
-            <div class="ao-chapter-card-image"><img src="images/topbox.jfif" alt="Top view of the carved Àpótí Ọlọ́wẹ̀ box" loading="lazy"></div>
-            <figcaption><a class="ao-chapter-item-link" href="#" data-chapter-fullscreen data-src="images/topbox.jfif" data-title="Àpótí Ọlọ́wẹ̀ · Top view" data-sub="Chapter 5 sculpture" data-chapter-label="Chapter 5">Top view · View full screen</a></figcaption>
-          </figure>
-          <figure>
-            <div class="ao-chapter-card-image"><img src="images/otherside.jfif" alt="Other side of the carved Àpótí Ọlọ́wẹ̀ box" loading="lazy"></div>
-            <figcaption><a class="ao-chapter-item-link" href="#" data-chapter-fullscreen data-src="images/otherside.jfif" data-title="Àpótí Ọlọ́wẹ̀ · Other side" data-sub="Chapter 5 sculpture" data-chapter-label="Chapter 5">Other side · View full screen</a></figcaption>
-          </figure>
+        <div class="ao-box-viewer">
+          <div class="ao-box-stage">
+            <img id="aoBoxImage" src="images/apotiolowebox.webp" alt="Àpótí Ọlọ́wẹ̀ carved box">
+            <video id="aoBoxVideo" controls playsinline preload="none" hidden aria-label="Àpótí Ọlọ́wẹ̀ sculpture video"></video>
+          </div>
+          <div class="ao-box-caption">
+            <p id="aoBoxCaption" class="ao-chapter-item-copy" aria-live="polite">The carved box at the heart of The Engagement.</p>
+            <a id="aoBoxFullscreen" class="ao-chapter-item-link" href="#" data-chapter-fullscreen data-src="images/apotiolowebox.webp" data-title="Àpótí Ọlọ́wẹ̀ · The Box" data-sub="Chapter 5 sculpture" data-chapter-label="Chapter 5">View full screen</a>
+          </div>
+          <div class="ao-box-thumbnails" aria-label="Choose a sculpture view">
+            <button type="button" class="ao-box-thumb" data-box-src="images/apotiolowebox.webp" data-box-kind="image" data-box-caption="The carved box at the heart of The Engagement." aria-pressed="true" aria-label="Show The Box"><img src="images/apotiolowebox.webp" alt="" loading="lazy"><span>The Box</span></button>
+            <button type="button" class="ao-box-thumb" data-box-src="images/topbox.jfif" data-box-kind="image" data-box-caption="Àpótí Ọlọ́wẹ̀ · Top view" aria-pressed="false" aria-label="Show Top view"><img src="images/topbox.jfif" alt="" loading="lazy"><span>Top view</span></button>
+            <button type="button" class="ao-box-thumb" data-box-src="images/otherside.jfif" data-box-kind="image" data-box-caption="Àpótí Ọlọ́wẹ̀ · Other side" aria-pressed="false" aria-label="Show Other side"><img src="images/otherside.jfif" alt="" loading="lazy"><span>Other side</span></button>
+            <button type="button" class="ao-box-thumb" data-box-src="images/ayo.jpg" data-box-kind="image" data-box-caption="Ayo holding the carved Àpótí box." aria-pressed="false" aria-label="Show Ayo"><img src="images/ayo.jpg" alt="" loading="lazy"><span>Ayo</span></button>
+            <button type="button" class="ao-box-thumb" data-box-src="videos/apoti-box-video-1.mp4" data-box-kind="video" data-box-caption="Àpótí Ọlọ́wẹ̀ · Video 1" aria-pressed="false" aria-label="Show Video 1"><video src="videos/apoti-box-video-1.mp4#t=2" muted playsinline preload="metadata" data-thumb-time="2" aria-hidden="true" tabindex="-1"></video><span>▶ Video 1</span></button>
+            <button type="button" class="ao-box-thumb" data-box-src="videos/apoti-box-video-2.mp4" data-box-kind="video" data-box-caption="Àpótí Ọlọ́wẹ̀ · Video 2" aria-pressed="false" aria-label="Show Video 2"><video src="videos/apoti-box-video-2.mp4#t=4" muted playsinline preload="metadata" data-thumb-time="4" aria-hidden="true" tabindex="-1"></video><span>▶ Video 2</span></button>
+          </div>
         </div>
-        <p class="ao-chapter-item-copy">The carved box at the heart of The Engagement.</p>
-        <a class="ao-chapter-item-link" href="#" data-chapter-fullscreen data-src="images/apotiolowebox.webp" data-title="Àpótí Ọlọ́wẹ̀ · The Box" data-sub="Chapter 5 sculpture" data-chapter-label="Chapter 5">View full screen</a>
-        <div class="ao-box-videos" aria-label="Àpótí Ọlọ́wẹ̀ sculpture videos">
-          <figure>
-            <video controls playsinline preload="none" poster="images/apotiolowebox.webp" aria-label="Àpótí Ọlọ́wẹ̀ sculpture video 1">
-              <source src="videos/apoti-box-video-1.mp4" type="video/mp4">
-              Your browser does not support this video. <a href="videos/apoti-box-video-1.mp4">Watch video 1</a>.
-            </video>
-            <figcaption>Àpótí Ọlọ́wẹ̀ · Video 1 <a class="ao-chapter-item-link" href="videos/apoti-box-video-1.mp4" target="_blank" rel="noopener">Open video</a></figcaption>
-          </figure>
-          <figure>
-            <video controls playsinline preload="none" poster="images/apotiolowebox.webp" aria-label="Àpótí Ọlọ́wẹ̀ sculpture video 2">
-              <source src="videos/apoti-box-video-2.mp4" type="video/mp4">
-              Your browser does not support this video. <a href="videos/apoti-box-video-2.mp4">Watch video 2</a>.
-            </video>
-            <figcaption>Àpótí Ọlọ́wẹ̀ · Video 2 <a class="ao-chapter-item-link" href="videos/apoti-box-video-2.mp4" target="_blank" rel="noopener">Open video</a></figcaption>
-          </figure>
-        </div>
-      </article>
-    </div>
-    <div class="ao-chapter-items">
-      <article class="ao-chapter-text-panel">
-        <p class="ao-chapter-item-type">Sculpture</p>
-        <h3 class="ao-chapter-item-title">Ayo</h3>
-        <div class="ao-chapter-card-image"><img src="images/ayo.jpg" alt="Sculpture of Ayo holding the carved Àpótí box" loading="lazy"></div>
-        <p class="ao-chapter-item-copy">Ayo holding the carved Àpótí box.</p>
-        <a class="ao-chapter-item-link" href="#" data-chapter-fullscreen data-src="images/ayo.jpg" data-title="Ayo" data-sub="Chapter 5 sculpture" data-chapter-label="Chapter 5">View full screen</a>
       </article>
     </div>
     <div class="ao-script-panel" id="chapter-five-script">
@@ -5576,5 +5553,61 @@ lbPanel.addEventListener('touchend', function(e) {
   document.addEventListener('keydown', function(event) { if (event.key === 'Escape' && modal.classList.contains('show')) closeModal(); });
 }());
 </script>
+
+<script>
+(function() {
+  var image = document.getElementById('aoBoxImage');
+  var video = document.getElementById('aoBoxVideo');
+  var caption = document.getElementById('aoBoxCaption');
+  var fullscreen = document.getElementById('aoBoxFullscreen');
+  var buttons = document.querySelectorAll('[data-box-src]');
+  if (!image || !video) return;
+  buttons.forEach(function(button) {
+    var thumbnail = button.querySelector('video[data-thumb-time]');
+    if (thumbnail) {
+      function showThumbnailFrame() {
+        var desired = Number(thumbnail.getAttribute('data-thumb-time'));
+        if (Number.isFinite(thumbnail.duration) && thumbnail.duration > 0) {
+          thumbnail.currentTime = Math.min(desired, thumbnail.duration / 2);
+        }
+        thumbnail.pause();
+      }
+      thumbnail.addEventListener('loadedmetadata', showThumbnailFrame);
+      if (thumbnail.readyState >= 1) showThumbnailFrame();
+    }
+    button.addEventListener('click', function() {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      var isVideo = button.getAttribute('data-box-kind') === 'video';
+      var src = button.getAttribute('data-box-src');
+      var label = button.getAttribute('data-box-caption');
+      image.hidden = isVideo;
+      video.hidden = !isVideo;
+      if (isVideo) {
+        video.src = src;
+        video.removeAttribute('poster');
+        video.setAttribute('aria-label', label);
+        video.load();
+      } else { image.src = src; image.alt = label; }
+      caption.textContent = label;
+      fullscreen.href = isVideo ? src : '#';
+      fullscreen.textContent = isVideo ? 'Open video' : 'View full screen';
+      if (isVideo) {
+        fullscreen.removeAttribute('data-chapter-fullscreen');
+        fullscreen.setAttribute('target', '_blank');
+        fullscreen.setAttribute('rel', 'noopener');
+      } else {
+        fullscreen.setAttribute('data-chapter-fullscreen', '');
+        fullscreen.setAttribute('data-src', src);
+        fullscreen.setAttribute('data-title', label);
+        fullscreen.removeAttribute('target');
+      }
+      buttons.forEach(function(item) { item.setAttribute('aria-pressed', item === button ? 'true' : 'false'); });
+    });
+  });
+})();
+</script>
+
 </body>
 </html>
