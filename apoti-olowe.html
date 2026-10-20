@@ -2180,6 +2180,7 @@
   .ao-comments button:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
   @media(max-width:500px) { .ao-reaction-row { grid-template-columns:repeat(3,minmax(0,1fr)); } .ao-discussion-body { padding:1rem; } .ao-reaction-panel { padding:1.3rem .6rem; } }
 
+  .ao-inline-reply-form { margin-top:1rem; padding-top:.75rem; border-top:1px solid rgba(201,153,58,.15); }
 </style>
 <!-- Match the homepage heading typography. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4296,13 +4297,15 @@ window.aoMountChapterComments=function(chapter,reader){
  <p class="ao-spoiler-notice">Chapter discussion below may contain spoilers.</p><div class="ao-comment-list" aria-label="Reader comments"></div><button type="button" class="ao-comment-more" hidden>Load more comments</button></div>`;
  reader.appendChild(section);
  const $=q=>section.querySelector(q),form=$('form'),list=$('.ao-comment-list'),feedback=$('.ao-comment-feedback'),more=$('.ao-comment-more'),replying=$('.ao-comment-replying'),text=form.elements.body,submit=form.querySelector('[type="submit"]');
+ const formHome=document.createComment('Main comment editor position');form.before(formHome);
+ function parkForm(){formHome.parentNode.insertBefore(form,formHome.nextSibling);form.classList.remove('ao-inline-reply-form');}
  let parent=null,nextOffset=null,sort='best',requestId=null,myReaction=null,loadingId=0,controller=null,posting=false,reactionBusy=false;
  const draftKey='ao-comment-draft-'+chapter;
  try{form.elements.name.value=sessionStorage.getItem('ao-comment-name')||'';text.value=sessionStorage.getItem(draftKey)||'';}catch(_){}
  function updateEditor(){text.disabled=posting;form.elements.name.disabled=posting;submit.disabled=posting||!text.value.trim()||!form.elements.name.value.trim();$('.ao-char-count').textContent=text.value.length+'/2000';}
  function saveDraft(){requestId=null;updateEditor();try{sessionStorage.setItem('ao-comment-name',form.elements.name.value);sessionStorage.setItem(draftKey,text.value);}catch(_) {}}
  form.addEventListener('input',saveDraft);updateEditor();
- function resetReply(){parent=null;requestId=null;replying.hidden=true;}
+ function resetReply(){parent=null;requestId=null;replying.hidden=true;parkForm();}
  $('[data-cancel-reply]').addEventListener('click',resetReply);
  function insert(before,after=''){if(posting)return;const a=text.selectionStart,b=text.selectionEnd,selected=text.value.slice(a,b);if(text.value.length+before.length+after.length>2000)return;text.setRangeText(before+selected+after,a,b,'select');text.focus();saveDraft();}
  section.querySelectorAll('[data-format]').forEach(b=>b.addEventListener('click',()=>insert(b.dataset.format,b.dataset.format)));
@@ -4314,12 +4317,12 @@ window.aoMountChapterComments=function(chapter,reader){
   const content=document.createElement('div');content.className='ao-comment-content';const heading=document.createElement('div');heading.className='ao-comment-meta';const name=document.createElement('strong');name.textContent=c.display_name;const date=document.createElement('time');date.dateTime=c.created_at;date.textContent=new Date(c.created_at).toLocaleDateString(undefined,{dateStyle:'medium'});heading.append(name,date);
   const body=document.createElement('p');body.className='ao-comment-text';formatText(body,c.body);const actions=document.createElement('div');actions.className='ao-comment-actions';const like=document.createElement('button');like.type='button';like.textContent=(c.liked?'♥ ':'♡ ')+(c.likes||0);like.setAttribute('aria-label','Like comment by '+c.display_name);like.setAttribute('aria-pressed',String(!!c.liked));
   like.addEventListener('click',async()=>{like.disabled=true;try{await apiPost({action:'like',comment_id:c.id,enabled:!c.liked});c.liked=!c.liked;c.likes=Number(c.likes||0)+(c.liked?1:-1);like.textContent=(c.liked?'♥ ':'♡ ')+c.likes;like.setAttribute('aria-pressed',String(c.liked));}catch(e){feedback.textContent=e.message;}finally{like.disabled=false;}});actions.appendChild(like);
-  if(!isReply){const reply=document.createElement('button');reply.type='button';reply.textContent='Reply';reply.addEventListener('click',()=>{parent=c.id;requestId=null;replying.querySelector('span').textContent='Replying to '+c.display_name;replying.hidden=false;form.scrollIntoView({behavior:'smooth',block:'start'});text.focus({preventScroll:true});});actions.appendChild(reply);}
-  content.append(heading,body,actions);item.append(avatar,content);if(!isReply)(c.replies||[]).forEach(r=>content.appendChild(renderComment(r,true)));return item;
+  if(!isReply){const reply=document.createElement('button');reply.type='button';reply.textContent='Reply';reply.addEventListener('click',()=>{if(posting)return;parent=c.id;requestId=null;replying.querySelector('span').textContent='Replying to '+c.display_name;replying.hidden=false;content.appendChild(form);form.classList.add('ao-inline-reply-form');form.scrollIntoView({behavior:'smooth',block:'nearest'});text.focus({preventScroll:true});});actions.appendChild(reply);}
+  content.append(heading,body,actions);item.append(avatar,content);if(!isReply){(c.replies||[]).forEach(r=>content.appendChild(renderComment(r,true)));if(parent===c.id){content.appendChild(form);form.classList.add('ao-inline-reply-form');}}return item;
  }
  function paintStats(data){myReaction=data.my_reaction||null;const counts=data.reactions||{};const totalReactions=Object.values(counts).reduce((sum,n)=>sum+Number(n),0),totalComments=Number(data.total||0);$('.ao-reaction-total').textContent=totalReactions.toLocaleString()+(totalReactions===1?' reaction':' reactions');$('.ao-comment-total').textContent=totalComments.toLocaleString()+(totalComments===1?' Comment':' Comments');section.querySelectorAll('[data-reaction]').forEach(b=>{b.querySelector('strong').textContent=Number(counts[b.dataset.reaction]||0).toLocaleString();b.setAttribute('aria-pressed',String(myReaction===b.dataset.reaction));b.disabled=false;});}
  async function readComments(append=false){
-  if(controller)controller.abort();controller=new AbortController();const id=++loadingId;more.disabled=true;section.querySelectorAll('[data-sort]').forEach(b=>b.setAttribute('aria-pressed',String(sort===b.dataset.sort)));if(!append)list.textContent='Loading comments…';
+  if(controller)controller.abort();controller=new AbortController();const id=++loadingId;more.disabled=true;section.querySelectorAll('[data-sort]').forEach(b=>b.setAttribute('aria-pressed',String(sort===b.dataset.sort)));if(!append){parkForm();list.textContent='Loading comments…';}
   try{const offset=append?nextOffset||0:0;const response=await fetch(endpoint+'?view=discussion&chapter='+chapter+'&sort='+sort+'&offset='+offset,{cache:'no-store',signal:controller.signal});const data=await response.json();if(!response.ok||!Array.isArray(data.comments))throw Error(data.error||'Unable to load comments.');if(id!==loadingId)return;if(!append)list.replaceChildren();if(!append&&!data.comments.length){const empty=document.createElement('p');empty.className='ao-comment-empty';empty.textContent='Be the first to share your thoughts.';list.appendChild(empty);}const existing=new Set(Array.from(list.querySelectorAll('[data-comment-id]'),n=>n.dataset.commentId));data.comments.forEach(c=>{if(existing.has(c.id))return;const node=renderComment(c,false);node.dataset.commentId=c.id;list.appendChild(node);});paintStats(data);nextOffset=data.next_offset;more.hidden=nextOffset===null||nextOffset===undefined;}
   catch(e){if(e.name==='AbortError'||id!==loadingId)return;if(!append){list.replaceChildren();const message=document.createElement('p');message.textContent='Comments could not be loaded. ';const retry=document.createElement('button');retry.type='button';retry.textContent='Try again';retry.addEventListener('click',()=>readComments());message.appendChild(retry);list.appendChild(message);$('.ao-reaction-total').textContent='Reactions temporarily unavailable';}else feedback.textContent='Could not load more comments. Please try again.';}
   finally{if(id===loadingId)more.disabled=false;}
