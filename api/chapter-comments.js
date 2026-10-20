@@ -4,6 +4,24 @@ const crypto = require('crypto');
 const FIELDS = 'id,chapter_id,parent_id,display_name,body,created_at';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RELEASES = ['2026-05-03', '2026-06-01', '2026-08-03', '2026-09-14', '2026-10-14', '2026-11-09'];
+function readerIdentity(req,res) {
+  const secret=process.env.COMMENTS_RATE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if(!secret) throw Error('Missing comments secret');
+  const hmac=x=>crypto.createHmac('sha256',secret).update(x).digest('hex');
+  const cookie=String(req.headers.cookie || '').match(/(?:^|;\s*)ao_reader=([0-9a-f]{32})\.([0-9a-f]{64})(?:;|$)/);
+  let id=cookie?.[1];
+  if(!id || !crypto.timingSafeEqual(Buffer.from(cookie[2],'hex'),Buffer.from(hmac('cookie:'+id),'hex'))) {
+    id=crypto.randomBytes(16).toString('hex');
+    const secure=String(req.headers.host || '').startsWith('127.0.0.1:') || String(req.headers.host || '').startsWith('localhost:') ? '' : '; Secure';
+    res.setHeader('Set-Cookie',`ao_reader=${id}.${hmac('cookie:'+id)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${secure}`);
+  }
+  const ip=String(req.headers['x-vercel-forwarded-for'] || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
+  if(!ip) throw Error('Missing network address');
+  return {reader:hmac('reader:'+id),ip:hmac(ip)};
+}
+function allowedOrigin(req) {
+  return !req.headers.origin || new Set(['https://www.kaysworks.com','https://kaysworks.com',process.env.ALLOWED_ORIGIN,process.env.VERCEL_URL && 'https://'+process.env.VERCEL_URL].filter(Boolean)).has(req.headers.origin);
+}
 function admin(req) {
   const actual = req.headers['x-admin-password'];
   const expected = process.env.ADMIN_PASSWORD;
@@ -77,6 +95,14 @@ module.exports = async function handler(req, res) {
         if(error) throw error;
         return res.status(200).json({comments:data || []});
       }
+      if(req.query.view==='discussion') {
+        const sort=req.query.sort || 'best', offset=Number(req.query.offset || 0);
+        if(!['best','new','old'].includes(sort) || !Number.isInteger(offset) || offset<0 || offset>100000) return res.status(400).json({error:'Invalid comment order or page.'});
+        const identity=readerIdentity(req,res);
+        const {data,error}=await db.rpc('read_chapter_discussion',{p_chapter:chapter,p_reader:identity.reader,p_sort:sort,p_offset:offset});
+        if(error) throw error;
+        return res.status(200).json(data);
+      }
       let query = db.from('chapter_comments').select(FIELDS).eq('chapter_id',chapter).eq('status','visible').is('parent_id',null).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(21);
       if (req.query.before) {
         let cursor;
@@ -96,6 +122,18 @@ module.exports = async function handler(req, res) {
       const last=roots[roots.length-1];
       return res.status(200).json({comments:roots.map(c=>({...c,replies:replies.filter(r=>r.parent_id===c.id)})),next_cursor:data.length>20?Buffer.from(JSON.stringify({at:last.created_at,id:last.id})).toString('base64url'):null});
     }
+    if(payload.action==='reaction' || payload.action==='like') {
+      if(!allowedOrigin(req)) return res.status(403).json({error:'Please react from the website.'});
+      if(payload.action==='reaction' && payload.value!==null && !['upvote','funny','love','surprised','angry','sad'].includes(payload.value)) return res.status(400).json({error:'Choose a reaction.'});
+      if(payload.action==='like' && (!UUID.test(payload.comment_id || '') || typeof payload.enabled!=='boolean')) return res.status(400).json({error:'Choose a comment.'});
+      const identity=readerIdentity(req,res);
+      const {data,error}=await db.rpc('set_chapter_engagement',{p_chapter:chapter,p_reader:identity.reader,p_ip:identity.ip,p_kind:payload.action,p_value:payload.value || null,p_comment:payload.comment_id || null,p_enabled:payload.enabled || false});
+      if(error?.message?.includes('engagement_rate_limit')) {res.setHeader('Retry-After','60');return res.status(429).json({error:'Please wait a moment before reacting again.'});}
+      if(error?.message?.includes('engagement_invalid')) return res.status(400).json({error:'This reaction is no longer available.'});
+      if(error)throw error;
+      return res.status(200).json(data);
+    }
+    if(payload.action) return res.status(400).json({error:'Unknown action.'});
     const name=typeof payload.name==='string'?payload.name.trim():'';
     const body=typeof payload.body==='string'?payload.body.trim():'';
     if(name.length<1 || name.length>60 || body.length<1 || body.length>3000 || !UUID.test(payload.request_id || '') || (payload.parent_id && !UUID.test(payload.parent_id))) return res.status(400).json({error:'Enter a name (up to 60 characters) and a comment (up to 3,000 characters).'});
