@@ -5187,8 +5187,12 @@ window.aoMountChapterComments=function(chapter,reader){
   "outro": ""
 });
 
+  // Chapter 6 remains a teaser until the final script is added.
+  scripts.push({id:'ch6', kicker:'Chapter 6 · Final chapter', title:'Aftermath', tab:'Chapter 6', comingSoon:true});
+
   // ── Build HTML from a script object ──
   function buildScriptHTML(s) {
+    if (s.comingSoon) return '<div style="text-align:center;padding:clamp(3rem,8vw,6rem) 1rem;"><p class="ao-script-kicker">The final chapter</p><h3 style="font-family:Cinzel,serif;color:var(--text);font-weight:400;">Final chapter coming in November</h3></div>';
     var html = s.sceneTitle ? '<h4 class="ao-script-scene">' + s.sceneTitle + '</h4>' : '';
     if (s.intro) html += '<p class="ao-script-intro">' + s.intro + '</p>';
     html += '<div class="ao-script-divider" aria-hidden="true"></div>';
@@ -5355,7 +5359,7 @@ window.aoMountChapterComments=function(chapter,reader){
     titleEl.textContent = s.title;
     body.innerHTML = id === 'ch5' && !chapterFiveIsLive() && !chapterFivePreview ? chapterFiveComingSoon() : buildScriptHTML(s);
     body.scrollTop = 0;
-    if (id !== 'ch5' || chapterFiveIsLive()) window.aoMountChapterComments(id, body);
+    if (!s.comingSoon && (id !== 'ch5' || chapterFiveIsLive())) window.aoMountChapterComments(id, body);
     renderChapterNavigation(id);
   }
 
@@ -5417,6 +5421,7 @@ window.aoMountChapterComments=function(chapter,reader){
     if (hash === '#script-ch3') openModal('ch3', false);
     if (hash === '#script-ch4') openModal('ch4', false);
     if (hash === '#script-ch5') openModal('ch5', false);
+    if (hash === '#script-ch6') openModal('ch6', false);
   }
 
   // ── Wire up all Read Script buttons ──
