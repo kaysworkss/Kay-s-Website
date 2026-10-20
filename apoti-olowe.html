@@ -2108,6 +2108,25 @@
     .lac-img-wrap, .lac-img-wrap img { min-height: 112px; }
     .auction-actions .btn-mint { width: 100%; text-align: center; box-sizing: border-box; }
   }
+
+  .ao-comments { border-top:1px solid rgba(201,153,58,.25); margin-top:3rem; padding-top:2rem; }
+  .ao-comment-form label { display:block; margin:1rem 0; color:var(--text); }
+  .ao-comment-form input, .ao-comment-form textarea { display:block; width:100%; box-sizing:border-box; border:1px solid rgba(201,153,58,.35); border-radius:4px; padding:.8rem; background:#1b120d; color:var(--text); font:inherit; margin-top:.35rem; }
+  .ao-comment-form textarea { resize:vertical; }
+  .ao-comment-form input:focus, .ao-comment-form textarea:focus { outline:2px solid var(--gold); outline-offset:2px; }
+  .ao-comments button { font:inherit; color:var(--gold); border:1px solid rgba(201,153,58,.35); background:transparent; padding:.4rem .8rem; border-radius:4px; cursor:pointer; }
+  .ao-comments button:disabled { opacity:.5; cursor:wait; }
+  .ao-comments .ao-comment-submit { background:var(--gold); color:#211207; font-weight:bold; }
+  .ao-comment-note { font-size:.9rem; }
+  .ao-comment-feedback { min-height:1.5em; }
+  .ao-comment-trap { position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden; }
+  .ao-comment { border-top:1px solid rgba(201,153,58,.15); padding:1.1rem 0; }
+  .ao-comment-meta { display:flex; flex-wrap:wrap; gap:.7rem; align-items:baseline; }
+  .ao-comment-meta time { font-size:.8rem; opacity:.7; }
+  .ao-comment-text { white-space:pre-wrap; overflow-wrap:anywhere; margin:.6rem 0 !important; }
+  .ao-comment-reply { margin-left:1.2rem; padding-left:1rem; border-left:1px solid rgba(201,153,58,.25); }
+  .ao-comment-replying[hidden], .ao-comment-more[hidden] { display:none; }
+
 </style>
 <!-- Match the homepage heading typography. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3293,6 +3312,7 @@ imgGrey.src = SRC_GREY;
       </div>
       <div class="sm-reader-actions">
         <div class="sm-share-wrap">
+          <button class="sm-icon-btn" id="scriptCommentsJump" type="button" aria-label="Jump to chapter comments" title="Comments">&#9998;</button>
           <button class="sm-icon-btn" id="scriptShareLink" type="button" aria-label="Share this chapter" aria-expanded="false" aria-controls="scriptShareMenu">&#8599;</button>
           <div class="sm-share-menu" id="scriptShareMenu" hidden>
             <button type="button" data-script-share="copy">Copy link</button>
@@ -4199,6 +4219,91 @@ lbPanel.addEventListener('touchend', function(e) {
   setInterval(_checkAuction, 60000);
 }());
 
+// Chapter discussion UI. Text is rendered as text, never interpreted as HTML.
+(function() {
+  const endpoint = '/api/chapter-comments';
+  window.aoMountChapterComments = function(chapter, reader) {
+    const section = document.createElement('section');
+    section.className = 'ao-comments';
+    section.id = 'chapterComments';
+    section.innerHTML = `<h3 class="ao-script-scene">Conversation · ${chapter.replace('ch','Chapter ')}</h3>
+      <p>What stayed with you? Leave a thought or join the conversation.</p>
+      <form class="ao-comment-form">
+        <div class="ao-comment-replying" hidden><span></span> <button type="button" data-cancel-reply>Cancel reply</button></div>
+        <label>Your name<input name="name" required maxlength="60" autocomplete="nickname"></label>
+        <label>Your comment<textarea name="body" required maxlength="3000" rows="4" placeholder="Share your thoughts…"></textarea></label>
+        <label class="ao-comment-trap" aria-hidden="true">Leave blank<input name="website" tabindex="-1" autocomplete="off"></label>
+        <p class="ao-comment-note">Your name and comment will be public. No account needed. Please be respectful.</p>
+        <button type="submit" class="ao-comment-submit">Post comment</button>
+        <p class="ao-comment-feedback" role="status" aria-live="polite"></p>
+      </form>
+      <div class="ao-comment-list" aria-label="Reader comments"></div>
+      <button type="button" class="ao-comment-more" hidden>Load more comments</button>`;
+    reader.appendChild(section);
+    const form=section.querySelector('form'), list=section.querySelector('.ao-comment-list');
+    const feedback=section.querySelector('.ao-comment-feedback'), more=section.querySelector('.ao-comment-more');
+    const replying=section.querySelector('.ao-comment-replying');
+    let parent=null, cursor=null, busy=false, requestId=null;
+    const key='ao-comment-draft-'+chapter;
+    try { form.elements.name.value=sessionStorage.getItem('ao-comment-name') || ''; form.elements.body.value=sessionStorage.getItem(key) || ''; } catch(_) {}
+    form.addEventListener('input',function(){requestId=null;try {sessionStorage.setItem('ao-comment-name',form.elements.name.value);sessionStorage.setItem(key,form.elements.body.value);}catch(_) {}});
+    function resetReply(){parent=null;requestId=null;replying.hidden=true;}
+    section.querySelector('[data-cancel-reply]').addEventListener('click',resetReply);
+    function renderComment(comment,isReply) {
+      const item=document.createElement('article');item.className='ao-comment'+(isReply?' ao-comment-reply':'');
+      const heading=document.createElement('div');heading.className='ao-comment-meta';
+      const name=document.createElement('strong');name.textContent=comment.display_name;
+      const date=document.createElement('time');date.dateTime=comment.created_at;date.textContent=new Date(comment.created_at).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});
+      heading.append(name,date);
+      const text=document.createElement('p');text.className='ao-comment-text';text.textContent=comment.body;
+      item.append(heading,text);
+      if(!isReply){
+        const reply=document.createElement('button');reply.type='button';reply.className='ao-comment-reply-button';reply.textContent='Reply';
+        reply.addEventListener('click',function(){parent=comment.id;requestId=null;replying.querySelector('span').textContent='Replying to '+comment.display_name;replying.hidden=false;form.scrollIntoView({behavior:'smooth',block:'start'});form.elements.body.focus();});
+        item.appendChild(reply);
+        (comment.replies || []).forEach(c=>item.appendChild(renderComment(c,true)));
+      }
+      return item;
+    }
+    async function readComments(append=false){
+      if(busy)return;busy=true;more.disabled=true;
+      if(!append)list.textContent='Loading comments…';
+      try{
+        const response=await fetch(endpoint+'?chapter='+chapter+(append&&cursor?'&before='+encodeURIComponent(cursor):''),{cache:'no-store'});
+        const data=await response.json();if(!response.ok)throw Error(data.error || 'Unable to load comments.');
+        if(!append)list.replaceChildren();
+        if(!append&&!data.comments.length)list.textContent='Be the first to leave a thought.';
+        data.comments.forEach(c=>list.appendChild(renderComment(c,false)));
+        cursor=data.next_cursor;more.hidden=!cursor;
+      }catch(error){
+        if(!append){list.textContent='';const message=document.createElement('p');message.textContent='Comments could not be loaded. ';const retry=document.createElement('button');retry.type='button';retry.textContent='Try again';retry.addEventListener('click',()=>readComments());message.appendChild(retry);list.appendChild(message);}
+        else feedback.textContent='Could not load more comments. Please try again.';
+      }finally{busy=false;more.disabled=false;}
+    }
+    more.addEventListener('click',()=>readComments(true));
+    form.addEventListener('submit',async function(event){
+      event.preventDefault();const submit=form.querySelector('[type="submit"]');if(submit.disabled)return;
+      const name=form.elements.name.value.trim(),body=form.elements.body.value.trim();
+      if(!name||!body){feedback.textContent='Please enter your name and comment.';return;}
+      if(!requestId){
+        const bytes=crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
+        const hex=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');requestId=hex.slice(0,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16)+'-'+hex.slice(16,20)+'-'+hex.slice(20);
+      }
+      submit.disabled=true;feedback.textContent='Posting…';
+      try{
+        const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chapter,name,body,parent_id:parent,request_id:requestId,website:form.elements.website.value})});
+        const data=await response.json().catch(()=>({error:'Comments are temporarily unavailable. Your draft is still here.'}));if(!response.ok || !data.comment)throw Error(data.error || 'Unable to post. Your draft is still here.');
+        form.elements.body.value='';try{sessionStorage.removeItem(key);}catch(_){}
+        resetReply();feedback.textContent='Thank you—your comment has been posted.';
+        await readComments();
+      }catch(error){feedback.textContent=error instanceof TypeError ? 'Could not connect. Your draft is still here; please try again.' : error.message || 'Unable to post. Your draft is still here.';}
+      finally{submit.disabled=false;}
+    });
+    readComments();
+  };
+})();
+
+
 // ── SCRIPT MODAL ──
 (function() {
 
@@ -5089,6 +5194,12 @@ lbPanel.addEventListener('touchend', function(e) {
   var body     = document.getElementById('scriptModalBody');
   var closeBtn = document.getElementById('scriptModalClose');
   var shareBtn = document.getElementById('scriptShareLink');
+  var commentsJump = document.getElementById('scriptCommentsJump');
+  if (commentsJump) commentsJump.addEventListener('click', function() {
+    var comments = body.querySelector('#chapterComments');
+    if (comments) { comments.scrollIntoView({behavior:'smooth',block:'start'}); comments.querySelector('textarea').focus({preventScroll:true}); }
+  });
+
   var shareMenu = document.getElementById('scriptShareMenu');
   var currentId = null;
   var canonicalStoryUrl = 'https://www.kaysworks.com/apoti-olowe';
@@ -5212,6 +5323,7 @@ lbPanel.addEventListener('touchend', function(e) {
     titleEl.textContent = s.title;
     body.innerHTML = id === 'ch5' && !chapterFiveIsLive() && !chapterFivePreview ? chapterFiveComingSoon() : buildScriptHTML(s);
     body.scrollTop = 0;
+    if (id !== 'ch5' || chapterFiveIsLive()) window.aoMountChapterComments(id, body);
     renderChapterNavigation(id);
   }
 

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Chapter comments · Kaysworks</title>
+<style>body{margin:0;background:#21150f;color:#e8dcc9;font:17px/1.6 Georgia,serif}main{max-width:850px;margin:3rem auto;padding:0 1.2rem}h1{font-weight:normal}input,select,button{font:inherit;border:1px solid #8c6739;border-radius:4px;background:#302018;color:#e8dcc9;padding:.6rem}button{cursor:pointer;color:#dfb65c}label{display:block;margin:1rem 0}article{border-top:1px solid #6b4c30;padding:1.2rem 0}article p{white-space:pre-wrap;overflow-wrap:anywhere}small{opacity:.7}.hidden-comment{opacity:.65}a{color:#dfb65c}[hidden]{display:none!important}.tools{display:flex;gap:1rem;flex-wrap:wrap;align-items:center}</style></head>
+<body><main><a href="/apoti-olowe">← Back to the story</a><h1>Chapter comments</h1><p>Hide or restore reader comments. Hiding a top-level comment also hides its replies from the public discussion.</p>
+<form id="login"><label>Existing site admin password <input id="password" type="password" autocomplete="current-password" required></label><button>Sign in</button></form>
+<div id="controls" class="tools" hidden><label>Chapter <select id="chapter"><option value="ch1">Chapter 1</option><option value="ch2">Chapter 2</option><option value="ch3">Chapter 3</option><option value="ch4">Chapter 4</option><option value="ch5" selected>Chapter 5</option><option value="ch6">Chapter 6</option></select></label><button id="refresh">Refresh</button><button id="logout">Sign out</button></div>
+<p id="status" role="status"></p><div id="comments"></div>
+<script>
+(()=>{
+const el=id=>document.getElementById(id);let password='';
+async function load(){el('status').textContent='Loading…';try{
+ const response=await fetch('/api/chapter-comments?action=moderate&chapter='+el('chapter').value,{headers:{'x-admin-password':password},cache:'no-store'});
+ const data=await response.json();if(!response.ok)throw Error(data.error||'Unable to load comments.');
+ el('login').hidden=true;el('controls').hidden=false;el('comments').replaceChildren();
+ for(const c of data.comments){
+  const article=document.createElement('article');if(c.status==='hidden')article.className='hidden-comment';
+  const heading=document.createElement('strong');heading.textContent=c.display_name+(c.parent_id?' · Reply':'');
+  const meta=document.createElement('small');meta.textContent=' · '+new Date(c.created_at).toLocaleString()+' · '+c.status;
+  const text=document.createElement('p');text.textContent=c.body;
+  const button=document.createElement('button');button.textContent=c.status==='hidden'?'Restore':'Hide';
+  button.addEventListener('click',async()=>{button.disabled=true;try{const r=await fetch('/api/chapter-comments',{method:'PATCH',headers:{'Content-Type':'application/json','x-admin-password':password},body:JSON.stringify({id:c.id,status:c.status==='hidden'?'visible':'hidden'})});const j=await r.json();if(!r.ok)throw Error(j.error||'Unable to update.');await load();}catch(e){el('status').textContent=e.message;}finally{button.disabled=false;}});
+  article.append(heading,meta,text,button);el('comments').appendChild(article);
+ }
+ el('status').textContent=data.comments.length?'Showing the latest '+data.comments.length+' entries.':'No comments yet.';
+}catch(e){el('status').textContent=e.message;}}
+el('login').addEventListener('submit',e=>{e.preventDefault();password=el('password').value;el('password').value='';load();});
+el('chapter').addEventListener('change',load);el('refresh').addEventListener('click',load);
+el('logout').addEventListener('click',()=>{password='';el('login').hidden=false;el('controls').hidden=true;el('comments').replaceChildren();el('status').textContent='Signed out.';});
+})();
+</script></main></body></html>
