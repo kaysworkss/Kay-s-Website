@@ -113,7 +113,7 @@ dialog.choice{max-width:560px;max-height:80vh;overflow:auto;border:1px solid var
   <h1>Story branches</h1>
   <span id="stats"></span>
   <span id="sync" role="status" aria-live="polite"></span><button id="menuBtn" aria-expanded="false">More ▾</button>
-  <button id="accountBtn">Sign in to sync</button><button id="storiesBtn" hidden>Stories</button><button id="retrySync" hidden>Retry sync</button><button id="publishLocal" hidden>Sync this local project</button><button id="guestProject" hidden>Open device-only project</button>
+  <button id="accountBtn">Sign in to sync</button><button id="storiesBtn" hidden>Stories</button><button id="retrySync" hidden>Retry sync</button><button id="publishLocal" hidden>Sync this local project</button><button id="loadCloud" hidden>Load cloud copy</button><button id="guestProject" hidden>Open device-only project</button>
   <dialog id="storiesDialog" class="choice"><h2>Your stories</h2><p class="cnote">Each story has its own parts, storylines and characters, saved to your account on every device. Use one story per chapter, book or project.</p><div id="storyList"></div><div class="crow"><input id="newStoryName" placeholder="New story name"><button id="newStoryBtn" class="pri">+ New story</button></div><button id="closeStories">Close</button></dialog>
   <dialog id="accountDialog" class="choice"><h2>Story account</h2>
     <p>Use the same email and password on every device. Your story is private to your Firebase account.</p>
@@ -213,6 +213,7 @@ function accountUI(){
   $('accountBtn').textContent=USER?'Account: '+(USER.email||'signed in'):'Sign in to sync';$('storiesBtn').hidden=!USER;
   $('loginForm').hidden=!!USER;$('logout').hidden=!USER;
   $('publishLocal').hidden=!USER||!(S.localOnly||importedLocally);
+  $('loadCloud').hidden=!USER||!S.localOnly;
   $('guestProject').hidden=!USER;
   if(USER)$('accountStatus').textContent='Signed in as '+USER.email;
 }
@@ -392,6 +393,32 @@ async function publishProject(){
     S.ct=tick();DC=S.ct;delete S.localOnly;importedLocally=false;ls();accountUI();connectSync();
   }catch(e){syncError(e)}
 }
+async function loadCloudCopy(){
+  if(!USER||!FB||!S.localOnly)return;
+  if(!confirm('Load the copy already saved in your Firebase account? The imported copy on this device will be kept under Restore previous. Nothing from this local copy will be uploaded.'))return;
+  const uid=USER.uid,localStory=STORY,localKey=storageKey,backupKey='storyBranchesImported:'+uid+':'+STORY;
+  try{
+    const libraryDoc=await FB.getDocFromServer(libRef());
+    if(!USER||USER.uid!==uid||STORY!==localStory||!S.localOnly)return;
+    if(DID)dUpd();if(SED&&SED._upd)SED._upd();save();
+    // Keep both the pre-import recovery file and this imported story before switching caches.
+    const prior=localStorage.getItem(RECOVERY_KEY);
+    if(prior)localStorage.setItem('storyBranchesBeforeCloudSwitch:'+uid+':'+localStory,prior);
+    localStorage.setItem(backupKey,JSON.stringify(S));
+    if(libraryDoc.exists()){
+      const value=JSON.parse(libraryDoc.data().payload),list=Array.isArray(value.stories)?value.stories:[];
+      if(list.length)LIB=list;
+    }else LIB=[{id:'main',name:'My story'}];
+    if(!LIB.some(story=>story.id===STORY))STORY=LIB[0]?.id||'main';
+    try{localStorage.setItem('storyBranches:lastStory',STORY)}catch(e){}
+    // Clear the imported cache only after preserving it; the snapshot listener will fill this cache.
+    localStorage.removeItem(localKey);
+    storageKey=skeyFor(STORY);
+    RECOVERY_KEY=backupKey;
+    S={nodes:{},next:1,col:1};importedLocally=false;seedTracking();resetView();accountUI();storiesUI();
+    setSync('Loading your cloud story…');connectSync();
+  }catch(e){syncError(e)}
+}
 function authMessage(e){
   const messages={'auth/invalid-credential':'Email or password is incorrect.','auth/wrong-password':'Email or password is incorrect.','auth/user-not-found':'Email or password is incorrect.','auth/invalid-email':'Enter a valid email address.','auth/too-many-requests':'Too many attempts. Please try again later.','auth/network-request-failed':'Could not connect. Check your internet connection.','auth/operation-not-allowed':'Enable Email/Password in Firebase Authentication.','auth/unauthorized-domain':'Add this hostname to Firebase Authentication authorized domains.','auth/user-disabled':'This account has been disabled.'};
   return messages[e.code]||'Sign-in error ('+(e.code||e.message)+').';
@@ -407,6 +434,7 @@ async function initSync(){
     try{await saveLib(l=>[...l,{id,name:n.slice(0,80)}]);$('newStoryName').value='';$('storiesDialog').close();switchStory(id)}catch(e){syncError(e)}};
   $('logout').onclick=async()=>{try{save();await FB.signOut(AUTH);$('accountDialog').close()}catch(e){$('accountStatus').textContent=authMessage(e)}};
   $('publishLocal').onclick=publishProject;
+  $('loadCloud').onclick=loadCloudCopy;
   $('guestProject').onclick=()=>{try{const raw=localStorage.getItem('storyBranches');if(!raw)throw Error('No device-only project is saved here. Import a backup instead.');confirmImport(validateBackup({format:BACKUP_FORMAT,version:BACKUP_VERSION,project:JSON.parse(raw)}),'Device-only project')}catch(e){backupStatus(e.message)}};
   $('retrySync').onclick=()=>{if(FB&&USER)connectSync();else loadFirebase().catch(syncError)};
   accountUI();setSync('Local copy available · connecting to sign-in…');
