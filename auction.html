@@ -3978,6 +3978,8 @@ function _slotMatchesStatus(slot, status) {
 // ─── UPCOMING INIT ────────────────────────────────────────────────────────────
 
 function initUpcoming() {
+  _upcomingInitialised = true;
+  _syncUpcomingBackButton();
   // If multiple pieces, show a piece selector strip on the upcoming view too
   _buildUpcomingPieceSelector();
 
@@ -4199,6 +4201,7 @@ function tickUpcoming(launchMs) {
 const _contractCache = {};
 
 async function initLive() {
+  _liveInitialised = true;
   // Connect provider once
   if (!provider) {
     if (cfg.rpcUrl) {
@@ -4234,6 +4237,7 @@ async function initLive() {
 // ─── Coming-next banner ───────────────────────────────────────────────────────
 
 let _upcomingInitialised = false;
+let _liveInitialised = false;
 
 function _renderComingNextBanner() {
   const banner = document.getElementById("coming-next-banner");
@@ -4253,15 +4257,43 @@ function _renderComingNextBanner() {
 function _cnbGoUpcoming() {
   document.getElementById("view-live").classList.remove("show");
   document.getElementById("view-upcoming").classList.add("show");
-  const backBtn = document.getElementById("upcoming-back-live");
-  if (backBtn) backBtn.style.display = "inline-flex";
+  _syncUpcomingBackButton();
   if (!_upcomingInitialised) { _upcomingInitialised = true; initUpcoming(); }
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function _returnToLiveAuction() {
-  document.getElementById("view-upcoming").classList.remove("show");
-  document.getElementById("view-live").classList.add("show");
+// The "Back to live auction" arrow belongs on the upcoming view whenever at
+// least one piece is live. It used to be shown only when arriving through the
+// coming-next banner, so a refresh (or a shared ?piece= link) lost it.
+function _hasLivePieces() {
+  return !cfg._preview && _auctions.some(p => p._effectiveStatus === "live");
+}
+
+function _syncUpcomingBackButton() {
+  const backBtn = document.getElementById("upcoming-back-live");
+  if (backBtn) backBtn.style.display = _hasLivePieces() ? "inline-flex" : "none";
+}
+
+async function _returnToLiveAuction() {
+  const upcomingView = document.getElementById("view-upcoming");
+  const liveView = document.getElementById("view-live");
+  const firstLive = _auctions.find(p => p._effectiveStatus === "live");
+  // Point the share/refresh URL at a live piece so a reload stays on live.
+  const current = _auctions[_activeIdx];
+  _syncPieceUrl(current && current._effectiveStatus === "live" ? current : firstLive);
+  if (!_liveInitialised) {
+    // The page was opened straight into the upcoming view (refresh or shared
+    // link), so the live view has never been set up. Do it now.
+    upcomingView.classList.remove("show");
+    document.getElementById("view-loading")?.classList.add("show");
+    await _prepareAuctionView("live", initLive);
+    aucOnOpen();
+    initCollectorRoom();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+  upcomingView.classList.remove("show");
+  liveView.classList.add("show");
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
