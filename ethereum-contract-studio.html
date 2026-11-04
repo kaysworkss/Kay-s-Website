@@ -37,6 +37,19 @@ let toastEl,toastTimer;function notify(msg,isErr){const t=typeof msg==='string'?
 let stepReject=null;
 function reviewStep(kind,body){return new Promise((resolve,reject)=>{stepReject=reject;review(kind,body,async()=>{stepReject=null;resolve()})})}
 const ERC721_ABI=['function ownerOf(uint256) view returns (address)','function getApproved(uint256) view returns (address)','function isApprovedForAll(address,address) view returns (bool)','function approve(address,uint256)'];
+
+async function waitApprovalMined(hash,nftAddr,id,owner,market){
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms)),deadline=Date.now()+5*60*1000;
+  let rp=null;try{rp=await getEthereumReadProvider()}catch(e){}
+  while(Date.now()<deadline){
+    for(const prov of [rp,provider].filter(Boolean)){
+      try{const rc=await prov.getTransactionReceipt(hash);if(rc){if(rc.status===1)return;throw Error('The NFT approval transaction failed on-chain, so the auction was not created. https://etherscan.io/tx/'+hash)}}catch(e){if(String(e.message).includes('failed on-chain'))throw e}
+      try{const c=new ethers.Contract(nftAddr,ERC721_ABI,prov),single=await c.getApproved(id),all=await c.isApprovedForAll(owner,market);if(all||single.toLowerCase()===market.toLowerCase())return}catch(e){}
+    }
+    await sleep(3000)
+  }
+  throw Error('Still waiting for the NFT approval to confirm. Check https://etherscan.io/tx/'+hash+' then click Review again; if it is approved the page will skip straight to the auction.')
+}
 async function ensureNftApproval(){
   const p=plainCreation(),market=selected.address,me=await signer.getAddress();
   if(!ethers.isAddress(p.nftContract))throw Error('NFT contract must be a valid Ethereum address.');
@@ -49,8 +62,7 @@ async function ensureNftApproval(){
   notify('Confirm the NFT approval in your wallet…');
   const tx=await nft.approve(market,id);
   notify(`Approval submitted. Waiting for confirmation…\nhttps://etherscan.io/tx/${tx.hash}`);
-  const rc=await tx.wait();
-  if(!rc||rc.status!==1)throw Error('The NFT approval transaction failed, so the auction was not created.');
+  await waitApprovalMined(tx.hash,p.nftContract,id,owner,market);
   notify(`NFT approved (token #${id}). Now review the auction itself.`);
   await reviewStep('Step 2 of 2 — Create the auction',{chain:'ethereum',contract:market,entrypoint:'createAuction',auctionId:'assigned automatically',payload:p});
 }
