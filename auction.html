@@ -1113,6 +1113,19 @@ body {
 .about-body p:last-child { margin-bottom: 0; }
 .about-body br + br { display: block; content: ""; margin-top: 0.4em; }
 
+
+/* "Read the chapter" link inside the about panel */
+.about-chapter-link-wrap { margin-top: 22px; }
+.about-chapter-link-wrap:empty { display: none; }
+.about-chapter-link {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 44px;
+  padding: 0.7rem 1.1rem; border: 1px solid rgba(201,153,58,0.45); border-radius: 3px;
+  background: rgba(201,153,58,0.08); color: var(--gold); text-decoration: none;
+  font-family: 'Cinzel', serif; font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase;
+  transition: background 0.2s, border-color 0.2s;
+}
+.about-chapter-link:hover, .about-chapter-link:focus-visible { background: rgba(201,153,58,0.16); border-color: var(--gold); outline: none; }
+
 /* ── Right bid column ── */
 .bid-col {
   overflow-y: scroll;
@@ -2086,6 +2099,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
           <div class="about-title" id="upcoming-about-title"></div>
           <div class="about-meta"  id="upcoming-about-meta"></div>
           <div class="about-body"  id="upcoming-about-body"></div>
+          <div class="about-chapter-link-wrap" id="upcoming-about-link"></div>
         </div>
       </div>
       <div class="art-info">
@@ -2205,6 +2219,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             <div class="about-title" id="live-about-title"></div>
             <div class="about-meta"  id="live-about-meta"></div>
             <div class="about-body"  id="live-about-body"></div>
+            <div class="about-chapter-link-wrap" id="live-about-link"></div>
           </div>
         </div>
         <div class="art-info">
@@ -5141,6 +5156,29 @@ function _sanitizeAbout(html) {
   return root.innerHTML;
 }
 
+// Button linking to the chapter on the Àpótí Ọlọ́wẹ̀ page. Only http(s) URLs
+// are accepted; text is set with textContent so nothing admin-entered is parsed as HTML.
+function renderChapterLink(view, url, label) {
+  const box = document.getElementById(`${view}-about-link`);
+  if (!box) return false;
+  box.textContent = "";
+  const text = String(label || "").trim() || "Read the chapter";
+  let href = "";
+  try {
+    const u = new URL(String(url || "").trim());
+    if (u.protocol === "https:" || u.protocol === "http:") href = u.href;
+  } catch (_) {}
+  if (!href) return false;
+  const a = document.createElement("a");
+  a.className = "about-chapter-link";
+  a.href = href;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.textContent = `${text} →`;
+  box.appendChild(a);
+  return true;
+}
+
 function populateAbout(view, data) {
   const src    = data || cfg;
   const title  = src.artTitle  || "";
@@ -5148,8 +5186,8 @@ function populateAbout(view, data) {
   const year   = src.artYear   || "";
   const medium = src.artMedium || "";
   const about  = src.artAbout  || "";
-
-  if (!about && !title) return;
+  const hasLink = renderChapterLink(view, src.chapterLink, src.chapterLinkLabel);
+  if (!about && !title && !hasLink) return;
 
   document.getElementById(`${view}-about-title`).textContent = title;
   const metaParts = [artist, year, medium].filter(Boolean);

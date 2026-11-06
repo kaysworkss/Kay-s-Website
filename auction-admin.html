@@ -221,6 +221,9 @@ body {
   overflow-x: auto;
   gap: 2px;
   scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
 }
 .piece-tab-item {
   display: inline-flex;
@@ -228,7 +231,7 @@ body {
   flex-shrink: 0;
   user-select: none;
   cursor: grab;
-  touch-action: pan-y;
+  touch-action: pan-x pan-y; /* allow horizontal swipe to scroll the tab strip */
 }
 .piece-tab-item:active { cursor: grabbing; }
 .piece-tab-item.drag-over {
@@ -250,6 +253,7 @@ body {
   display: none;
 }
 .piece-tab-drag-hint.show { display: block; }
+
 
 /* Chat lock toggle */
 .chat-lock-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
@@ -1175,6 +1179,15 @@ function _buildPieceForm(idx) {
       </div>
       <div class="field-hint">Select text and use <b>B</b>, <i>I</i>, <u>U</u> to format. Keyboard: Ctrl/⌘ + B / I / U.</div>
     </div>
+    <div class="field">
+      <label>Chapter link <span style="opacity:.6;text-transform:none;letter-spacing:0">(optional)</span></label>
+      <input id="${_pieceFieldId(idx,'chapterLink')}" placeholder="https://your-site.com/apoti-olowe.html#release-ch2" value="${_chEsc(d.chapterLink)}"/>
+      <div class="field-hint">Adds a button inside “About this work” that opens this chapter on your Àpótí Ọlọ́wẹ̀ page. On that page use the “Copy link” button under the chapter card and paste it here.</div>
+    </div>
+    <div class="field">
+      <label>Chapter button text <span style="opacity:.6;text-transform:none;letter-spacing:0">(optional)</span></label>
+      <input id="${_pieceFieldId(idx,'chapterLinkLabel')}" maxlength="60" placeholder="Read the chapter" value="${_chEsc(d.chapterLinkLabel)}"/>
+    </div>
     <div class="row2">
       <div class="field"><label>Year</label>
         <input id="${_pieceFieldId(idx,'artYear')}" placeholder="2025" value="${d.artYear||''}"/></div>
@@ -1295,6 +1308,12 @@ function _renderPieceTabs() {
   if (typeof _updateEffectiveHint === "function") _updateEffectiveHint(_activePieceIdx);
 }
 
+
+function _chEsc(v) {
+  return String(v == null ? "" : v)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
 // ─── Drag-to-reorder piece tabs ───────────────────────────────────────────────
 
 let _dragSrcIdx = null;
@@ -1306,8 +1325,10 @@ function _renderPieceTabItems() {
     const dotTitle = p.status ? `Status: ${eff}` : `Status: ${eff} (inherited)`;
     const label = p.artTitle || 'Piece ' + (i + 1);
     const canReorder = _pieces.length > 1;
+    // Touch screens reorder with the ‹ › buttons; draggable would fight swipe-scrolling.
+    const canDrag = canReorder && !(window.matchMedia && matchMedia("(pointer: coarse)").matches);
     return `
-    <div class="piece-tab-item ${i===_activePieceIdx?'active':''}" data-idx="${i}" draggable="${canReorder ? 'true' : 'false'}">
+    <div class="piece-tab-item ${i===_activePieceIdx?'active':''}" data-idx="${i}" draggable="${canDrag ? 'true' : 'false'}">
       <button type="button" class="piece-tab-main" data-action="select" title="Select ${label}">
         <span class="piece-tab-status-dot ${eff}" title="${dotTitle}"></span>${label}
       </button>
@@ -1420,6 +1441,7 @@ function _initTabDrag(container) {
     });
 
     btn.addEventListener("pointerdown", e => {
+      if (e.pointerType === "touch") return; // let the browser scroll the strip on touch
       if (!e.isPrimary || e.button !== 0 || e.target.closest("[data-action='remove'], [data-action='duplicate'], .piece-tab-move")) return;
       _pointerDrag = {
         srcIdx: parseInt(btn.dataset.idx, 10),
@@ -1661,7 +1683,7 @@ document.addEventListener("keyup", (e) => {
 
 function _savePieceFormValues(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
-  const fields = ["chain","contractAddr","marketplaceAddr","marketplaceAuctionId","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","usdHardCap","holderUsdHardCap","publicUsdHardCap","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","launchDate","status","chatLocked","chatLockMsg"];
+  const fields = ["chain","contractAddr","marketplaceAddr","marketplaceAuctionId","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","usdHardCap","holderUsdHardCap","publicUsdHardCap","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","chapterLink","chapterLinkLabel","launchDate","status","chatLocked","chatLockMsg"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
     if (!el) return;
