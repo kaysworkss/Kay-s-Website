@@ -109,6 +109,15 @@ function sanitiseRpcUrls(value) {
     }))].slice(0, 4);
 }
 
+// Link to the chapter on the Àpótí Ọlọ́wẹ̀ page: http(s) only.
+function sanitiseHttpUrl(value) {
+  const v = String(value || "").trim().slice(0, 500);
+  try {
+    const u = new URL(v);
+    return (u.protocol === "https:" || u.protocol === "http:") && !u.username && !u.password ? v : "";
+  } catch (_) { return ""; }
+}
+
 function sanitisePiece(p) {
   if (!p || typeof p !== "object") return null;
   const chain = String(p.chain || "eth").toLowerCase() === "tezos" ? "tezos" : "eth";
@@ -141,6 +150,8 @@ function sanitisePiece(p) {
     // ~8k words of formatted prose with markup overhead, well within Edge
     // Config's per-key budget even with 20 pieces.
     artAbout:     String(p.artAbout     || "").slice(0, 50000),
+    chapterLink:      sanitiseHttpUrl(p.chapterLink),
+    chapterLinkLabel: String(p.chapterLinkLabel || "").trim().slice(0, 60),
     artYear:      String(p.artYear      || "").slice(0, 10),
     artMedium:    String(p.artMedium    || "").slice(0, 200),
     artImage:     String(p.artImage     || "").slice(0, 500),
