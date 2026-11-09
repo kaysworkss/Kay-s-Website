@@ -883,6 +883,34 @@ body {
 .voice-rec-time { flex:1; font-variant-numeric:tabular-nums; }
 .voice-rec-btn { font-family:'Cinzel',serif; font-size:.5rem; letter-spacing:.15em; text-transform:uppercase; border:1px solid rgba(196,132,90,.4); background:transparent; color:var(--sand); border-radius:3px; padding:6px 10px; cursor:pointer; }
 .voice-rec-btn.send { background:var(--clay); color:var(--bark); border-color:var(--clay); }
+
+/* <phase-css> ── Phase tags, filter chips, gate notice ── */
+:root { --phase-patron: #c9993a; --phase-open: #8ea17a; }
+.piece-tab[data-phase="patron"] { box-shadow: inset 0 -2px 0 rgba(201,153,58,.6); }
+.piece-tab[data-phase="open"]   { box-shadow: inset 0 -2px 0 rgba(142,161,122,.6); }
+.piece-tab.active[data-phase="patron"] { box-shadow: 0 0 0 1px rgba(196,132,90,.18), inset 0 -2px 0 rgba(201,153,58,.6); }
+.piece-tab.active[data-phase="open"]   { box-shadow: 0 0 0 1px rgba(196,132,90,.18), inset 0 -2px 0 rgba(142,161,122,.6); }
+.piece-tab-phase { display:flex; flex-direction:column; gap:2px; margin-top:1px; }
+.piece-tab:not([data-phase]) .piece-tab-phase, .piece-tab[data-sold="1"] .piece-tab-phase { display:none; }
+.piece-phase-tag { align-self:flex-start; font-family:'Cinzel',serif; font-size:.38rem; letter-spacing:.12em; text-transform:uppercase; line-height:1.4; padding:1px 5px; border-radius:2px; border:1px solid transparent; }
+.piece-tab[data-phase="patron"] .piece-phase-tag { color:var(--phase-patron); border-color:rgba(201,153,58,.4);  background:rgba(201,153,58,.1); }
+.piece-tab[data-phase="open"]   .piece-phase-tag { color:var(--phase-open);   border-color:rgba(142,161,122,.4); background:rgba(142,161,122,.1); }
+.piece-phase-time { font-family:'Crimson Pro',serif; font-size:.7rem; font-style:italic; text-transform:none; letter-spacing:0; color:var(--text-muted); line-height:1.2; }
+.piece-phase-time:empty { display:none; }
+.piece-phase-filter { display:none; gap:6px; flex-wrap:wrap; padding:8px 20px 0; }
+.piece-phase-filter.show { display:flex; }
+.phase-chip { font-family:'Cinzel',serif; font-size:.46rem; letter-spacing:.14em; text-transform:uppercase; padding:5px 11px; border-radius:999px; border:1px solid var(--divider); background:transparent; color:var(--text-muted); cursor:pointer; transition:color .2s, border-color .2s, background .2s; }
+.phase-chip:hover { color:var(--sand); }
+.phase-chip.active { color:var(--sand); border-color:var(--clay); background:rgba(196,132,90,.1); }
+.phase-chip[data-f="open"].active   { color:var(--phase-open);   border-color:rgba(142,161,122,.6); background:rgba(142,161,122,.1); }
+.phase-chip[data-f="patron"].active { color:var(--phase-patron); border-color:rgba(201,153,58,.6);  background:rgba(201,153,58,.1); }
+.gate-notice-title { font-family:'Cinzel',serif; font-size:.62rem; letter-spacing:.16em; text-transform:uppercase; color:var(--phase-patron); margin-bottom:5px; }
+.gate-notice-opens { font-family:'Crimson Pro',serif; font-size:.98rem; color:var(--sand); margin-bottom:11px; line-height:1.4; }
+.gate-get-btn { display:none; align-items:center; gap:.45em; font-family:'Cinzel',serif; font-size:.5rem; letter-spacing:.14em; text-transform:uppercase; background:var(--phase-patron); color:var(--bark); text-decoration:none; padding:8px 14px; border-radius:3px; font-weight:600; }
+.gate-get-btn:hover { background:var(--clay); }
+.gate-notice-sub { font-family:'Crimson Pro',serif; font-size:.82rem; font-style:italic; color:var(--text-muted); margin-top:9px; }
+@media (max-width: 600px) { .piece-phase-filter { padding:7px 12px 0; } }
+/* </phase-css> */
 .voice-player { display:flex; align-items:center; gap:8px; min-width:150px; }
 .voice-play { width:26px; height:26px; border-radius:50%; border:1px solid rgba(196,132,90,.45); background:rgba(196,132,90,.12); color:var(--clay); cursor:pointer; font-size:.6rem; flex-shrink:0; padding:0; line-height:1; }
 .voice-track { flex:1; height:4px; background:rgba(196,132,90,.22); border-radius:2px; overflow:hidden; }
@@ -2213,6 +2241,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
       </div>
       <div class="piece-selector-hint">Tap a piece to switch</div>
     </div>
+    <div class="piece-phase-filter" id="piece-phase-filter"></div>
     <div class="piece-selector-scroll-wrap" id="piece-selector-scroll-wrap">
       <div class="piece-selector" id="piece-selector"></div>
     </div>
@@ -2262,10 +2291,11 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
         <div class="bid-inner">
 
           <!-- Gate access notice — shown when auction requires a token; hidden for open auctions and once wallet connects -->
-          <div id="live-gate-notice" style="display:none;margin-bottom:16px;background:rgba(196,132,90,0.05);border:1px solid var(--divider);border-radius:var(--r);padding:14px 16px">
-            <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Entry requirement</div>
-            <div style="font-family:'Crimson Pro',serif;font-size:0.9rem;color:var(--text-muted);line-height:1.6;font-style:italic;margin-bottom:8px">Hold <span id="live-gate-name-inline" style="color:var(--clay);font-style:normal">the entry token</span> to participate during the gated phase. Connect the wallet that holds it to join.</div>
-            <a id="live-gate-link" href="#" target="_blank" style="display:none;font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold);text-decoration:none;border-bottom:1px solid rgba(201,153,58,0.3);padding-bottom:1px" onmouseover="this.style.color='var(--clay)'" onmouseout="this.style.color='var(--gold)'">Get the entry token →</a>
+          <div id="live-gate-notice" style="display:none;margin-bottom:16px;background:rgba(201,153,58,0.06);border:1px solid rgba(201,153,58,0.28);border-left:3px solid var(--phase-patron);border-radius:var(--r);padding:14px 16px">
+            <div class="gate-notice-title">Patrons only for now</div>
+            <div class="gate-notice-opens" id="live-gate-opens">Opens to everyone soon</div>
+            <a id="live-gate-link" class="gate-get-btn" href="#" target="_blank" rel="noopener noreferrer">Get<span id="live-gate-name-inline">the entry token</span><span aria-hidden="true">→</span></a>
+            <div class="gate-notice-sub">Already a patron? Connect your wallet below.</div>
             <details class="gate-why">
               <summary>Why an entry token?</summary>
               <div class="gate-why-copy">
@@ -4342,6 +4372,7 @@ async function _returnToLiveAuction() {
 async function _buildPieceSelector() {
   const strip = document.getElementById("piece-selector");
   strip.innerHTML = "";
+  _slotPhase = {}; _phaseFilter = "all";
 
   // Show only live pieces. Preview mode also allows Off pieces so admins
   // can inspect unpublished work without making Live/Upcoming overrides leak.
@@ -4398,6 +4429,7 @@ async function _buildPieceSelector() {
       <div class="piece-tab-info">
         <div class="piece-tab-title">${slot.artTitle || "Piece " + (i + 1)}</div>
         <div class="piece-tab-bid" id="tab-bid-${i}">—</div>
+        <div class="piece-tab-phase"><span class="piece-phase-tag"></span><span class="piece-phase-time"></span></div>
         <div class="piece-tab-footer">
           <span class="piece-tab-live-dot" id="tab-dot-${i}"></span>
           ${pairBadge}
@@ -4408,7 +4440,12 @@ async function _buildPieceSelector() {
     btn.addEventListener("click", () => _switchAuction(i));
     strip.appendChild(btn);
     if (_isManualSold(slot, i)) _setTabSoldState(i, true);
+    // Pieces with no entry token are free-for-all from the start; gated pieces
+    // get their phase from the contract on the first poll.
+    if (!slot.gateName) _setTabPhase(i, { phase: "open", endsAtMs: 0 });
   }
+  _bindPhaseFilter();
+  if (!_phaseTickStarted) { _phaseTickStarted = true; setInterval(_tickPhases, 15000); }
 
   updateAuctionNav();
 
@@ -4428,7 +4465,134 @@ async function _buildPieceSelector() {
   setInterval(_pollAllTabBids, 20000);
 }
 
+// <phase-js>
+// ── Phase tags, filter chips and countdowns ───────────────────────────────────
+// patron = holder-only window (gate token needed) · open = free for all.
+let _slotPhase = {};           // slot index → { phase, endsAtMs }
+let _phaseFilter = "all";
+let _phaseTickStarted = false;
+let _phaseRepollAt = 0;
+let _gateOpensAtMs = null;     // null = hide · 0 = phased, time unknown · >0 = timestamp
+
+function _fmtOpensIn(ms) {
+  const m = Math.max(1, Math.round(ms / 60000));
+  const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${mm}m`;
+  return `${mm}m`;
+}
+
+function _ethPhaseFromState(s, slot) {
+  if (!slot?.gateName) return { phase: "open", endsAtMs: 0 };
+  if (_ethStateOpenToEveryone(s, slot)) return { phase: "open", endsAtMs: 0 };
+  const hasPhaseFields = s.gateEndsAt !== undefined || s.holderOnly !== undefined;
+  const holderOnly = hasPhaseFields ? s.holderOnly === true : true;
+  const endsMs = Number(s.gateEndsAt || 0) * 1000;
+  return { phase: "patron", endsAtMs: holderOnly && endsMs > Date.now() ? endsMs : 0 };
+}
+function _tezosPhaseFromAuction(slot, auction) {
+  if (!slot?.gateName) return { phase: "open", endsAtMs: 0 };
+  if (_tezosAuctionOpenToEveryone(auction)) return { phase: "open", endsAtMs: 0 };
+  const endsMs = auction.isPhased && auction.holderOnly ? Number(auction.gateEndMs || 0) : 0;
+  return { phase: "patron", endsAtMs: endsMs > Date.now() ? endsMs : 0 };
+}
+
+function _tabBtn(idx) { return document.querySelector(`#piece-selector .piece-tab[data-idx="${idx}"]`); }
+
+function _setTabPhase(i, info) {
+  let idx = i, btn = _tabBtn(idx);
+  if (!btn) {
+    // The Tezos half of a cross-chain pair has no card of its own — only fill in
+    // for its pair's card when that card has no phase yet.
+    const pk = _pairKeyForSlot(_auctions[i]);
+    if (!pk) return;
+    const rep = _visibleLiveIndexes.find(j => j !== i && _pairKeyForSlot(_auctions[j]) === pk);
+    if (rep === undefined || _slotPhase[rep]) return;
+    idx = rep; btn = _tabBtn(idx);
+    if (!btn) return;
+  }
+  _slotPhase[idx] = info;
+  btn.dataset.phase = info.phase;
+  _renderTabPhase(idx);
+  _renderPhaseFilter();
+}
+
+function _renderTabPhase(idx) {
+  const info = _slotPhase[idx], btn = _tabBtn(idx);
+  if (!info || !btn) return;
+  const tag  = btn.querySelector(".piece-phase-tag");
+  const time = btn.querySelector(".piece-phase-time");
+  if (tag)  tag.textContent = info.phase === "patron" ? "Patron phase" : "Open to all";
+  if (time) time.textContent = info.phase === "patron" && info.endsAtMs > 0
+    ? (info.endsAtMs > Date.now() ? "Opens to all in " + _fmtOpensIn(info.endsAtMs - Date.now()) : "Opening to all now…")
+    : "";
+}
+
+function _renderPhaseFilter() {
+  const box = document.getElementById("piece-phase-filter"); if (!box) return;
+  const n = { open: 0, patron: 0 };
+  document.querySelectorAll("#piece-selector .piece-tab").forEach(c => {
+    if (c.dataset.sold !== "1" && n[c.dataset.phase] !== undefined) n[c.dataset.phase]++;
+  });
+  if (!(n.open > 0 && n.patron > 0)) {          // nothing to choose between → no chips
+    box.classList.remove("show"); box.innerHTML = ""; _phaseFilter = "all"; _applyPhaseFilter(); return;
+  }
+  if (_phaseFilter === "open" && !n.open) _phaseFilter = "all";
+  const chips = [["all", "All", n.open + n.patron], ["open", "Open to all", n.open], ["patron", "Patron phase", n.patron]];
+  box.innerHTML = chips.map(([f, l, c]) =>
+    `<button type="button" class="phase-chip${_phaseFilter === f ? " active" : ""}" data-f="${f}">${l} · ${c}</button>`).join("");
+  box.classList.add("show");
+  _applyPhaseFilter();
+}
+
+function _applyPhaseFilter() {
+  document.querySelectorAll("#piece-selector .piece-tab").forEach(c => {
+    const hide = _phaseFilter !== "all" && c.dataset.phase && c.dataset.phase !== _phaseFilter;
+    c.style.display = hide ? "none" : "";
+  });
+  const strip = document.getElementById("piece-selector");
+  if (strip) strip.dispatchEvent(new Event("scroll"));   // refresh the scroll-fade hints
+}
+
+function _bindPhaseFilter() {
+  const box = document.getElementById("piece-phase-filter");
+  if (!box || box._bound) return;
+  box._bound = true;
+  box.addEventListener("click", (e) => {
+    const b = e.target.closest(".phase-chip"); if (!b) return;
+    _phaseFilter = b.dataset.f;
+    _renderPhaseFilter();
+  });
+}
+
+// Gate notice on the piece page
+function _renderGateOpens() {
+  const el = document.getElementById("live-gate-opens"); if (!el) return;
+  if (_gateOpensAtMs === null) { el.style.display = "none"; return; }
+  el.style.display = "";
+  el.textContent = _gateOpensAtMs > 0
+    ? (_gateOpensAtMs > Date.now() ? "Opens to everyone in " + _fmtOpensIn(_gateOpensAtMs - Date.now()) : "Opening to everyone now…")
+    : "Opens to everyone soon";
+}
+function _setGateOpensAt(ms) { _gateOpensAtMs = ms; _renderGateOpens(); }
+
+function _tickPhases() {
+  const now = Date.now();
+  let needRepoll = false;
+  Object.keys(_slotPhase).forEach(k => {
+    _renderTabPhase(+k);
+    const e = _slotPhase[k].endsAtMs;
+    if (_slotPhase[k].phase === "patron" && e > 0 && e <= now) needRepoll = true;
+  });
+  _renderGateOpens();
+  // A patron window just ended — re-read the contracts so cards flip to "Open to all"
+  if (needRepoll && now - _phaseRepollAt > 20000) { _phaseRepollAt = now; _pollAllTabBids(); }
+}
+// </phase-js>
+
 function _setTabSoldState(i, sold, bidText = "") {
+  const _tb = _tabBtn(i);
+  if (_tb && (_tb.dataset.sold === "1") !== !!sold) { _tb.dataset.sold = sold ? "1" : "0"; _renderPhaseFilter(); }
   const bidEl  = document.getElementById("tab-bid-"  + i);
   const soldEl = document.getElementById("tab-sold-" + i);
   const dotEl  = document.getElementById("tab-dot-"  + i);
@@ -4459,6 +4623,7 @@ async function _pollAllTabBids() {
       let c = _contractCache[_ethContractKeyForSlot(slot)];
       if (!c) { c = _makeEthAuctionContract(slot, provider); _contractCache[_ethContractKeyForSlot(slot)] = c; }
       const s       = await c.auctionState();
+      _setTabPhase(i, _ethPhaseFromState(s, slot));
       const bid     = s[6]; // _highestBid
       const settled = s[2]; // _settled
       if (manualSold || settled) {
@@ -4477,6 +4642,7 @@ async function _pollAllTabBids() {
     const aucRaw  = await _readTezosAuction(slot);
     const auction = _normalizeTezosAuction(aucRaw);
     if (!auction) return;
+    _setTabPhase(i, _tezosPhaseFromAuction(slot, auction));
 
     if (manualSold || auction.settled || auction.cancelled) {
       _setTabSoldState(i, true);
@@ -4942,6 +5108,7 @@ async function _switchAuction(idx, opts = {}) {
   // Keep the warning hidden until refreshState() loads the current on-chain
   // phase. Configuration alone may still name a gate after the public phase
   // begins, which otherwise causes a stale token warning to flash on load.
+  _setGateOpensAt(null);
   const _lgNotice = document.getElementById("live-gate-notice");
   if (_lgNotice) {
     _lgNotice.style.display = "none";
@@ -6343,6 +6510,9 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     const holderOnly     = s.holderOnly === true;
     const openToEveryone = _ethStateOpenToEveryone(s, _activeCfg());
     _setAuctionOpenToEveryone(openToEveryone);
+    _setGateOpensAt(openToEveryone || (s.gateEndsAt === undefined && s.holderOnly === undefined)
+      ? null
+      : (holderOnly && gateEndsAt * 1000 > Date.now() ? gateEndsAt * 1000 : 0));
     if (_pairKeyForSlot(_activeCfg()) && gateEndsAt > 0 && typeof s.holderOnly === "boolean") {
       _setCrossChainPhase(s.holderOnly ? "holder" : "public");
     }
@@ -6857,6 +7027,9 @@ async function refreshTezosState(runToken = _switchToken, prefetched = null) {
     else if (!auction.started)                     { sl.textContent = "Waiting for Tezos auction start"; sl.className = "status-line upcoming-line"; }
     else                                           { sl.textContent = "Ended - awaiting settlement"; sl.className = "status-line ended"; }
 
+    _setGateOpensAt(!openToEveryone && auction.isPhased && auction.holderOnly
+      ? (auction.gateEndMs > nowMs ? auction.gateEndMs : 0)
+      : null);
     const gateNotice = document.getElementById("live-gate-notice");
     if (gateNotice && auction.isPhased) {
       gateNotice.style.display = (!openToEveryone && auction.holderOnly && !tezosAddress) ? "block" : "none";
