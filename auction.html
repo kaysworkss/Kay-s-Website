@@ -8394,6 +8394,19 @@ function _voiceBar(state) {  // "rec" | "sending" | null
 
 // ── Permission handling ──
 // The browser shows its own microphone prompt. If it is already blocked, say how to fix it instead of failing silently.
+// Wallet apps open pages in an embedded WebView that often refuses microphone access
+// no matter what the user approves, because the wallet app itself must grant it.
+function _voiceInAppBrowser() {
+  const ua = navigator.userAgent || "";
+  const eth = window.ethereum || {};
+  return /; wv\)|MetaMaskMobile|Trust|CoinbaseWallet|CBWallet|imToken|TokenPocket|Rainbow|Phantom|OKX|Bitget|SafePal|Zerion/i.test(ua)
+      || (/iPhone|iPad|iPod/.test(ua) && !/Safari/.test(ua))
+      || !!(eth.isTrust || eth.isCoinbaseWallet || eth.isTokenPocket || eth.isImToken);
+}
+function _voiceInAppMsg() {
+  notify("err", "Microphone not available here",
+    "Your wallet's built-in browser doesn't allow microphone access. Open this page in Chrome or Safari to record — you can connect your wallet there too. Listening still works.");
+}
 async function _voiceMicState() {
   try { return (await navigator.permissions.query({ name: "microphone" })).state; } catch (_) { return "unknown"; }
 }
@@ -8404,7 +8417,8 @@ async function toggleVoiceRecord(role) {
   if (role === "auctioneer" ? !_isKay() : !_roomEligible) return;
   if (_auctionSettled || _chatManuallyLocked || !_auctionId) return;
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-    notify("err", "Voice not supported", "This browser can't record audio. Try Chrome or Safari.");
+    if (_voiceInAppBrowser()) _voiceInAppMsg();
+    else notify("err", "Voice not supported", "This browser can't record audio. Try Chrome or Safari.");
     return;
   }
   if (Date.now() - _vLastSentAt < VOICE_COOLDOWN_MS) {
@@ -8412,6 +8426,7 @@ async function toggleVoiceRecord(role) {
     return;
   }
   if (await _voiceMicState() === "denied") {
+    if (_voiceInAppBrowser()) { _voiceInAppMsg(); return; }
     notify("err", "Microphone blocked", "Microphone access is off for this site. Open your browser's site settings (the icon beside the address), allow the microphone, then try again.");
     return;
   }
@@ -8420,6 +8435,7 @@ async function toggleVoiceRecord(role) {
     stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
   } catch (e) {
     if (e && e.name === "NotFoundError") notify("err", "No microphone", "No microphone was found on this device.");
+    else if (_voiceInAppBrowser()) _voiceInAppMsg();
     else notify("err", "Microphone blocked", "Allow microphone access for this site (browser site settings) to send voice notes.");
     return;
   }
