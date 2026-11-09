@@ -872,6 +872,22 @@ body {
 .chat-compose-input::placeholder { color:rgba(196,132,90,.3); }
 .chat-send-btn { font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.15em; text-transform:uppercase; background:var(--bark); color:var(--sand); border:none; border-radius:3px; padding:6px 11px; cursor:pointer; white-space:nowrap; }
 .chat-send-btn:disabled { opacity:.35; cursor:not-allowed; }
+/* ── Voice notes ── */
+.chat-mic-btn { background:var(--bark); color:var(--sand); border:none; border-radius:3px; padding:6px 10px; cursor:pointer; font-size:.82rem; line-height:1; flex-shrink:0; }
+.chat-mic-btn:disabled { opacity:.35; cursor:not-allowed; }
+.voice-rec-bar { display:none; align-items:center; gap:9px; padding:9px 13px; border-top:1px solid var(--divider); background:rgba(158,79,46,.14); font-family:'Crimson Pro',serif; font-size:.9rem; color:var(--sand); flex-shrink:0; }
+.voice-rec-bar.show { display:flex; }
+.voice-rec-dot { width:9px; height:9px; border-radius:50%; background:#d9534f; flex-shrink:0; animation:voicePulse 1s ease-in-out infinite; }
+@keyframes voicePulse { 50% { opacity:.25; } }
+.voice-rec-time { flex:1; font-variant-numeric:tabular-nums; }
+.voice-rec-btn { font-family:'Cinzel',serif; font-size:.5rem; letter-spacing:.15em; text-transform:uppercase; border:1px solid rgba(196,132,90,.4); background:transparent; color:var(--sand); border-radius:3px; padding:6px 10px; cursor:pointer; }
+.voice-rec-btn.send { background:var(--clay); color:var(--bark); border-color:var(--clay); }
+.voice-player { display:flex; align-items:center; gap:8px; min-width:150px; }
+.voice-play { width:26px; height:26px; border-radius:50%; border:1px solid rgba(196,132,90,.45); background:rgba(196,132,90,.12); color:var(--clay); cursor:pointer; font-size:.6rem; flex-shrink:0; padding:0; line-height:1; }
+.voice-track { flex:1; height:4px; background:rgba(196,132,90,.22); border-radius:2px; overflow:hidden; }
+.voice-fill { height:100%; width:0; background:var(--clay); }
+.voice-dur { font-family:'Crimson Pro',serif; font-size:.75rem; color:var(--text-muted); font-variant-numeric:tabular-nums; min-width:28px; text-align:right; }
+
 
 /* ── Collector profile panel ── */
 .profile-panel { padding:10px 13px; border-top:1px solid var(--divider); background:var(--bg-alt); display:none; flex-shrink:0; }
@@ -2501,6 +2517,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             <div class="slabel" style="margin-bottom:6px">Custom call</div>
             <div class="gavel-custom-row">
               <input class="gavel-input" id="gavel-custom-input" placeholder="Speak to the room…" onkeydown="if(event.key==='Enter')sendGavelCustom()"/>
+              <button class="chat-mic-btn" onclick="toggleVoiceRecord('auctioneer')" title="Speak to the room (voice note)" aria-label="Record a voice note as auctioneer">🎙</button>
               <button class="gavel-call-btn" onclick="sendGavelCustom()">Call it</button>
             </div>
             <!-- FlexAuction on-chain actions -->
@@ -2556,6 +2573,14 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
         <span id="chat-settled-lock-msg">This auction has concluded — the collector room is now archived</span>
       </div>
 
+      <!-- Voice note recording bar -->
+      <div class="voice-rec-bar" id="voice-rec-bar">
+        <span class="voice-rec-dot" id="voice-rec-dot"></span>
+        <span class="voice-rec-time" id="voice-rec-time">0:00</span>
+        <button class="voice-rec-btn" id="voice-rec-cancel" onclick="voiceRecCancel()">Cancel</button>
+        <button class="voice-rec-btn send" id="voice-rec-send" onclick="voiceRecSend()">Send</button>
+      </div>
+
       <div class="chat-input-zone" id="chat-input-zone">
         <div class="slabel" style="margin-bottom:6px">React</div>
         <div class="react-row">
@@ -2572,6 +2597,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
         </div>
         <div class="chat-compose-row">
           <input class="chat-compose-input" id="room-chat-input" placeholder="Connect wallet to chat…" disabled onkeydown="if(event.key==='Enter')sendRoomMsg()"/>
+          <button class="chat-mic-btn" id="room-mic-btn" onclick="toggleVoiceRecord('collector')" disabled title="Record a voice note" aria-label="Record a voice note">🎙</button>
           <button class="chat-send-btn" onclick="sendRoomMsg()" disabled>Send</button>
         </div>
       </div>
@@ -4567,6 +4593,8 @@ function _syncCollectorRoomForSlot(slot) {
 
   _auctionId  = effectiveId;
   _seenMsgIds = new Set();
+  _stopVoicePlayback();
+  if (_vRec) _voiceEnd(false);
 
   // Restore from cache immediately
   const feed = document.getElementById("chat-feed");
@@ -7358,6 +7386,7 @@ function _updateChatInputState() {
     if (locked)  locked.style.display = "none";
     if (profilePanel) profilePanel.classList.add("show");
     reacts.forEach(b => b.disabled = false);
+    const _mic = document.getElementById("room-mic-btn"); if (_mic) _mic.disabled = false;
   } else {
     const walletCopy = !_activeAuctionNeedsGateToken()
       ? { lock: "Connect wallet to join the room", placeholder: "Connect wallet to chat…" }
@@ -7368,6 +7397,7 @@ function _updateChatInputState() {
     if (locked)  locked.style.display = "flex";
     if (profilePanel) profilePanel.classList.remove("show");
     reacts.forEach(b => b.disabled = true);
+    const _mic = document.getElementById("room-mic-btn"); if (_mic) _mic.disabled = true;
   }
 }
 
@@ -8075,7 +8105,7 @@ function _renderMsg(row) {
       ? `<img src="${aucAvatar}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px;" data-fallback="auc-avatar" onerror="_aucAvatFallback(this)">`
       : `<div class="chat-auc-avatar">KA</div>`;
     const aucRoleLabel = `<span style="font-family:'Cinzel',serif;font-size:0.42rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--clay);opacity:0.7;margin-left:5px">Auctioneer</span>`;
-    wrap.innerHTML = `<div class="chat-bubble-auc">${aucAvatHtml}<div class="chat-auc-bubble"><div class="chat-auc-name">${_esc(aucName)}${aucRoleLabel}</div><div class="chat-c-text" style="color:#e8d5b0">${_esc(row.message)}</div><div class="chat-c-time">${ts}</div></div></div>`;
+    wrap.innerHTML = `<div class="chat-bubble-auc">${aucAvatHtml}<div class="chat-auc-bubble"><div class="chat-auc-name">${_esc(aucName)}${aucRoleLabel}</div><div class="chat-c-text" style="color:#e8d5b0">${_msgBodyHtml(row)}</div><div class="chat-c-time">${ts}</div></div></div>`;
   } else if (row.type === "reaction") {
     const emoji = row.message;
     const existing = feed.querySelector(`.react-pill[data-emoji="${emoji}"]`);
@@ -8096,7 +8126,7 @@ function _renderMsg(row) {
     const badge = row.is_bid ? `<span style="font-family:'Cinzel',serif;font-size:.46rem;letter-spacing:.12em;text-transform:uppercase;background:rgba(107,124,92,.15);border:1px solid rgba(107,124,92,.35);border-radius:3px;padding:1px 5px;color:#6b7c5c;margin-left:4px">Bid</span>` : "";
     const bStyle = row.is_bid ? "background:rgba(196,132,90,.08);border-color:rgba(196,132,90,.28);" : "";
     const tStyle = row.is_bid ? "color:var(--clay);font-weight:600;" : "";
-    wrap.innerHTML = `<div class="chat-bubble-collector" style="${isMe?"flex-direction:row-reverse":""}">${avatHtml}<div class="chat-c-bubble" style="${bStyle}${isMe?"text-align:right":""}"><div class="chat-c-name" style="color:${color}">${_esc(dispName)}${badge}</div><div class="chat-c-text" style="${tStyle}">${_esc(row.message)}</div><div class="chat-c-time">${ts}</div></div></div>`;
+    wrap.innerHTML = `<div class="chat-bubble-collector" style="${isMe?"flex-direction:row-reverse":""}">${avatHtml}<div class="chat-c-bubble" style="${bStyle}${isMe?"text-align:right":""}"><div class="chat-c-name" style="color:${color}">${_esc(dispName)}${badge}</div><div class="chat-c-text" style="${tStyle}">${_msgBodyHtml(row)}</div><div class="chat-c-time">${ts}</div></div></div>`;
     // Async: fetch profile if not cached, then re-render this bubble
     if (!profile && addr !== "0x????") {
       _loadProfile(addr).then(p => {
@@ -8256,6 +8286,227 @@ async function sendRoomMsg() {
 async function sendRoomReaction(emoji) {
   if (!_roomEligible) return;
   await _postMsg("reaction", emoji);
+}
+
+
+// ── Voice notes ───────────────────────────────────────────────────────────────
+// A voice note is a normal collector_messages row whose message is
+//   voice::<public storage url>::<seconds>
+// The audio itself lives in the public Supabase Storage bucket "voice-notes",
+// so voice notes appear live in the room and in the Hall of Fame archive.
+const VOICE_BUCKET        = "voice-notes";
+const VOICE_PUBLIC_PREFIX = `${SUPABASE_URL}/storage/v1/object/public/${VOICE_BUCKET}/`;
+const VOICE_MAX_SEC       = 120;
+const VOICE_MIN_SEC       = 1;
+const VOICE_MAX_BYTES     = 2 * 1024 * 1024;
+const VOICE_COOLDOWN_MS   = 4000;
+let _vRec = null;          // active recording state
+let _vBusy = false;        // upload in progress
+let _vLastSentAt = 0;
+let _vAudio = null, _vPlayingBtn = null;
+
+function _parseVoice(message) {
+  const m = /^voice::(\S+)::(\d{1,3})$/.exec(String(message || ""));
+  if (!m || !m[1].startsWith(VOICE_PUBLIC_PREFIX)) return null;
+  if (!/^[A-Za-z0-9._\-\/]+$/.test(m[1].slice(VOICE_PUBLIC_PREFIX.length))) return null;
+  return { url: m[1], secs: Math.min(parseInt(m[2], 10), 600) };
+}
+function _fmtDur(s) { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+
+// Returns the inner HTML for a message bubble: escaped text, or a voice player.
+function _msgBodyHtml(row) {
+  const v = _parseVoice(row.message);
+  if (!v) return _esc(row.message);
+  return `<div class="voice-player" data-src="${_esc(v.url)}" data-secs="${v.secs}"><button class="voice-play" type="button" aria-label="Play voice note">▶</button><div class="voice-track"><div class="voice-fill"></div></div><span class="voice-dur">${_fmtDur(v.secs)}</span></div>`;
+}
+
+// ── Playback (one note at a time) ──
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest && e.target.closest(".voice-play");
+  if (btn) _toggleVoicePlay(btn);
+});
+
+function _voiceResetUi(btn) {
+  const player = btn && btn.closest(".voice-player"); if (!player) return;
+  btn.textContent = "▶";
+  const fill = player.querySelector(".voice-fill"); if (fill) fill.style.width = "0";
+  const dur = player.querySelector(".voice-dur"); if (dur) dur.textContent = _fmtDur(+player.dataset.secs || 0);
+}
+function _stopVoicePlayback() {
+  if (_vAudio) {
+    const a = _vAudio, b = _vPlayingBtn;
+    _vAudio = null; _vPlayingBtn = null;
+    a.onended = a.onpause = a.ontimeupdate = a.onerror = null;
+    try { a.pause(); } catch (_) {}
+    _voiceResetUi(b);
+  }
+}
+function _toggleVoicePlay(btn) {
+  const player = btn.closest(".voice-player"); if (!player) return;
+  if (_vPlayingBtn === btn && _vAudio) {
+    if (_vAudio.paused) _vAudio.play().catch(() => {}); else _vAudio.pause();
+    return;
+  }
+  _stopVoicePlayback();
+  const fill  = player.querySelector(".voice-fill");
+  const dur   = player.querySelector(".voice-dur");
+  const total = +player.dataset.secs || 0;
+  const a = new Audio();
+  a.preload = "auto";
+  a.src = player.dataset.src;
+  _vAudio = a; _vPlayingBtn = btn;
+  a.onplay  = () => { btn.textContent = "❚❚"; };
+  a.onpause = () => { if (!a.ended) btn.textContent = "▶"; };
+  a.ontimeupdate = () => {
+    // MediaRecorder files often report an infinite duration — fall back to the stored length
+    const d = isFinite(a.duration) && a.duration > 0 ? a.duration : total;
+    if (d && fill) fill.style.width = Math.min(100, (a.currentTime / d) * 100) + "%";
+    if (dur) dur.textContent = _fmtDur(a.currentTime);
+  };
+  a.onended = () => { _vAudio = null; _vPlayingBtn = null; _voiceResetUi(btn); };
+  a.onerror = () => {
+    _vAudio = null; _vPlayingBtn = null; _voiceResetUi(btn);
+    notify("err", "Voice note", "Could not play this voice note on this device.");
+  };
+  a.play().catch(() => {});
+}
+
+// ── Recording ──
+function _voicePickMime() {
+  if (!window.MediaRecorder) return "";
+  // MP4/AAC first: it plays on every phone. WebM only as a fallback.
+  const c = ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
+  return c.find(t => { try { return MediaRecorder.isTypeSupported(t); } catch (_) { return false; } }) || "";
+}
+function _voiceExt(mime) { return /mp4|aac/.test(mime) ? "m4a" : /ogg/.test(mime) ? "ogg" : "webm"; }
+
+function _voiceBar(state) {  // "rec" | "sending" | null
+  const bar = document.getElementById("voice-rec-bar"); if (!bar) return;
+  bar.classList.toggle("show", !!state);
+  const dot = document.getElementById("voice-rec-dot");
+  const btns = [document.getElementById("voice-rec-cancel"), document.getElementById("voice-rec-send")];
+  if (dot) dot.style.display = state === "rec" ? "" : "none";
+  btns.forEach(b => { if (b) b.style.display = state === "rec" ? "" : "none"; });
+  const t = document.getElementById("voice-rec-time");
+  if (t && state === "sending") t.textContent = "Sending voice note…";
+}
+
+// ── Permission handling ──
+// The browser shows its own microphone prompt. If it is already blocked, say how to fix it instead of failing silently.
+async function _voiceMicState() {
+  try { return (await navigator.permissions.query({ name: "microphone" })).state; } catch (_) { return "unknown"; }
+}
+
+async function toggleVoiceRecord(role) {
+  if (_vRec) return voiceRecSend();            // mic pressed while recording = send
+  if (_vBusy) return;
+  if (role === "auctioneer" ? !_isKay() : !_roomEligible) return;
+  if (_auctionSettled || _chatManuallyLocked || !_auctionId) return;
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    notify("err", "Voice not supported", "This browser can't record audio. Try Chrome or Safari.");
+    return;
+  }
+  if (Date.now() - _vLastSentAt < VOICE_COOLDOWN_MS) {
+    notify("err", "One moment", "Wait a few seconds between voice notes.");
+    return;
+  }
+  if (await _voiceMicState() === "denied") {
+    notify("err", "Microphone blocked", "Microphone access is off for this site. Open your browser's site settings (the icon beside the address), allow the microphone, then try again.");
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  } catch (e) {
+    if (e && e.name === "NotFoundError") notify("err", "No microphone", "No microphone was found on this device.");
+    else notify("err", "Microphone blocked", "Allow microphone access for this site (browser site settings) to send voice notes.");
+    return;
+  }
+  const mime = _voicePickMime();
+  let rec;
+  try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : { audioBitsPerSecond: 32000 }); }
+  catch (e) {
+    stream.getTracks().forEach(t => t.stop());
+    notify("err", "Voice not supported", "Could not start the recorder on this device.");
+    return;
+  }
+  _stopVoicePlayback();
+  const st = { rec, stream, chunks: [], startedAt: Date.now(), role, mime: rec.mimeType || mime || "audio/webm",
+               roomId: _auctionId, send: false, timer: null };
+  rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) st.chunks.push(ev.data); };
+  rec.onstop = () => _voiceFinish(st);
+  _vRec = st;
+  rec.start(250);
+  _voiceBar("rec");
+  const t = document.getElementById("voice-rec-time");
+  if (t) t.textContent = "0:00";
+  st.timer = setInterval(() => {
+    const s = (Date.now() - st.startedAt) / 1000;
+    if (t) t.textContent = _fmtDur(s) + " / " + _fmtDur(VOICE_MAX_SEC);
+    if (s >= VOICE_MAX_SEC) voiceRecSend();
+  }, 200);
+}
+
+function voiceRecSend()   { _voiceEnd(true);  }
+function voiceRecCancel() { _voiceEnd(false); }
+
+function _voiceEnd(send) {
+  const st = _vRec; if (!st) return;
+  st.send = send;
+  clearInterval(st.timer);
+  _vRec = null;
+  _voiceBar(send ? "sending" : null);
+  try {
+    if (st.rec.state !== "inactive") st.rec.stop(); else _voiceFinish(st);
+  } catch (_) { _voiceFinish(st); }
+}
+
+async function _voiceFinish(st) {
+  try { st.stream.getTracks().forEach(t => t.stop()); } catch (_) {}
+  if (st.done) return; st.done = true;
+  if (!st.send) { _voiceBar(null); return; }
+  const secs = Math.min(VOICE_MAX_SEC, Math.max(0, Math.round((Date.now() - st.startedAt) / 1000)));
+  if (secs < VOICE_MIN_SEC || !st.chunks.length) {
+    _voiceBar(null);
+    notify("err", "Too short", "Hold on a little longer to record a voice note.");
+    return;
+  }
+  const baseMime = st.mime.split(";")[0] || "audio/webm";
+  const blob = new Blob(st.chunks, { type: baseMime });
+  if (blob.size > VOICE_MAX_BYTES) {
+    _voiceBar(null);
+    notify("err", "Too large", "That voice note is too large. Try a shorter one.");
+    return;
+  }
+  _vBusy = true;
+  try {
+    const who  = st.role === "auctioneer" ? "kay" : String(signerAddress || "anon").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 42);
+    const room = String(st.roomId || "room").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 60) || "room";
+    const path = `${room}/${who}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${_voiceExt(baseMime)}`;
+    const up = await fetch(`${SUPABASE_URL}/storage/v1/object/${VOICE_BUCKET}/${path}`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_ANON, Authorization: "Bearer " + SUPABASE_ANON, "Content-Type": baseMime, "x-upsert": "false", "cache-control": "max-age=31536000" },
+      body: blob,
+    });
+    if (!up.ok) {
+      let msg = "Upload failed";
+      try { const j = await up.json(); msg = j.message || j.error || msg; } catch (_) {}
+      throw new Error(msg);
+    }
+    await _sb.insert("collector_messages", {
+      auction_id: st.roomId,
+      wallet_address: st.role === "auctioneer" ? "auctioneer" : (signerAddress || "unknown"),
+      type: st.role === "auctioneer" ? "auctioneer" : "collector",
+      message: `voice::${VOICE_PUBLIC_PREFIX}${path}::${secs}`,
+      is_bid: false,
+    });
+    _vLastSentAt = Date.now();
+  } catch (e) {
+    notify("err", "Voice note failed", e.message || "Could not send the voice note.");
+  } finally {
+    _vBusy = false;
+    _voiceBar(null);
+  }
 }
 
 window._roomHookBid = async function(bidder, amount) {
