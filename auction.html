@@ -911,6 +911,9 @@ body {
 .gate-notice-sub { font-family:'Crimson Pro',serif; font-size:.82rem; font-style:italic; color:var(--text-muted); margin-top:9px; }
 @media (max-width: 600px) { .piece-phase-filter { padding:7px 12px 0; } }
 .piece-tab[data-phase="pending"] .piece-phase-tag { color:var(--text-muted); border-color:var(--divider); background:transparent; }
+.in-chooser { grid-column: 1 / -1; margin-bottom: 0 !important; }
+.cc-choice-status.patron { color: var(--phase-patron); }
+.cc-choice-status.patron .cc-choice-status-dot { background: var(--phase-patron); }
 /* </phase-css> */
 .voice-player { display:flex; align-items:center; gap:8px; min-width:150px; }
 .voice-play { width:26px; height:26px; border-radius:50%; border:1px solid rgba(196,132,90,.45); background:rgba(196,132,90,.12); color:var(--clay); cursor:pointer; font-size:.6rem; flex-shrink:0; padding:0; line-height:1; }
@@ -2296,7 +2299,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
             <div class="gate-notice-title">Patrons only for now</div>
             <div class="gate-notice-opens" id="live-gate-opens">Opens to everyone soon</div>
             <a id="live-gate-link" class="gate-get-btn" href="#" target="_blank" rel="noopener noreferrer">Get<span id="live-gate-name-inline">the entry token</span><span aria-hidden="true">→</span></a>
-            <div class="gate-notice-sub">Already a patron? Connect your wallet below.</div>
+            <div class="gate-notice-sub">Already a patron? Connect your wallet to bid.</div>
             <details class="gate-why">
               <summary>Why an entry token?</summary>
               <div class="gate-why-copy">
@@ -4618,6 +4621,74 @@ function _resolvePendingTabs() {
     if (_slotPhase[k].phase === "pending") _setTabPhase(+k, { phase: "patron", endsAtMs: 0, provisional: true });
   });
 }
+
+function _phaseGateLink(slot) {
+  if (slot?.gateLink) return slot.gateLink;
+  const pk = _pairKeyForSlot(slot);
+  if (!pk) return "";
+  const other = _auctions.find(x => x !== slot && _pairKeyForSlot(x) === pk && x.gateLink);
+  return other ? other.gateLink : "";
+}
+// Fill the notice's token name and "Get" button — from either half of a pair.
+function _fillGateNotice(slot) {
+  const name = _phaseGateName(slot);
+  if (!name) return;
+  const nm = document.getElementById("live-gate-name-inline");
+  if (nm) nm.textContent = name;
+  const a = document.getElementById("live-gate-link");
+  if (a) {
+    const link = _phaseGateLink(slot);
+    if (link && link.startsWith("http")) { a.href = link; a.style.display = "inline-flex"; }
+    else a.style.display = "none";
+  }
+}
+// In a paired auction the patron notice sits INSIDE the chain chooser (same level as the
+// "open to everyone" banner and the two chain cards); elsewhere it stays at the top of the panel.
+function _syncGatePlacement() {
+  const notice  = document.getElementById("live-gate-notice");
+  const chooser = document.getElementById("cc-chooser");
+  if (!notice || !chooser) return;
+  const patron = chooser.classList.contains("show") && notice.style.display === "block";
+  if (patron && notice.parentElement !== chooser) {
+    chooser.prepend(notice); notice.classList.add("in-chooser");
+  } else if (!patron && notice.parentElement === chooser) {
+    const home = document.querySelector(".bid-inner");
+    if (home) home.prepend(notice);
+    notice.classList.remove("in-chooser");
+  }
+  ["eth", "xtz"].forEach(k => {
+    const el = document.getElementById(`cc-${k}-status`); if (!el) return;
+    el.classList.toggle("patron", patron);
+    const t = el.querySelector("span:last-child");
+    if (t) t.textContent = patron ? "Patrons only" : "Open";
+  });
+}
+function _initGatePlacement() {
+  const notice = document.getElementById("live-gate-notice");
+  const chooser = document.getElementById("cc-chooser");
+  if (!notice || !chooser || notice._placementBound) return;
+  notice._placementBound = true;
+  const mo = new MutationObserver(_syncGatePlacement);
+  mo.observe(notice,  { attributes: true, attributeFilter: ["style"] });
+  mo.observe(chooser, { attributes: true, attributeFilter: ["class"] });
+  _syncGatePlacement();
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", _initGatePlacement);
+else _initGatePlacement();
+
+// The chooser reads the pair's phase from the contract as soon as it loads — show the
+// patron notice (or the open banner) right then, not only after the piece page refreshes.
+function _ccApplyPhaseUi(tezSlot, ethSlot, auction) {
+  if (!auction || !auction.isPhased) return;
+  if (_tezosAuctionOpenToEveryone(auction)) { _setAuctionOpenToEveryone(true); _setGateOpensAt(null); return; }
+  const slot = ethSlot || tezSlot;
+  if (!_phaseGateName(slot) && !_phaseGateName(tezSlot)) return;
+  _fillGateNotice(slot);
+  _setAuctionOpenToEveryone(false);
+  _setGateOpensAt(auction.gateEndMs > Date.now() ? auction.gateEndMs : 0);
+  const notice = document.getElementById("live-gate-notice");
+  if (notice) notice.style.display = (signerAddress || tezosAddress) ? "none" : "block";
+}
 // </phase-js>
 
 function _setTabSoldState(i, sold, bidText = "") {
@@ -4904,6 +4975,7 @@ async function _ccPopulateChooserPrices(pairKey) {
       tezosAuction = _normalizeTezosAuction(aucRaw);
       if (tezosAuction) {
         hardCap = _setCrossChainPhase(tezosAuction.isPhased && !tezosAuction.holderOnly ? "public" : "holder");
+        _ccApplyPhaseUi(tezSlot, ethSlot, tezosAuction);
       }
     } catch(e) {
       console.warn("_ccPopulateChooserPrices phase read:", e);
@@ -5146,19 +5218,7 @@ async function _switchAuction(idx, opts = {}) {
   const _lgNotice = document.getElementById("live-gate-notice");
   if (_lgNotice) {
     _lgNotice.style.display = "none";
-    if (slot.gateName) {
-      const _lgName = document.getElementById("live-gate-name-inline");
-      if (_lgName) _lgName.textContent = slot.gateName;
-      const _lgLink = document.getElementById("live-gate-link");
-      if (_lgLink) {
-        if (slot.gateLink && slot.gateLink.startsWith("http")) {
-          _lgLink.href = slot.gateLink;
-          _lgLink.style.display = "inline-flex";
-        } else {
-          _lgLink.style.display = "none";
-        }
-      }
-    }
+    _fillGateNotice(slot);
   }
 
   populateAbout("live", slot);
@@ -6592,7 +6652,8 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     else                                         { sl.textContent = "Ended — awaiting settlement";      sl.className = "status-line ended"; }
 
     const gateNotice = document.getElementById("live-gate-notice");
-    if (gateNotice && cfg.gateName) {
+    if (gateNotice && (cfg.gateName || _phaseGateName(_activeCfg()))) {
+      _fillGateNotice(_activeCfg());
       gateNotice.style.display = (openToEveryone || signerAddress) ? "none" : "block";
     }
 
