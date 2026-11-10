@@ -910,6 +910,7 @@ body {
 .gate-get-btn:hover { background:var(--clay); }
 .gate-notice-sub { font-family:'Crimson Pro',serif; font-size:.82rem; font-style:italic; color:var(--text-muted); margin-top:9px; }
 @media (max-width: 600px) { .piece-phase-filter { padding:7px 12px 0; } }
+.piece-tab[data-phase="pending"] .piece-phase-tag { color:var(--text-muted); border-color:var(--divider); background:transparent; }
 /* </phase-css> */
 .voice-player { display:flex; align-items:center; gap:8px; min-width:150px; }
 .voice-play { width:26px; height:26px; border-radius:50%; border:1px solid rgba(196,132,90,.45); background:rgba(196,132,90,.12); color:var(--clay); cursor:pointer; font-size:.6rem; flex-shrink:0; padding:0; line-height:1; }
@@ -4441,9 +4442,11 @@ async function _buildPieceSelector() {
     strip.appendChild(btn);
     if (_isManualSold(slot, i)) _setTabSoldState(i, true);
     // Pieces with no entry token are free-for-all from the start; gated pieces
-    // get their phase from the contract on the first poll.
-    if (!slot.gateName) _setTabPhase(i, { phase: "open", endsAtMs: 0 });
+    // (either half of a pair) show "Checking…" until the contract answers.
+    _setTabPhase(i, _phaseGateName(slot) ? { phase: "pending", endsAtMs: 0 } : { phase: "open", endsAtMs: 0 });
   }
+  _tabPollRetries = 0;
+  setTimeout(_resolvePendingTabs, 8000);
   _bindPhaseFilter();
   if (!_phaseTickStarted) { _phaseTickStarted = true; setInterval(_tickPhases, 15000); }
 
@@ -4482,16 +4485,25 @@ function _fmtOpensIn(ms) {
   return `${mm}m`;
 }
 
+// A cross-chain pair is gated if either half names an entry token.
+function _phaseGateName(slot) {
+  if (slot?.gateName) return slot.gateName;
+  const pk = _pairKeyForSlot(slot);
+  if (!pk) return "";
+  const other = _auctions.find(x => x !== slot && _pairKeyForSlot(x) === pk && x.gateName);
+  return other ? other.gateName : "";
+}
+
 function _ethPhaseFromState(s, slot) {
-  if (!slot?.gateName) return { phase: "open", endsAtMs: 0 };
-  if (_ethStateOpenToEveryone(s, slot)) return { phase: "open", endsAtMs: 0 };
+  if (!_phaseGateName(slot)) return { phase: "open", endsAtMs: 0 };
+  if (_ethStateOpenToEveryone(s, { ...slot, gateName: _phaseGateName(slot) })) return { phase: "open", endsAtMs: 0 };
   const hasPhaseFields = s.gateEndsAt !== undefined || s.holderOnly !== undefined;
   const holderOnly = hasPhaseFields ? s.holderOnly === true : true;
   const endsMs = Number(s.gateEndsAt || 0) * 1000;
   return { phase: "patron", endsAtMs: holderOnly && endsMs > Date.now() ? endsMs : 0 };
 }
 function _tezosPhaseFromAuction(slot, auction) {
-  if (!slot?.gateName) return { phase: "open", endsAtMs: 0 };
+  if (!_phaseGateName(slot)) return { phase: "open", endsAtMs: 0 };
   if (_tezosAuctionOpenToEveryone(auction)) return { phase: "open", endsAtMs: 0 };
   const endsMs = auction.isPhased && auction.holderOnly ? Number(auction.gateEndMs || 0) : 0;
   return { phase: "patron", endsAtMs: endsMs > Date.now() ? endsMs : 0 };
@@ -4507,7 +4519,7 @@ function _setTabPhase(i, info) {
     const pk = _pairKeyForSlot(_auctions[i]);
     if (!pk) return;
     const rep = _visibleLiveIndexes.find(j => j !== i && _pairKeyForSlot(_auctions[j]) === pk);
-    if (rep === undefined || _slotPhase[rep]) return;
+    if (rep === undefined || (_slotPhase[rep] && _slotPhase[rep].phase !== "pending" && !_slotPhase[rep].provisional)) return;
     idx = rep; btn = _tabBtn(idx);
     if (!btn) return;
   }
@@ -4522,7 +4534,7 @@ function _renderTabPhase(idx) {
   if (!info || !btn) return;
   const tag  = btn.querySelector(".piece-phase-tag");
   const time = btn.querySelector(".piece-phase-time");
-  if (tag)  tag.textContent = info.phase === "patron" ? "Patron phase" : "Open to all";
+  if (tag)  tag.textContent = info.phase === "patron" ? "Patron phase" : info.phase === "pending" ? "Checking…" : "Open to all";
   if (time) time.textContent = info.phase === "patron" && info.endsAtMs > 0
     ? (info.endsAtMs > Date.now() ? "Opens to all in " + _fmtOpensIn(info.endsAtMs - Date.now()) : "Opening to all now…")
     : "";
@@ -4547,7 +4559,7 @@ function _renderPhaseFilter() {
 
 function _applyPhaseFilter() {
   document.querySelectorAll("#piece-selector .piece-tab").forEach(c => {
-    const hide = _phaseFilter !== "all" && c.dataset.phase && c.dataset.phase !== _phaseFilter;
+    const hide = _phaseFilter !== "all" && c.dataset.phase && c.dataset.phase !== "pending" && c.dataset.phase !== _phaseFilter;
     c.style.display = hide ? "none" : "";
   });
   const strip = document.getElementById("piece-selector");
@@ -4588,6 +4600,24 @@ function _tickPhases() {
   // A patron window just ended — re-read the contracts so cards flip to "Open to all"
   if (needRepoll && now - _phaseRepollAt > 20000) { _phaseRepollAt = now; _pollAllTabBids(); }
 }
+let _tabPollRetries = 0;
+// A contract read failed (slow or rate-limited RPC). Never leave a gated card blank:
+// show it as a patron piece (it has an entry token configured) and try again shortly.
+function _onTabPollError(slot, i, e) {
+  console.warn("[tabs] phase/bid poll failed for piece", i, e && (e.message || e));
+  const btn = _tabBtn(i);
+  const cur = _slotPhase[i];
+  if (btn && _phaseGateName(slot) && (!cur || cur.phase === "pending")) {
+    _setTabPhase(i, { phase: "patron", endsAtMs: 0, provisional: true });
+  }
+  if (_tabPollRetries < 3) { _tabPollRetries++; setTimeout(_pollAllTabBids, 3000 * _tabPollRetries); }
+}
+// Safety net: anything still "checking" after a few seconds is shown as patron.
+function _resolvePendingTabs() {
+  Object.keys(_slotPhase).forEach(k => {
+    if (_slotPhase[k].phase === "pending") _setTabPhase(+k, { phase: "patron", endsAtMs: 0, provisional: true });
+  });
+}
 // </phase-js>
 
 function _setTabSoldState(i, sold, bidText = "") {
@@ -4609,7 +4639,11 @@ function _setTabSoldState(i, sold, bidText = "") {
 
 async function _pollAllTabBids() {
   // Run all slot polls in parallel — no sequential waiting
-  await Promise.allSettled(_auctions.map(async (slot, i) => {
+  await Promise.allSettled(_auctions.map((slot, i) => _pollOneTab(slot, i).catch(e => _onTabPollError(slot, i, e))));
+}
+
+async function _pollOneTab(slot, i) {
+  {
     const manualSold = _isManualSold(slot, i);
     const chain      = _slotChain(slot);
 
@@ -4651,7 +4685,7 @@ async function _pollAllTabBids() {
       const xtz   = mutez > 0 ? (mutez / 1_000_000).toFixed(2).replace(/\.?0+$/, "") + " XTZ" : "—";
       _setTabSoldState(i, false, xtz);
     }
-  }));
+  }
 }
 
 function _setPieceTabsBusy(isBusy) {
@@ -6510,6 +6544,7 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
     const holderOnly     = s.holderOnly === true;
     const openToEveryone = _ethStateOpenToEveryone(s, _activeCfg());
     _setAuctionOpenToEveryone(openToEveryone);
+    _setTabPhase(_activeIdx, _ethPhaseFromState(s, _activeCfg()));
     _setGateOpensAt(openToEveryone || (s.gateEndsAt === undefined && s.holderOnly === undefined)
       ? null
       : (holderOnly && gateEndsAt * 1000 > Date.now() ? gateEndsAt * 1000 : 0));
@@ -7027,6 +7062,7 @@ async function refreshTezosState(runToken = _switchToken, prefetched = null) {
     else if (!auction.started)                     { sl.textContent = "Waiting for Tezos auction start"; sl.className = "status-line upcoming-line"; }
     else                                           { sl.textContent = "Ended - awaiting settlement"; sl.className = "status-line ended"; }
 
+    _setTabPhase(_activeIdx, _tezosPhaseFromAuction(_activeCfg(), auction));
     _setGateOpensAt(!openToEveryone && auction.isPhased && auction.holderOnly
       ? (auction.gateEndMs > nowMs ? auction.gateEndMs : 0)
       : null);
