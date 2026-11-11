@@ -5,13 +5,20 @@
  * POST   — admin only (X-Admin-Password header), saves new config
  * DELETE — admin only, resets config to default
  *
- * Storage: Vercel Edge Config
- * Env vars: EDGE_CONFIG, EDGE_CONFIG_ID, VERCEL_API_TOKEN, ADMIN_PASSWORD
+ * Storage: Supabase table `site_config` (one jsonb row, key = "auction_config").
+ *          Vercel Edge Config is only read as a fallback until the first save
+ *          after migrating, so existing configs keep working.
+ * Env vars: SUPABASE_SERVICE_ROLE_KEY (also accepts SUPABASE_SERVICE_KEY or
+ *          SUPABASE_SECRET_KEY; secret, server-side only), ADMIN_PASSWORD
+ *          Optional: SUPABASE_URL (defaults to the project URL below)
+ *          Legacy (fallback read / best-effort reset only): EDGE_CONFIG,
+ *          EDGE_CONFIG_ID, VERCEL_API_TOKEN
  */
 
 const { createClient } = require("@vercel/edge-config");
 
 const EC_KEY = "auction_config";
+const MAX_PIECES = 200;
 
 // ── Edge Config helpers ───────────────────────────────────────────────────────
 
@@ -33,6 +40,7 @@ function edgeConfigWriteSettings() {
 }
 
 async function ecGet() {
+  if (!process.env.EDGE_CONFIG) return null;
   const client = createClient(process.env.EDGE_CONFIG);
   return await client.get(EC_KEY);
 }
@@ -77,6 +85,76 @@ async function ecDel() {
     const txt = await res.text();
     throw new Error(`Edge Config delete failed ${res.status}: ${txt}`);
   }
+}
+
+
+// ── Supabase storage (no practical size limit for this use) ───────────────────
+
+const SB_URL = String(process.env.SUPABASE_URL || "https://haijshusgcbdexfueunr.supabase.co").replace(/\/+$/, "");
+
+// Accepts the usual names for the server-side Supabase key. Never use the public/anon key here.
+function sbKey() {
+  return String(
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.SUPABASE_SECRET_KEY || ""
+  ).trim();
+}
+
+function sbHeaders() {
+  const key = sbKey();
+  if (!key) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+  const h = { apikey: key, "Content-Type": "application/json" };
+  // Legacy service_role keys are JWTs and go in Authorization too; the newer
+  // sb_secret_… keys are not JWTs and must only be sent as `apikey`.
+  if (key.startsWith("eyJ")) h.Authorization = `Bearer ${key}`;
+  return h;
+}
+
+async function dbGet() {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/site_config?key=eq.${encodeURIComponent(EC_KEY)}&select=value&limit=1`,
+    { headers: sbHeaders() }
+  );
+  if (!res.ok) throw new Error(`Supabase read failed ${res.status}: ${await res.text()}`);
+  const rows = await res.json();
+  return Array.isArray(rows) && rows[0] ? rows[0].value : null;
+}
+
+async function dbSet(value) {
+  const res = await fetch(`${SB_URL}/rest/v1/site_config?on_conflict=key`, {
+    method: "POST",
+    headers: { ...sbHeaders(), Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ key: EC_KEY, value, updated_at: new Date().toISOString() }),
+  });
+  if (!res.ok) throw new Error(`Supabase write failed ${res.status}: ${await res.text()}`);
+}
+
+async function dbDel() {
+  const res = await fetch(`${SB_URL}/rest/v1/site_config?key=eq.${encodeURIComponent(EC_KEY)}`, {
+    method: "DELETE",
+    headers: { ...sbHeaders(), Prefer: "return=minimal" },
+  });
+  if (!res.ok) throw new Error(`Supabase delete failed ${res.status}: ${await res.text()}`);
+}
+
+// Read: Supabase first; fall back to the old Edge Config copy so nothing breaks
+// before the first save after migrating (or if Supabase is briefly unreachable).
+async function readStored() {
+  try {
+    const v = await dbGet();
+    if (v) return v;
+  } catch (err) {
+    console.warn("Supabase read failed, falling back to Edge Config:", err && err.message);
+  }
+  try { return await ecGet(); } catch (_) { return null; }
+}
+
+// Reset: clear Supabase, and the old Edge Config copy too (best effort) so the
+// fallback read cannot bring the old config back.
+async function clearStored() {
+  await dbDel();
+  try { await ecDel(); } catch (_) {}
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -166,8 +244,8 @@ function sanitisePiece(p) {
 
 function sanitiseAuctions(arr) {
   if (!Array.isArray(arr)) return [];
-  // Cap at 20 pieces to keep the stored object reasonable for Edge Config
-  return arr.slice(0, 20).map(sanitisePiece).filter(Boolean);
+  // Safety ceiling only — storage is Supabase now, so this is far above any real use.
+  return arr.slice(0, MAX_PIECES).map(sanitisePiece).filter(Boolean);
 }
 
 // ── Default config ────────────────────────────────────────────────────────────
@@ -218,8 +296,12 @@ module.exports = async function handler(req, res) {
       return res.status(401).json({ ok: false, error: "Unauthorized" });
     }
     try {
-      const stored = await ecGet();
+      const stored = await readStored();
       const config = stored || DEFAULT_CONFIG;
+      // Admin reads are always fresh; public reads may be cached for a few seconds.
+      res.setHeader("Cache-Control", req.headers["x-admin-password"] !== undefined
+        ? "no-store"
+        : "public, s-maxage=5, stale-while-revalidate=30");
       return res.status(200).json({ ok: true, config });
     } catch (err) {
       console.error("GET error:", err);
@@ -280,7 +362,7 @@ module.exports = async function handler(req, res) {
     };
 
     try {
-      await ecSet(config);
+      await dbSet(config);
       return res.status(200).json({ ok: true, config });
     } catch (err) {
       console.error("POST error:", err);
@@ -288,12 +370,12 @@ module.exports = async function handler(req, res) {
       const safeDetail = detail.startsWith("Missing ")
         ? detail
         : /write failed (401|403)/.test(detail)
-          ? "VERCEL_API_TOKEN is invalid, expired, or lacks access to this Edge Config"
-          : /write failed 404/.test(detail)
-            ? "Edge Config ID or Vercel team scope is incorrect"
+          ? "SUPABASE_SERVICE_ROLE_KEY is invalid or lacks access"
+          : /write failed 404/.test(detail) || /PGRST205|site_config/.test(detail)
+            ? "Table site_config not found in Supabase — run the setup SQL"
             : /write failed 4\d\d/.test(detail)
               ? detail.slice(0, 500)
-              : "Check the Vercel function logs for the Edge Config write error";
+              : "Check the Vercel function logs for the Supabase write error";
       return res.status(500).json({ ok: false, error: `Failed to save config: ${safeDetail}` });
     }
   }
@@ -303,7 +385,7 @@ module.exports = async function handler(req, res) {
       return res.status(401).json({ ok: false, error: "Unauthorized" });
     }
     try {
-      await ecDel();
+      await clearStored();
       return res.status(200).json({ ok: true, config: DEFAULT_CONFIG });
     } catch (err) {
       console.error("DELETE error:", err);
