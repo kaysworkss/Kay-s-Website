@@ -2051,6 +2051,8 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 .cc-banner-dot         { width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; animation:live-blink 1.4s ease-in-out infinite; }
 .cc-dot-locked         { animation:none; opacity:0.55; }
 
+
+.auction-category-filter{display:none;gap:7px;flex-wrap:wrap;padding:10px 20px 2px}.auction-category-filter.show{display:flex}.category-chip{font-family:Cinzel,serif;font-size:.48rem;letter-spacing:.12em;text-transform:uppercase;padding:6px 12px;border-radius:999px;border:1px solid var(--divider);background:transparent;color:var(--text-muted);cursor:pointer}.category-chip.active{color:var(--sand);border-color:var(--clay);background:rgba(196,132,90,.1)}.auction-masonry{display:none;columns:4 175px;column-gap:12px;padding:10px 20px 14px;max-height:36vh;overflow:auto;overscroll-behavior:contain}.auction-masonry.show{display:block}.auction-work-card{display:inline-block;break-inside:avoid;width:100%;margin:0 0 12px;padding:0;text-align:left;border:1px solid var(--divider);background:var(--bg-alt);color:var(--sand);cursor:pointer;border-radius:3px;overflow:hidden}.auction-work-card:hover{border-color:var(--clay)}.auction-work-card img{display:block;width:100%;height:auto;max-height:360px;object-fit:contain;background:rgba(0,0,0,.12)}.auction-work-meta{padding:8px 10px 10px}.auction-work-title{font-family:Cinzel,serif;font-size:.65rem;line-height:1.4}.auction-work-tag{display:inline-block;margin-top:6px;margin-right:4px;padding:2px 6px;border:1px solid var(--divider);border-radius:999px;color:var(--text-muted);font-size:.56rem}.auction-work-empty{padding:14px;color:var(--text-muted);font-style:italic;break-inside:avoid}@media(max-width:600px){.auction-category-filter{padding:8px 12px 2px}.auction-masonry{columns:2 135px;padding:8px 12px 12px;max-height:32vh}}
 </style>
 <!-- Vercel Web Analytics -->
 <script>
@@ -2245,7 +2247,9 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
       </div>
       <div class="piece-selector-hint">Tap a piece to switch</div>
     </div>
+    <div class="auction-category-filter" id="auction-category-filter" aria-label="Filter by category"></div>
     <div class="piece-phase-filter" id="piece-phase-filter"></div>
+    <div class="auction-masonry" id="auction-masonry"></div>
     <div class="piece-selector-scroll-wrap" id="piece-selector-scroll-wrap">
       <div class="piece-selector" id="piece-selector"></div>
     </div>
@@ -4407,6 +4411,7 @@ async function _buildPieceSelector() {
   if (grouped.length <= 1) {
     strip.classList.remove("show");
     if (wrap) wrap.classList.remove("show");
+    _renderCategoryGallery();
     updateAuctionNav();
     return;
   }
@@ -4451,6 +4456,7 @@ async function _buildPieceSelector() {
   _tabPollRetries = 0;
   setTimeout(_resolvePendingTabs, 8000);
   _bindPhaseFilter();
+  _categoryHashChanged();
   if (!_phaseTickStarted) { _phaseTickStarted = true; setInterval(_tickPhases, 15000); }
 
   updateAuctionNav();
@@ -4543,6 +4549,24 @@ function _renderTabPhase(idx) {
     : "";
 }
 
+let _categoryFilter = "all";
+let _collectionFilter = "all";
+function _categorySlug(value){return String(value||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
+function _renderCategoryGallery(){
+ const box=document.getElementById("auction-category-filter"),grid=document.getElementById("auction-masonry"); if(!box||!grid)return;
+ const items=(_visibleLiveIndexes||[]).map(i=>({i,slot:_auctions[i]})).filter(x=>x.slot);
+ const cats=Array.from(new Set(items.map(x=>String(x.slot.category||"").trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+ box.replaceChildren();
+ if(cats.length>1){box.classList.add("show"); for(const value of ["all",...cats]){const btn=document.createElement("button");btn.type="button";btn.className="category-chip"+(value===_categoryFilter?" active":"");btn.textContent=(value==="all"?"All":value)+" · "+(value==="all"?items.length:items.filter(x=>String(x.slot.category||"").trim()===value).length);btn.addEventListener("click",()=>{_categoryFilter=value;_collectionFilter="all";const slug=value==="all"?"":_categorySlug(value);history.pushState({category:slug},"",location.pathname+location.search+(slug?"#"+slug:""));_renderCategoryGallery();});box.appendChild(btn);}}else{box.classList.remove("show");_categoryFilter="all";}
+ const relevant=items.filter(x=>_categoryFilter==="all"||String(x.slot.category||"").trim()===_categoryFilter);
+ const collections=Array.from(new Set(relevant.map(x=>String(x.slot.collection||"").trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+ if(_categoryFilter!=="all"&&collections.length){for(const value of ["all",...collections]){const btn=document.createElement("button");btn.type="button";btn.className="category-chip"+((_collectionFilter===value)?" active":"");btn.textContent=(value==="all"?"All sets":value)+" · "+(value==="all"?relevant.length:relevant.filter(x=>String(x.slot.collection||"").trim()===value).length);btn.addEventListener("click",()=>{_collectionFilter=value;_renderCategoryGallery();});box.appendChild(btn);}box.classList.add("show");}
+ const phase=_phaseFilter||"all";const shown=relevant.filter(x=>{if(_collectionFilter!=="all"&&String(x.slot.collection||"").trim()!==_collectionFilter)return false;const ph=_slotPhase[x.i]?.phase||"pending";return phase==="all"||ph===phase||ph==="pending";});grid.replaceChildren();
+ for(const {i,slot} of shown){const card=document.createElement("button");card.type="button";card.className="auction-work-card";card.addEventListener("click",()=>_switchAuction(i));if(slot.artImage){const img=document.createElement("img");img.src=toHTTP(slot.artImage);img.alt=slot.artTitle||"Artwork";img.loading="lazy";card.appendChild(img);}const meta=document.createElement("div");meta.className="auction-work-meta";const title=document.createElement("div");title.className="auction-work-title";title.textContent=slot.artTitle||"Piece "+(i+1);meta.appendChild(title);for(const tag of [slot.category,slot.collection])if(tag){const span=document.createElement("span");span.className="auction-work-tag";span.textContent=tag;meta.appendChild(span);}card.appendChild(meta);grid.appendChild(card);}
+ if(!shown.length){const empty=document.createElement("div");empty.className="auction-work-empty";empty.textContent="No works match these filters.";grid.appendChild(empty);}grid.classList.add("show");
+}
+function _categoryHashChanged(){const hash=decodeURIComponent(location.hash.slice(1));const cats=(_auctions||[]).map(x=>String(x.category||"").trim()).filter(Boolean);const match=cats.find(c=>_categorySlug(c)===hash);_categoryFilter=match||"all";_collectionFilter="all";_renderCategoryGallery();}
+window.addEventListener("hashchange",_categoryHashChanged);window.addEventListener("popstate",_categoryHashChanged);
 function _renderPhaseFilter() {
   const box = document.getElementById("piece-phase-filter"); if (!box) return;
   const n = { open: 0, patron: 0 };
@@ -4558,6 +4582,7 @@ function _renderPhaseFilter() {
     `<button type="button" class="phase-chip${_phaseFilter === f ? " active" : ""}" data-f="${f}">${l} · ${c}</button>`).join("");
   box.classList.add("show");
   _applyPhaseFilter();
+  _renderCategoryGallery();
 }
 
 function _applyPhaseFilter() {

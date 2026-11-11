@@ -1192,6 +1192,10 @@ function _buildPieceForm(idx) {
         <div class="field-hint">Public reserve anchor after the holder phase ends.</div>
       </div>
     </div>
+    <div class="row2">
+      <div class="field"><label>Category</label><input id="${_pieceFieldId(idx,'category')}" list="piece-category-list" maxlength="80" placeholder="e.g. Painting or Sculpture" value="${_chEsc(d.category)}"/><datalist id="piece-category-list">${[...new Set(_pieces.map(p => String(p.category || "").trim()).filter(Boolean))].map(v => `<option value="${_chEsc(v)}"></option>`).join("")}</datalist><div class="field-hint">Free text; existing categories are suggested.</div></div>
+      <div class="field"><label>Set / group <span style="opacity:.6;text-transform:none;letter-spacing:0">(optional)</span></label><input id="${_pieceFieldId(idx,'collection')}" list="piece-collection-list" maxlength="80" placeholder="e.g. Sculpture Set 1" value="${_chEsc(d.collection)}"/><datalist id="piece-collection-list">${[...new Set(_pieces.map(p => String(p.collection || "").trim()).filter(Boolean))].map(v => `<option value="${_chEsc(v)}"></option>`).join("")}</datalist><div class="field-hint">Leaves each work individual while allowing set filters.</div></div>
+    </div>
     <div class="field">
       <label>Title</label>
       <input id="${_pieceFieldId(idx,'artTitle')}" placeholder="e.g. ìgbáradì" value="${d.artTitle||''}"/>
@@ -1738,7 +1742,7 @@ document.addEventListener("keyup", (e) => {
 
 function _savePieceFormValuesRaw(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
-  const fields = ["chain","contractAddr","marketplaceAddr","marketplaceAuctionId","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","usdHardCap","holderUsdHardCap","publicUsdHardCap","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","chapterLink","chapterLinkLabel","launchDate","status","chatLocked","chatLockMsg"];
+  const fields = ["chain","contractAddr","marketplaceAddr","marketplaceAuctionId","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","usdHardCap","holderUsdHardCap","publicUsdHardCap","category","collection","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","chapterLink","chapterLinkLabel","launchDate","status","chatLocked","chatLockMsg"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
     if (!el) return;
@@ -1762,8 +1766,8 @@ function _savePieceFormValuesRaw(idx) {
 // _pieces stays a flat list of auction slots, so the saved format is unchanged.
 // A pair is two slots with the same pair key — one Ethereum, one Tezos — and the
 // editor shows them as ONE card: shared details once, chain settings side by side.
-const _PAIR_SHARED = ["artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","chapterLink","chapterLinkLabel","launchDate","chatLocked","chatLockMsg","usdHardCap","holderUsdHardCap","publicUsdHardCap"];
-const _PAIR_LABELS = { artTitle:"Title", artArtist:"Artist", artAbout:"About text", artYear:"Year", artMedium:"Medium", artImage:"Image URL", gateName:"Gate token", gateLink:"Gate link", chapterLink:"Chapter link", chapterLinkLabel:"Chapter button text", launchDate:"Launch date", chatLocked:"Chat lock", chatLockMsg:"Chat lock message", usdHardCap:"USD hard cap", holderUsdHardCap:"Holder phase cap", publicUsdHardCap:"Public phase cap" };
+const _PAIR_SHARED = ["category","collection","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","chapterLink","chapterLinkLabel","launchDate","chatLocked","chatLockMsg","usdHardCap","holderUsdHardCap","publicUsdHardCap"];
+const _PAIR_LABELS = { category:"Category", collection:"Set / group", artTitle:"Title", artArtist:"Artist", artAbout:"About text", artYear:"Year", artMedium:"Medium", artImage:"Image URL", gateName:"Gate token", gateLink:"Gate link", chapterLink:"Chapter link", chapterLinkLabel:"Chapter button text", launchDate:"Launch date", chatLocked:"Chat lock", chatLockMsg:"Chat lock message", usdHardCap:"USD hard cap", holderUsdHardCap:"Holder phase cap", publicUsdHardCap:"Public phase cap" };
 const _splitStatusKeys = new Set();   // pairs the admin chose to give a status per chain
 let _serverSnapshot = null;           // config exactly as loaded, for the backup button
 
