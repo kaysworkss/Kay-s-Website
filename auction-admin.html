@@ -1193,8 +1193,22 @@ function _buildPieceForm(idx) {
       </div>
     </div>
     <div class="row2">
-      <div class="field"><label>Category</label><input id="${_pieceFieldId(idx,'category')}" list="piece-category-list" maxlength="80" placeholder="e.g. Painting or Sculpture" value="${_chEsc(d.category)}"/><datalist id="piece-category-list">${[...new Set(_pieces.map(p => String(p.category || "").trim()).filter(Boolean))].map(v => `<option value="${_chEsc(v)}"></option>`).join("")}</datalist><div class="field-hint">Free text; existing categories are suggested.</div></div>
-      <div class="field"><label>Set / group <span style="opacity:.6;text-transform:none;letter-spacing:0">(optional)</span></label><input id="${_pieceFieldId(idx,'collection')}" list="piece-collection-list" maxlength="80" placeholder="e.g. Sculpture Set 1" value="${_chEsc(d.collection)}"/><datalist id="piece-collection-list">${[...new Set(_pieces.map(p => String(p.collection || "").trim()).filter(Boolean))].map(v => `<option value="${_chEsc(v)}"></option>`).join("")}</datalist><div class="field-hint">Leaves each work individual while allowing set filters.</div></div>
+      <div class="field">
+        <label>Category</label>
+        <select id="${_pieceFieldId(idx,'category')}" onchange="_onCategoryChange(${idx})">
+          <option value="" ${!d.category ? 'selected' : ''}>— Not set —</option>
+          <option value="painting" ${d.category === 'painting' ? 'selected' : ''}>Painting</option>
+          <option value="sculpture" ${d.category === 'sculpture' ? 'selected' : ''}>Sculpture</option>
+          ${d.category && !['painting','sculpture'].includes(d.category) ? `<option value="${_chEsc(d.category)}" selected>${_chEsc(d.category)}</option>` : ''}
+        </select>
+        <div class="field-hint">Collectors can filter the auction page by category.</div>
+      </div>
+      <div class="field" id="${_pieceFieldId(idx,'setWrap')}" style="display:${d.category === 'sculpture' ? 'block' : 'none'}">
+        <label>Part of a set</label>
+        <input id="${_pieceFieldId(idx,'setName')}" list="set-names-${idx}" placeholder="e.g. Ijoko set" value="${_chEsc(d.setName || '')}"/>
+        <datalist id="set-names-${idx}">${[...new Set(_pieces.map(x => String(x.setName || '').trim()).filter(Boolean))].map(n => `<option value="${_chEsc(n)}"></option>`).join('')}</datalist>
+        <div class="field-hint">Leave blank for a single sculpture. Pieces with the same set name are grouped together.</div>
+      </div>
     </div>
     <div class="field">
       <label>Title</label>
@@ -1742,7 +1756,7 @@ document.addEventListener("keyup", (e) => {
 
 function _savePieceFormValuesRaw(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
-  const fields = ["chain","contractAddr","marketplaceAddr","marketplaceAuctionId","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","usdHardCap","holderUsdHardCap","publicUsdHardCap","category","collection","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","chapterLink","chapterLinkLabel","launchDate","status","chatLocked","chatLockMsg"];
+  const fields = ["chain","contractAddr","marketplaceAddr","marketplaceAuctionId","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","usdHardCap","holderUsdHardCap","publicUsdHardCap","category","setName","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","chapterLink","chapterLinkLabel","launchDate","status","chatLocked","chatLockMsg"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
     if (!el) return;
@@ -1762,12 +1776,20 @@ function _savePieceFormValuesRaw(idx) {
   _ensurePieceId(_pieces[idx]);
 }
 
+function _onCategoryChange(idx) {
+  const sel  = document.getElementById(_pieceFieldId(idx, 'category'));
+  const wrap = document.getElementById(_pieceFieldId(idx, 'setWrap'));
+  const isSculpture = !!sel && sel.value === 'sculpture';
+  if (wrap) wrap.style.display = isSculpture ? 'block' : 'none';
+  if (!isSculpture) { const inp = document.getElementById(_pieceFieldId(idx, 'setName')); if (inp) inp.value = ''; }
+}
+
 // ─── Paired auctions: one card for an ETH + Tezos pair ───────────────────────
 // _pieces stays a flat list of auction slots, so the saved format is unchanged.
 // A pair is two slots with the same pair key — one Ethereum, one Tezos — and the
 // editor shows them as ONE card: shared details once, chain settings side by side.
-const _PAIR_SHARED = ["category","collection","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","chapterLink","chapterLinkLabel","launchDate","chatLocked","chatLockMsg","usdHardCap","holderUsdHardCap","publicUsdHardCap"];
-const _PAIR_LABELS = { category:"Category", collection:"Set / group", artTitle:"Title", artArtist:"Artist", artAbout:"About text", artYear:"Year", artMedium:"Medium", artImage:"Image URL", gateName:"Gate token", gateLink:"Gate link", chapterLink:"Chapter link", chapterLinkLabel:"Chapter button text", launchDate:"Launch date", chatLocked:"Chat lock", chatLockMsg:"Chat lock message", usdHardCap:"USD hard cap", holderUsdHardCap:"Holder phase cap", publicUsdHardCap:"Public phase cap" };
+const _PAIR_SHARED = ["category","setName","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","chapterLink","chapterLinkLabel","launchDate","chatLocked","chatLockMsg","usdHardCap","holderUsdHardCap","publicUsdHardCap"];
+const _PAIR_LABELS = { category:"Category", setName:"Set", artTitle:"Title", artArtist:"Artist", artAbout:"About text", artYear:"Year", artMedium:"Medium", artImage:"Image URL", gateName:"Gate token", gateLink:"Gate link", chapterLink:"Chapter link", chapterLinkLabel:"Chapter button text", launchDate:"Launch date", chatLocked:"Chat lock", chatLockMsg:"Chat lock message", usdHardCap:"USD hard cap", holderUsdHardCap:"Holder phase cap", publicUsdHardCap:"Public phase cap" };
 const _splitStatusKeys = new Set();   // pairs the admin chose to give a status per chain
 let _serverSnapshot = null;           // config exactly as loaded, for the backup button
 

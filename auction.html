@@ -914,6 +914,24 @@ body {
 .in-chooser { grid-column: 1 / -1; margin-bottom: 0 !important; }
 .cc-choice-status.patron { color: var(--phase-patron); }
 .cc-choice-status.patron .cc-choice-status-dot { background: var(--phase-patron); }
+
+/* ── Category / set filters ── */
+.piece-cat-filter { display:none; gap:8px; flex-wrap:wrap; padding:10px 20px 0; }
+.piece-cat-filter.show { display:flex; }
+.cat-chip { font-family:'Cinzel',serif; font-size:.5rem; letter-spacing:.14em; text-transform:uppercase; padding:7px 14px; border-radius:999px; border:1px solid var(--divider); background:transparent; color:var(--text-muted); cursor:pointer; transition:color .2s, border-color .2s, background .2s; }
+.cat-chip b { font-weight:400; margin-left:7px; opacity:.7; }
+.cat-chip:hover { color:var(--sand); }
+.cat-chip.on { color:var(--sand); border-color:var(--clay); background:rgba(196,132,90,.1); }
+.set-chip { font-family:'Cinzel',serif; font-size:.46rem; letter-spacing:.14em; text-transform:uppercase; padding:5px 11px; border-radius:6px; border:1px solid var(--divider); background:transparent; color:var(--text-muted); cursor:pointer; }
+.set-chip b { font-weight:400; margin-left:6px; opacity:.7; }
+.set-chip:hover { color:var(--sand); }
+.set-chip.on { color:var(--sand); border-color:var(--clay); background:rgba(196,132,90,.08); }
+.cat-chip:disabled, .set-chip:disabled, .phase-chip:disabled { opacity:.35; cursor:not-allowed; }
+.piece-tab-cat { font-family:'Cinzel',serif; font-size:.38rem; letter-spacing:.16em; text-transform:uppercase; color:var(--text-muted); line-height:1.2; margin-bottom:1px; }
+.piece-filter-empty { display:none; padding:14px 20px 0; font-family:'Crimson Pro',serif; font-size:.95rem; color:var(--text-muted); }
+.piece-filter-empty.show { display:block; }
+.piece-filter-empty button { font-family:'Cinzel',serif; font-size:.46rem; letter-spacing:.14em; text-transform:uppercase; margin-left:10px; padding:5px 11px; border-radius:999px; border:1px solid var(--clay); background:transparent; color:var(--clay); cursor:pointer; }
+@media (max-width: 600px) { .piece-cat-filter { padding:8px 12px 0; } .piece-filter-empty { padding:12px 12px 0; } }
 /* </phase-css> */
 .voice-player { display:flex; align-items:center; gap:8px; min-width:150px; }
 .voice-play { width:26px; height:26px; border-radius:50%; border:1px solid rgba(196,132,90,.45); background:rgba(196,132,90,.12); color:var(--clay); cursor:pointer; font-size:.6rem; flex-shrink:0; padding:0; line-height:1; }
@@ -2245,7 +2263,10 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
       </div>
       <div class="piece-selector-hint">Tap a piece to switch</div>
     </div>
+    <div class="piece-cat-filter" id="piece-cat-filter"></div>
+    <div class="piece-cat-filter" id="piece-set-filter"></div>
     <div class="piece-phase-filter" id="piece-phase-filter"></div>
+    <div class="piece-filter-empty" id="piece-filter-empty">Nothing matches these filters right now. <button type="button" id="piece-filter-clear">Clear filters</button></div>
     <div class="piece-selector-scroll-wrap" id="piece-selector-scroll-wrap">
       <div class="piece-selector" id="piece-selector"></div>
     </div>
@@ -4376,7 +4397,7 @@ async function _returnToLiveAuction() {
 async function _buildPieceSelector() {
   const strip = document.getElementById("piece-selector");
   strip.innerHTML = "";
-  _slotPhase = {}; _phaseFilter = "all";
+  _slotPhase = {}; _phaseFilter = "all"; _catFilter = "all"; _setFilter = ""; _setLabels = {};
 
   // Show only live pieces. Preview mode also allows Off pieces so admins
   // can inspect unpublished work without making Live/Upcoming overrides leak.
@@ -4402,7 +4423,9 @@ async function _buildPieceSelector() {
       grouped.push({ ...item, pairKey: "", ethIdx: -1, tezIdx: -1 });
     }
   }
+  grouped.splice(0, grouped.length, ..._groupBySet(grouped));   // pieces of one set sit together
   _visibleLiveIndexes = grouped.map(({ i }) => i);
+  _selectorTotal = grouped.length;
 
   if (grouped.length <= 1) {
     strip.classList.remove("show");
@@ -4419,6 +4442,10 @@ async function _buildPieceSelector() {
     const btn = document.createElement("button");
     btn.className = "piece-tab";
     btn.dataset.idx = i;
+    btn.dataset.grp = _chipGroupOf(slot);
+    btn.dataset.set = _setKeyOf(slot);
+    if (_setKeyOf(slot)) _setLabels[_setKeyOf(slot)] = _slotSetName(slot);
+    const _tagText = _cardTagText(slot);
 
     const thumbHtml = slot.artImage
       ? `<img class="piece-tab-thumb" src="${toHTTP(slot.artImage)}" alt="" onerror="this.style.display='none'">`
@@ -4431,6 +4458,7 @@ async function _buildPieceSelector() {
     btn.innerHTML = `
       ${thumbHtml}
       <div class="piece-tab-info">
+        ${_tagText ? `<div class="piece-tab-cat">${_esc(_tagText)}</div>` : ""}
         <div class="piece-tab-title">${slot.artTitle || "Piece " + (i + 1)}</div>
         <div class="piece-tab-bid" id="tab-bid-${i}">—</div>
         <div class="piece-tab-phase"><span class="piece-phase-tag"></span><span class="piece-phase-time"></span></div>
@@ -4451,6 +4479,8 @@ async function _buildPieceSelector() {
   _tabPollRetries = 0;
   setTimeout(_resolvePendingTabs, 8000);
   _bindPhaseFilter();
+  _applyFilterHash();      // honour a shared link such as #sets/ijoko-set
+  _renderPhaseFilter();
   if (!_phaseTickStarted) { _phaseTickStarted = true; setInterval(_tickPhases, 15000); }
 
   updateAuctionNav();
@@ -4543,41 +4573,170 @@ function _renderTabPhase(idx) {
     : "";
 }
 
-function _renderPhaseFilter() {
-  const box = document.getElementById("piece-phase-filter"); if (!box) return;
-  const n = { open: 0, patron: 0 };
-  document.querySelectorAll("#piece-selector .piece-tab").forEach(c => {
-    if (c.dataset.sold !== "1" && n[c.dataset.phase] !== undefined) n[c.dataset.phase]++;
-  });
-  if (!(n.open > 0 && n.patron > 0)) {          // nothing to choose between → no chips
-    box.classList.remove("show"); box.innerHTML = ""; _phaseFilter = "all"; _applyPhaseFilter(); return;
-  }
-  if (_phaseFilter === "open" && !n.open) _phaseFilter = "all";
-  const chips = [["all", "All", n.open + n.patron], ["open", "Open to all", n.open], ["patron", "Patron phase", n.patron]];
-  box.innerHTML = chips.map(([f, l, c]) =>
-    `<button type="button" class="phase-chip${_phaseFilter === f ? " active" : ""}" data-f="${f}">${l} · ${c}</button>`).join("");
-  box.classList.add("show");
-  _applyPhaseFilter();
+// ── Category / set / phase filtering ──────────────────────────────────────────
+// Every piece keeps its own card. A card belongs to one chip group: "sets" if it has a
+// set name, otherwise its category (painting, sculpture…), otherwise "other".
+let _catFilter = "all";        // "all" or a chip group key
+let _setFilter = "";           // set key, only meaningful while _catFilter === "sets"
+let _setLabels = {};           // set key → display name
+let _selectorTotal = 0;
+const _CAT_PLURAL   = { painting: "Paintings", sculpture: "Sculptures", sets: "Sculpture sets", other: "Other" };
+const _CAT_SINGULAR = { painting: "Painting",  sculpture: "Sculpture" };
+const _CAT_URL      = { painting: "paintings", sculpture: "sculptures", sets: "sets", other: "other" };
+
+function _slug(v) { return String(v || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60); }
+function _pairOtherSlot(slot) {
+  const pk = _pairKeyForSlot(slot);
+  return pk ? (_auctions.find(x => x !== slot && _pairKeyForSlot(x) === pk) || null) : null;
+}
+// A cross-chain pair is one card: category / set can be set on either half.
+function _slotCategory(slot) { return _slug((slot && slot.category) || (_pairOtherSlot(slot) || {}).category || ""); }
+function _slotSetName(slot)  { return String((slot && slot.setName) || (_pairOtherSlot(slot) || {}).setName || "").trim(); }
+function _setKeyOf(slot)     { return _slug(_slotSetName(slot)); }
+function _chipGroupOf(slot)  { return _setKeyOf(slot) ? "sets" : (_slotCategory(slot) || "other"); }
+function _titleCase(k)       { return String(k).charAt(0).toUpperCase() + String(k).slice(1).replace(/-/g, " "); }
+function _catLabel(k)        { return _CAT_PLURAL[k] || _titleCase(k); }
+function _cardTagText(slot) {
+  const sn = _slotSetName(slot); if (sn) return sn;
+  const c = _slotCategory(slot);
+  return c ? (_CAT_SINGULAR[c] || _titleCase(c)) : "";
 }
 
-function _applyPhaseFilter() {
-  document.querySelectorAll("#piece-selector .piece-tab").forEach(c => {
-    const hide = _phaseFilter !== "all" && c.dataset.phase && c.dataset.phase !== "pending" && c.dataset.phase !== _phaseFilter;
-    c.style.display = hide ? "none" : "";
+// Pieces of the same set sit next to each other (first appearance decides the position).
+function _groupBySet(list) {
+  const out = [], placed = new Set();
+  list.forEach(g => {
+    const k = _setKeyOf(g.slot);
+    if (!k) { out.push(g); return; }
+    if (placed.has(k)) return;
+    placed.add(k);
+    list.filter(x => _setKeyOf(x.slot) === k).forEach(x => out.push(x));
   });
+  return out;
+}
+
+function _cardMatches(x, f) {
+  if (f.cat !== "all" && x.grp !== f.cat) return false;
+  if (f.cat === "sets" && f.set && x.set !== f.set) return false;
+  if (f.ph !== "all") {
+    if (x.ph === "pending" || !x.ph) return true;   // phase not known yet — keep it visible
+    return !x.sold && x.ph === f.ph;                 // sold pieces have no phase to match
+  }
+  return true;
+}
+
+function _renderPhaseFilter() {
+  const catBox = document.getElementById("piece-cat-filter");
+  const setBox = document.getElementById("piece-set-filter");
+  const phBox  = document.getElementById("piece-phase-filter");
+  if (!phBox) return;
+  const info = [...document.querySelectorAll("#piece-selector .piece-tab")].map(c => ({
+    el: c, grp: c.dataset.grp || "other", set: c.dataset.set || "", ph: c.dataset.phase || "", sold: c.dataset.sold === "1"
+  }));
+
+  // ── which category chips are worth showing
+  const present = new Set(info.map(x => x.grp));
+  const showCats = info.some(x => x.grp !== "other") && present.size >= 2;
+  if (!showCats || (_catFilter !== "all" && !present.has(_catFilter))) { _catFilter = "all"; _setFilter = ""; }
+  if (_catFilter !== "sets") _setFilter = "";
+  else if (_setFilter && !info.some(x => x.set === _setFilter)) _setFilter = "";
+  const rank = k => { const i = ["painting", "sculpture", "sets"].indexOf(k); return i >= 0 ? i : (k === "other" ? 99 : 50); };
+  const groups = [...present].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+
+  const chip = (cls, attr, key, label, n, on) =>
+    `<button type="button" class="${cls}${on ? " on" : ""}" ${attr}="${_esc(key)}"${n ? "" : " disabled"}>${_esc(label)}<b>${n}</b></button>`;
+
+  if (catBox) {
+    if (showCats) {
+      const chips = [["all", "All"]].concat(groups.map(g => [g, _catLabel(g)]));
+      catBox.innerHTML = chips.map(([k, l]) =>
+        chip("cat-chip", "data-cat", k, l, info.filter(x => _cardMatches(x, { cat: k, set: "", ph: _phaseFilter })).length, _catFilter === k)).join("");
+      catBox.classList.add("show");
+    } else { catBox.innerHTML = ""; catBox.classList.remove("show"); }
+  }
+  if (setBox) {
+    if (showCats && _catFilter === "sets") {
+      const keys = [...new Set(info.filter(x => x.grp === "sets").map(x => x.set))];
+      const cnt = k => info.filter(x => _cardMatches(x, { cat: "sets", set: k, ph: _phaseFilter })).length;
+      setBox.innerHTML = chip("set-chip", "data-set", "", "All sets", cnt(""), _setFilter === "") +
+        keys.map(k => chip("set-chip", "data-set", k, _setLabels[k] || k, cnt(k), _setFilter === k)).join("");
+      setBox.classList.add("show");
+    } else { setBox.innerHTML = ""; setBox.classList.remove("show"); }
+  }
+
+  // ── phase chips (only when the current selection has both kinds)
+  const scope = info.filter(x => _cardMatches(x, { cat: _catFilter, set: _setFilter, ph: "all" }));
+  const n = { open: 0, patron: 0 };
+  scope.forEach(x => { if (!x.sold && n[x.ph] !== undefined) n[x.ph]++; });
+  const anyPending = info.some(x => !x.ph || x.ph === "pending");
+  const showPh = n.open > 0 && n.patron > 0;
+  if (!anyPending && (!showPh || (_phaseFilter !== "all" && !n[_phaseFilter]))) _phaseFilter = "all";
+  if (showPh) {
+    const chips = [["all", "All", scope.length], ["open", "Open to all", n.open], ["patron", "Patron phase", n.patron]];
+    phBox.innerHTML = chips.map(([f, l, c]) =>
+      `<button type="button" class="phase-chip${_phaseFilter === f ? " active" : ""}" data-f="${f}"${c ? "" : " disabled"}>${l} · ${c}</button>`).join("");
+    phBox.classList.add("show");
+  } else { phBox.classList.remove("show"); phBox.innerHTML = ""; }
+
+  // ── show / hide the cards
+  const f = { cat: _catFilter, set: _setFilter, ph: _phaseFilter };
+  let shown = 0;
+  info.forEach(x => { const ok = _cardMatches(x, f); x.el.style.display = ok ? "" : "none"; if (ok) shown++; });
+  const total = _selectorTotal || info.length;
+  const filtered = _catFilter !== "all" || _setFilter || _phaseFilter !== "all";
+  const count = document.getElementById("piece-selector-count");
+  if (count) count.textContent = filtered ? `${shown} of ${total} auctions live` : `${total} auctions live`;
+  const empty = document.getElementById("piece-filter-empty");
+  if (empty) empty.classList.toggle("show", shown === 0 && info.length > 0);
   const strip = document.getElementById("piece-selector");
   if (strip) strip.dispatchEvent(new Event("scroll"));   // refresh the scroll-fade hints
 }
+function _applyPhaseFilter() { _renderPhaseFilter(); }
+
+// ── Shareable links: #paintings · #sculptures · #sets · #sets/ijoko-set · …/patron ──
+function _filterHash() {
+  const parts = [];
+  if (_catFilter !== "all") parts.push(_CAT_URL[_catFilter] || _catFilter);
+  if (_catFilter === "sets" && _setFilter) parts.push(_setFilter);
+  if (_phaseFilter !== "all") { if (!parts.length) parts.push("all"); parts.push(_phaseFilter); }
+  return parts.length ? "#" + parts.join("/") : "";
+}
+function _pushFilterHash() {
+  const h = _filterHash();
+  if ((location.hash || "") === h) return;
+  try { history.pushState(null, "", location.pathname + location.search + h); } catch (_) {}
+}
+function _applyFilterHash() {
+  const isPh = t => t === "open" || t === "patron";
+  let parts = [];
+  try { parts = (location.hash || "").replace(/^#\/?/, "").split("/").map(decodeURIComponent).filter(Boolean); } catch (_) {}
+  let cat = "all", set = "", ph = "all";
+  if (parts.length && !isPh(parts[0])) {
+    const t = parts.shift().toLowerCase();
+    cat = t === "all" ? "all" : (Object.keys(_CAT_URL).find(k => _CAT_URL[k] === t) || t);
+  }
+  if (cat === "sets" && parts.length && !isPh(parts[0])) set = _slug(parts.shift());
+  if (parts.length && isPh(parts[0])) ph = parts[0];
+  _catFilter = cat; _setFilter = set; _phaseFilter = ph;
+}
 
 function _bindPhaseFilter() {
-  const box = document.getElementById("piece-phase-filter");
-  if (!box || box._bound) return;
-  box._bound = true;
-  box.addEventListener("click", (e) => {
-    const b = e.target.closest(".phase-chip"); if (!b) return;
-    _phaseFilter = b.dataset.f;
+  const wrap = document.getElementById("piece-selector-wrap");
+  if (!wrap || wrap._filtersBound) return;
+  wrap._filtersBound = true;
+  wrap.addEventListener("click", (e) => {
+    const c = e.target.closest(".cat-chip, .set-chip, .phase-chip, #piece-filter-clear");
+    if (!c || c.disabled) return;
+    if (c.id === "piece-filter-clear") { _catFilter = "all"; _setFilter = ""; _phaseFilter = "all"; }
+    else if (c.classList.contains("cat-chip"))   { _catFilter = c.dataset.cat; _setFilter = ""; }
+    else if (c.classList.contains("set-chip"))   { _setFilter = c.dataset.set; }
+    else                                         { _phaseFilter = c.dataset.f; }
+    _pushFilterHash();
     _renderPhaseFilter();
   });
+  const fromUrl = () => { _applyFilterHash(); _renderPhaseFilter(); };
+  window.addEventListener("popstate", fromUrl);
+  window.addEventListener("hashchange", fromUrl);
 }
 
 // Gate notice on the piece page
