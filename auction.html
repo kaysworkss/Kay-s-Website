@@ -932,6 +932,34 @@ body {
 .piece-filter-empty.show { display:block; }
 .piece-filter-empty button { font-family:'Cinzel',serif; font-size:.46rem; letter-spacing:.14em; text-transform:uppercase; margin-left:10px; padding:5px 11px; border-radius:999px; border:1px solid var(--clay); background:transparent; color:var(--clay); cursor:pointer; }
 @media (max-width: 600px) { .piece-cat-filter { padding:8px 12px 0; } .piece-filter-empty { padding:12px 12px 0; } }
+
+/* ── Gallery overview (masonry) ── */
+#view-live.gallery-ready:not(.gallery-open) .piece-selector-wrap { display:none !important; }
+#view-live.gallery-open #live-flex-wrap { display:none !important; }
+#view-live.gallery-open .piece-selector-wrap.show { flex:1 1 auto; min-height:0; overflow-y:auto; position:static; border-bottom:none; }
+#view-live.gallery-open .piece-selector-scroll-wrap::before,
+#view-live.gallery-open .piece-selector-scroll-wrap::after { display:none; }
+#view-live.gallery-open .piece-selector.show { display:flex; align-items:flex-start; overflow:visible; white-space:normal; gap:14px; padding:16px 20px 40px; }
+.gcol { flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:14px; }
+.gcol .piece-tab { width:100%; display:flex; flex-shrink:0; border-radius:8px; }
+.gcol .piece-tab-thumb { height:auto; aspect-ratio:4 / 5; }
+.gcol .piece-tab-info { padding:10px 12px 14px; gap:4px; }
+.gcol .piece-tab-title { font-size:.62rem; letter-spacing:.14em; }
+.gcol .piece-tab-cat { font-size:.42rem; }
+.gcol .piece-tab-bid { font-size:1.15rem; }
+.gcol .piece-tab.active::before { display:none; }
+.gcol .piece-tab:hover { transform:translateY(-2px); }
+.gallery-back { display:none; align-items:center; gap:12px; flex-wrap:wrap; padding:9px 20px; border-bottom:1px solid var(--divider); background:var(--bg); flex-shrink:0; }
+#view-live.gallery-ready:not(.gallery-open) .gallery-back { display:flex; }
+.gallery-back button { font-family:'Cinzel',serif; font-size:.52rem; letter-spacing:.16em; text-transform:uppercase; background:transparent; border:1px solid var(--clay); color:var(--clay); padding:6px 13px; border-radius:999px; cursor:pointer; transition:background .2s; }
+.gallery-back button:hover { background:rgba(196,132,90,.12); }
+.gallery-back-ctx { font-family:'Crimson Pro',serif; font-size:.9rem; font-style:italic; color:var(--text-muted); }
+.gallery-back-ctx:empty { display:none; }
+@media (max-width: 760px) {
+  #view-live.gallery-open .piece-selector.show { padding:12px 12px 32px; gap:10px; }
+  .gcol { gap:10px; }
+  .gallery-back { padding:8px 12px; }
+}
 /* </phase-css> */
 .voice-player { display:flex; align-items:center; gap:8px; min-width:150px; }
 .voice-play { width:26px; height:26px; border-radius:50%; border:1px solid rgba(196,132,90,.45); background:rgba(196,132,90,.12); color:var(--clay); cursor:pointer; font-size:.6rem; flex-shrink:0; padding:0; line-height:1; }
@@ -2270,6 +2298,12 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
     <div class="piece-selector-scroll-wrap" id="piece-selector-scroll-wrap">
       <div class="piece-selector" id="piece-selector"></div>
     </div>
+  </div>
+
+  <!-- Back to the gallery overview (shown while a piece is open) -->
+  <div class="gallery-back" id="gallery-back">
+    <button type="button" id="gallery-back-btn">&larr; All works</button>
+    <span class="gallery-back-ctx" id="gallery-back-ctx"></span>
   </div>
 
   <div id="live-flex-wrap" style="display:flex;flex:1;min-height:0;overflow:hidden;">
@@ -4061,7 +4095,7 @@ function _linkedPieceIndex() {
 
 function _syncPieceUrl(slot) {
   const pieceId = String(slot?.pieceId || "").trim();
-  if (!pieceId || cfg._preview) return;
+  if (!pieceId || cfg._preview || _suppressPieceUrl) return;
   const url = new URL(window.location.href);
   url.searchParams.set("piece", pieceId);
   url.searchParams.delete("preview");
@@ -4327,6 +4361,11 @@ async function initLive() {
     const firstLive = _visibleLiveIndexes[0] ?? _auctions.findIndex(p => p._effectiveStatus === "live");
     startIdx = firstLive >= 0 ? firstLive : 0;
   }
+  // Arrive on the gallery overview unless a piece was asked for (shared link or admin preview)
+  const startInPiece = (cfg._preview && typeof cfg._pieceIdx === "number") ||
+    (linkedIdx >= 0 && _slotMatchesStatus(_auctions[linkedIdx], "live"));
+  if (_galleryAvailable && !startInPiece) { _suppressPieceUrl = true; _showGallery(); }
+  else { _suppressPieceUrl = false; const _lv = document.getElementById("view-live"); if (_lv) _lv.classList.remove("gallery-open"); }
   await _switchAuction(startIdx);
   initAuctionSwipe();
 }
@@ -4426,6 +4465,8 @@ async function _buildPieceSelector() {
   grouped.splice(0, grouped.length, ..._groupBySet(grouped));   // pieces of one set sit together
   _visibleLiveIndexes = grouped.map(({ i }) => i);
   _selectorTotal = grouped.length;
+  _galleryAvailable = grouped.length > 1;
+  { const _lv = document.getElementById("view-live"); if (_lv) _lv.classList.toggle("gallery-ready", _galleryAvailable); }
 
   if (grouped.length <= 1) {
     strip.classList.remove("show");
@@ -4437,6 +4478,7 @@ async function _buildPieceSelector() {
   strip.classList.add("show");
   if (wrap) wrap.classList.add("show");
   if (count) count.textContent = `${grouped.length} auctions live`;
+  { const _hint = document.querySelector(".piece-selector-hint"); if (_hint) _hint.textContent = "Tap a work to open it"; }
 
   for (const { slot, i, pairKey, ethIdx, tezIdx } of grouped) {
     const btn = document.createElement("button");
@@ -4469,7 +4511,7 @@ async function _buildPieceSelector() {
         </div>
       </div>`;
 
-    btn.addEventListener("click", () => _switchAuction(i));
+    btn.addEventListener("click", () => _openPiece(i));
     strip.appendChild(btn);
     if (_isManualSold(slot, i)) _setTabSoldState(i, true);
     // Pieces with no entry token are free-for-all from the start; gated pieces
@@ -4690,6 +4732,8 @@ function _renderPhaseFilter() {
   if (empty) empty.classList.toggle("show", shown === 0 && info.length > 0);
   const strip = document.getElementById("piece-selector");
   if (strip) strip.dispatchEvent(new Event("scroll"));   // refresh the scroll-fade hints
+  _updateBackCtx();
+  _scheduleGalleryLayout();
 }
 function _applyPhaseFilter() { _renderPhaseFilter(); }
 
@@ -4734,9 +4778,25 @@ function _bindPhaseFilter() {
     _pushFilterHash();
     _renderPhaseFilter();
   });
-  const fromUrl = () => { _applyFilterHash(); _renderPhaseFilter(); };
-  window.addEventListener("popstate", fromUrl);
-  window.addEventListener("hashchange", fromUrl);
+  const backBtn = document.getElementById("gallery-back-btn");
+  if (backBtn) backBtn.addEventListener("click", () => _showGallery({ push: true }));
+  window.addEventListener("hashchange", () => { _applyFilterHash(); _renderPhaseFilter(); });
+  // Browser back / forward moves between the gallery and an open piece
+  window.addEventListener("popstate", () => {
+    _applyFilterHash();
+    if (_galleryAvailable) {
+      const idx = _linkedPieceIndex();
+      if (idx >= 0 && _slotMatchesStatus(_auctions[idx], "live")) {
+        const rep = _visibleLiveIndexes[_liveOrderIndexOf(idx)];
+        _openPiece(rep !== undefined ? rep : idx, { push: false });
+        _renderPhaseFilter();
+        return;
+      }
+      _showGallery();
+    }
+    _renderPhaseFilter();
+  });
+  let _rz; window.addEventListener("resize", () => { clearTimeout(_rz); _rz = setTimeout(() => { if (_galleryCols() !== _glCols) _scheduleGalleryLayout(); }, 150); });
 }
 
 // Gate notice on the piece page
@@ -4848,6 +4908,124 @@ function _ccApplyPhaseUi(tezSlot, ethSlot, auction) {
   const notice = document.getElementById("live-gate-notice");
   if (notice) notice.style.display = (signerAddress || tezosAddress) ? "none" : "block";
 }
+
+// ── Gallery overview ──────────────────────────────────────────────────────────
+// With more than one live piece, visitors land on a masonry overview. The same card
+// elements carry bids, phase tags and sold states; opening one shows the piece page.
+let _galleryAvailable = false;
+let _suppressPieceUrl = false;
+let _glQueued = false, _glCols = 0;
+
+function _galleryRoot() { return document.getElementById("view-live"); }
+
+// Order used by the previous / next arrows: the current filter, in gallery order.
+function _navIndexes() {
+  if (!_galleryAvailable) return _visibleLiveIndexes;
+  const shown = _visibleLiveIndexes.filter(i => { const c = _tabBtn(i); return !c || c.style.display !== "none"; });
+  const pos = _liveOrderIndexOf(_activeIdx);
+  const activeRep = pos >= 0 ? _visibleLiveIndexes[pos] : -1;
+  if (!shown.length || (activeRep >= 0 && !shown.includes(activeRep))) return _visibleLiveIndexes;
+  return shown;
+}
+function _navOrderIndexOf(idx, list) {
+  const d = list.indexOf(idx);
+  if (d >= 0) return d;
+  const pk = _pairKeyForSlot(_auctions[idx]);
+  return pk ? list.findIndex(i => _pairKeyForSlot(_auctions[i]) === pk) : -1;
+}
+
+function _updateBackCtx() {
+  const el = document.getElementById("gallery-back-ctx"); if (!el) return;
+  const bits = [];
+  if (_catFilter !== "all") bits.push(_catFilter === "sets" && _setFilter ? (_setLabels[_setFilter] || "Sculpture sets") : _catLabel(_catFilter));
+  if (_phaseFilter !== "all") bits.push(_phaseFilter === "open" ? "Open to all" : "Patron phase");
+  el.textContent = bits.join(" · ");
+}
+
+function _showGallery(opts = {}) {
+  if (!_galleryAvailable) return;
+  const v = _galleryRoot(); if (!v) return;
+  v.classList.add("gallery-open");
+  _suppressPieceUrl = true;
+  if (opts.push || opts.replace) {
+    const u = new URL(location.href); u.searchParams.delete("piece");
+    const target = u.pathname + u.search + u.hash;
+    try { opts.push ? history.pushState(null, "", target) : history.replaceState(history.state, "", target); } catch (_) {}
+  }
+  _stopVoicePlayback();
+  _renderPhaseFilter();
+  _layoutGallery();
+  requestAnimationFrame(() => window.scrollTo(0, 0));
+}
+
+async function _openPiece(i, opts = {}) {
+  const v = _galleryRoot();
+  if (_galleryAvailable && opts.push !== false) {
+    try { history.pushState(null, "", location.pathname + location.search + location.hash); } catch (_) {}
+  }
+  if (v) v.classList.remove("gallery-open");
+  _suppressPieceUrl = false;
+  _updateBackCtx();
+  window.scrollTo({ top: 0 });
+  const pos = _liveOrderIndexOf(_activeIdx);
+  const activeRep = pos >= 0 ? _visibleLiveIndexes[pos] : -1;
+  if (activeRep === i && !_auctionSwitching) {
+    // This piece is already loaded in the background — just reveal it
+    _syncPieceUrl(_auctions[_activeIdx]);
+    updateAuctionNav();
+  } else {
+    await _switchAuction(i);
+  }
+  window.dispatchEvent(new Event("resize"));
+}
+
+function _galleryCols() {
+  const strip = document.getElementById("piece-selector");
+  const narrow = window.innerWidth <= 760;
+  const cs = strip ? getComputedStyle(strip) : null;
+  const inner = strip ? strip.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0) : window.innerWidth;
+  const gap = narrow ? 10 : 14, minW = narrow ? 150 : 200;
+  return Math.max(narrow ? 2 : 1, Math.min(5, Math.floor((inner + gap) / (minW + gap))));
+}
+
+function _scheduleGalleryLayout() {
+  if (_glQueued) return;
+  _glQueued = true;
+  requestAnimationFrame(() => { _glQueued = false; _layoutGallery(); });
+}
+
+// Masonry that still reads left to right: each card goes under the shortest column.
+function _layoutGallery() {
+  if (!_galleryAvailable) return;
+  const root = _galleryRoot();
+  if (!root || !root.classList.contains("gallery-open")) return;
+  const strip = document.getElementById("piece-selector"); if (!strip) return;
+  const cards = _visibleLiveIndexes.map(i => _tabBtn(i)).filter(Boolean);
+  if (!cards.length) return;
+  cards.forEach(c => {
+    const im = c.querySelector("img.piece-tab-thumb");
+    if (im && im.complete && im.naturalWidth) im.style.aspectRatio = Math.max(.55, Math.min(1.8, im.naturalWidth / im.naturalHeight)).toFixed(3);
+  });
+  const cols = _galleryCols();
+  const colEls = [];
+  strip.replaceChildren();
+  for (let k = 0; k < cols; k++) { const d = document.createElement("div"); d.className = "gcol"; strip.appendChild(d); colEls.push(d); }
+  cards.forEach(c => {
+    if (c.style.display === "none") { colEls[0].appendChild(c); return; }
+    let k = 0, min = Infinity;
+    colEls.forEach((el, j) => { const h = el.offsetHeight; if (h < min) { min = h; k = j; } });
+    colEls[k].appendChild(c);
+  });
+  _glCols = cols;
+  if (!strip._imgBound) {
+    strip._imgBound = true;
+    let t;
+    strip.addEventListener("load", (e) => {
+      const im = e.target;
+      if (im && im.classList && im.classList.contains("piece-tab-thumb")) { clearTimeout(t); t = setTimeout(_scheduleGalleryLayout, 200); }
+    }, true);
+  }
+}
 // </phase-js>
 
 function _setTabSoldState(i, sold, bidText = "") {
@@ -4939,10 +5117,11 @@ function _liveOrderIndexOf(idx) {
 }
 
 function activeAuctionOrder() {
-  const orderIdx = _liveOrderIndexOf(_activeIdx);
+  const list = _navIndexes();
+  const orderIdx = _navOrderIndexOf(_activeIdx, list);
   return {
     current: orderIdx >= 0 ? orderIdx + 1 : _activeIdx + 1,
-    total: _visibleLiveIndexes.length || _auctions.length || 1,
+    total: list.length || _auctions.length || 1,
     orderIdx,
   };
 }
@@ -4962,11 +5141,12 @@ function updateAuctionNav(isBusy = _auctionSwitching) {
 
 function switchAuctionStep(delta) {
   if (_auctionSwitching) return;
+  const list = _navIndexes();
   const { orderIdx, total } = activeAuctionOrder();
   if (orderIdx < 0 || total <= 1) return;
   const nextOrderIdx = orderIdx + delta;
   if (nextOrderIdx < 0 || nextOrderIdx >= total) return;
-  _switchAuction(_visibleLiveIndexes[nextOrderIdx]);
+  _switchAuction(list[nextOrderIdx]);
 }
 
 function _visibleUpcomingIndexes() {
