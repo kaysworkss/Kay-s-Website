@@ -222,8 +222,9 @@ function sanitisePiece(p) {
     publicUsdHardCap:  p.publicUsdHardCap != null && isFinite(parseFloat(p.publicUsdHardCap)) && parseFloat(p.publicUsdHardCap) > 0
       ? parseFloat(p.publicUsdHardCap)
       : null,
-    category:     String(p.category || "").trim().slice(0, 80),
-    collection:   String(p.collection || "").trim().slice(0, 80),
+    // Collector-facing grouping: category (e.g. "painting", "sculpture") and an optional set name.
+    category:     String(p.category     || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 40),
+    setName:      String(p.setName      || "").trim().slice(0, 80),
     artTitle:     String(p.artTitle     || "").slice(0, 200),
     artArtist:    String(p.artArtist    || "").slice(0, 200),
     // Long-form HTML (rich text from the admin editor). 50k chars allows for
@@ -346,8 +347,6 @@ module.exports = async function handler(req, res) {
       publicUsdHardCap: body.publicUsdHardCap != null && isFinite(parseFloat(body.publicUsdHardCap)) && parseFloat(body.publicUsdHardCap) > 0
         ? parseFloat(body.publicUsdHardCap)
         : null,
-      category:         String(body.category || "").trim().slice(0, 80),
-      collection:       String(body.collection || "").trim().slice(0, 80),
       artTitle:         String(body.artTitle         || "").slice(0, 200),
       artArtist:        String(body.artArtist        || "").slice(0, 200),
       artAbout:         String(body.artAbout         || "").slice(0, 50000),
