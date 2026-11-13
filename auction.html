@@ -960,6 +960,11 @@ body {
   .gcol { gap:10px; }
   .gallery-back { padding:8px 12px; }
 }
+.piece-tab-bidnote { font-family:'Crimson Pro',serif; font-size:.72rem; font-style:italic; text-transform:none; letter-spacing:0; color:var(--text-muted); line-height:1.2; margin-top:-2px; }
+.piece-tab-bidnote:empty { display:none; }
+.piece-pair-badge { display:inline-flex; background:rgba(201,153,58,0.12); border-color:rgba(201,153,58,.35); color:var(--gold); }
+.piece-pair-badge.chain-eth { background:rgba(126,160,214,.12); border-color:rgba(126,160,214,.45); color:#7ea0d6; }
+.piece-pair-badge.chain-tez { background:rgba(169,139,224,.12); border-color:rgba(169,139,224,.45); color:#a98be0; }
 /* </phase-css> */
 .voice-player { display:flex; align-items:center; gap:8px; min-width:150px; }
 .voice-play { width:26px; height:26px; border-radius:50%; border:1px solid rgba(196,132,90,.45); background:rgba(196,132,90,.12); color:var(--clay); cursor:pointer; font-size:.6rem; flex-shrink:0; padding:0; line-height:1; }
@@ -1062,8 +1067,6 @@ body {
   cursor: pointer;
 }
 .mode-toggle-bar .series-back-link { align-self:center; }
-.live-overview-links { display:flex; align-items:center; gap:12px; }
-#view-live:not(.gallery-open) .live-overview-links { display:none; }
 .swipe-hint {
   display: none;
   margin-top: 10px;
@@ -2266,10 +2269,7 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 22px 0; }
 
   <!-- Mode toggle bar -->
   <div class="mode-toggle-bar">
-    <div class="live-overview-links">
-      <a href="/apoti-olowe" class="series-back-link"><span>&larr;</span> Àpótí Ọlọ́wẹ̀</a>
-      <a href="/hall-of-fame" class="series-back-link">Hall of Fame</a>
-    </div>
+    <a href="/apoti-olowe" class="series-back-link"><span>&larr;</span> Àpótí Ọlọ́wẹ̀</a>
     <div class="mode-tabs">
       <button class="mode-tab active" id="tab-collector" onclick="setMode('collector')">Collector view</button>
       <button class="mode-tab" id="tab-auctioneer" onclick="setMode('auctioneer')" style="display:none">Auctioneer mode</button>
@@ -4499,7 +4499,7 @@ async function _buildPieceSelector() {
       : `<div class="piece-tab-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:18px">◈</div>`;
 
     const pairBadge = pairKey && ethIdx >= 0 && tezIdx >= 0
-      ? `<span class="piece-tab-sold-badge" style="display:inline-flex;background:rgba(201,153,58,0.12);border-color:rgba(201,153,58,.35);color:var(--gold)">ETH / XTZ</span>`
+      ? `<span class="piece-tab-sold-badge piece-pair-badge" id="tab-pair-${i}">ETH / XTZ</span>`
       : "";
 
     btn.innerHTML = `
@@ -4508,6 +4508,7 @@ async function _buildPieceSelector() {
         ${_tagText ? `<div class="piece-tab-cat">${_esc(_tagText)}</div>` : ""}
         <div class="piece-tab-title">${slot.artTitle || "Piece " + (i + 1)}</div>
         <div class="piece-tab-bid" id="tab-bid-${i}">—</div>
+        <div class="piece-tab-bidnote" id="tab-bidnote-${i}"></div>
         <div class="piece-tab-phase"><span class="piece-phase-tag"></span><span class="piece-phase-time"></span></div>
         <div class="piece-tab-footer">
           <span class="piece-tab-live-dot" id="tab-dot-${i}"></span>
@@ -4522,6 +4523,7 @@ async function _buildPieceSelector() {
     // Pieces with no entry token are free-for-all from the start; gated pieces
     // (either half of a pair) show "Checking…" until the contract answers.
     _setTabPhase(i, _phaseGateName(slot) ? { phase: "pending", endsAtMs: 0 } : { phase: "open", endsAtMs: 0 });
+    if (!_isManualSold(slot, i)) _applyPairPrice(i, slot, null);
   }
   _tabPollRetries = 0;
   setTimeout(_resolvePendingTabs, 8000);
@@ -4606,6 +4608,7 @@ function _setTabPhase(i, info) {
   _slotPhase[idx] = info;
   btn.dataset.phase = info.phase;
   _renderTabPhase(idx);
+  if (btn.dataset.sold !== "1") _applyPairPrice(idx, _auctions[idx], info.phase);
   _renderPhaseFilter();
 }
 
@@ -5031,14 +5034,71 @@ function _layoutGallery() {
     }, true);
   }
 }
+
+// ── Prices on the cards ──────────────────────────────────────────────────────
+// Single auction: read from the contract (current bid, else the starting bid).
+// Paired auction: the USD cap set in the admin for the piece's phase.
+function _fmtEthShort(wei) {
+  const n = parseFloat(ethers.formatEther(wei));
+  if (!isFinite(n)) return "—";
+  return (n >= 1 ? n.toFixed(3) : n.toFixed(4)).replace(/\.?0+$/, "") + " ETH";
+}
+function _fmtXtzShort(mutez) { return (mutez / 1_000_000).toFixed(2).replace(/\.?0+$/, "") + " XTZ"; }
+
+// Live bids seen on each half of a cross-chain pair: { pairKey: { eth, tez } }
+let _pairLive = {};
+function _recordPairLive(pk, chain, bid) {
+  (_pairLive[pk] = _pairLive[pk] || {})[chain] = bid || null;
+}
+// The chain holding the active bid (if both somehow have one, the larger in USD wins).
+function _pairLiveBid(pk) {
+  const e = _pairLive[pk] || {};
+  if (e.eth && e.tez) {
+    const ue = _ethUsd() ? e.eth.amount * _ethUsd() : null;
+    const ut = _xtzUsd() ? e.tez.amount * _xtzUsd() : null;
+    return (ue != null && ut != null && ut > ue) ? e.tez : e.eth;
+  }
+  return e.eth || e.tez || null;
+}
+function _pairRepIdx(slot) {
+  const pk = _pairKeyForSlot(slot);
+  return pk ? _visibleLiveIndexes.find(j => _pairKeyForSlot(_auctions[j]) === pk) : undefined;
+}
+function _setPairChain(idx, chain) {
+  const b = document.getElementById("tab-pair-" + idx); if (!b) return;
+  b.classList.toggle("chain-eth", chain === "eth");
+  b.classList.toggle("chain-tez", chain === "tez");
+  b.textContent = chain === "eth" ? "ETH" : chain === "tez" ? "XTZ" : "ETH / XTZ";
+}
+// Paired auction: the live bid once there is one (in the active chain), otherwise the USD cap.
+function _pairCardPrice(slot, phase) {
+  const pk = _pairKeyForSlot(slot);
+  if (!pk) return null;
+  const live = _pairLiveBid(pk);
+  if (live) return { text: live.text, note: "Current bid", chain: live.chain };
+  const key = phase === "patron" ? "holder" : phase === "open" ? "public" : null;
+  const cap = _usdHardCapForPair(pk, slot, key);
+  return cap ? { text: _fmtUsd(cap), note: "Starting at", chain: null } : null;
+}
+function _applyPairPrice(idx, slot, phase) {
+  const pc = _pairCardPrice(slot, phase);
+  if (!pc) return false;
+  const card = _tabBtn(idx);
+  if (card && card.dataset.sold === "1") return true;   // a sold card stays sold
+  _setTabSoldState(idx, false, pc.text, pc.note);
+  _setPairChain(idx, pc.chain);
+  return true;
+}
 // </phase-js>
 
-function _setTabSoldState(i, sold, bidText = "") {
+function _setTabSoldState(i, sold, bidText = "", note = "") {
   const _tb = _tabBtn(i);
   if (_tb && (_tb.dataset.sold === "1") !== !!sold) { _tb.dataset.sold = sold ? "1" : "0"; _renderPhaseFilter(); }
   const bidEl  = document.getElementById("tab-bid-"  + i);
   const soldEl = document.getElementById("tab-sold-" + i);
   const dotEl  = document.getElementById("tab-dot-"  + i);
+  const noteEl = document.getElementById("tab-bidnote-" + i);
+  if (noteEl) noteEl.textContent = sold ? "" : (note || "");
   if (sold) {
     if (bidEl)  bidEl.style.display  = "none";
     if (soldEl) soldEl.style.display = "";
@@ -5072,11 +5132,18 @@ async function _pollOneTab(slot, i) {
       const s       = await c.auctionState();
       _setTabPhase(i, _ethPhaseFromState(s, slot));
       const bid     = s[6]; // _highestBid
+      const nextBid = s[7]; // minimum next bid (the starting bid while there are no bids)
       const settled = s[2]; // _settled
+      const _pk = _pairKeyForSlot(slot);
       if (manualSold || settled) {
+        if (_pk) _recordPairLive(_pk, "eth", null);
         _setTabSoldState(i, true);
       } else {
-        _setTabSoldState(i, false, bid > 0n ? ethers.formatEther(bid) + " ETH" : "—");
+        if (_pk) _recordPairLive(_pk, "eth", bid > 0n ? { chain: "eth", amount: parseFloat(ethers.formatEther(bid)), text: _fmtEthShort(bid) } : null);
+        if (_applyPairPrice(i, slot, (_slotPhase[i] || {}).phase)) { /* pair: live bid or dollar cap */ }
+        else if (bid > 0n)     _setTabSoldState(i, false, _fmtEthShort(bid), "Current bid");
+        else if (nextBid > 0n) _setTabSoldState(i, false, _fmtEthShort(nextBid), "Starting bid");
+        else                   _setTabSoldState(i, false, "—");
       }
       return;
     }
@@ -5092,11 +5159,20 @@ async function _pollOneTab(slot, i) {
     _setTabPhase(i, _tezosPhaseFromAuction(slot, auction));
 
     if (manualSold || auction.settled || auction.cancelled) {
+      { const _spk = _pairKeyForSlot(slot); if (_spk) _recordPairLive(_spk, "tez", null); }
       _setTabSoldState(i, true);
     } else {
-      const mutez = auction.highestBidMutez > 0 ? auction.highestBidMutez : auction.minNextBidMutez;
-      const xtz   = mutez > 0 ? (mutez / 1_000_000).toFixed(2).replace(/\.?0+$/, "") + " XTZ" : "—";
-      _setTabSoldState(i, false, xtz);
+      const _pk = _pairKeyForSlot(slot);
+      if (_pk) _recordPairLive(_pk, "tez", auction.highestBidMutez > 0 ? { chain: "tez", amount: auction.highestBidMutez / 1_000_000, text: _fmtXtzShort(auction.highestBidMutez) } : null);
+      // The card of a pair belongs to its Ethereum half, so a Tezos bid is shown there
+      const _card = _tabBtn(i) ? i : _pairRepIdx(slot);
+      if (_pk && _card !== undefined && _applyPairPrice(_card, slot, (_slotPhase[_card] || {}).phase)) {
+        /* pair: live bid or dollar cap shown on the pair's card */
+      } else {
+        const mutez = auction.highestBidMutez > 0 ? auction.highestBidMutez : auction.minNextBidMutez;
+        const xtz   = mutez > 0 ? _fmtXtzShort(mutez) : "—";
+        _setTabSoldState(i, false, xtz, mutez > 0 ? (auction.highestBidMutez > 0 ? "Current bid" : "Starting bid") : "");
+      }
     }
   }
 }
