@@ -1288,6 +1288,20 @@ function _buildPieceForm(idx) {
           style="margin-top:0"/>
       </div>
       <div class="field-hint">Lock to close the room. The message above will be shown to collectors instead of the input.</div>
+    </div>
+    <div class="field">
+      <label>Test auction</label>
+      <div class="chat-lock-row">
+        <button type="button"
+          class="chat-lock-toggle ${d.testOnly ? 'on' : ''}"
+          id="${_pieceFieldId(idx,'testOnlyToggle')}"
+          onclick="toggleTestOnly(${idx})"></button>
+        <span class="chat-lock-label ${d.testOnly ? 'on' : ''}" id="${_pieceFieldId(idx,'testOnlyLabel')}">
+          ${d.testOnly ? '🧪 Test only — hidden from public' : 'Public'}
+        </span>
+        <input type="hidden" id="${_pieceFieldId(idx,'testOnly')}" value="${d.testOnly ? 'true' : 'false'}"/>
+      </div>
+      <div class="field-hint">When on, this piece is removed from the public config. Only someone who unlocks test mode on the auction page (secret keystroke / corner taps / ?test link, plus your access code) can see it. Set status to Live to test bidding.</div>
     </div>`;
 }
 
@@ -1332,6 +1346,17 @@ function toggleChatLock(idx) {
   if (label)   { label.classList.toggle('on', next); label.textContent = next ? '🔒 Chat locked' : 'Chat open'; }
   if (hidden)  hidden.value = next ? 'true' : 'false';
   if (msgWrap) msgWrap.classList.toggle('show', next);
+}
+
+function toggleTestOnly(idx) {
+  const next   = !(_pieces[idx].testOnly || false);
+  _pieces[idx].testOnly = next;
+  const toggle = document.getElementById(_pieceFieldId(idx, 'testOnlyToggle'));
+  const label  = document.getElementById(_pieceFieldId(idx, 'testOnlyLabel'));
+  const hidden = document.getElementById(_pieceFieldId(idx, 'testOnly'));
+  if (toggle) toggle.classList.toggle('on', next);
+  if (label)  { label.classList.toggle('on', next); label.textContent = next ? '🧪 Test only — hidden from public' : 'Public'; }
+  if (hidden) hidden.value = next ? 'true' : 'false';
 }
 
 function _renderPieceTabs() {
@@ -1756,13 +1781,13 @@ document.addEventListener("keyup", (e) => {
 
 function _savePieceFormValuesRaw(idx) {
   if (idx < 0 || idx >= _pieces.length) return;
-  const fields = ["chain","contractAddr","marketplaceAddr","marketplaceAuctionId","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","usdHardCap","holderUsdHardCap","publicUsdHardCap","category","setName","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","chapterLink","chapterLinkLabel","launchDate","status","chatLocked","chatLockMsg"];
+  const fields = ["chain","contractAddr","marketplaceAddr","marketplaceAuctionId","tezosContractAddr","tezosAuctionId","tezosNetwork","tezosRpcUrl","crossChainPairKey","usdHardCap","holderUsdHardCap","publicUsdHardCap","category","setName","artTitle","artArtist","artAbout","artYear","artMedium","artImage","gateName","gateLink","chapterLink","chapterLinkLabel","launchDate","status","chatLocked","chatLockMsg","testOnly"];
   fields.forEach(f => {
     const el = document.getElementById(_pieceFieldId(idx, f));
     if (!el) return;
     if (f === "artAbout") {
       _pieces[idx][f] = _rteSanitize(el.innerHTML || "").trim();
-    } else if (f === "chatLocked") {
+    } else if (f === "chatLocked" || f === "testOnly") {
       _pieces[idx][f] = el.value === "true";
     } else if (f === "usdHardCap" || f === "holderUsdHardCap" || f === "publicUsdHardCap") {
       const v = parseFloat(el.value);

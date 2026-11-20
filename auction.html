@@ -2721,11 +2721,26 @@ async function loadConfig() {
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
+  // Test mode: a stored access code asks the server for the hidden test piece too.
+  let testCode = "";
+  try { testCode = localStorage.getItem("kw_test_code") || ""; } catch (_) {}
   try {
-    const res  = await fetch(AUCTION_API, { signal: controller.signal });
+    const res  = await fetch(testCode ? AUCTION_API + "?test=1" : AUCTION_API, {
+      signal: controller.signal,
+      ...(testCode ? { headers: { "X-Test-Code": testCode }, cache: "no-store" } : {}),
+    });
     if (!res.ok) throw new Error("Auction configuration could not be loaded.");
     const json = await res.json();
     if (!json.ok || !json.config) throw new Error("Auction configuration is unavailable.");
+    if (testCode) {
+      if (json.testAccess) {
+        window.__kwTestMode = true;
+        document.dispatchEvent(new Event("kw-test-mode"));
+      } else {
+        // Code was changed or revoked — drop it and carry on as a normal visitor.
+        try { localStorage.removeItem("kw_test_code"); } catch (_) {}
+      }
+    }
     return json.config;
   } catch (e) {
     console.warn("Could not load auction config from API:", e);
@@ -5421,7 +5436,7 @@ async function _ccPopulateChooserPrices(pairKey) {
       const ethUsdNow = _ethUsd();
       if (hardCap && ethUsdNow) {
         // Hard cap set — back-calculate ETH from the fixed USD value
-        const ethFromCap = (hardCap / ethUsdNow).toFixed(4).replace(/\.?0+$/, "");
+        const ethFromCap = _ethCeil4Str(hardCap / ethUsdNow);
         if (ethPriceEl) ethPriceEl.textContent = ethFromCap + " ETH";
         if (ethSubEl)   ethSubEl.textContent   = "\u2248 " + _fmtUsd(hardCap);
       } else if (hardCap) {
@@ -5441,7 +5456,7 @@ async function _ccPopulateChooserPrices(pairKey) {
     } catch(e) { console.warn("Ethereum chooser read:", e); }
   } else if (hardCap && _ethUsd()) {
     // No ETH contract but hard cap is set — still show cap-derived ETH
-    const ethFromCap = (hardCap / _ethUsd()).toFixed(4).replace(/\.?0+$/, "");
+    const ethFromCap = _ethCeil4Str(hardCap / _ethUsd());
     if (ethPriceEl) ethPriceEl.textContent = ethFromCap + " ETH";
     if (ethSubEl)   ethSubEl.textContent   = "\u2248 " + _fmtUsd(hardCap);
     if (ethStatusEl) ethStatusEl.style.display = "";
@@ -7108,7 +7123,7 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
       const _ethStatMin     = _ethStatPending
         ? "\u2026"
         : (_ethStatHardCap && _ethStatUsdNow && noBids)
-          ? (_ethStatHardCap / _ethStatUsdNow).toFixed(4).replace(/\.?0+$/, "") + " ETH"
+          ? _ethCeil4Str(_ethStatHardCap / _ethStatUsdNow) + " ETH"
           : ethers.formatEther(mnb) + " ETH";
       const _ethStatSub     = _ethStatPending
         ? _pricePendingLabel()
@@ -7160,6 +7175,26 @@ async function refreshState(runToken = _switchToken, contract = auctionContract)
   } catch(e) { console.error("refreshState:", e); }
 }
 
+// ─── ETH floor helpers: always round UP (never below the real floor) ─────────
+// Works in wei (BigInt) so the result can never land under the on-chain minimum
+// or the USD-anchored floor because of float rounding.
+const _ETH_4DP_STEP = 10n ** 14n;
+function _fmtEthCeil4(wei) {
+  const up = ((wei + _ETH_4DP_STEP - 1n) / _ETH_4DP_STEP) * _ETH_4DP_STEP;
+  return ethers.formatEther(up).replace(/\.?0+$/, "");
+}
+function _ethCeil4Str(eth) {                       // ETH float -> string, rounded up to 4 dp
+  return _fmtEthCeil4(BigInt(Math.ceil(eth * 1e18)));
+}
+function _ethBidFloorStr(capMinEth) {              // max(on-chain minimum, USD floor), rounded up
+  let wei = minNextBid;
+  if (capMinEth && isFinite(capMinEth) && capMinEth > 0) {
+    const capWei = BigInt(Math.ceil(capMinEth * 1e18));
+    if (capWei > wei) wei = capWei;
+  }
+  return _fmtEthCeil4(wei);
+}
+
 function updateBidHint() {
   const currLabel = document.getElementById("bid-currency-label");
   const bidInput  = document.getElementById("bid-input");
@@ -7191,9 +7226,7 @@ function updateBidHint() {
   const _ethUsdNow  = _ethUsd();
   const _ethCapMin  = (_ethHardCap && _ethUsdNow) ? _ethHardCap / _ethUsdNow : null;
   // Use whichever is higher: hard cap or on-chain minimum
-  const _ethFloor   = _ethCapMin
-    ? Math.max(_ethCapMin, parseFloat(min)).toFixed(4).replace(/\.?0+$/, "")
-    : min;
+  const _ethFloor   = _ethCapMin ? _ethBidFloorStr(_ethCapMin) : min;
   const _ethUsdHint = _ethHardCap ? ` · ≈ ${_fmtUsd(_ethHardCap)}` : "";
   const _ethPending = _ethAnchorPending(); // hard cap set but no price yet — don't prefill a wrong floor
   document.getElementById("bid-hint").textContent = _ethPending
@@ -7233,7 +7266,7 @@ function onBidInput() {
   const ok = document.getElementById("eligibility").classList.contains("yes");
   // The floor isn't known until the price feed answers on a USD-anchored auction
   const floorUnknown = isTezos ? _xtzAnchorPending(window._ccEthReserveWei ?? null) : _ethAnchorPending();
-  document.getElementById("bid-btn").disabled = floorUnknown || val < min || !ok || !isLive;
+  document.getElementById("bid-btn").disabled = floorUnknown || val < min - 1e-12 || !ok || !isLive;
 }
 
 // ─── Countdown ────────────────────────────────────────────────────────────────
@@ -7842,6 +7875,36 @@ async function submitPrivateOffer() {
   }
 }
 
+// ─── Send a bid through the wallet ───────────────────────────────────────────
+// The page does NOT estimate gas or read the balance. It hands the wallet the
+// destination, calldata and exact bid value, and the wallet simulates, estimates
+// gas and shows its own warnings (e.g. "Not enough gas") before anything is signed.
+// One guard stays on the page: the auction contract must exist on the network
+// the wallet is currently on, so a bid can never be sent on the wrong network.
+async function _sendBidViaWallet(wei) {
+  const slot = _activeCfg();
+  const prov = signer.provider || provider;
+  let to, data;
+  if (_isMarketplaceAuctionSlot(slot)) {
+    to   = slot.marketplaceAddr;
+    data = new ethers.Interface(MARKETPLACE_ABI).encodeFunctionData("bid", [_marketplaceAuctionId(slot)]);
+  } else {
+    to   = slot.contractAddr;
+    data = new ethers.Interface(AUCTION_ABI).encodeFunctionData("bid", []);
+  }
+  const code = await prov.getCode(to);
+  if (!code || code === "0x") {
+    throw Object.assign(new Error("Auction contract not found on the wallet's network"), { code: "WRONG_NETWORK" });
+  }
+  const hash = await prov.send("eth_sendTransaction", [{
+    from:  signerAddress,
+    to,
+    data,
+    value: ethers.toBeHex(wei),
+  }]);
+  return { hash, prov };
+}
+
 async function placeBid() {
   if (_auctionReadinessBlocked) return;
   if (_slotChain(_activeCfg()) === "tezos") return placeTezosBid();
@@ -7858,9 +7921,10 @@ async function placeBid() {
   btn.innerHTML = `<div class="spin"></div> Submitting…`;
 
   try {
-    const tx = await auctionContract.connect(signer).bid({ value: wei });
-    notify("info","Bid submitted",`Tx: ${tx.hash.slice(0,12)}…`);
-    await tx.wait();
+    const { hash, prov } = await _sendBidViaWallet(wei);
+    notify("info","Bid submitted",`Tx: ${hash.slice(0,12)}…`);
+    const receipt = await prov.waitForTransaction(hash, 1, 5 * 60 * 1000);
+    if (!receipt || receipt.status === 0) throw new Error("The bid transaction failed on-chain. Your ETH was not spent on the bid.");
     notify("ok","Bid confirmed",`Your bid of ${amt} ETH is now leading`);
     document.getElementById("bid-input").value = "";
     const _confirmedBid = { bidder: signerAddress, amount: wei };
@@ -7870,7 +7934,19 @@ async function placeBid() {
     await checkEligibility();
     aucOnBid(_confirmedBid, true);
   } catch(e) {
-    notify("err","Bid failed", e?.reason || e?.shortMessage || e?.message || "Transaction failed");
+    const _em = String(e?.shortMessage || e?.message || "");
+    if (e?.code === "WRONG_NETWORK") {
+      notify("err", "Wrong network", "The auction contract wasn't found on the network your wallet is using. Switch your wallet to the network this auction runs on, then try again.");
+    } else if (e?.code === "ACTION_REJECTED" || e?.code === 4001 || /user (rejected|denied)/i.test(_em)) {
+      notify("info", "Cancelled", "The wallet request was closed. No bid was placed.");
+    } else if (e?.code === "TIMEOUT") {
+      notify("info", "Still confirming", "The bid is taking a while to confirm. Check your wallet; the page will update once it lands.");
+      refreshState().catch(() => {});
+    } else if (e?.code === "INSUFFICIENT_FUNDS" || /insufficient funds/i.test(_em)) {
+      notify("err", "Not enough ETH", "This wallet can't cover the bid plus the network fee.");
+    } else {
+      notify("err","Bid failed", e?.reason || e?.shortMessage || e?.message || "Transaction failed");
+    }
   } finally {
     btn.disabled = false;
     btn.innerHTML = "Place bid";
@@ -10111,5 +10187,141 @@ function simReset() {
     <div class="wc-modal-body" id="wc-modal-body"></div>
   </div>
 </div>
+
+<!-- ══ TEST ACCESS — hidden payment-test auction ═══════════════════════════
+     Unlock paths:  desktop → type the TRIGGER word anywhere on the page
+                    mobile  → tap the bottom-left corner 5 times quickly
+                    either  → open /auction?test   (bookmark/home-screen friendly)
+                              or /auction?test=YOURCODE to unlock in one step
+     The real gate is server-side (TEST_ACCESS_CODE); these only open the prompt. -->
+<style>
+#kwt-hotspot{position:fixed;left:0;bottom:0;width:56px;height:56px;z-index:9500;background:transparent;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#kwt-pill{position:fixed;left:50%;bottom:calc(10px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:9400;display:flex;align-items:center;gap:10px;padding:6px 6px 6px 14px;border-radius:999px;background:#c9993a;color:#1e1410;font:600 .62rem/1 'Montserrat',sans-serif;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 4px 18px rgba(0,0,0,.45);white-space:nowrap}
+#kwt-pill[hidden],#kwt-modal[hidden]{display:none}
+#kwt-pill button{font:inherit;letter-spacing:inherit;text-transform:inherit;border:0;border-radius:999px;padding:8px 12px;background:#1e1410;color:#e8d5b0;cursor:pointer}
+#kwt-modal{position:fixed;inset:0;z-index:9700;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,10,6,.82);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);cursor:auto}
+#kwt-modal *{cursor:auto}
+.kwt-card{width:100%;max-width:340px;background:var(--bg-alt,#2a1c14);border:1px solid var(--rule,rgba(196,132,90,.25));border-radius:4px;padding:22px 20px;color:var(--text,#e8d5b0);font-family:'Crimson Pro',serif}
+.kwt-eyebrow{font:600 .6rem/1 'Montserrat',sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--gold,#c9993a);margin-bottom:10px}
+.kwt-card p{font-size:1rem;line-height:1.4;margin-bottom:14px;color:var(--text-muted,#9a8070)}
+#kwt-input{width:100%;font-size:16px;padding:12px;border-radius:3px;border:1px solid var(--rule,rgba(196,132,90,.25));background:rgba(255,255,255,.05);color:var(--text,#e8d5b0);outline:none;margin-bottom:12px}
+#kwt-input:focus{border-color:var(--clay,#c4845a)}
+.kwt-row{display:flex;gap:10px}
+.kwt-row button{flex:1;font:600 .66rem/1 'Montserrat',sans-serif;letter-spacing:.14em;text-transform:uppercase;padding:14px 10px;border-radius:3px;border:1px solid var(--rule,rgba(196,132,90,.25));background:transparent;color:var(--text,#e8d5b0);cursor:pointer}
+.kwt-row button.primary{background:var(--accent,#9e4f2e);border-color:var(--accent,#9e4f2e);color:#f5ede0}
+#kwt-msg{min-height:1.2em;margin-top:12px;font-size:.95rem;color:var(--text-muted,#9a8070)}
+#kwt-msg.err{color:#d98a6a}
+</style>
+<div id="kwt-hotspot" aria-hidden="true"></div>
+<div id="kwt-pill" hidden><span>🧪 Test mode</span><button type="button" id="kwt-exit">Exit</button></div>
+<div id="kwt-modal" hidden role="dialog" aria-modal="true" aria-labelledby="kwt-title">
+  <div class="kwt-card">
+    <div class="kwt-eyebrow" id="kwt-title">Test access</div>
+    <p>Enter your access code to open the hidden test auction.</p>
+    <input id="kwt-input" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="Access code" aria-label="Access code"/>
+    <div class="kwt-row">
+      <button type="button" id="kwt-cancel">Cancel</button>
+      <button type="button" id="kwt-go" class="primary">Unlock</button>
+    </div>
+    <div id="kwt-msg" role="status" aria-live="polite"></div>
+  </div>
+</div>
+<script>
+(function () {
+  var TRIGGER = "testmode";            // desktop: type this anywhere (outside a text field)
+  var TAPS = 5, TAP_WINDOW = 3000;     // mobile: taps in the bottom-left corner, within this many ms
+  var KEY = "kw_test_code";
+  var API = "/api/auction-config?test=1";
+
+  var modal = document.getElementById("kwt-modal");
+  var input = document.getElementById("kwt-input");
+  var msg   = document.getElementById("kwt-msg");
+  var go    = document.getElementById("kwt-go");
+  var pill  = document.getElementById("kwt-pill");
+
+  function store(code) { try { localStorage.setItem(KEY, code); } catch (_) {} }
+  function clear()     { try { localStorage.removeItem(KEY); } catch (_) {} }
+  function setMsg(t, err) { msg.textContent = t || ""; msg.className = err ? "err" : ""; }
+
+  function openModal() {
+    setMsg("");
+    input.value = "";
+    modal.hidden = false;
+    input.focus();                              // inside the user's tap, so mobile keyboards open
+    setTimeout(function () { input.focus(); }, 60);
+  }
+  function closeModal() { modal.hidden = true; input.blur(); }
+
+  async function attempt(code) {
+    code = String(code || "").trim();
+    if (!code) { setMsg("Enter the code.", true); return; }
+    go.disabled = true; setMsg("Checking…");
+    try {
+      var r = await fetch(API, { headers: { "X-Test-Code": code }, cache: "no-store" });
+      var j = await r.json();
+      if (!j || !j.ok || !j.testAccess) { setMsg("Code not recognised.", true); return; }
+      store(code);
+      var pieces = (j.config && j.config.auctions) || [];
+      var t = pieces.filter(function (p) { return p && p.testOnly && p.pieceId; })[0];
+      if (!t) { setMsg("Code accepted, but no piece is marked Test only yet. Set one in the admin and save."); return; }
+      location.href = location.pathname + "?piece=" + encodeURIComponent(t.pieceId);
+    } catch (e) {
+      setMsg("Could not reach the server. Try again.", true);
+    } finally { go.disabled = false; }
+  }
+
+  go.addEventListener("click", function () { attempt(input.value); });
+  input.addEventListener("keydown", function (e) { if (e.key === "Enter") attempt(input.value); });
+  document.getElementById("kwt-cancel").addEventListener("click", closeModal);
+  modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !modal.hidden) closeModal(); });
+
+  // Desktop: typed sequence
+  var buf = "", lastKey = 0;
+  document.addEventListener("keydown", function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey || !e.key || e.key.length !== 1) return;
+    var t = e.target, tag = t && t.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t && t.isContentEditable)) return;
+    var now = Date.now();
+    if (now - lastKey > 2000) buf = "";
+    lastKey = now;
+    buf = (buf + e.key.toLowerCase()).slice(-TRIGGER.length);
+    if (buf === TRIGGER) { buf = ""; openModal(); }
+  });
+
+  // Mobile: tap the bottom-left corner several times
+  var taps = [];
+  document.getElementById("kwt-hotspot").addEventListener("click", function () {
+    var now = Date.now();
+    taps = taps.filter(function (t) { return now - t < TAP_WINDOW; });
+    taps.push(now);
+    if (taps.length >= TAPS) { taps = []; openModal(); }
+  });
+
+  // Exit test mode
+  document.getElementById("kwt-exit").addEventListener("click", function () {
+    clear(); location.href = location.pathname;
+  });
+
+  // Show the pill once the page's config load confirms a valid stored code
+  function showPill() { pill.hidden = false; }
+  if (window.__kwTestMode) showPill();
+  document.addEventListener("kw-test-mode", showPill);
+
+  // ?test / ?test=CODE
+  try {
+    var qs = new URLSearchParams(location.search);
+    if (qs.has("test")) {
+      var code = qs.get("test");
+      qs.delete("test");
+      var q = qs.toString();
+      history.replaceState(null, "", location.pathname + (q ? "?" + q : "") + location.hash);
+      if (code) { openModal(); input.value = code; attempt(code); }
+      else openModal();
+    }
+  } catch (_) {}
+})();
+</script>
+
 </body>
 </html>
