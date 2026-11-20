@@ -8,6 +8,10 @@
  * Storage: Supabase table `site_config` (one jsonb row, key = "auction_config").
  *          Vercel Edge Config is only read as a fallback until the first save
  *          after migrating, so existing configs keep working.
+ * Test-only pieces: a piece saved with testOnly:true is stripped from every public
+ *          response. It is only returned to the admin page, or to a request that
+ *          sends a matching X-Test-Code header (env TEST_ACCESS_CODE, min 6 chars;
+ *          unset = test access disabled).
  * Env vars: SUPABASE_SERVICE_ROLE_KEY (also accepts SUPABASE_SERVICE_KEY or
  *          SUPABASE_SECRET_KEY; secret, server-side only), ADMIN_PASSWORD
  *          Optional: SUPABASE_URL (defaults to the project URL below)
@@ -16,6 +20,7 @@
  */
 
 const { createClient } = require("@vercel/edge-config");
+const crypto = require("crypto");
 
 const EC_KEY = "auction_config";
 const MAX_PIECES = 200;
@@ -173,7 +178,7 @@ function isAuthorised(req) {
 function cors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Admin-Password");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Admin-Password, X-Test-Code");
 }
 
 // ── Sanitisers ────────────────────────────────────────────────────────────────
@@ -241,6 +246,8 @@ function sanitisePiece(p) {
     launchDate:   String(p.launchDate   || "").slice(0, 50),
     status:       ["live","upcoming","off",""].includes(p.status) ? (p.status || "") : "",
     chatLocked:   p.chatLocked === true,
+    // Hidden from the public config; only reachable with the test access code.
+    testOnly:     p.testOnly === true,
     chatLockMsg:  String(p.chatLockMsg  || "").slice(0, 300),
   };
 }
@@ -283,6 +290,40 @@ const DEFAULT_CONFIG = {
   savedAt:          null,
 };
 
+// ── Test-only pieces (hidden payment-test auction) ───────────────────────────
+
+const LEGACY_PIECE_FIELDS = [
+  "chain","contractAddr","marketplaceAddr","marketplaceAuctionId","tezosContractAddr",
+  "tezosAuctionId","tezosNetwork","tezosRpcUrl","tezosRpcUrls","crossChainPairKey",
+  "usdHardCap","holderUsdHardCap","publicUsdHardCap","artTitle","artArtist","artAbout",
+  "artYear","artMedium","artImage","gateName","gateLink",
+];
+
+function sha(v) { return crypto.createHash("sha256").update(String(v)).digest(); }
+
+// null = no code sent, true = valid, false = wrong (or test access not configured)
+function checkTestCode(req) {
+  const given = req.headers["x-test-code"];
+  if (given === undefined) return null;
+  const expected = String(process.env.TEST_ACCESS_CODE || "");
+  if (expected.length < 6) return false;           // fail closed
+  return crypto.timingSafeEqual(sha(String(given).trim()), sha(expected));
+}
+
+function withoutTestPieces(config) {
+  if (!config || !Array.isArray(config.auctions)) return config;
+  if (!config.auctions.some(p => p && p.testOnly === true)) return config;
+  const out = { ...config, auctions: config.auctions.filter(p => !(p && p.testOnly === true)) };
+  // The legacy single-piece fields mirror auctions[0]; blank them if that was a test piece,
+  // otherwise old readers would still see it.
+  if (config.auctions[0] && config.auctions[0].testOnly === true) {
+    LEGACY_PIECE_FIELDS.forEach(k => { out[k] = DEFAULT_CONFIG[k]; });
+  }
+  return out;
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 module.exports = async function handler(req, res) {
@@ -295,17 +336,30 @@ module.exports = async function handler(req, res) {
   if (req.method === "GET") {
     // Public readers send no admin header. When the admin page supplies one,
     // validate it so the login gate cannot accept a bad/empty password.
-    if (req.headers["x-admin-password"] !== undefined && !isAuthorised(req)) {
+    const adminRead = req.headers["x-admin-password"] !== undefined;
+    if (adminRead && !isAuthorised(req)) {
       return res.status(401).json({ ok: false, error: "Unauthorized" });
     }
     try {
       const stored = await readStored();
-      const config = stored || DEFAULT_CONFIG;
-      // Admin reads are always fresh; public reads may be cached for a few seconds.
-      res.setHeader("Cache-Control", req.headers["x-admin-password"] !== undefined
+      let config = stored || DEFAULT_CONFIG;
+
+      const testCheck = checkTestCode(req);        // null | true | false
+      const testAccess = !adminRead && testCheck === true;
+      if (!adminRead && !testAccess) {
+        if (testCheck === false) await sleep(600); // slow down guessing
+        config = withoutTestPieces(config);
+      }
+
+      // Admin and test requests are never cached (a cached public copy would hide
+      // the test piece; a cached test copy would leak it). Public reads may be
+      // cached for a few seconds.
+      const query = req.query || {};
+      const personal = adminRead || testCheck !== null || query.test !== undefined;
+      res.setHeader("Cache-Control", personal
         ? "no-store"
         : "public, s-maxage=5, stale-while-revalidate=30");
-      return res.status(200).json({ ok: true, config });
+      return res.status(200).json({ ok: true, config, testAccess });
     } catch (err) {
       console.error("GET error:", err);
       return res.status(500).json({ ok: false, error: "Failed to read config" });
