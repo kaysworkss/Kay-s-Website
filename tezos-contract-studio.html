@@ -12,7 +12,7 @@
 <div class="pane hidden" id="inspect"><div class="links" id="explorerLinks"></div><div class="row" style="margin-top:18px"><div class="field"><label>Auction ID for state query</label><input id="inspectId" value="0"></div><div><button class="primary" id="refresh">Refresh live state</button></div></div><div class="status" id="state">No query made yet.</div><section id="auctionBrowser"><h2>Reusable-contract auctions</h2><p class="sub">Load the selected contract’s auction big-map to see each auction ID, token name, FA2 contract, token ID and status. “Prepare cancel” fills the cancellation form; it does not send an operation.</p><button class="primary" id="loadAuctions">Load auctions</button><div class="status hidden" id="auctionLoadStatus"></div><div class="auction-list" id="auctionList"></div></section></div>
 <div class="pane hidden" id="recreate"><div id="ethDeploy"><p>This deploys the included <b>KayPhasedAuction</b> clean-room template: ERC-721/1155 custody, scheduled and gated phases, public reserve, buy-now, anti-sniping, platform fee and pull refunds.</p><div class="row"><div class="field"><label>Fee recipient</label><input id="feeRecipient" placeholder="0x…"></div><div class="field"><label>Fee (basis points, max 1000)</label><input id="feeBps" value="250"></div></div><label class="check"><input type="checkbox" id="auditAck"> I understand this template is unaudited and should be tested and independently reviewed before valuable assets are used.</label><label class="check"><input type="checkbox" id="mainnetAck"> I accept the currently connected Ethereum network as the deployment target.</label><button class="primary" id="reviewDeploy">Review deployment</button></div><div id="tezDeploy" class="hidden"><p>This fetches the selected contract's live Micheline script, supplies fresh empty storage, and asks your Tezos wallet to originate it. The entry-point layout is preserved.</p><div class="row"><div class="field"><label>Admin / fee recipient</label><input id="tezAdmin" placeholder="tz1…"></div><div class="field"><label>Fee percent (contract storage unit)</label><input id="tezFee" value="250"></div></div><label class="check"><input type="checkbox" id="tezAck"> I reviewed the source contract and accept origination fees and the risk of reusing its on-chain script.</label><button class="primary" id="reviewTezDeploy">Review origination</button></div><div class="status" id="deployStatus">No deployment prepared.</div></div></section><div class="foot">Live Tezos storage data is provided via TzKT API. Wallet signatures remain entirely in MetaMask or Beacon-compatible wallets.</div></main>
 <div class="modal hidden" id="modal"><div><div class="eyebrow">Final review</div><h2 id="modalTitle">Review</h2><pre id="modalBody"></pre><p class="danger">Check the network, contract, entry point, arguments, amount and wallet gas/storage estimate before confirming.</p><div class="actions"><button class="primary" id="confirm">Continue to wallet</button><button class="secondary" id="close">Cancel</button></div></div></div>
-<script src="./taquito-bundle-ipfs.js"></script><script src="./contract-artifact.js"></script><script src="./ethers.umd.min.js"></script>
+<script src="./contract-artifact.js"></script><script src="./ethers.umd.min.js"></script>
 <script type="module">
 let TezosToolkit,MichelsonMap,BeaconWallet;const NetworkType={MAINNET:'mainnet'};
 const contracts=[{id:'eth-one',chain:'eth',name:'Ethereum · individual auction 1',address:'0x00e99184c575a8e42342c06c256552158dabc594',kind:'individual'},{id:'eth-two',chain:'eth',name:'Ethereum · individual auction 2',address:'0x81484457bd1cc4bfe471010f31293e3e841ca6a3',kind:'individual'},{id:'eth-three',chain:'eth',name:'Ethereum · individual auction 3',address:'0x855328e637e6899189d37f07c7fd37245d5bcd87',kind:'individual'},{id:'eth-many',chain:'eth',name:'Ethereum · reusable phased auction',address:'0x64ecd16Cb8899B94df428578889506D3AcaF3423',kind:'reusable'},{id:'tez-one',chain:'tez',name:'Tezos · reusable auction V1',address:'KT1FKpxrc9TnJNySgJUKMieq7iXhPrqWHSvB',kind:'tezos1'},{id:'tez-two',chain:'tez',name:'Tezos · reusable phased auction V2',address:'KT1TMzH1rzCattJUhcFP4TqQV48jiAK4dKpT',kind:'tezos2'}];
@@ -27,7 +27,9 @@ function syncActionFields(){const a=$('#action').value;$('#jsonWrap').classList.
 function sync(){const acts=actionSets[selected.kind];$('#action').innerHTML=acts.map(a=>`<option>${a}</option>`).join('');$('#payload').value=sample();syncActionFields();$('#ethDeploy').classList.toggle('hidden',selected.chain!=='eth');$('#tezDeploy').classList.toggle('hidden',selected.chain!=='tez');$('#explorerLinks').innerHTML=`<a target="_blank" href="${explorer()}">Open ${selected.chain==='eth'?'Etherscan':'TzKT'} ↗</a>`;status(`Selected ${selected.name}\n${selected.address}`)}
 async function mainnetCode(address){if(window.ethereum){const p=new ethers.BrowserProvider(window.ethereum);const n=await p.getNetwork();if(n.chainId===1n)return await p.getCode(address)}const urls=['https://ethereum-rpc.publicnode.com','https://eth.llamarpc.com','https://rpc.ankr.com/eth'];let last;for(const url of urls)try{const p=new ethers.JsonRpcProvider(url,1,{staticNetwork:true});const code=await Promise.race([p.getCode(address),new Promise((_,reject)=>setTimeout(()=>reject(Error('RPC timeout')),8000))]);if(code)return code}catch(e){last=e}throw Error(`Ethereum mainnet RPC unavailable${last?.message?`: ${last.message}`:''}`)}
 async function loadCustom(){const box=$('#loadStatus');box.classList.remove('hidden');try{if(!window.ethers)throw Error('The local Ethereum library did not load. Keep ethers.umd.min.js beside this page.');const address=$('#customAddress').value.trim();if(!ethers.isAddress(address))throw Error('Enter a valid Ethereum contract address.');box.textContent='Reading deployed bytecode from Ethereum mainnet…';const code=(await mainnetCode(address)).toLowerCase();if(code==='0x')throw Error('No contract bytecode exists at this address on Ethereum mainnet.');const missing=individualSignatures.filter(sig=>!code.includes(ethers.id(sig).slice(2,10).toLowerCase()));if(missing.length)throw Error(`Compatibility check failed. Missing core selectors: ${missing.join(', ')}`);const existing=contracts.find(c=>c.address.toLowerCase()===address.toLowerCase());selected=existing||{id:`custom-${address.toLowerCase()}`,chain:'eth',name:'Ethereum · loaded individual auction',address:ethers.getAddress(address),kind:'individual',custom:true};if(!existing)contracts.unshift(selected);renderCards();sync();box.textContent=`Compatible core individual-auction interface detected.\nLoaded ${selected.address}\n\nSelector matching cannot prove identical internal behavior—review every wallet transaction.`}catch(e){box.textContent=`Not loaded: ${e.message}`}}
-async function loadTezosLibraries(){if(TezosToolkit&&BeaconWallet)return;let b=window.TaquitoBundle;if(b&&b.default)b=b.default;if(!b||!b.TezosToolkit||!b.BeaconWallet)throw Error('taquito-bundle-ipfs.js did not load. Make sure it is deployed next to this page and the page was hard-refreshed.');TezosToolkit=b.TezosToolkit;MichelsonMap=b.MichelsonMap;BeaconWallet=b.BeaconWallet}
+function loadScriptOnce(url){return new Promise((res,rej)=>{const t=document.createElement('script');t.src=url;t.async=true;t.onload=res;t.onerror=()=>rej(Error('Could not load '+url+'. If this page has a Content-Security-Policy, allow https://unpkg.com in script-src.'));document.head.appendChild(t)})}
+let tzLibsLoading;
+async function loadTezosLibraries(){if(TezosToolkit)return;if(!(window.taquito&&window.taquito.TezosToolkit)){tzLibsLoading=tzLibsLoading||loadScriptOnce('https://unpkg.com/@taquito/taquito@20.1.0/dist/taquito.min.js').catch(e=>{tzLibsLoading=null;throw e});await tzLibsLoading}if(!(window.taquito&&window.taquito.TezosToolkit))throw Error('Taquito did not load.');TezosToolkit=window.taquito.TezosToolkit;MichelsonMap=window.taquito.MichelsonMap}
 async function loadWalletConnect(){if(wcProvider)return wcProvider;const mod=await import('https://esm.sh/@walletconnect/ethereum-provider@2.17.2');const EthereumProvider=mod.EthereumProvider||mod.default;wcProvider=await EthereumProvider.init({projectId:WC_PROJECT_ID,chains:[1],showQrModal:true,metadata:{name:"Kay's Works Contract Studio",description:'Auction contract administration',url:location.href,icons:[]}});return wcProvider}
 const TEZOS_MAINNET_RPC='https://rpc.tzkt.io/mainnet';
 /* ---- Temple direct dApp bridge (ported from tezos-nft-creator.html) ---- */
@@ -38,74 +40,96 @@ function templePageRequest(payload,timeoutMs=60000){return new Promise((resolve,
 function templeDirectAvailable(ms=800){return new Promise(resolve=>{let timer;const fin=ok=>{clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ok)};function onMsg(evt){const d=evt.data;if(evt.source===window&&d&&d.type==='TEMPLE_PAGE_RESPONSE'&&d.payload==='PONG')fin(true)}window.addEventListener('message',onMsg);window.postMessage({type:'TEMPLE_PAGE_REQUEST',payload:'PING'},'*');timer=setTimeout(()=>fin(false),ms)})}
 function templeDirectProvider(permission){const resolveParams=async p=>typeof p==='function'?p():p;const resolveInput=async v=>{while(typeof v==='function')v=v();if(v&&typeof v.then==='function')v=await v;return v};const unwrap=v=>{if(!v||Array.isArray(v))return v;if(Array.isArray(v.opParams))return v.opParams;if(Array.isArray(v.contents))return v.contents;if(v.operation&&Array.isArray(v.operation.contents))return v.operation.contents;if(v.params)return v.params;return v};const clean=async ops=>{const r=unwrap(await resolveInput(ops));const arr=Array.isArray(r)?r:[r];return makeCloneable(arr).map(op=>{if(!op)return op;if(!op.kind&&op.code&&(op.init||op.storage))op.kind='origination';if(!op.kind&&(op.destination||op.to||op.contract||op.address)){op.kind='transaction';if(!op.destination)op.destination=op.to||op.contract||op.address;if(op.amount===undefined)op.amount='0'}return op}).filter(op=>op&&op.kind)};return{getPKH:()=>Promise.resolve(permission.pkh),mapTransferParamsToWalletParams:resolveParams,mapOriginateParamsToWalletParams:resolveParams,mapDelegateParamsToWalletParams:resolveParams,sendOperations:async ops=>{const opParams=await clean(ops);if(!opParams.length)throw Error('Temple adapter received no valid operation parameters: '+oneLineJson(makeCloneable(ops),520));const resp=await templePageRequest({type:'OPERATION_REQUEST',sourcePkh:permission.pkh,opParams},120000);const h=extractOpHash(resp);if(typeof h!=='string')throw Error('Temple returned no operation hash: '+oneLineJson(resp,520));return h},sign:async bytes=>{const sig=await templePageRequest({type:'SIGN_REQUEST',sourcePkh:permission.pkh,payload:bytes},90000);return{bytes,sig,prefixSig:sig,sbytes:bytes+sig}}}}
 async function connectTempleDirect(){const permission=await templePageRequest({type:'PERMISSION_REQUEST',network:'mainnet',appMeta:{name:"Kay's Works Contract Studio"},force:true},90000);if(!permission||!permission.pkh)throw Error('Temple did not return an account.');wallet=templeDirectProvider(permission);tezos=new TezosToolkit(TEZOS_MAINNET_RPC);tezos.setWalletProvider(wallet);setTezAdmin(permission.pkh);markConnected(permission.pkh);notify(`Connected ${permission.pkh}\nTezos mainnet · Temple`)}
-/* ---- Tezos wallet connection: Temple extension (desktop) or Beacon (phones, QR, other wallets) ----
-   Modelled on auction.html: same Beacon client options, no custom RPC sent to the wallet for mainnet,
-   a retry with a clean reset, and the session is reused so each transaction no longer re-pairs. */
+/* ---- Tezos wallet connection: Temple extension (desktop) or the Beacon modal (phones, QR, other wallets) ----
+   Same approach as auction.html: the standalone @airgap/beacon-sdk 4.6.2 DAppClient opens the Beacon modal
+   directly, and Taquito's TezosToolkit sends through a small Beacon-backed wallet provider.
+   (Taquito's bundled BeaconWallet is no longer used for connecting.) */
 const TZ_WC_PROJECT_ID='f9a3c36a9a9b8d60f77e64a5a4b8ef7c';   // same WalletConnect key auction.html gives Beacon
-const TZ={wallet:null,busy:null};
+const TZ={client:null,loading:null,busy:null};
 const onMobile=()=>/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-function makeTezosBeaconWallet(){
-  // Beacon's getDAppClientInstance() is a singleton, so these options are fixed by the first call: create once.
-  return new BeaconWallet({
+const tzTimeout=(p,ms,msg)=>new Promise((res,rej)=>{const t=setTimeout(()=>rej(Error(msg)),ms);Promise.resolve(p).then(v=>{clearTimeout(t);res(v)},e=>{clearTimeout(t);rej(e)})});
+function findBeaconSdk(){for(const s of [window.beacon,window.walletbeacon,window.beaconSdk,window.airgapBeaconSdk])if(s&&typeof s.DAppClient==='function')return s;return null}
+function loadBeaconSdk(){
+  const ex=findBeaconSdk();if(ex)return Promise.resolve(ex);
+  if(TZ.loading)return TZ.loading;
+  TZ.loading=loadScriptOnce('https://unpkg.com/@airgap/beacon-sdk@4.6.2/dist/walletbeacon.min.js').then(()=>{const sdk=findBeaconSdk();if(!sdk)throw Error('Beacon SDK loaded but has no DAppClient.');return sdk}).catch(e=>{TZ.loading=null;throw e});
+  return TZ.loading;
+}
+function beaconMatrixNodes(sdk){const region=(sdk.Regions&&sdk.Regions.EUROPE_WEST)||'EUROPE_WEST';return{[region]:[1,2,3,4,5,6,7,8].map(n=>`beacon-node-${n}.octez.io`)}}
+function makeBeaconClient(sdk){
+  return new sdk.DAppClient({
     name:"Kay's Works Contract Studio",
-    appUrl:location.origin,
     iconUrl:location.origin+'/images/kayslogo1.png',
-    preferredNetwork:NetworkType.MAINNET,
-    network:{type:NetworkType.MAINNET},                        // no rpcUrl for mainnet, like auction.html
+    appUrl:location.origin,
+    network:{type:(sdk.NetworkType&&sdk.NetworkType.MAINNET)||'mainnet'},   // type only, no custom RPC (as auction.html)
     featuredWallets:['temple','kukai','umami','trust'],
+    matrixNodes:beaconMatrixNodes(sdk),
+    scopes:[(sdk.PermissionScope&&sdk.PermissionScope.OPERATION_REQUEST)||'operation_request',(sdk.PermissionScope&&sdk.PermissionScope.SIGN)||'sign'],
     walletConnectOptions:{projectId:TZ_WC_PROJECT_ID}
   });
 }
-async function resetTezosBeacon(w){
-  if(!w)return;const c=w.client||w;
-  for(const task of [()=>c.removeAllAccounts?.(),()=>c.clearActiveAccount?.(),()=>c.setActiveAccount?.()]){try{await task()}catch(e){}}
+async function resetBeaconClient(client){
+  if(!client)return;
+  for(const task of [()=>client.removeAllAccounts?.(),()=>client.clearActiveAccount?.(),()=>client.setActiveAccount?.(),()=>client.destroy?.()]){
+    try{await tzTimeout(task(),3000,'reset step timed out')}catch(e){}      // a stuck reset step must never block the modal
+  }
+}
+const tezosOpHash=v=>{if(!v)return'';if(typeof v==='string'){const m=v.match(/\bo[1-9A-HJ-NP-Za-km-z]{50,}\b/);return m?m[0]:v}return v.transactionHash||v.opHash||v.hash||''};
+/* Taquito wallet provider backed by the Beacon client. Amounts: Taquito passes tez unless mutez:true; Beacon wants mutez. */
+function beaconDirectProvider(client,address){
+  const run=async p=>typeof p==='function'?p():p;
+  const mutez=(a,isMutez)=>String(Math.round(isMutez?Number(a||0):Number(a||0)*1e6));
+  return{
+    client,
+    getPKH:async()=>address,
+    mapTransferParamsToWalletParams:async f=>{const p=await run(f);const op={kind:'transaction',destination:p.to||p.destination,amount:mutez(p.amount,p.mutez)};const par=p.parameter||p.parameters;if(par)op.parameters=par;return op},
+    mapOriginateParamsToWalletParams:async f=>{const p=await run(f);return{kind:'origination',script:{code:p.code,storage:p.init!==undefined?p.init:p.storage},balance:p.balance===undefined?'0':mutez(p.balance,p.mutez)}},
+    mapDelegateParamsToWalletParams:async f=>{const p=await run(f);return{kind:'delegation',delegate:p.delegate}},
+    sendOperations:async ops=>{
+      const operationDetails=(await Promise.all(ops.map(run))).filter(Boolean);
+      if(!operationDetails.length)throw Error('Beacon received no operation payload.');
+      const hash=tezosOpHash(await client.requestOperation({operationDetails}));
+      if(!hash)throw Error('Beacon approved the operation but returned no operation hash.');
+      return hash;
+    },
+    sign:async bytes=>{const r=await client.requestSignPayload({signingType:'micheline',payload:bytes,sourceAddress:address});const sig=(r&&(r.signature||r.sig))||'';return{bytes,sig,prefixSig:sig,sbytes:bytes+sig}}
+  };
 }
 async function tezosSessionAlive(){
   if(!tezos||!wallet)return false;
   const c=wallet.client;
-  if(c?.getActiveAccount){try{return !!(await c.getActiveAccount())}catch(e){return false}}
-  return true;                                                 // Temple direct bridge has no client to ask
+  if(c&&c.getActiveAccount){try{return !!(await tzTimeout(c.getActiveAccount(),4000,'timeout'))}catch(e){return false}}
+  return true;                                                  // Temple direct bridge has no client to ask
 }
-/* Ask the wallet for permission. Resolves from requestPermissions(), or earlier if the active account
-   shows up while the page was in the background (mobile browsers can pause the Beacon relay socket).
-   Only time the page is visible counts towards the timeout. */
-function requestBeaconPermission(w){
-  const c=w.client;
-  return new Promise((resolve,reject)=>{
-    let done=false,visible=0,last=Date.now();
-    const finish=(fn,v)=>{if(done)return;done=true;clearInterval(poll);document.removeEventListener('visibilitychange',onVis);fn(v)};
-    const onVis=()=>{last=Date.now()};
-    const poll=setInterval(async()=>{
-      const now=Date.now();if(!document.hidden)visible+=now-last;last=now;
-      try{const a=await c.getActiveAccount?.();if(a?.address)return finish(resolve,a.address)}catch(e){}
-      if(visible>=150000)finish(reject,Error('The wallet did not respond. Tap Connect mobile wallet / QR and try again.'))
-    },1000);
-    document.addEventListener('visibilitychange',onVis);
-    w.requestPermissions().then(async()=>{const a=await c.getActiveAccount?.();a?.address?finish(resolve,a.address):finish(reject,Error('Beacon connected but returned no address.'))},e=>finish(reject,e));
-  });
-}
+const requestBeaconPermission=client=>tzTimeout(client.requestPermissions(),120000,'The wallet did not respond in time. Tap Connect mobile wallet / QR and try again.');
 async function connectTezos(forceBeacon){
-  if(TZ.busy)return TZ.busy;                                   // ignore double taps / parallel callers
+  if(TZ.busy)return TZ.busy;                                    // ignore double taps
   TZ.busy=(async()=>{
+    if(forceBeacon||onMobile())loadBeaconSdk().catch(()=>{});   // download in parallel with Taquito
     await loadTezosLibraries();
-    if(!forceBeacon&&await tezosSessionAlive())return;         // already connected: reuse it
-    // Temple extension probe: desktop only. On a phone it cannot exist, and its 800 ms wait would delay Beacon.
-    if(!forceBeacon&&!onMobile()&&await templeDirectAvailable()){
+    if(!forceBeacon&&await tezosSessionAlive())return;          // already connected: reuse it (no re-pairing per transaction)
+    if(!forceBeacon&&!onMobile()&&await templeDirectAvailable()){   // Temple extension probe: desktop only
       notify('Opening Temple… approve the connection in the Temple window.');
       await connectTempleDirect();return;
     }
-    notify(onMobile()?'Opening wallet options… choose your wallet app, approve there, then return to this tab.':'Opening Beacon wallet options… if nothing appears, allow popups for this site.');
-    if(!TZ.wallet)TZ.wallet=makeTezosBeaconWallet();
-    let w=TZ.wallet,addr;
-    await resetTezosBeacon(w);                                 // always pair fresh, as the old code did
-    try{addr=await requestBeaconPermission(w)}
+    notify('Loading Beacon…');
+    const sdk=await tzTimeout(loadBeaconSdk(),20000,'The Beacon SDK took too long to load.');
+    notify(onMobile()?'Opening Beacon… choose your wallet, approve there, then return to this tab.':'Opening Beacon… choose your wallet in the popup.');
+    let client=TZ.client;
+    if(!client)client=TZ.client=makeBeaconClient(sdk);
+    else if(forceBeacon){await resetBeaconClient(client);client=TZ.client=makeBeaconClient(sdk)}
+    let permission;
+    try{permission=await requestBeaconPermission(client)}
     catch(first){
-      if(/reject|denied|abort|cancel/i.test(first?.message||''))throw first;   // the user said no: don't re-prompt
-      await resetTezosBeacon(w);
-      addr=await requestBeaconPermission(w);                   // one clean retry, like auction.html
+      if(/abort|denied|cancel|closed|timed out|did not respond/i.test((first&&first.message)||''))throw first;   // user said no, or it timed out: don't loop
+      await resetBeaconClient(client);client=TZ.client=makeBeaconClient(sdk);
+      permission=await requestBeaconPermission(client);         // one clean retry, as auction.html does
     }
+    const account=await client.getActiveAccount?.();
+    const addr=(permission&&permission.address)||(account&&account.address);
+    if(!addr)throw Error('Beacon connected but returned no address.');
     tezos=new TezosToolkit(TEZOS_MAINNET_RPC);
-    wallet=w;
+    wallet=beaconDirectProvider(client,addr);
     tezos.setWalletProvider(wallet);
     setTezAdmin(addr);markConnected(addr);
     notify(`Connected ${addr}\nTezos mainnet · Beacon`);
