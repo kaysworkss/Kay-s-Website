@@ -4658,7 +4658,9 @@ function _pairOtherSlot(slot) {
 function _slotCategory(slot) { return _slug((slot && slot.category) || (_pairOtherSlot(slot) || {}).category || ""); }
 function _slotSetName(slot)  { return String((slot && slot.setName) || (_pairOtherSlot(slot) || {}).setName || "").trim(); }
 function _setKeyOf(slot)     { return _slug(_slotSetName(slot)); }
-function _chipGroupOf(slot)  { return _setKeyOf(slot) ? "sets" : (_slotCategory(slot) || "other"); }
+// A piece's category chip is always its real category. Being in a set does NOT move it out of
+// "Sculptures" (sets are sculptures); the "Sculpture sets" chip is a separate view that counts sets.
+function _chipGroupOf(slot)  { return _slotCategory(slot) || (_setKeyOf(slot) ? "sculpture" : "other"); }
 function _titleCase(k)       { return String(k).charAt(0).toUpperCase() + String(k).slice(1).replace(/-/g, " "); }
 function _catLabel(k)        { return _CAT_PLURAL[k] || _titleCase(k); }
 function _cardTagText(slot) {
@@ -4681,8 +4683,10 @@ function _groupBySet(list) {
 }
 
 function _cardMatches(x, f) {
-  if (f.cat !== "all" && x.grp !== f.cat) return false;
-  if (f.cat === "sets" && f.set && x.set !== f.set) return false;
+  if (f.cat === "sets") {
+    if (!x.set) return false;                       // the sets view only holds pieces that belong to a set
+    if (f.set && x.set !== f.set) return false;
+  } else if (f.cat !== "all" && x.grp !== f.cat) return false;
   if (f.ph !== "all") {
     if (x.ph === "pending" || !x.ph) return true;   // phase not known yet — keep it visible
     return !x.sold && x.ph === f.ph;                 // sold pieces have no phase to match
@@ -4701,6 +4705,8 @@ function _renderPhaseFilter() {
 
   // ── which category chips are worth showing
   const present = new Set(info.map(x => x.grp));
+  const hasSets = info.some(x => x.set);
+  if (hasSets) present.add("sets");               // virtual chip: counted per set, not per piece
   const showCats = info.some(x => x.grp !== "other") && present.size >= 2;
   if (!showCats || (_catFilter !== "all" && !present.has(_catFilter))) { _catFilter = "all"; _setFilter = ""; }
   if (_catFilter !== "sets") _setFilter = "";
@@ -4714,14 +4720,18 @@ function _renderPhaseFilter() {
   if (catBox) {
     if (showCats) {
       const chips = [["all", "All"]].concat(groups.map(g => [g, _catLabel(g)]));
-      catBox.innerHTML = chips.map(([k, l]) =>
-        chip("cat-chip", "data-cat", k, l, info.filter(x => _cardMatches(x, { cat: k, set: "", ph: _phaseFilter })).length, _catFilter === k)).join("");
+      catBox.innerHTML = chips.map(([k, l]) => {
+        const hit = info.filter(x => _cardMatches(x, { cat: k, set: "", ph: _phaseFilter }));
+        // "Sculpture sets" counts how many sets there are (e.g. 1), not how many pieces sit inside them (e.g. 5)
+        const n = k === "sets" ? new Set(hit.map(x => x.set)).size : hit.length;
+        return chip("cat-chip", "data-cat", k, l, n, _catFilter === k);
+      }).join("");
       catBox.classList.add("show");
     } else { catBox.innerHTML = ""; catBox.classList.remove("show"); }
   }
   if (setBox) {
     if (showCats && _catFilter === "sets") {
-      const keys = [...new Set(info.filter(x => x.grp === "sets").map(x => x.set))];
+      const keys = [...new Set(info.filter(x => x.set).map(x => x.set))];
       const cnt = k => info.filter(x => _cardMatches(x, { cat: "sets", set: k, ph: _phaseFilter })).length;
       setBox.innerHTML = chip("set-chip", "data-set", "", "All sets", cnt(""), _setFilter === "") +
         keys.map(k => chip("set-chip", "data-set", k, _setLabels[k] || k, cnt(k), _setFilter === k)).join("");
